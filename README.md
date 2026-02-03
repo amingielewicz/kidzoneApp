@@ -1,57 +1,105 @@
 # Aplikacja mobilna: Miejsca przyjazne dzieciom
 
-## Cel
-Aplikacja pomaga rodzicom wyszukiwać miejsca przyjazne małym dzieciom (place zabaw, kawiarnie i restauracje z kącikiem dla dzieci, sale zabaw itp.) w dużych miastach. Użytkownicy po zalogowaniu mogą dodawać nowe miejsca, edytować własne wpisy oraz komentować miejsca innych użytkowników.
+## Opis projektu
 
-## Plan funkcjonalny (MVP)
+Aplikacja mobilna dla rodziców, umożliwiająca szybkie wyszukiwanie i ocenianie miejsc przyjaznych małym dzieciom w dużych miastach (place zabaw, kawiarnie i restauracje z kącikiem dziecięcym, sale zabaw itp.).
+
+Użytkownicy po zalogowaniu mogą:
+
+* dodawać nowe miejsca,
+* edytować i usuwać własne wpisy,
+* komentować i oceniać miejsca dodane przez innych.
+
+Projekt skupia się na prostocie, geolokalizacji i realnej użyteczności w codziennym życiu rodzica.
+
+---
+
+## Zakres MVP
 
 ### 1. Uwierzytelnianie
-- Rejestracja i logowanie użytkowników.
-- Opcjonalnie logowanie federacyjne (np. Google).
+
+* Rejestracja i logowanie użytkowników (e‑mail/hasło).
+* Opcjonalne logowanie federacyjne (Google).
 
 ### 2. Wyszukiwanie i przeglądanie miejsc
-- Lista miejsc z filtrowaniem (typ miejsca, miasto, odległość, udogodnienia).
-- Widok szczegółów miejsca: opis, adres, godziny otwarcia, udogodnienia, średnia ocena.
-- Widok mapy (lista + mapa) oraz wyszukiwanie w pobliżu.
+
+* Lista miejsc z filtrowaniem:
+
+  * typ miejsca,
+  * miasto,
+  * odległość,
+  * udogodnienia.
+* Widok szczegółów miejsca:
+
+  * opis,
+  * adres,
+  * godziny otwarcia,
+  * udogodnienia,
+  * średnia ocena i liczba ocen.
+* Widok lista + mapa.
+* Wyszukiwanie miejsc w pobliżu użytkownika.
 
 ### 3. Dodawanie i edycja miejsc
-- Dodawanie nowych miejsc przez zalogowanych użytkowników.
-- Edycja i usuwanie wyłącznie przez autora wpisu.
-- Walidacja danych (np. nazwa, adres, typ, koordynaty).
+
+* Dodawanie nowych miejsc przez zalogowanych użytkowników.
+* Edycja i usuwanie wyłącznie przez autora wpisu.
+* Walidacja danych wejściowych (nazwa, adres, typ, koordynaty).
 
 ### 4. Komentarze i oceny
-- Dodawanie komentarzy przez zalogowanych użytkowników.
-- Wyświetlanie komentarzy w szczegółach miejsca.
-- System ocen (np. 1–5) z wyliczaną średnią.
-- Podstawowa moderacja (zgłoszenia, ukrywanie komentarzy).
 
-### 5. Geolokalizacja
-- Wyszukiwanie miejsc w pobliżu na podstawie GPS.
-- Sortowanie po odległości.
-- Geolokalizacja jest częścią MVP.
+* Dodawanie komentarzy przez zalogowanych użytkowników.
+* System ocen w skali 1–5.
+* Automatyczne wyliczanie średniej oceny.
+* Podstawowa moderacja:
 
-## Sugerowany stos technologiczny (Android)
+  * zgłaszanie nadużyć,
+  * możliwość ukrycia komentarzy.
+
+### 5. Geolokalizacja (element obowiązkowy MVP)
+
+* Pobieranie lokalizacji użytkownika (GPS).
+* Sortowanie miejsc po odległości.
+* Wyświetlanie miejsc na mapie.
+
+---
+
+## Stos technologiczny (Android)
 
 ### UI
-- **Jetpack Compose** — nowoczesny UI.
-- **Material 3** — spójny design.
+
+* **Jetpack Compose** – deklaratywne UI.
+* **Material 3** – spójny i nowoczesny design.
 
 ### Architektura
-- **MVVM** z warstwą Repozytorium.
-- **Hilt** — wstrzykiwanie zależności.
-- **Kotlin Coroutines + Flow** — asynchroniczność i reaktywność.
+
+* **MVVM** + warstwa Repozytorium.
+* **Hilt** – wstrzykiwanie zależności.
+* **Kotlin Coroutines + Flow** – asynchroniczność i reaktywność.
 
 ### Dane
-- **Room** — cache offline.
-- **Retrofit + OkHttp** — komunikacja z API.
-- **Kotlinx Serialization** lub **Moshi** — serializacja.
 
-### Usługi zewnętrzne (opcjonalnie)
-- **Firebase Authentication** — szybkie logowanie.
-- **Google Maps SDK / Maps Compose** — mapy.
-- **Firestore** (backend no‑code) **lub** własne API (np. Ktor/Spring).
-  - Uwaga: Firebase oferuje bezpłatny plan startowy, ale nie jest projektem open‑source.
-  - Jeśli wymagane jest rozwiązanie open‑source, rozważ Supabase (open‑source + darmowy tier) albo własny backend (np. Ktor/Spring) z bazą Postgres.
+* **Room** – cache offline.
+* **Retrofit + OkHttp** – komunikacja z API.
+* **Kotlinx Serialization** lub **Moshi** – serializacja danych.
+
+### Backend / usługi zewnętrzne
+
+* **Supabase** (rekomendowane):
+
+  * open‑source,
+  * darmowy tier,
+  * Auth + Postgres + Storage.
+
+Alternatywy:
+
+* Firebase (szybki start, brak open‑source),
+* własny backend: **Ktor** lub **Spring Boot** + **PostgreSQL**.
+
+### Mapy
+
+* **Google Maps SDK** / **Maps Compose**.
+
+---
 
 ## Model danych (przykład)
 
@@ -81,10 +129,19 @@ data class Comment(
     val rating: Int
 )
 
-enum class PlaceType { PLAYGROUND, CAFE, RESTAURANT, INDOOR_PLAYGROUND }
+enum class PlaceType {
+    PLAYGROUND,
+    CAFE,
+    RESTAURANT,
+    INDOOR_PLAYGROUND
+}
 ```
 
-## Przykładowa warstwa repozytorium
+---
+
+## Warstwa danych
+
+### Repozytorium
 
 ```kotlin
 interface PlacesRepository {
@@ -95,7 +152,7 @@ interface PlacesRepository {
 }
 ```
 
-## Przykładowy ViewModel
+### ViewModel (przykład)
 
 ```kotlin
 @HiltViewModel
@@ -104,15 +161,25 @@ class PlacesViewModel @Inject constructor(
 ) : ViewModel() {
 
     val places = repo.observePlaces()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            emptyList()
+        )
 
     fun addPlace(place: Place) {
-        viewModelScope.launch { repo.addPlace(place) }
+        viewModelScope.launch {
+            repo.addPlace(place)
+        }
     }
 }
 ```
 
-## UI: lista miejsc (Compose)
+---
+
+## UI (Jetpack Compose)
+
+### Lista miejsc
 
 ```kotlin
 @Composable
@@ -138,59 +205,70 @@ fun PlaceCard(place: Place) {
 }
 ```
 
+---
+
 ## Zasady dostępu i bezpieczeństwo
-- Edycja/usuwanie możliwe tylko przez autora wpisu (`authorId == request.auth.uid`).
-- Komentarze może dodawać każdy zalogowany użytkownik.
-- Oceny (1–5) przypisane do komentarza lub osobnej kolekcji (1 ocena na użytkownika i miejsce).
-- Podstawowy system zgłaszania nadużyć.
 
-## Etapy wdrożenia (propozycja)
-1. **MVP UI**: lista + szczegóły miejsca + mapa.
-2. **Logowanie**.
-3. **Dodawanie/edycja miejsc**.
-4. **Komentarze + oceny**.
-5. **Geolokalizacja (MVP)**.
-6. **Cache offline**.
-7. **Moderacja i rozwój funkcji społecznościowych**.
+* Edycja i usuwanie miejsca tylko przez autora wpisu:
+  `authorId == request.auth.uid`.
+* Komentarze dostępne dla każdego zalogowanego użytkownika.
+* Jedna ocena użytkownika na jedno miejsce.
+* Możliwość zgłaszania nadużyć.
 
-## Start od początku (proponowana ścieżka realizacji)
-Poniżej minimalny plan krok po kroku, aby wystartować projekt od zera i szybko dojść do działającego MVP.
+---
 
-### Krok 1: Decyzje startowe (MVP)
-- **Mapa + geolokalizacja**: tak (obowiązkowo).
-- **Komentarze + oceny**: tak (obowiązkowo).
-- **Zdjęcia**: nie na start.
-- **Backend**: **open‑source** (rekomendowane Supabase) lub własny backend (np. Ktor/Spring + Postgres).
+## Plan wdrożenia
 
-### Krok 2: Szkielet aplikacji (Android)
-- Utwórz nowy projekt w Android Studio z **Jetpack Compose**.
-- Dodaj podstawowe zależności:
-  - Compose + Material 3
-  - Hilt
-  - Coroutines + Flow
-  - Maps Compose
-  - Retrofit (jeśli własne API) lub klient Supabase
+### Etap 1: Decyzje MVP
 
-### Krok 3: Model danych i kontrakty API
-- Zdefiniuj modele `Place`, `Comment`, `PlaceType` (jak wyżej).
-- Przygotuj endpointy/kontrakty:
-  - `GET /places`
-  - `POST /places`
-  - `PATCH /places/{id}`
-  - `GET /places/{id}/comments`
-  - `POST /places/{id}/comments` (z oceną 1–5)
+* Mapa i geolokalizacja: **tak**.
+* Komentarze i oceny: **tak**.
+* Zdjęcia: **nie** (po MVP).
+* Backend: **Supabase** lub własne API.
 
-### Krok 4: Pierwsze ekrany MVP
-- **Lista miejsc** + filtracja.
-- **Szczegóły miejsca** z ocenami i komentarzami.
-- **Mapa** z pinami i wyszukiwaniem w pobliżu.
-- **Formularz dodawania miejsca**.
+### Etap 2: Szkielet aplikacji
 
-### Krok 5: Autoryzacja i reguły dostępu
-- Logowanie (np. e‑mail/hasło).
-- Edycja/usuń tylko własne miejsca.
-- Jeden użytkownik = jedna ocena na miejsce.
+* Nowy projekt Android (Jetpack Compose).
+* Konfiguracja Hilt, Coroutines, Material 3.
+* Integracja map.
 
-### Krok 6: Testy i walidacja
-- Testy jednostkowe repozytorium i ViewModel.
-- Walidacja danych wejściowych w formularzach.
+### Etap 3: API i modele
+
+* Definicja modeli danych.
+* Endpointy:
+
+  * `GET /places`
+  * `POST /places`
+  * `PATCH /places/{id}`
+  * `GET /places/{id}/comments`
+  * `POST /places/{id}/comments`
+
+### Etap 4: Ekrany MVP
+
+* Lista miejsc + filtry.
+* Szczegóły miejsca.
+* Mapa z pinami.
+* Formularz dodawania miejsca.
+
+### Etap 5: Autoryzacja
+
+* Logowanie użytkowników.
+* Reguły dostępu do edycji i ocen.
+
+### Etap 6: Testy i jakość
+
+* Testy jednostkowe repozytoriów i ViewModeli.
+* Walidacja formularzy.
+* Podstawowe testy UI.
+
+---
+
+## Status projektu
+
+MVP – w fazie projektowania / implementacji.
+
+Projekt nadaje się jako:
+
+* aplikacja produkcyjna,
+* projekt portfolio,
+* baza pod dalszą rozbudowę (zdjęcia, ulubione miejsca, powiadomienia).
