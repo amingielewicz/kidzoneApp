@@ -1,0 +1,23 @@
+{
+  "_comment": "Replace this file with the real google-services.json downloaded from Firebase Console (https://console.firebase.google.com). Save it as app/google-services.json. This template is committed only as a reference.",
+  "project_info": {
+    "project_number": "REPLACE_WITH_PROJECT_NUMBER",
+    "project_id": "REPLACE_WITH_PROJECT_ID",
+    "storage_bucket": "REPLACE_WITH_STORAGE_BUCKET"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "REPLACE_WITH_APP_ID",
+        "android_client_info": {
+          "package_name": "com.playword"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "REPLACE_WITH_API_KEY"
+        }
+      ]
+    }
+  ]
+}
