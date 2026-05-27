@@ -5,10 +5,12 @@ import android.annotation.SuppressLint
 import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,15 +20,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -34,6 +35,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,7 +45,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -53,7 +54,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.CameraPositionState
@@ -61,7 +61,8 @@ import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapType
 import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MapsComposeExperimentalApi
+import com.google.maps.android.compose.MarkerComposable
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.playground.domain.model.Place
@@ -89,22 +90,30 @@ private const val NEAR_ME_ZOOM = 14f
 /**
  * Ekran mapy z pinezkami miejsc.
  *
- *  - Markery generowane z [com.playground.domain.model.Place], kolor pinezki
- *    zgodny z [com.playground.presentation.common.CategoryStyle] (poprzez
- *    konwersję RGB → HSV hue dla `BitmapDescriptorFactory.defaultMarker`).
+ *  - Pinezki to [MarkerComposable] z maps-compose – każdy marker renderuje
+ *    okrągłą plakietkę w kolorze kategorii z ikonką tej kategorii w środku
+ *    (spójne z [com.playground.presentation.common.CategoryStyle], czyli
+ *    tym co user widzi na chipach / kartach miejsc).
  *  - Filtry na overlayu nad mapą: kategoria + przełącznik "Najlepiej oceniane".
- *  - FAB "Blisko mnie" – pyta o uprawnienie lokalizacji przy pierwszym użyciu,
- *    a po jego nadaniu animuje kamerę do bieżącej pozycji.
+ *  - Natywne kontrolki Maps SDK: przycisk "Moja lokalizacja" (top-right) i
+ *    zoom +/- (bottom-right) – żeby mapa wyglądała "po Google'owemu".
+ *    Kontrolki są przesunięte przez `contentPadding`, żeby nie wpadały pod
+ *    globalny `+` FAB z [com.playground.presentation.main.MainScreen].
+ *  - Permission ACCESS_FINE_LOCATION jest proszona automatycznie przy
+ *    pierwszym wejściu na ekran ([LaunchedEffect]) – natywny crosshair
+ *    pokaże się dopiero gdy `isMyLocationEnabled == true`.
  *  - Klik pinezki otwiera [ModalBottomSheet] z miniaturą + nazwą + adresem
  *    + przyciskiem "Zobacz szczegóły".
  *
  * Adnotacja [SuppressLint] – Lint nie potrafi prześledzić, że
  * `MapProperties.isMyLocationEnabled = locationPermissionGranted` jest
  * ustawiane tylko gdy uprawnienie faktycznie zostało nadane (sprawdzamy
- * w runtime).
+ * w runtime). [MapsComposeExperimentalApi] – wymagane przez
+ * `MarkerComposable`, oficjalna ścieżka renderowania custom contentu jako
+ * pinezki.
  */
 @SuppressLint("MissingPermission")
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class)
 @Composable
 fun MapScreen(
     onOpenPlaceDetails: (placeId: String) -> Unit,
@@ -116,7 +125,8 @@ fun MapScreen(
 
     // Trzymamy lokalnie, bo musimy reagować na nadanie uprawnienia bez
     // restartu ekranu. Wartość początkowa = stan systemowy w chwili pierwszej
-    // kompozycji (gdy user już raz zezwolił, FAB od razu działa bez dialogu).
+    // kompozycji (gdy user już raz zezwolił, native crosshair od razu jest
+    // widoczny bez dodatkowego dialogu).
     var locationPermissionGranted by remember { mutableStateOf(hasLocationPermission(context)) }
 
     val cameraPositionState = rememberCameraPositionState {
@@ -128,9 +138,20 @@ fun MapScreen(
     ) { granted ->
         locationPermissionGranted = granted
         if (granted) {
-            // User właśnie nadał uprawnienie z intencją "pokaż mnie", więc
-            // od razu centrujemy kamerę – inaczej musiałby kliknąć FAB drugi raz.
+            // Nadanie uprawnienia = jasny sygnał "chcę się znaleźć", więc
+            // sami centrujemy kamerę. Native crosshair user może później
+            // używać do "wróć do mnie" po przewinięciu mapy.
             scope.launch { recenterOnUser(context, cameraPositionState) }
+        }
+    }
+
+    // Auto-prośba o uprawnienie tylko jeśli go jeszcze nie mamy. Wchodząc
+    // na zakładkę "Mapa" user wyraża jasną intencję chęci zobaczenia siebie
+    // na mapie – timing dialogu jest naturalny. Jeśli wcześniej trwale
+    // odmówił, system po cichu zwróci `granted=false` bez UI.
+    LaunchedEffect(Unit) {
+        if (!locationPermissionGranted) {
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
@@ -146,29 +167,43 @@ fun MapScreen(
                 isMyLocationEnabled = locationPermissionGranted
             ),
             uiSettings = MapUiSettings(
-                // Wbudowany przycisk "my location" SDK byłby duplikatem naszego
-                // FAB – wyłączamy go, żeby nie nakładał się na overlay filtrów.
-                myLocationButtonEnabled = false,
-                zoomControlsEnabled = false,
+                // Natywny przycisk lokalizacji w prawym górnym rogu mapy –
+                // pojawia się dopiero gdy isMyLocationEnabled == true (czyli
+                // gdy permission jest granted, patrz LaunchedEffect powyżej).
+                myLocationButtonEnabled = true,
+                // Natywne +/- w prawym dolnym rogu mapy. contentPadding
+                // poniżej przesuwa je tak, by nie kolidowały z `+` FAB-em
+                // z MainScreena (też BottomEnd).
+                zoomControlsEnabled = true,
                 mapToolbarEnabled = false,
                 compassEnabled = true
             ),
+            // Native zoom controls + atrybucja Google'a domyślnie siedzą w
+            // prawym dolnym rogu canvasu mapy, czyli pod globalnym FAB-em
+            // "+" z MainScreena. Przesuwamy je o ok. wysokość FAB-a +
+            // bottom navigation, żeby były dostępne palcem.
+            //
+            // 96.dp ≈ 56 (FAB) + 16 (margin Scaffolda wokół FAB) + 24 (luz
+            // wizualny + bottom nav). Dobierane na oko, łatwo skorygować.
+            contentPadding = PaddingValues(bottom = 96.dp),
             // Tap w pustą część mapy = zamykamy bottom sheet (jeśli otwarty).
             onMapClick = { viewModel.onPlaceSelected(null) }
         ) {
             state.places.forEach { place ->
-                Marker(
+                MarkerComposable(
+                    keys = arrayOf(place.id, place.category),
                     state = MarkerState(LatLng(place.latitude, place.longitude)),
                     title = place.name,
                     snippet = place.address.takeIf { it.isNotBlank() },
-                    icon = BitmapDescriptorFactory.defaultMarker(place.category.toMarkerHue()),
-                    // true = consume zdarzenie. Domyślny info-window ma uboższe
-                    // info niż nasz sheet, więc nadpisujemy zachowanie własnym.
+                    // true = consume zdarzenie. Domyślny info-window ma
+                    // uboższe info niż nasz sheet, więc nadpisujemy własnym.
                     onClick = {
                         viewModel.onPlaceSelected(place.id)
                         true
                     }
-                )
+                ) {
+                    CategoryMarkerIcon(category = place.category)
+                }
             }
         }
 
@@ -184,24 +219,6 @@ fun MapScreen(
                 .padding(8.dp)
         )
 
-        // --- FAB "Blisko mnie" w prawym dolnym rogu ---
-        FloatingActionButton(
-            onClick = {
-                if (locationPermissionGranted) {
-                    scope.launch { recenterOnUser(context, cameraPositionState) }
-                } else {
-                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                }
-            },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        ) {
-            Icon(Icons.Filled.MyLocation, contentDescription = "Blisko mnie")
-        }
-
         // --- Stany pomocnicze: spinner przy pierwszym ładowaniu i błąd ---
         if (state.isLoading && state.places.isEmpty()) {
             CircularProgressIndicator(
@@ -212,8 +229,9 @@ fun MapScreen(
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    // Nie chcemy zasłaniać FAB-a, więc bottom padding > FAB.
-                    .padding(start = 16.dp, end = 88.dp, bottom = 16.dp),
+                    // Bottom padding > FAB + bottom nav, żeby błąd nie
+                    // chował się pod kontrolkami.
+                    .padding(start = 16.dp, end = 88.dp, bottom = 96.dp),
                 color = MaterialTheme.colorScheme.errorContainer,
                 shape = MaterialTheme.shapes.medium,
                 tonalElevation = 4.dp
@@ -245,6 +263,37 @@ fun MapScreen(
                 }
             )
         }
+    }
+}
+
+/**
+ * Pojedyncza pinezka renderowana jako [MarkerComposable] – kółko w kolorze
+ * kategorii z białą ikoną tej kategorii w środku, plus białe obramowanie
+ * dla kontrastu na różnych tłach mapy.
+ *
+ * MarkerComposable zamienia ten Composable na bitmapę przy starcie i
+ * dalej traktuje ją tak jak zwykłą pinezkę Maps SDK, więc nie ma kosztu
+ * recompose przy każdym przesunięciu kamery.
+ */
+@Composable
+private fun CategoryMarkerIcon(category: PlaceCategory) {
+    val style = category.style
+    Surface(
+        shape = CircleShape,
+        color = style.color,
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.surface),
+        shadowElevation = 4.dp
+    ) {
+        Icon(
+            imageVector = style.icon,
+            contentDescription = null,
+            // Tinta na kolor surface (zwykle biały / prawie biały) – ikona
+            // wyraźnie odcina się na kolorowym tle plakietki.
+            tint = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .size(36.dp)
+                .padding(6.dp)
+        )
     }
 }
 
@@ -435,24 +484,6 @@ private fun PlacePreviewContent(
             Text("Zobacz szczegóły")
         }
     }
-}
-
-/**
- * Konwertuje kolor kategorii (Compose `Color`, RGB) na hue HSV (0..360),
- * którego oczekuje [BitmapDescriptorFactory.defaultMarker]. Dzięki temu
- * pinezki na mapie mają spójną tożsamość wizualną z chipami / kartami,
- * bez konieczności rysowania własnych assetów PNG.
- */
-private fun PlaceCategory.toMarkerHue(): Float {
-    val color: Color = this.style.color
-    val hsv = FloatArray(3)
-    android.graphics.Color.RGBToHSV(
-        (color.red * 255).toInt(),
-        (color.green * 255).toInt(),
-        (color.blue * 255).toInt(),
-        hsv
-    )
-    return hsv[0]
 }
 
 /**
