@@ -47,12 +47,26 @@ suspend fun fetchCurrentLocation(context: Context): Pair<Double, Double>? =
         val client = LocationServices.getFusedLocationProviderClient(context)
         val cts = CancellationTokenSource()
 
-        client.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token)
+        client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
             .addOnSuccessListener { location ->
-                cont.resume(location?.let { it.latitude to it.longitude })
+                if (location != null) {
+                    cont.resume(location.latitude to location.longitude)
+                } else {
+                    // Jesli getCurrentLocation zwrocilo null, probujemy pobrac ostatnia znana lokalizacje
+                    client.lastLocation.addOnSuccessListener { lastLoc ->
+                        cont.resume(lastLoc?.let { it.latitude to it.longitude })
+                    }.addOnFailureListener {
+                        cont.resume(null)
+                    }
+                }
             }
             .addOnFailureListener { e ->
-                cont.resumeWithException(e)
+                // W razie bledu getCurrentLocation rowniez probujemy lastLocation jako fallback
+                client.lastLocation.addOnSuccessListener { lastLoc ->
+                    cont.resume(lastLoc?.let { it.latitude to it.longitude })
+                }.addOnFailureListener {
+                    cont.resumeWithException(e)
+                }
             }
 
         cont.invokeOnCancellation { cts.cancel() }
