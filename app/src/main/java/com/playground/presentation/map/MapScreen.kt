@@ -3,6 +3,9 @@ package com.playground.presentation.map
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -23,6 +26,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,8 +37,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,10 +53,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -155,6 +164,21 @@ fun MapScreen(
         }
     }
 
+    // Gdy user wraca z systemowych ustawień appki (gdzie ręcznie nadał lub
+    // odebrał uprawnienie), Activity wraca w stan RESUMED. Wtedy odświeżamy
+    // `locationPermissionGranted` z systemu, żeby banner automatycznie
+    // zniknął bez potrzeby restartu zakładki Mapa.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                locationPermissionGranted = hasLocationPermission(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val selectedPlace = state.places.firstOrNull { it.id == state.selectedPlaceId }
 
@@ -207,17 +231,39 @@ fun MapScreen(
             }
         }
 
-        // --- Overlay z filtrami u góry ---
-        FiltersOverlay(
-            selectedCategory = state.selectedCategory,
-            topRatedOnly = state.topRatedOnly,
-            onCategorySelected = viewModel::onCategorySelected,
-            onToggleTopRated = viewModel::toggleTopRated,
+        // --- Overlay z filtrami + (opcjonalnie) banner permission u góry ---
+        Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .padding(8.dp)
-        )
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FiltersOverlay(
+                selectedCategory = state.selectedCategory,
+                topRatedOnly = state.topRatedOnly,
+                onCategorySelected = viewModel::onCategorySelected,
+                onToggleTopRated = viewModel::toggleTopRated,
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (!locationPermissionGranted) {
+                LocationPermissionBanner(
+                    onAllowClick = {
+                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                    },
+                    onOpenSettingsClick = {
+                        // Fallback dla "permanently denied" – w tym stanie launcher.launch()
+                        // nic nie zrobi (callback wraca z false bez UI). Przerzucamy usera
+                        // do systemowych Ustawień appki, gdzie zawsze może włączyć Location.
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.fromParts("package", context.packageName, null)
+                        }
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
 
         // --- Stany pomocnicze: spinner przy pierwszym ładowaniu i błąd ---
         if (state.isLoading && state.places.isEmpty()) {
@@ -294,6 +340,70 @@ private fun CategoryMarkerIcon(category: PlaceCategory) {
                 .size(36.dp)
                 .padding(6.dp)
         )
+    }
+}
+
+/**
+ * Banner widoczny gdy user nie ma jeszcze nadanego uprawnienia
+ * [Manifest.permission.ACCESS_FINE_LOCATION] – tłumaczy dlaczego niebieska
+ * kropka "gdzie jestem" się nie pojawia, i daje dwie ścieżki naprawy:
+ *
+ *  - **"Pozwól"** – ponawia systemowy dialog uprawnień. Działa, gdy user
+ *    odmówił raz (Don't allow). Jeśli wybrał "Don't ask again" /
+ *    "permanently denied", dialog się nie pokaże – wtedy zostaje przycisk
+ *    "Ustawienia".
+ *  - **"Ustawienia"** – otwiera stronę ustawień appki w systemie, gdzie
+ *    user zawsze może ręcznie włączyć Location. Po powrocie banner
+ *    znika automatycznie dzięki `DisposableEffect` na ON_RESUME w callsite.
+ */
+@Composable
+private fun LocationPermissionBanner(
+    onAllowClick: () -> Unit,
+    onOpenSettingsClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 4.dp,
+        shadowElevation = 4.dp
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.MyLocation,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "Włącz lokalizację, żeby zobaczyć siebie na mapie",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(
+                    onClick = onOpenSettingsClick,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Ustawienia")
+                }
+                Button(
+                    onClick = onAllowClick,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Pozwól")
+                }
+            }
+        }
     }
 }
 
