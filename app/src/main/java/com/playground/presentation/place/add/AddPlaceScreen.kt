@@ -53,6 +53,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.playground.R
 import com.playground.domain.model.Amenity
 import com.playground.domain.model.PlaceCategory
+import com.playground.presentation.common.style
 import kotlinx.coroutines.launch
 
 /**
@@ -259,6 +260,7 @@ private fun CategoryDropdown(
     enabled: Boolean
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val selectedStyle = selected.style
 
     ExposedDropdownMenuBox(
         expanded = expanded,
@@ -269,6 +271,13 @@ private fun CategoryDropdown(
             onValueChange = {},
             readOnly = true,
             label = { Text("Kategoria") },
+            leadingIcon = {
+                Icon(
+                    imageVector = selectedStyle.icon,
+                    contentDescription = null,
+                    tint = selectedStyle.color
+                )
+            },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             enabled = enabled,
             modifier = Modifier
@@ -280,8 +289,16 @@ private fun CategoryDropdown(
             onDismissRequest = { expanded = false }
         ) {
             PlaceCategory.entries.forEach { category ->
+                val style = category.style
                 DropdownMenuItem(
                     text = { Text(stringResource(category.labelRes)) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = style.icon,
+                            contentDescription = null,
+                            tint = style.color
+                        )
+                    },
                     onClick = {
                         onSelected(category)
                         expanded = false
