@@ -1,36 +1,59 @@
 package com.playground.data.repository
 
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ktx.toObject
 import com.playground.data.remote.FirestoreCollections
 import com.playground.data.remote.dto.PlaceDto
 import com.playground.domain.model.Place
 import com.playground.domain.model.PlaceCategory
 import com.playground.domain.repository.PlaceRepository
 import com.playground.utils.OpResult
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Implementacja [PlaceRepository] oparta o Firestore.
- *
- * Implementacje metod są tu placeholderami – do uzupełnienia gdy podłączymy
- * prawdziwy projekt Firebase i zdefiniujemy reguły dostępu.
  */
 @Singleton
 class FirestorePlaceRepository @Inject constructor(
     private val firestore: FirebaseFirestore
 ) : PlaceRepository {
 
-    override fun observePlaces(category: PlaceCategory?): Flow<List<Place>> {
-        // TODO: podpiąć snapshotListener pod kolekcję places, opcjonalnie z whereEqualTo("category", ...)
-        return flowOf(emptyList())
+    override fun observePlaces(category: PlaceCategory?): Flow<List<Place>> = callbackFlow {
+        // Bazowe zapytanie - opcjonalnie filtrowane po kategorii.
+        val query = if (category != null) {
+            placesCollection().whereEqualTo("category", category.name)
+        } else {
+            placesCollection()
+        }
+
+        val registration = query.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
+            val places = snapshot?.documents
+                ?.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
+                .orEmpty()
+            trySend(places)
+        }
+        awaitClose { registration.remove() }
     }
 
-    override suspend fun getPlace(placeId: String): OpResult<Place> {
-        // TODO: placesCollection().document(placeId).get().await().toObject(PlaceDto::class.java)?.toDomain()
-        return OpResult.failure(NotImplementedError("getPlace – do uzupełnienia"))
+    override suspend fun getPlace(placeId: String): OpResult<Place> = try {
+        val snapshot = placesCollection().document(placeId).get().await()
+        val dto = snapshot.toObject<PlaceDto>()
+        if (dto != null) {
+            OpResult.success(dto.toDomain())
+        } else {
+            OpResult.failure(NoSuchElementException("Brak miejsca o id=$placeId"))
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
     }
 
     override suspend fun getPlacesNear(
@@ -38,23 +61,39 @@ class FirestorePlaceRepository @Inject constructor(
         longitude: Double,
         radiusKm: Double
     ): OpResult<List<Place>> {
-        // TODO: filtrowanie po geohashu (np. biblioteka GeoFirestore) lub bounding box
-        return OpResult.success(emptyList())
+        // TODO: filtrowanie po geohashu (np. biblioteka GeoFirestore) lub bounding box.
+        // Na razie zwracamy wszystkie - klient wyfiltruje, MVP bez geo-zapytania.
+        return try {
+            val snapshot = placesCollection().get().await()
+            val places = snapshot.documents.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
+            OpResult.success(places)
+        } catch (e: Exception) {
+            OpResult.failure(e)
+        }
     }
 
-    override suspend fun getTopPlaces(limit: Int): OpResult<List<Place>> {
-        // TODO: orderBy("averageRating", DESCENDING).limit(limit)
-        return OpResult.success(emptyList())
+    override suspend fun getTopPlaces(limit: Int): OpResult<List<Place>> = try {
+        val snapshot = placesCollection()
+            .orderBy("averageRating", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .limit(limit.toLong())
+            .get()
+            .await()
+        val places = snapshot.documents.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
+        OpResult.success(places)
+    } catch (e: Exception) {
+        OpResult.failure(e)
     }
 
-    override suspend fun addPlace(place: Place): OpResult<Place> {
-        // TODO: placesCollection().add(PlaceDto.fromDomain(place))
-        return OpResult.failure(NotImplementedError("addPlace – do uzupełnienia"))
+    override suspend fun addPlace(place: Place): OpResult<Place> = try {
+        // Tworzymy referencje (auto-generowany id), id wkladamy do dokumentu zeby
+        // pozniej moc czytac id z samego DTO bez polegania na nazwie dokumentu.
+        val docRef = placesCollection().document()
+        val placeWithId = place.copy(id = docRef.id)
+        docRef.set(PlaceDto.fromDomain(placeWithId)).await()
+        OpResult.success(placeWithId)
+    } catch (e: Exception) {
+        OpResult.failure(e)
     }
 
-    @Suppress("unused")
     private fun placesCollection() = firestore.collection(FirestoreCollections.PLACES)
-
-    @Suppress("unused")
-    private fun PlaceDto.dummyReference(): PlaceDto = this // marker, by import nie został wycięty
 }
