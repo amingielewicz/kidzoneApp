@@ -194,14 +194,9 @@ private fun CategoryFilterBar(
     selectedCategory: PlaceCategory?,
     onCategorySelected: (PlaceCategory?) -> Unit
 ) {
-    val context = LocalContext.current
-    // Kategorie alfabetycznie po polskim labelu – pobieramy w runtime'ie,
-    // bo @StringRes znamy dopiero z Contextem. "Wszystkie" zostaje zawsze
-    // na pierwszej pozycji bo to nie jest filtr per se, tylko reset.
-    val orderedCategories = remember(context) {
-        PlaceCategory.entries.sortedBy { context.getString(it.labelRes).lowercase() }
-    }
-
+    // Kolejność jak w enum PlaceCategory (świadomie nie alfabetycznie –
+    // logiczne grupowanie: place zabaw → sale → kawiarnia/restauracja →
+    // park → atrakcje → inne). "Wszystkie" zostaje pierwsze jako reset.
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -214,7 +209,7 @@ private fun CategoryFilterBar(
             onClick = { onCategorySelected(null) },
             label = { Text("Wszystkie") }
         )
-        orderedCategories.forEach { category ->
+        PlaceCategory.entries.forEach { category ->
             val style = category.style
             FilterChip(
                 selected = selectedCategory == category,

@@ -44,10 +44,4 @@ sealed class Route(val path: String) {
         const val ARG_PLACE_ID = "placeId"
         fun create(placeId: String): String = "place_details/$placeId"
     }
-
-    /** Mapa w pełnoekranie skupiona na pojedynczym miejscu (z markerem). */
-    data object PlaceMap : Route("place_map/{placeId}") {
-        const val ARG_PLACE_ID = "placeId"
-        fun create(placeId: String): String = "place_map/$placeId"
-    }
 }
