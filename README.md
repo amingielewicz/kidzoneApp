@@ -1,274 +1,132 @@
-# Aplikacja mobilna: Miejsca przyjazne dzieciom
+# Playground
 
-## Opis projektu
+> Mapa miejsc przyjaznych dzieciom — aplikacja mobilna Android.
 
-Aplikacja mobilna dla rodziców, umożliwiająca szybkie wyszukiwanie i ocenianie miejsc przyjaznych małym dzieciom w dużych miastach (place zabaw, kawiarnie i restauracje z kącikiem dziecięcym, sale zabaw itp.).
+Playground to społecznościowa aplikacja dla rodziców i opiekunów. Pozwala
+dodawać i oceniać miejsca przyjazne dzieciom (place zabaw, restauracje
+z kącikiem dla dzieci, sale zabaw, parki, kawiarnie rodzinne), wyszukiwać
+je na mapie, filtrować po kategorii i sprawdzać najlepsze pozycje
+w okolicy.
 
-Użytkownicy po zalogowaniu mogą:
+To repozytorium zawiera **minimalny szkielet projektu** — kompiluje się,
+uruchamia, pokazuje nawigację między ekranami; logika biznesowa jest
+zaznaczona jako `TODO` i będzie wypełniana w kolejnych iteracjach.
 
-* dodawać nowe miejsca,
-* edytować i usuwać własne wpisy,
-* komentować i oceniać miejsca dodane przez innych.
+## Stack
 
-Projekt skupia się na prostocie, geolokalizacji i realnej użyteczności w codziennym życiu rodzica.
+- **Kotlin 2.0.20** + **Jetpack Compose** (Material 3, BOM 2024.09.03)
+- **Hilt 2.52** (DI)
+- **Firebase** (Auth, Firestore, Storage) – BOM 33.4.0
+- **Google Maps** SDK + `maps-compose`
+- **Coil** (obrazy), **Retrofit + OkHttp** (na przyszłość, dla Opcji 2 backendu),
+  **Room** (cache offline)
+- **Navigation Compose**, **Coroutines**
+- Architektura: **MVVM + Clean Architecture** (warstwy `data` / `domain` / `presentation`)
 
----
+## Struktura projektu
 
-## Zakres MVP
-
-### 1. Uwierzytelnianie
-
-* Rejestracja i logowanie użytkowników (e‑mail/hasło).
-* Opcjonalne logowanie federacyjne (Google).
-
-### 2. Wyszukiwanie i przeglądanie miejsc
-
-* Lista miejsc z filtrowaniem:
-
-  * typ miejsca,
-  * miasto,
-  * odległość,
-  * udogodnienia.
-* Widok szczegółów miejsca:
-
-  * opis,
-  * adres,
-  * godziny otwarcia,
-  * udogodnienia,
-  * średnia ocena i liczba ocen.
-* Widok lista + mapa.
-* Wyszukiwanie miejsc w pobliżu użytkownika.
-
-### 3. Dodawanie i edycja miejsc
-
-* Dodawanie nowych miejsc przez zalogowanych użytkowników.
-* Edycja i usuwanie wyłącznie przez autora wpisu.
-* Walidacja danych wejściowych (nazwa, adres, typ, koordynaty).
-
-### 4. Komentarze i oceny
-
-* Dodawanie komentarzy przez zalogowanych użytkowników.
-* System ocen w skali 1–5.
-* Automatyczne wyliczanie średniej oceny.
-* Podstawowa moderacja:
-
-  * zgłaszanie nadużyć,
-  * możliwość ukrycia komentarzy.
-
-### 5. Geolokalizacja (element obowiązkowy MVP)
-
-* Pobieranie lokalizacji użytkownika (GPS).
-* Sortowanie miejsc po odległości.
-* Wyświetlanie miejsc na mapie.
-
----
-
-## Stos technologiczny (Android)
-
-### UI
-
-* **Jetpack Compose** – deklaratywne UI.
-* **Material 3** – spójny i nowoczesny design.
-
-### Architektura
-
-* **MVVM** + warstwa Repozytorium.
-* **Hilt** – wstrzykiwanie zależności.
-* **Kotlin Coroutines + Flow** – asynchroniczność i reaktywność.
-
-### Dane
-
-* **Room** – cache offline.
-* **Retrofit + OkHttp** – komunikacja z API.
-* **Kotlinx Serialization** lub **Moshi** – serializacja danych.
-
-### Backend / usługi zewnętrzne
-
-* **Supabase** (rekomendowane):
-
-  * open‑source,
-  * darmowy tier,
-  * Auth + Postgres + Storage.
-
-Alternatywy:
-
-* Firebase (szybki start, brak open‑source),
-* własny backend: **Ktor** lub **Spring Boot** + **PostgreSQL**.
-
-### Mapy
-
-* **Google Maps SDK** / **Maps Compose**.
-
----
-
-## Model danych (przykład)
-
-```kotlin
-data class Place(
-    val id: String,
-    val name: String,
-    val type: PlaceType,
-    val city: String,
-    val address: String,
-    val lat: Double,
-    val lng: Double,
-    val description: String,
-    val amenities: List<String>,
-    val authorId: String,
-    val createdAt: Long,
-    val ratingAvg: Double,
-    val ratingCount: Int
-)
-
-data class Comment(
-    val id: String,
-    val placeId: String,
-    val authorId: String,
-    val text: String,
-    val createdAt: Long,
-    val rating: Int
-)
-
-enum class PlaceType {
-    PLAYGROUND,
-    CAFE,
-    RESTAURANT,
-    INDOOR_PLAYGROUND
-}
+```
+app/src/main/java/com/playground
+├── PlaygroundApplication.kt   # @HiltAndroidApp
+├── MainActivity.kt          # @AndroidEntryPoint, host Compose
+│
+├── data
+│   ├── remote
+│   │   ├── FirestoreCollections.kt
+│   │   └── dto/             # UserDto, PlaceDto, ReviewDto
+│   └── repository/          # Firebase implementacje repozytoriów
+│
+├── domain
+│   ├── model/               # User, Place, Review, Photo, PlaceCategory, Amenity
+│   └── repository/          # interfejsy: AuthRepository, PlaceRepository, ReviewRepository
+│
+├── presentation
+│   ├── splash/              # SplashScreen + SplashViewModel
+│   ├── auth/                # LoginScreen, RegisterScreen
+│   ├── main/                # MainScreen (shell z bottom navigation)
+│   ├── home/                # HomeScreen
+│   ├── map/                 # MapScreen
+│   ├── place
+│   │   ├── list/            # PlaceListScreen
+│   │   ├── details/         # PlaceDetailsScreen
+│   │   └── add/             # AddPlaceScreen
+│   ├── profile/             # ProfileScreen
+│   └── ranking/             # RankingScreen
+│
+├── ui/theme/                # Color, Type, Theme (paleta marki)
+├── navigation/              # Routes (sealed class) + NavGraph
+├── di/                      # FirebaseModule, RepositoryModule
+└── utils/                   # OpResult sealed interface
 ```
 
----
+## Mapa schematu bazy
 
-## Warstwa danych
+- Kolekcja `users` ↔ `domain.model.User` ↔ `data.remote.dto.UserDto`
+- Kolekcja `places` ↔ `domain.model.Place` ↔ `data.remote.dto.PlaceDto`
+- Kolekcja `reviews` ↔ `domain.model.Review` ↔ `data.remote.dto.ReviewDto`
+- (`photos` zarządzane razem z `places` przez listę URL-i z Firebase Storage)
 
-### Repozytorium
+## Uruchomienie lokalne
 
-```kotlin
-interface PlacesRepository {
-    fun observePlaces(): Flow<List<Place>>
-    suspend fun addPlace(place: Place)
-    suspend fun updatePlace(place: Place)
-    suspend fun addComment(placeId: String, comment: Comment)
-}
+### 1. Wymagania
+
+- Android Studio Koala (lub nowsze) z JDK 17
+- Gradle 8.9 (wrapper – wystarczy `./gradlew` po zainicjowaniu)
+- Konto Firebase + projekt z włączonymi: Authentication, Firestore, Storage
+- Klucz Google Maps (Maps SDK for Android)
+
+### 2. Wygenerowanie wrappera Gradle
+
+W repo nie ma `gradlew`/`gradle-wrapper.jar` — wygeneruj je raz:
+
+```bash
+gradle wrapper --gradle-version 8.9
 ```
 
-### ViewModel (przykład)
+Alternatywnie zaimportuj projekt do Android Studio – IDE doda wrapper za Ciebie.
 
-```kotlin
-@HiltViewModel
-class PlacesViewModel @Inject constructor(
-    private val repo: PlacesRepository
-) : ViewModel() {
+### 3. Konfiguracja Firebase
 
-    val places = repo.observePlaces()
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5_000),
-            emptyList()
-        )
+1. W konsoli Firebase utwórz projekt.
+2. Dodaj aplikację Android z `applicationId = com.playground`.
+3. Pobierz `google-services.json` i wrzuć do `app/google-services.json`.
+   (Przykładowa struktura jest w `app/google-services.json.template`).
+4. Włącz: Authentication (e-mail/hasło, Google), Cloud Firestore, Storage.
 
-    fun addPlace(place: Place) {
-        viewModelScope.launch {
-            repo.addPlace(place)
-        }
-    }
-}
+### 4. Konfiguracja klucza Google Maps
+
+W pliku `local.properties` (nie committuj) dodaj:
+
+```
+MAPS_API_KEY=AIzaSy...twoj_klucz
 ```
 
----
+Klucz jest podstawiany do `AndroidManifest.xml` jako `${MAPS_API_KEY}`.
 
-## UI (Jetpack Compose)
+### 5. Build
 
-### Lista miejsc
-
-```kotlin
-@Composable
-fun PlacesScreen(viewModel: PlacesViewModel) {
-    val places by viewModel.places.collectAsState()
-
-    LazyColumn {
-        items(places) { place ->
-            PlaceCard(place)
-        }
-    }
-}
-
-@Composable
-fun PlaceCard(place: Place) {
-    Card {
-        Column(Modifier.padding(16.dp)) {
-            Text(place.name, style = MaterialTheme.typography.titleMedium)
-            Text(place.address)
-            Text(place.type.name)
-        }
-    }
-}
+```bash
+./gradlew assembleDebug
 ```
 
----
+## Status MVP
 
-## Zasady dostępu i bezpieczeństwo
+| Funkcja                       | Status |
+|-------------------------------|--------|
+| Struktura projektu i DI       | ✅     |
+| Theme + nawigacja             | ✅     |
+| Modele i interfejsy repo      | ✅     |
+| Logowanie e-mail/Google       | ⏳ TODO |
+| Mapa Google Maps + pinezki    | ⏳ TODO |
+| Dodawanie miejsc              | ⏳ TODO |
+| Oceny i komentarze            | ⏳ TODO |
+| Lista miejsc + filtry         | ⏳ TODO |
+| Ranking i odznaki             | ⏳ TODO |
 
-* Edycja i usuwanie miejsca tylko przez autora wpisu:
-  `authorId == request.auth.uid`.
-* Komentarze dostępne dla każdego zalogowanego użytkownika.
-* Jedna ocena użytkownika na jedno miejsce.
-* Możliwość zgłaszania nadużyć.
+## Kolejne kroki
 
----
-
-## Plan wdrożenia
-
-### Etap 1: Decyzje MVP
-
-* Mapa i geolokalizacja: **tak**.
-* Komentarze i oceny: **tak**.
-* Zdjęcia: **nie** (po MVP).
-* Backend: **Supabase** lub własne API.
-
-### Etap 2: Szkielet aplikacji
-
-* Nowy projekt Android (Jetpack Compose).
-* Konfiguracja Hilt, Coroutines, Material 3.
-* Integracja map.
-
-### Etap 3: API i modele
-
-* Definicja modeli danych.
-* Endpointy:
-
-  * `GET /places`
-  * `POST /places`
-  * `PATCH /places/{id}`
-  * `GET /places/{id}/comments`
-  * `POST /places/{id}/comments`
-
-### Etap 4: Ekrany MVP
-
-* Lista miejsc + filtry.
-* Szczegóły miejsca.
-* Mapa z pinami.
-* Formularz dodawania miejsca.
-
-### Etap 5: Autoryzacja
-
-* Logowanie użytkowników.
-* Reguły dostępu do edycji i ocen.
-
-### Etap 6: Testy i jakość
-
-* Testy jednostkowe repozytoriów i ViewModeli.
-* Walidacja formularzy.
-* Podstawowe testy UI.
-
----
-
-## Status projektu
-
-MVP – w fazie projektowania / implementacji.
-
-Projekt nadaje się jako:
-
-* aplikacja produkcyjna,
-* projekt portfolio,
-* baza pod dalszą rozbudowę (zdjęcia, ulubione miejsca, powiadomienia).
+1. Podłączyć logikę `FirebaseAuthRepository` (e-mail/hasło, Google Sign-In, reset).
+2. Zaimplementować `FirestorePlaceRepository.observePlaces` na snapshot listenerach.
+3. Zbudować `MapScreen` na `maps-compose` z pinezkami i filtrami.
+4. Zbudować formularz `AddPlaceScreen` + upload zdjęć do Storage.
+5. Dodać ViewModele dla list/detali i wpiąć je w ekrany.

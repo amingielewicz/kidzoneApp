@@ -1,0 +1,41 @@
+<resources>
+    <string name="app_name">Playground</string>
+    <string name="app_tagline">Mapa miejsc przyjaznych dzieciom</string>
+
+    <!-- Auth -->
+    <string name="login">Zaloguj się</string>
+    <string name="register">Zarejestruj się</string>
+    <string name="email">E-mail</string>
+    <string name="password">Hasło</string>
+    <string name="forgot_password">Nie pamiętam hasła</string>
+    <string name="login_with_google">Zaloguj się przez Google</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Start</string>
+    <string name="nav_map">Mapa</string>
+    <string name="nav_list">Lista</string>
+    <string name="nav_ranking">Ranking</string>
+    <string name="nav_profile">Profil</string>
+
+    <!-- Place -->
+    <string name="add_place">Dodaj miejsce</string>
+    <string name="place_details">Szczegóły miejsca</string>
+    <string name="rating">Ocena</string>
+    <string name="reviews">Opinie</string>
+
+    <!-- Categories -->
+    <string name="category_playground">Plac zabaw</string>
+    <string name="category_restaurant">Restauracja</string>
+    <string name="category_play_room">Sala zabaw</string>
+    <string name="category_cafe">Kawiarnia rodzinna</string>
+    <string name="category_park">Park</string>
+    <string name="category_attraction">Atrakcja</string>
+    <string name="category_other">Inne</string>
+
+    <!-- Amenities -->
+    <string name="amenity_changing_table">Przewijak</string>
+    <string name="amenity_kids_menu">Menu dziecięce</string>
+    <string name="amenity_parking">Parking</string>
+    <string name="amenity_toilet">Toaleta</string>
+    <string name="amenity_stroller_access">Dostęp dla wózków</string>
+</resources>
