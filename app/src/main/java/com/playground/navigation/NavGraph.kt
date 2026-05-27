@@ -89,12 +89,8 @@ fun PlaygroundNavGraph(
             arguments = listOf(
                 navArgument(Route.PlaceDetails.ARG_PLACE_ID) { type = NavType.StringType }
             )
-        ) { backStackEntry ->
-            val placeId = backStackEntry.arguments
-                ?.getString(Route.PlaceDetails.ARG_PLACE_ID)
-                .orEmpty()
+        ) {
             PlaceDetailsScreen(
-                placeId = placeId,
                 onBack = { navController.popBackStack() }
             )
         }
