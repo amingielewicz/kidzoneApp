@@ -12,6 +12,13 @@ pluginManagement {
     }
 }
 
+// Auto-provisioning JDK przez Foojay – dodane przez Android Studio przy
+// migracji "Gradle Daemon Toolchain". Pozwala Gradle'owi samemu pobrać
+// brakujący JDK, gdy lokalna instalacja nie pasuje.
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version "0.10.0"
+}
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {

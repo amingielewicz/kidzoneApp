@@ -84,6 +84,11 @@ dependencies {
     implementation(libs.firebase.firestore.ktx)
     implementation(libs.firebase.storage.ktx)
 
+    // Credential Manager (Google Sign-In przez nowoczesne API)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
+
     // Google Maps
     implementation(libs.maps.compose)
     implementation(libs.play.services.maps)
