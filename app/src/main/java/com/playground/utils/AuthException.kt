@@ -23,6 +23,6 @@ sealed class AuthException(message: String) : Exception(message) {
     data object InvalidEmail : AuthException("Niepoprawny format adresu e-mail")
 
     /** Brak Internetu, timeout, blad po stronie Firebase. */
-    data class Network(val cause: Throwable) :
-        AuthException(cause.message ?: "Blad polaczenia z serwerem")
+    data class Network(val networkCause: Throwable) :
+        AuthException(networkCause.message ?: "Blad polaczenia z serwerem")
 }
