@@ -5,8 +5,9 @@ import com.playground.utils.OpResult
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Operacje uwierzytelniania (e-mail/hasło + Google) i obserwacja
- * aktualnie zalogowanego użytkownika.
+ * Operacje uwierzytelniania (e-mail/hasło + Google), obserwacja
+ * aktualnie zalogowanego użytkownika oraz odczyt publicznych danych
+ * innych użytkowników (np. autora miejsca).
  */
 interface AuthRepository {
 
@@ -23,4 +24,13 @@ interface AuthRepository {
     suspend fun sendPasswordResetEmail(email: String): OpResult<Unit>
 
     suspend fun signOut()
+
+    /**
+     * Pobiera dokument użytkownika z kolekcji `users`.
+     *
+     * Używane np. na ekranie szczegółów miejsca, żeby pokazać
+     * "Dodano przez: {nick}". Nie wymaga, by [userId] był aktualnie
+     * zalogowanym użytkownikiem.
+     */
+    suspend fun getUserById(userId: String): OpResult<User>
 }

@@ -9,6 +9,7 @@ import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ktx.toObject
 import com.playground.data.remote.FirestoreCollections
 import com.playground.data.remote.dto.UserDto
 import com.playground.domain.model.User
@@ -28,7 +29,8 @@ import javax.inject.Singleton
  *  - logowanie i rejestracja e-mail/haslo,
  *  - logowanie Google przez Google Sign-In (token przekazywany z UI),
  *  - reset hasla e-mailem,
- *  - obserwacja aktualnie zalogowanego uzytkownika.
+ *  - obserwacja aktualnie zalogowanego uzytkownika,
+ *  - odczyt publicznych danych innych uzytkownikow (autor miejsca itp.).
  *
  * Po pomyslnej rejestracji tworzymy dokument w kolekcji `users`
  * (zob. [FirestoreCollections.USERS]), zeby reszta aplikacji mogla go
@@ -120,6 +122,22 @@ class FirebaseAuthRepository @Inject constructor(
 
     override suspend fun signOut() {
         firebaseAuth.signOut()
+    }
+
+    override suspend fun getUserById(userId: String): OpResult<User> = try {
+        require(userId.isNotBlank()) { "userId nie może być puste" }
+        val snapshot = firestore.collection(FirestoreCollections.USERS)
+            .document(userId)
+            .get()
+            .await()
+        val dto = snapshot.toObject<UserDto>()
+        if (dto != null) {
+            OpResult.success(dto.toDomain())
+        } else {
+            OpResult.failure(NoSuchElementException("Brak użytkownika o id=$userId"))
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
     }
 
     // --- helpers ---

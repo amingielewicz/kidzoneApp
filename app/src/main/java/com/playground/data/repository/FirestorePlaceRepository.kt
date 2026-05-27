@@ -119,5 +119,51 @@ class FirestorePlaceRepository @Inject constructor(
         OpResult.failure(e)
     }
 
+    override suspend fun updatePlace(place: Place): OpResult<Place> = try {
+        require(place.id.isNotBlank()) { "Place.id musi być ustawione przy edycji" }
+
+        // .set() bez merge nadpisuje cały dokument - jest to świadome:
+        // przy edycji UI zawsze wysyła kompletny obiekt (z zachowanymi
+        // ownerUserId, createdAtMillis, averageRating, reviewsCount itd.),
+        // a nadpisanie zapewnia że Firestore nie zostawi nieużywanych pól
+        // gdyby user np. usunął wszystkie udogodnienia.
+        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+            placesCollection().document(place.id)
+                .set(PlaceDto.fromDomain(place))
+                .await()
+            true
+        }
+        if (completed == null) {
+            OpResult.failure(
+                java.util.concurrent.TimeoutException(
+                    "Zapis trwa zbyt długo. Sprawdź połączenie z Internetem."
+                )
+            )
+        } else {
+            OpResult.success(place)
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
+    override suspend fun deletePlace(placeId: String): OpResult<Unit> = try {
+        require(placeId.isNotBlank()) { "placeId nie może być puste" }
+        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+            placesCollection().document(placeId).delete().await()
+            true
+        }
+        if (completed == null) {
+            OpResult.failure(
+                java.util.concurrent.TimeoutException(
+                    "Usunięcie trwa zbyt długo. Sprawdź połączenie z Internetem."
+                )
+            )
+        } else {
+            OpResult.success(Unit)
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
     private fun placesCollection() = firestore.collection(FirestoreCollections.PLACES)
 }
