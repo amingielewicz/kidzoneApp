@@ -27,8 +27,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -40,6 +42,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.playground.R
+import kotlinx.coroutines.launch
 
 /**
  * Ekran logowania - e-mail/haslo + Google + reset hasla.
@@ -58,6 +61,10 @@ fun LoginScreen(
     // Lokalny stan UI - widocznosc hasla. Nie nalezy do ViewModelu, bo to czysto
     // sprawa renderowania, niezalezna od logiki auth.
     var isPasswordVisible by remember { mutableStateOf(false) }
+
+    // Do uruchamiania Google Sign-In z poziomu UI (Credential Manager wymaga Activity context).
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     // Po pomyslnym logowaniu - nawigacja na main.
     LaunchedEffect(state.isSignedIn) {
@@ -159,10 +166,40 @@ fun LoginScreen(
             }
 
             Spacer(Modifier.height(8.dp))
-            // Google Sign-In - na razie nie podpiete (wymaga SHA-1 + GoogleSignInClient).
+            // Google Sign-In - wymaga: 1) wlaczonego Google providera w Firebase,
+            // 2) dodanego SHA-1 debug keystore, 3) aktualnego google-services.json.
             OutlinedButton(
-                onClick = { /* TODO: integracja Google Sign-In w osobnym PR */ },
-                enabled = false,
+                onClick = {
+                    coroutineScope.launch {
+                        // Web Client ID czytamy w runtime, zeby brak konfiguracji
+                        // Firebase nie blokowal kompilacji (zasob default_web_client_id
+                        // generowany jest dopiero gdy google-services.json ma OAuth web client).
+                        val resId = context.resources.getIdentifier(
+                            WEB_CLIENT_ID_RES_NAME, "string", context.packageName
+                        )
+                        val webClientId = if (resId != 0) context.getString(resId) else ""
+
+                        if (webClientId.isBlank()) {
+                            viewModel.showInlineMessage(
+                                "Wlacz Google Sign-In w Firebase Console i pobierz nowy google-services.json do app/"
+                            )
+                            return@launch
+                        }
+
+                        when (val result = launchGoogleSignIn(context, webClientId)) {
+                            is GoogleSignInResult.Success ->
+                                viewModel.signInWithGoogle(result.idToken)
+                            GoogleSignInResult.Cancelled -> Unit // user anulowal - bez komunikatu
+                            GoogleSignInResult.NoGoogleAccountOnDevice ->
+                                viewModel.showInlineMessage(
+                                    "Brak konta Google na urzadzeniu. Dodaj konto w Ustawieniach Androida."
+                                )
+                            is GoogleSignInResult.Error ->
+                                viewModel.showInlineMessage(result.message)
+                        }
+                    }
+                },
+                enabled = !state.isLoading,
                 modifier = Modifier.fillMaxWidth().height(48.dp)
             ) {
                 Text(stringResource(R.string.login_with_google))

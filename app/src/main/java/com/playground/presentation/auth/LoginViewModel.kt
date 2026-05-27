@@ -83,6 +83,32 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Wywolywane z UI po uzyskaniu idToken z Google Sign-In (Credential Manager).
+     * Przekazuje token do repo, ktory wymienia go na sesje FirebaseAuth.
+     */
+    fun signInWithGoogle(idToken: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, message = null) }
+            val result = authRepository.signInWithGoogle(idToken)
+            _uiState.update {
+                when (result) {
+                    is OpResult.Success -> it.copy(isLoading = false, isSignedIn = true)
+                    is OpResult.Failure -> it.copy(
+                        isLoading = false,
+                        message = mapError(result.error),
+                        isMessageError = true
+                    )
+                }
+            }
+        }
+    }
+
+    /** Pokazuje uzytkownikowi blad/info pochodzacy z procesu Google Sign-In w UI. */
+    fun showInlineMessage(text: String, isError: Boolean = true) {
+        _uiState.update { it.copy(message = text, isMessageError = isError) }
+    }
+
     fun forgotPassword() {
         val email = _uiState.value.email.trim()
         if (email.isBlank()) {
