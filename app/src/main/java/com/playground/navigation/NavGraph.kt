@@ -12,7 +12,6 @@ import com.playground.presentation.auth.RegisterScreen
 import com.playground.presentation.main.MainScreen
 import com.playground.presentation.place.add.AddPlaceScreen
 import com.playground.presentation.place.details.PlaceDetailsScreen
-import com.playground.presentation.place.map.PlaceMapScreen
 import com.playground.presentation.splash.SplashScreen
 
 /**
@@ -118,25 +117,11 @@ fun PlaygroundNavGraph(
                 onEditPlace = { placeId ->
                     navController.navigate(Route.AddPlace.create(placeId))
                 },
-                onOpenMap = { placeId ->
-                    navController.navigate(Route.PlaceMap.create(placeId))
-                },
                 onDeleted = {
                     // Po usunięciu wracamy do shellu Main – snapshot listener
                     // na liście usunie kartę sam.
                     navController.popBackStack(Route.Main.path, inclusive = false)
                 }
-            )
-        }
-
-        composable(
-            route = Route.PlaceMap.path,
-            arguments = listOf(
-                navArgument(Route.PlaceMap.ARG_PLACE_ID) { type = NavType.StringType }
-            )
-        ) {
-            PlaceMapScreen(
-                onBack = { navController.popBackStack() }
             )
         }
     }
