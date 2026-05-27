@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,6 +8,28 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.services)
 }
+
+/**
+ * Sekrety dla developera (klucze API itp.) trzymamy w `local.properties`,
+ * bo to plik gitignorowany z natury (Android Studio sam go tak traktuje).
+ *
+ * Niestety `project.findProperty()` Gradle'a czyta tylko `gradle.properties`
+ * – `local.properties` jest specjalny i jest parsowany jedynie przez Android
+ * Gradle Plugin do wyciągnięcia `sdk.dir`. Dlatego ładujemy go tu ręcznie,
+ * żeby manifestPlaceholders mogły z niego korzystać.
+ *
+ * Łańcuch: local.properties -> gradle.properties / -P -> zmienna środowiskowa.
+ */
+val localProperties = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
+fun resolveSecret(key: String): String =
+    localProperties.getProperty(key)
+        ?: (project.findProperty(key) as String?)
+        ?: System.getenv(key)
+        ?: ""
 
 android {
     namespace = "com.playground"
@@ -21,9 +45,21 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
 
-        // Read Google Maps API key from local.properties or env. Set MAPS_API_KEY in
-        // local.properties (e.g. MAPS_API_KEY=AIza...) for development.
-        manifestPlaceholders["MAPS_API_KEY"] = (project.findProperty("MAPS_API_KEY") as String?) ?: ""
+        // Klucz Google Maps – ładowany przez resolveSecret() z chain:
+        //   local.properties (preferowane, gitignored)
+        //     -> gradle.properties / -PMAPS_API_KEY=...
+        //     -> zmienna środowiskowa MAPS_API_KEY (CI/CD)
+        // Pusty klucz = mapa się odpali ale Maps SDK rzuci `Authorization
+        // failure` w Logcat i zobaczysz puste szare/zielone tło. Wypisujemy
+        // ostrzeżenie w czasie konfiguracji żeby ten przypadek był widoczny.
+        val mapsApiKey = resolveSecret("MAPS_API_KEY")
+        if (mapsApiKey.isBlank()) {
+            logger.warn(
+                "[playground] MAPS_API_KEY is empty. Set it in local.properties " +
+                    "(MAPS_API_KEY=AIza...) – mapa nie będzie się renderowała."
+            )
+        }
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
     buildTypes {
