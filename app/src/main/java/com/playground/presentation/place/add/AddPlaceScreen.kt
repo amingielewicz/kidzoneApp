@@ -146,19 +146,10 @@ fun AddPlaceScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            // --- Adres (wymagany) ---
-            OutlinedTextField(
-                value = state.address,
-                onValueChange = viewModel::onAddressChange,
-                label = { RequiredFieldLabel("Adres") },
-                singleLine = true,
-                enabled = !state.isSaving,
-                modifier = Modifier.fillMaxWidth()
-            )
-
             Spacer(Modifier.height(12.dp))
 
-            // --- Lokalizacja GPS (wymagana) ---
+            // --- Lokalizacja GPS (wymagana) – nad adresem, by po pobraniu
+            // GPS adres mógł zostać wypełniony przez reverse geocoding ---
             LocationSection(
                 latitude = state.latitude,
                 longitude = state.longitude,
@@ -171,6 +162,19 @@ fun AddPlaceScreen(
                     }
                 },
                 enabled = !state.isSaving
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            // --- Adres (wymagany) – po GPS, żeby reverse geocoding mógł go
+            // wypełnić, ale nadal w pełni edytowalny przez użytkownika ---
+            OutlinedTextField(
+                value = state.address,
+                onValueChange = viewModel::onAddressChange,
+                label = { RequiredFieldLabel("Adres") },
+                singleLine = true,
+                enabled = !state.isSaving,
+                modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(Modifier.height(16.dp))
