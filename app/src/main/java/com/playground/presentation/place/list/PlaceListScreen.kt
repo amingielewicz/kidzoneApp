@@ -52,6 +52,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.playground.domain.model.Amenity
 import com.playground.domain.model.Place
 import com.playground.domain.model.PlaceCategory
+import com.playground.presentation.common.rememberPlaceCategoriesInDisplayOrder
 import com.playground.presentation.common.style
 import kotlinx.coroutines.launch
 
@@ -194,13 +195,11 @@ private fun CategoryFilterBar(
     selectedCategory: PlaceCategory?,
     onCategorySelected: (PlaceCategory?) -> Unit
 ) {
-    val context = LocalContext.current
-    // Kategorie alfabetycznie po polskim labelu – pobieramy w runtime'ie,
-    // bo @StringRes znamy dopiero z Contextem. "Wszystkie" zostaje zawsze
+    // Kategorie w jednolitej kolejności wyświetlania (alfabetycznie po
+    // polskim labelu). Wspólne źródło prawdy z MapScreen – patrz docs
+    // [rememberPlaceCategoriesInDisplayOrder]. "Wszystkie" zostaje zawsze
     // na pierwszej pozycji bo to nie jest filtr per se, tylko reset.
-    val orderedCategories = remember(context) {
-        PlaceCategory.entries.sortedBy { context.getString(it.labelRes).lowercase() }
-    }
+    val orderedCategories = rememberPlaceCategoriesInDisplayOrder()
 
     Row(
         modifier = Modifier

@@ -76,6 +76,7 @@ import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.playground.domain.model.Place
 import com.playground.domain.model.PlaceCategory
+import com.playground.presentation.common.rememberPlaceCategoriesInDisplayOrder
 import com.playground.presentation.common.style
 import com.playground.presentation.place.add.fetchCurrentLocation
 import com.playground.presentation.place.add.hasLocationPermission
@@ -191,25 +192,28 @@ fun MapScreen(
                 isMyLocationEnabled = locationPermissionGranted
             ),
             uiSettings = MapUiSettings(
-                // Natywny przycisk lokalizacji w prawym górnym rogu mapy –
-                // pojawia się dopiero gdy isMyLocationEnabled == true (czyli
-                // gdy permission jest granted, patrz LaunchedEffect powyżej).
+                // Natywny przycisk lokalizacji Maps SDK w prawym górnym rogu
+                // mapy. Pojawia się dopiero gdy `isMyLocationEnabled = true`
+                // (czyli gdy permission jest granted) – callsite załatwia to
+                // przez `LaunchedEffect` z auto-prośbą o uprawnienie.
                 myLocationButtonEnabled = true,
                 // Natywne +/- w prawym dolnym rogu mapy. contentPadding
-                // poniżej przesuwa je tak, by nie kolidowały z `+` FAB-em
-                // z MainScreena (też BottomEnd).
+                // poniżej przesuwa je wyraźnie wyżej nad globalny `+` FAB
+                // z MainScreena, żeby zoomować można było palcem bez
+                // kolizji ze sferą wpływu plusa.
                 zoomControlsEnabled = true,
                 mapToolbarEnabled = false,
                 compassEnabled = true
             ),
-            // Native zoom controls + atrybucja Google'a domyślnie siedzą w
-            // prawym dolnym rogu canvasu mapy, czyli pod globalnym FAB-em
-            // "+" z MainScreena. Przesuwamy je o ok. wysokość FAB-a +
-            // bottom navigation, żeby były dostępne palcem.
+            // Native zoom controls + atrybucja Google'a domyślnie siedzą
+            // w prawym dolnym rogu canvasu mapy – czyli pod globalnym
+            // `+` FAB-em z MainScreena. Przesuwamy je o tyle, żeby były
+            // wyraźnie nad nim z luzem na palec.
             //
-            // 96.dp ≈ 56 (FAB) + 16 (margin Scaffolda wokół FAB) + 24 (luz
-            // wizualny + bottom nav). Dobierane na oko, łatwo skorygować.
-            contentPadding = PaddingValues(bottom = 96.dp),
+            // 120.dp ≈ 56 (`+` FAB) + 16 (margin Scaffolda) + 48 (luz
+            // wizualny / dodatkowa bezpieczna strefa). Dobierane na oko,
+            // łatwo skorygować.
+            contentPadding = PaddingValues(bottom = 120.dp),
             // Tap w pustą część mapy = zamykamy bottom sheet (jeśli otwarty).
             onMapClick = { viewModel.onPlaceSelected(null) }
         ) {
@@ -419,12 +423,10 @@ private fun FiltersOverlay(
     onToggleTopRated: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    // Kategorie alfabetycznie po polskim labelu (Context-bound, więc remember
-    // z kluczem context). Spójnie z PlaceListScreen.
-    val orderedCategories = remember(context) {
-        PlaceCategory.entries.sortedBy { context.getString(it.labelRes).lowercase() }
-    }
+    // Kategorie w jednolitej kolejności wyświetlania (alfabetycznie po
+    // polskim labelu). Wspólne źródło prawdy z PlaceListScreen – patrz
+    // docs [rememberPlaceCategoriesInDisplayOrder].
+    val orderedCategories = rememberPlaceCategoriesInDisplayOrder()
 
     Surface(
         modifier = modifier,
