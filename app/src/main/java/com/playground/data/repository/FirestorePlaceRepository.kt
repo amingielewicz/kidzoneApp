@@ -12,8 +12,20 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/**
+ * Maks. czas na zapis do Firestore (w ms).
+ *
+ * Bez timeoutu Firebase retryuje w nieskończoność, gdy emulator ma popsute
+ * Google Play Services (znany glitch z `SecurityException: Unknown calling
+ * package name 'com.google.android.gms'`). Po tym czasie zwracamy
+ * [java.util.concurrent.TimeoutException], żeby UI mogło pokazać użytkownikowi
+ * sensowny komunikat zamiast wieczystego spinnera.
+ */
+private const val WRITE_TIMEOUT_MS = 30_000L
 
 /**
  * Implementacja [PlaceRepository] oparta o Firestore.
@@ -89,8 +101,20 @@ class FirestorePlaceRepository @Inject constructor(
         // pozniej moc czytac id z samego DTO bez polegania na nazwie dokumentu.
         val docRef = placesCollection().document()
         val placeWithId = place.copy(id = docRef.id)
-        docRef.set(PlaceDto.fromDomain(placeWithId)).await()
-        OpResult.success(placeWithId)
+        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+            docRef.set(PlaceDto.fromDomain(placeWithId)).await()
+            true
+        }
+        if (completed == null) {
+            OpResult.failure(
+                java.util.concurrent.TimeoutException(
+                    "Zapis trwa zbyt długo. Sprawdź połączenie z Internetem, " +
+                        "a jeśli używasz emulatora – wykonaj Cold Boot."
+                )
+            )
+        } else {
+            OpResult.success(placeWithId)
+        }
     } catch (e: Exception) {
         OpResult.failure(e)
     }
