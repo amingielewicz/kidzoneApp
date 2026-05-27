@@ -123,9 +123,9 @@ fun LoginScreen(
                                 Icons.Filled.Visibility
                             },
                             contentDescription = if (isPasswordVisible) {
-                                "Ukryj haslo"
+                                "Ukryj hasło"
                             } else {
-                                "Pokaz haslo"
+                                "Pokaż hasło"
                             }
                         )
                     }
@@ -181,7 +181,7 @@ fun LoginScreen(
 
                         if (webClientId.isBlank()) {
                             viewModel.showInlineMessage(
-                                "Wlacz Google Sign-In w Firebase Console i pobierz nowy google-services.json do app/"
+                                "Włącz Google Sign-In w Firebase Console i pobierz nowy google-services.json do app/"
                             )
                             return@launch
                         }
@@ -192,7 +192,7 @@ fun LoginScreen(
                             GoogleSignInResult.Cancelled -> Unit // user anulowal - bez komunikatu
                             GoogleSignInResult.NoGoogleAccountOnDevice ->
                                 viewModel.showInlineMessage(
-                                    "Brak konta Google na urzadzeniu. Dodaj konto w Ustawieniach Androida."
+                                    "Brak konta Google na urządzeniu. Dodaj konto w Ustawieniach Androida."
                                 )
                             is GoogleSignInResult.Error ->
                                 viewModel.showInlineMessage(result.message)

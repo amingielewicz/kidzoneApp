@@ -55,7 +55,7 @@ class FirebaseAuthRepository @Inject constructor(
         runFirebase {
             val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
             val firebaseUser = result.user
-                ?: throw IllegalStateException("Logowanie sie powiodlo, ale Firebase nie zwrocil uzytkownika")
+                ?: throw IllegalStateException("Logowanie się powiodło, ale Firebase nie zwrócił użytkownika")
             firebaseUser.toDomain()
         }
 
@@ -66,7 +66,7 @@ class FirebaseAuthRepository @Inject constructor(
     ): OpResult<User> = runFirebase {
         val result = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
         val firebaseUser = result.user
-            ?: throw IllegalStateException("Rejestracja sie powiodla, ale Firebase nie zwrocil uzytkownika")
+            ?: throw IllegalStateException("Rejestracja się powiodła, ale Firebase nie zwrócił użytkownika")
 
         // Ustaw display name na FirebaseUser, zeby byl dostepny od razu w UI.
         firebaseUser.updateProfile(
@@ -93,7 +93,7 @@ class FirebaseAuthRepository @Inject constructor(
         val credential = GoogleAuthProvider.getCredential(idToken, null)
         val result = firebaseAuth.signInWithCredential(credential).await()
         val firebaseUser = result.user
-            ?: throw IllegalStateException("Logowanie Google sie powiodlo, ale Firebase nie zwrocil uzytkownika")
+            ?: throw IllegalStateException("Logowanie Google się powiodło, ale Firebase nie zwrócił użytkownika")
 
         // Jesli to pierwsze logowanie tego uzytkownika - stworz mu dokument w `users`.
         val isNewUser = result.additionalUserInfo?.isNewUser == true

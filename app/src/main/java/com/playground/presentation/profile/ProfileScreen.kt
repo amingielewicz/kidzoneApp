@@ -18,9 +18,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
 /**
- * Profil uzytkownika - na razie pokazuje nazwe + e-mail i przycisk
- * wylogowania. Statystyki (liczba miejsc / opinii) i odznaki dolozymy w
- * kolejnej iteracji.
+ * Profil użytkownika – na razie pokazuje nazwę + e-mail i przycisk
+ * wylogowania. Statystyki (liczba miejsc / opinii) i odznaki dołożymy
+ * w kolejnej iteracji.
  */
 @Composable
 fun ProfileScreen(
@@ -36,7 +36,7 @@ fun ProfileScreen(
         verticalArrangement = Arrangement.Top
     ) {
         Text(
-            text = user?.name?.ifBlank { "Uzytkownik" } ?: "Uzytkownik",
+            text = user?.name?.ifBlank { "Użytkownik" } ?: "Użytkownik",
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.primary
         )

@@ -1,28 +1,28 @@
 package com.playground.utils
 
 /**
- * Typowane bledy uwierzytelniania - warstwa data tlumaczy na nie wyjatki
- * Firebase, dzieki czemu warstwa presentation moze je dyskryminowac bez
- * siegania do typow Firebase.
+ * Typowane błędy uwierzytelniania – warstwa data tłumaczy na nie wyjątki
+ * Firebase, dzięki czemu warstwa presentation może je dyskryminować bez
+ * sięgania do typów Firebase.
  */
 sealed class AuthException(message: String) : Exception(message) {
 
     /** Konto z podanym e-mailem nie istnieje. */
     data object UserNotFound : AuthException("Konto nie istnieje")
 
-    /** Nieprawidlowy e-mail lub haslo. */
-    data object InvalidCredentials : AuthException("Nieprawidlowy e-mail lub haslo")
+    /** Nieprawidłowy e-mail lub hasło. */
+    data object InvalidCredentials : AuthException("Nieprawidłowy e-mail lub hasło")
 
-    /** Konto z tym e-mailem juz istnieje (rejestracja). */
-    data object EmailAlreadyInUse : AuthException("Ten e-mail jest juz zajety")
+    /** Konto z tym e-mailem już istnieje (rejestracja). */
+    data object EmailAlreadyInUse : AuthException("Ten e-mail jest już zajęty")
 
-    /** Haslo nie spelnia wymagan Firebase (zwykle min. 6 znakow). */
-    data object WeakPassword : AuthException("Haslo jest za slabe (min. 6 znakow)")
+    /** Hasło nie spełnia wymagań Firebase (zwykle min. 6 znaków). */
+    data object WeakPassword : AuthException("Hasło jest za słabe (min. 6 znaków)")
 
     /** Niepoprawny format adresu e-mail. */
     data object InvalidEmail : AuthException("Niepoprawny format adresu e-mail")
 
-    /** Brak Internetu, timeout, blad po stronie Firebase. */
+    /** Brak Internetu, timeout, błąd po stronie Firebase. */
     data class Network(val networkCause: Throwable) :
-        AuthException(networkCause.message ?: "Blad polaczenia z serwerem")
+        AuthException(networkCause.message ?: "Błąd połączenia z serwerem")
 }
