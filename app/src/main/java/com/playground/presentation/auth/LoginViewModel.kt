@@ -16,8 +16,8 @@ import javax.inject.Inject
 /**
  * ViewModel ekranu logowania.
  *
- * Trzyma stan formularza ([UiState]), dyspozycjonuje akcje uzytkownika
- * (zaloguj, reset hasla) i tlumaczy bledy z [AuthException] na czytelne
+ * Trzyma stan formularza ([UiState]), dyspozycjonuje akcje użytkownika
+ * (zaloguj, reset hasła) i tłumaczy błędy z [AuthException] na czytelne
  * komunikaty po polsku.
  */
 @HiltViewModel
@@ -28,14 +28,14 @@ class LoginViewModel @Inject constructor(
     /**
      * Stan UI logowania.
      *
-     * @property email aktualna wartosc pola e-mail
-     * @property password aktualna wartosc pola haslo
+     * @property email aktualna wartość pola e-mail
+     * @property password aktualna wartość pola hasło
      * @property isLoading czy trwa request do Firebase
-     * @property message komunikat do pokazania uzytkownikowi (blad lub info)
-     * @property isMessageError true gdy [message] jest bledem (kolor czerwony),
-     *           false gdy informacja (np. "wyslano link resetujacy")
-     * @property isSignedIn true po pomyslnym logowaniu - sygnal dla UI by
-     *           wykonac nawigacje na main
+     * @property message komunikat do pokazania użytkownikowi (błąd lub info)
+     * @property isMessageError true gdy [message] jest błędem (kolor czerwony),
+     *           false gdy informacja (np. "wysłano link resetujący")
+     * @property isSignedIn true po pomyślnym logowaniu – sygnał dla UI by
+     *           wykonać nawigację na main
      */
     data class UiState(
         val email: String = "",
@@ -45,7 +45,7 @@ class LoginViewModel @Inject constructor(
         val isMessageError: Boolean = true,
         val isSignedIn: Boolean = false
     ) {
-        /** Oba pola wypelnione - tylko wtedy mozna kliknac "Zaloguj sie". */
+        /** Oba pola wypełnione – tylko wtedy można kliknąć "Zaloguj się". */
         val isFormValid: Boolean
             get() = email.isNotBlank() && password.isNotBlank()
     }
@@ -64,7 +64,7 @@ class LoginViewModel @Inject constructor(
     fun signIn() {
         val state = _uiState.value
         if (state.email.isBlank() || state.password.isBlank()) {
-            _uiState.update { it.copy(message = "Wypelnij e-mail i haslo", isMessageError = true) }
+            _uiState.update { it.copy(message = "Wypełnij e-mail i hasło", isMessageError = true) }
             return
         }
         viewModelScope.launch {
@@ -84,8 +84,8 @@ class LoginViewModel @Inject constructor(
     }
 
     /**
-     * Wywolywane z UI po uzyskaniu idToken z Google Sign-In (Credential Manager).
-     * Przekazuje token do repo, ktory wymienia go na sesje FirebaseAuth.
+     * Wywoływane z UI po uzyskaniu idToken z Google Sign-In (Credential Manager).
+     * Przekazuje token do repo, który wymienia go na sesję FirebaseAuth.
      */
     fun signInWithGoogle(idToken: String) {
         viewModelScope.launch {
@@ -104,7 +104,7 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    /** Pokazuje uzytkownikowi blad/info pochodzacy z procesu Google Sign-In w UI. */
+    /** Pokazuje użytkownikowi błąd/info pochodzący z procesu Google Sign-In w UI. */
     fun showInlineMessage(text: String, isError: Boolean = true) {
         _uiState.update { it.copy(message = text, isMessageError = isError) }
     }
@@ -114,7 +114,7 @@ class LoginViewModel @Inject constructor(
         if (email.isBlank()) {
             _uiState.update {
                 it.copy(
-                    message = "Wpisz e-mail w polu wyzej, zeby zresetowac haslo",
+                    message = "Wpisz e-mail w polu wyżej, żeby zresetować hasło",
                     isMessageError = true
                 )
             }
@@ -127,7 +127,7 @@ class LoginViewModel @Inject constructor(
                 when (result) {
                     is OpResult.Success -> it.copy(
                         isLoading = false,
-                        message = "Wyslalismy link do zresetowania hasla na $email",
+                        message = "Wysłaliśmy link do zresetowania hasła na $email",
                         isMessageError = false
                     )
                     is OpResult.Failure -> it.copy(
@@ -141,7 +141,7 @@ class LoginViewModel @Inject constructor(
     }
 
     private fun mapError(throwable: Throwable): String = when (throwable) {
-        is AuthException -> throwable.message ?: "Nieznany blad"
-        else -> throwable.message ?: "Nieznany blad"
+        is AuthException -> throwable.message ?: "Nieznany błąd"
+        else -> throwable.message ?: "Nieznany błąd"
     }
 }

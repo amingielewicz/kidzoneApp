@@ -56,13 +56,13 @@ import com.playground.domain.model.PlaceCategory
 import kotlinx.coroutines.launch
 
 /**
- * Ekran dodawania nowego miejsca - formularz zapisywany do Firestore.
+ * Ekran dodawania nowego miejsca – formularz zapisywany do Firestore.
  *
- *  - nazwa, opis, kategoria, adres - pola tekstowe
- *  - GPS przez przycisk "Pobierz moja lokalizacje" (uses FusedLocationClient,
- *    z permission requestem przy pierwszym uzyciu)
+ *  - nazwa, opis, kategoria, adres – pola tekstowe
+ *  - GPS przez przycisk "Pobierz moją lokalizację" (uses FusedLocationClient,
+ *    z permission requestem przy pierwszym użyciu)
  *  - udogodnienia jako FilterChips (multi-select)
- *  - przycisk "Zapisz miejsce" enabled tylko gdy formularz wazny
+ *  - przycisk "Zapisz miejsce" enabled tylko gdy formularz ważny
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,12 +75,12 @@ fun AddPlaceScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // Po pomyslnym zapisie - wracamy poziom wyzej.
+    // Po pomyślnym zapisie – wracamy poziom wyżej.
     LaunchedEffect(state.isSaved) {
         if (state.isSaved) onSaved()
     }
 
-    // Launcher prosby o uprawnienie lokalizacji.
+    // Launcher prośby o uprawnienie lokalizacji.
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -187,7 +187,7 @@ fun AddPlaceScreen(
                 enabled = !state.isSaving
             )
 
-            // --- Komunikat bledu ---
+            // --- Komunikat błędu ---
             state.errorMessage?.let { msg ->
                 Spacer(Modifier.height(12.dp))
                 Text(
@@ -221,7 +221,7 @@ fun AddPlaceScreen(
     }
 }
 
-/** Pobiera lokalizacje przez [fetchCurrentLocation] i propaguje do [viewModel]. */
+/** Pobiera lokalizację przez [fetchCurrentLocation] i propaguje do [viewModel]. */
 private suspend fun fetchAndSetLocation(
     context: android.content.Context,
     viewModel: AddPlaceViewModel
@@ -232,10 +232,10 @@ private suspend fun fetchAndSetLocation(
         if (coords != null) {
             viewModel.onLocationFetched(coords.first, coords.second)
         } else {
-            viewModel.onLocationError("Brak fixu GPS - sprawdz, czy lokalizacja jest wlaczona")
+            viewModel.onLocationError("Brak fixu GPS – sprawdź, czy lokalizacja jest włączona")
         }
     } catch (e: Exception) {
-        viewModel.onLocationError(e.message ?: "Blad pobierania lokalizacji")
+        viewModel.onLocationError(e.message ?: "Błąd pobierania lokalizacji")
     }
 }
 
@@ -308,9 +308,9 @@ private fun LocationSection(
                 Spacer(Modifier.size(8.dp))
                 Text(
                     text = if (latitude != null && longitude != null) {
-                        "Aktualizuj lokalizacje"
+                        "Aktualizuj lokalizację"
                     } else {
-                        "Pobierz moja lokalizacje *"
+                        "Pobierz moją lokalizację *"
                     }
                 )
             }
@@ -326,7 +326,7 @@ private fun LocationSection(
     }
 }
 
-/** Siatka FilterChip-ow do multi-select udogodnien. */
+/** Siatka FilterChip-ów do multi-select udogodnień. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AmenitiesGrid(
@@ -350,7 +350,7 @@ private fun AmenitiesGrid(
     }
 }
 
-/** Tekst etykiety + czerwona gwiazdka, do wymaganych pol. */
+/** Tekst etykiety + czerwona gwiazdka, do wymaganych pól. */
 @Composable
 private fun RequiredFieldLabel(text: String) {
     val errorColor = MaterialTheme.colorScheme.error

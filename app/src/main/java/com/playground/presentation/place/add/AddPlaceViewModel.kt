@@ -20,8 +20,8 @@ import javax.inject.Inject
 /**
  * ViewModel ekranu dodawania miejsca.
  *
- * Trzyma stan formularza i obsluguje akcje uzytkownika - zmiana pol,
- * pobranie GPS, toggle udogodnien, zapis do Firestore.
+ * Trzyma stan formularza i obsługuje akcje użytkownika – zmiana pól,
+ * pobranie GPS, toggle udogodnień, zapis do Firestore.
  */
 @HiltViewModel
 class AddPlaceViewModel @Inject constructor(
@@ -32,12 +32,12 @@ class AddPlaceViewModel @Inject constructor(
     /**
      * Stan UI ekranu "Dodaj miejsce".
      *
-     * @property latitude wspolrzedna geograficzna - null gdy nie pobrano
-     * @property longitude wspolrzedna geograficzna - null gdy nie pobrano
+     * @property latitude współrzędna geograficzna – null gdy nie pobrano
+     * @property longitude współrzędna geograficzna – null gdy nie pobrano
      * @property isFetchingLocation true podczas pobierania GPS
      * @property isSaving true podczas zapisu do Firestore
-     * @property errorMessage komunikat bledu (np. brak GPS, blad zapisu)
-     * @property isSaved true po pomyslnym zapisie - sygnal do nawigacji
+     * @property errorMessage komunikat błędu (np. brak GPS, błąd zapisu)
+     * @property isSaved true po pomyślnym zapisie – sygnał do nawigacji
      */
     data class UiState(
         val name: String = "",
@@ -52,7 +52,7 @@ class AddPlaceViewModel @Inject constructor(
         val errorMessage: String? = null,
         val isSaved: Boolean = false
     ) {
-        /** Wszystkie wymagane pola wypelnione - mozna kliknac "Zapisz". */
+        /** Wszystkie wymagane pola wypełnione – można kliknąć "Zapisz". */
         val isFormValid: Boolean
             get() = name.trim().isNotBlank() &&
                 address.trim().isNotBlank() &&
@@ -106,12 +106,12 @@ class AddPlaceViewModel @Inject constructor(
 
     /**
      * Buduje [Place] z aktualnego stanu UI i zapisuje przez repozytorium.
-     * Wymaga zalogowanego uzytkownika - jego id staje sie [Place.ownerUserId].
+     * Wymaga zalogowanego użytkownika – jego id staje się [Place.ownerUserId].
      */
     fun save() {
         val state = _uiState.value
         if (!state.isFormValid) {
-            _uiState.update { it.copy(errorMessage = "Wypelnij wymagane pola i pobierz lokalizacje") }
+            _uiState.update { it.copy(errorMessage = "Wypełnij wymagane pola i pobierz lokalizację") }
             return
         }
 
@@ -123,7 +123,7 @@ class AddPlaceViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isSaving = false,
-                        errorMessage = "Musisz byc zalogowany, by dodac miejsce"
+                        errorMessage = "Musisz być zalogowany, by dodać miejsce"
                     )
                 }
                 return@launch
@@ -148,7 +148,7 @@ class AddPlaceViewModel @Inject constructor(
                     is OpResult.Success -> it.copy(isSaving = false, isSaved = true)
                     is OpResult.Failure -> it.copy(
                         isSaving = false,
-                        errorMessage = result.error.message ?: "Blad zapisu miejsca"
+                        errorMessage = result.error.message ?: "Błąd zapisu miejsca"
                     )
                 }
             }

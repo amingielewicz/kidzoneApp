@@ -32,7 +32,7 @@ class RegisterViewModel @Inject constructor(
         val isNameValid: Boolean
             get() = name.trim().isNotBlank()
 
-        /** Prosta walidacja formatu - Firebase i tak zweryfikuje server-side. */
+        /** Prosta walidacja formatu – Firebase i tak zweryfikuje server-side. */
         val isEmailValid: Boolean
             get() = email.trim().let { trimmed ->
                 trimmed.contains('@') &&
@@ -43,7 +43,7 @@ class RegisterViewModel @Inject constructor(
         val isPasswordValid: Boolean
             get() = password.length >= 6
 
-        /** Wszystkie pola spelniaja warunki - mozna klikac "Zarejestruj sie". */
+        /** Wszystkie pola spełniają warunki – można klikać "Zarejestruj się". */
         val isFormValid: Boolean
             get() = isNameValid && isEmailValid && isPasswordValid
     }
@@ -71,7 +71,7 @@ class RegisterViewModel @Inject constructor(
 
         when {
             name.isBlank() -> {
-                _uiState.update { it.copy(errorMessage = "Podaj imie / nazwe uzytkownika") }
+                _uiState.update { it.copy(errorMessage = "Podaj imię / nazwę użytkownika") }
                 return
             }
             email.isBlank() -> {
@@ -79,7 +79,7 @@ class RegisterViewModel @Inject constructor(
                 return
             }
             password.length < 6 -> {
-                _uiState.update { it.copy(errorMessage = "Haslo musi miec min. 6 znakow") }
+                _uiState.update { it.copy(errorMessage = "Hasło musi mieć min. 6 znaków") }
                 return
             }
         }
@@ -100,7 +100,7 @@ class RegisterViewModel @Inject constructor(
     }
 
     private fun mapError(throwable: Throwable): String = when (throwable) {
-        is AuthException -> throwable.message ?: "Nieznany blad"
-        else -> throwable.message ?: "Nieznany blad"
+        is AuthException -> throwable.message ?: "Nieznany błąd"
+        else -> throwable.message ?: "Nieznany błąd"
     }
 }
