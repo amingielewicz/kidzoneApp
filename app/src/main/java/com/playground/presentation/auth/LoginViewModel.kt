@@ -44,7 +44,11 @@ class LoginViewModel @Inject constructor(
         val message: String? = null,
         val isMessageError: Boolean = true,
         val isSignedIn: Boolean = false
-    )
+    ) {
+        /** Oba pola wypelnione - tylko wtedy mozna kliknac "Zaloguj sie". */
+        val isFormValid: Boolean
+            get() = email.isNotBlank() && password.isNotBlank()
+    }
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()

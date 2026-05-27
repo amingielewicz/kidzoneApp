@@ -28,7 +28,25 @@ class RegisterViewModel @Inject constructor(
         val isLoading: Boolean = false,
         val errorMessage: String? = null,
         val isRegistered: Boolean = false
-    )
+    ) {
+        val isNameValid: Boolean
+            get() = name.trim().isNotBlank()
+
+        /** Prosta walidacja formatu - Firebase i tak zweryfikuje server-side. */
+        val isEmailValid: Boolean
+            get() = email.trim().let { trimmed ->
+                trimmed.contains('@') &&
+                    trimmed.substringAfter('@').contains('.') &&
+                    trimmed.length >= 5
+            }
+
+        val isPasswordValid: Boolean
+            get() = password.length >= 6
+
+        /** Wszystkie pola spelniaja warunki - mozna klikac "Zarejestruj sie". */
+        val isFormValid: Boolean
+            get() = isNameValid && isEmailValid && isPasswordValid
+    }
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()

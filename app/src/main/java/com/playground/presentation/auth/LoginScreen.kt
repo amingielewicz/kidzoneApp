@@ -30,9 +30,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.withStyle
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -83,7 +86,7 @@ fun LoginScreen(
             OutlinedTextField(
                 value = state.email,
                 onValueChange = viewModel::onEmailChange,
-                label = { Text(stringResource(R.string.email)) },
+                label = { RequiredFieldLabel(stringResource(R.string.email)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 enabled = !state.isLoading,
@@ -93,7 +96,7 @@ fun LoginScreen(
             OutlinedTextField(
                 value = state.password,
                 onValueChange = viewModel::onPasswordChange,
-                label = { Text(stringResource(R.string.password)) },
+                label = { RequiredFieldLabel(stringResource(R.string.password)) },
                 singleLine = true,
                 visualTransformation = if (isPasswordVisible) {
                     VisualTransformation.None
@@ -141,7 +144,7 @@ fun LoginScreen(
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = viewModel::signIn,
-                enabled = !state.isLoading,
+                enabled = !state.isLoading && state.isFormValid,
                 modifier = Modifier.fillMaxWidth().height(48.dp)
             ) {
                 if (state.isLoading) {
@@ -180,4 +183,21 @@ fun LoginScreen(
             }
         }
     }
+}
+
+/**
+ * Label dla wymaganego pola - tekst + czerwona gwiazdka. Uzywany w
+ * OutlinedTextField, gdzie label musi byc Composable.
+ */
+@Composable
+private fun RequiredFieldLabel(text: String) {
+    val errorColor = MaterialTheme.colorScheme.error
+    Text(
+        buildAnnotatedString {
+            append(text)
+            withStyle(SpanStyle(color = errorColor)) {
+                append(" *")
+            }
+        }
+    )
 }

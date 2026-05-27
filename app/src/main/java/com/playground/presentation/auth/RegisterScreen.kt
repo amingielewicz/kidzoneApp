@@ -32,9 +32,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.playground.R
@@ -80,8 +83,9 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = state.name,
                 onValueChange = viewModel::onNameChange,
-                label = { Text("Nazwa") },
+                label = { RequiredFieldLabel("Nazwa") },
                 singleLine = true,
+                isError = state.name.isNotEmpty() && !state.isNameValid,
                 enabled = !state.isLoading,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -89,8 +93,14 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = state.email,
                 onValueChange = viewModel::onEmailChange,
-                label = { Text(stringResource(R.string.email)) },
+                label = { RequiredFieldLabel(stringResource(R.string.email)) },
                 singleLine = true,
+                isError = state.email.isNotEmpty() && !state.isEmailValid,
+                supportingText = {
+                    if (state.email.isNotEmpty() && !state.isEmailValid) {
+                        Text("Niepoprawny format e-maila")
+                    }
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 enabled = !state.isLoading,
                 modifier = Modifier.fillMaxWidth()
@@ -99,8 +109,9 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = state.password,
                 onValueChange = viewModel::onPasswordChange,
-                label = { Text(stringResource(R.string.password)) },
+                label = { RequiredFieldLabel(stringResource(R.string.password)) },
                 singleLine = true,
+                isError = state.password.isNotEmpty() && !state.isPasswordValid,
                 visualTransformation = if (isPasswordVisible) {
                     VisualTransformation.None
                 } else {
@@ -143,7 +154,7 @@ fun RegisterScreen(
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = viewModel::register,
-                enabled = !state.isLoading,
+                enabled = !state.isLoading && state.isFormValid,
                 modifier = Modifier.fillMaxWidth().height(48.dp)
             ) {
                 if (state.isLoading) {
@@ -158,4 +169,20 @@ fun RegisterScreen(
             }
         }
     }
+}
+
+/**
+ * Label dla wymaganego pola - tekst + czerwona gwiazdka.
+ */
+@Composable
+private fun RequiredFieldLabel(text: String) {
+    val errorColor = MaterialTheme.colorScheme.error
+    Text(
+        buildAnnotatedString {
+            append(text)
+            withStyle(SpanStyle(color = errorColor)) {
+                append(" *")
+            }
+        }
+    )
 }
