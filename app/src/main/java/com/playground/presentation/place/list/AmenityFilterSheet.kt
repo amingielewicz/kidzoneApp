@@ -56,7 +56,41 @@ private data class AmenitySection(
     val matchingCategories: Set<PlaceCategory>
 )
 
+// Sekcje są ułożone alfabetycznie po tytule (locale-aware się tu nie liczy
+// bo same tytuły są ASCII-friendly Polish - kolejność stała na compile-time).
 private val SHEET_SECTIONS: List<AmenitySection> = listOf(
+    AmenitySection(
+        title = "Atrakcja",
+        amenities = listOf(
+            Amenity.STROLLER_RENTAL,
+            Amenity.REST_AREAS,
+            Amenity.FAMILY_FAST_TRACK,
+            Amenity.PARENT_CHILD_ROOM,
+            Amenity.LOST_CHILD_POINT
+        ),
+        matchingCategories = setOf(PlaceCategory.ATTRACTION)
+    ),
+    AmenitySection(
+        title = "Ogólne",
+        amenities = listOf(
+            Amenity.WIDE_DOORS,
+            Amenity.FAMILY_PARKING,
+            Amenity.KID_FRIENDLY_SIGNS,
+            Amenity.WIFI,
+            Amenity.QUIET_AREAS
+        ),
+        matchingCategories = emptySet()
+    ),
+    AmenitySection(
+        title = "Park",
+        amenities = listOf(
+            Amenity.PICNIC_AREA,
+            Amenity.SAFE_PATHS,
+            Amenity.DRINKING_WATER,
+            Amenity.BREASTFEEDING_AREA
+        ),
+        matchingCategories = setOf(PlaceCategory.PARK)
+    ),
     AmenitySection(
         title = "Plac zabaw",
         amenities = listOf(
@@ -97,38 +131,6 @@ private val SHEET_SECTIONS: List<AmenitySection> = listOf(
             Amenity.LOCKERS
         ),
         matchingCategories = setOf(PlaceCategory.PLAY_ROOM)
-    ),
-    AmenitySection(
-        title = "Park",
-        amenities = listOf(
-            Amenity.PICNIC_AREA,
-            Amenity.SAFE_PATHS,
-            Amenity.DRINKING_WATER,
-            Amenity.BREASTFEEDING_AREA
-        ),
-        matchingCategories = setOf(PlaceCategory.PARK)
-    ),
-    AmenitySection(
-        title = "Atrakcja",
-        amenities = listOf(
-            Amenity.STROLLER_RENTAL,
-            Amenity.REST_AREAS,
-            Amenity.FAMILY_FAST_TRACK,
-            Amenity.PARENT_CHILD_ROOM,
-            Amenity.LOST_CHILD_POINT
-        ),
-        matchingCategories = setOf(PlaceCategory.ATTRACTION)
-    ),
-    AmenitySection(
-        title = "Ogólne",
-        amenities = listOf(
-            Amenity.WIDE_DOORS,
-            Amenity.FAMILY_PARKING,
-            Amenity.KID_FRIENDLY_SIGNS,
-            Amenity.WIFI,
-            Amenity.QUIET_AREAS
-        ),
-        matchingCategories = emptySet()
     )
 )
 
@@ -291,6 +293,12 @@ private fun SectionItem(
         }
 
         AnimatedVisibility(visible = expanded) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            // Udogodnienia w sekcji alfabetycznie po polskim labelu
+            // (locale-aware, więc np. "Ł" idzie po "L").
+            val sortedAmenities = remember(section, context) {
+                section.amenities.sortedBy { context.getString(it.labelRes).lowercase() }
+            }
             FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -298,7 +306,7 @@ private fun SectionItem(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                section.amenities.forEach { amenity ->
+                sortedAmenities.forEach { amenity ->
                     val labelText = androidx.compose.ui.res.stringResource(amenity.labelRes)
                     FilterChip(
                         selected = amenity in selectedAmenities,

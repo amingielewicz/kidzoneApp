@@ -21,14 +21,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -36,11 +38,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -55,8 +59,11 @@ import kotlinx.coroutines.launch
  * 4 najczęściej szukane udogodnienia – pokazujemy je jako quick-chipy
  * bezpośrednio na ekranie (zawsze widoczne, multi-select). Pasują do każdej
  * kategorii i to po nich rodzice filtrują najczęściej.
+ *
+ * Kolejność wyświetlania jest sortowana alfabetycznie po polskim labelu
+ * w runtime'ie (zob. [QuickAmenityBar]).
  */
-private val QUICK_AMENITIES = listOf(
+private val QUICK_AMENITIES = setOf(
     Amenity.CHANGING_TABLE,
     Amenity.TOILET,
     Amenity.STROLLER_ACCESS,
@@ -187,6 +194,14 @@ private fun CategoryFilterBar(
     selectedCategory: PlaceCategory?,
     onCategorySelected: (PlaceCategory?) -> Unit
 ) {
+    val context = LocalContext.current
+    // Kategorie alfabetycznie po polskim labelu – pobieramy w runtime'ie,
+    // bo @StringRes znamy dopiero z Contextem. "Wszystkie" zostaje zawsze
+    // na pierwszej pozycji bo to nie jest filtr per se, tylko reset.
+    val orderedCategories = remember(context) {
+        PlaceCategory.entries.sortedBy { context.getString(it.labelRes).lowercase() }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -199,7 +214,7 @@ private fun CategoryFilterBar(
             onClick = { onCategorySelected(null) },
             label = { Text("Wszystkie") }
         )
-        PlaceCategory.entries.forEach { category ->
+        orderedCategories.forEach { category ->
             val style = category.style
             FilterChip(
                 selected = selectedCategory == category,
@@ -217,6 +232,16 @@ private fun CategoryFilterBar(
     }
 }
 
+/**
+ * Drugi rząd filtrów na ekranie listy.
+ *
+ * Po **lewej** – ikonowy `FilledTonalIconButton` (otwiera sheet z resztą
+ * udogodnień). Z [BadgedBox] pokazującym liczbę aktywnych filtrów spoza
+ * quick-set. Bez tekstu, sam ikona [Icons.Filled.Tune].
+ *
+ * Po prawej – 4 uniwersalne quick-amenity chipy, sortowane alfabetycznie
+ * po polskim labelu.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun QuickAmenityBar(
@@ -225,6 +250,11 @@ private fun QuickAmenityBar(
     onAmenityToggled: (Amenity) -> Unit,
     onOpenFilterSheet: () -> Unit
 ) {
+    val context = LocalContext.current
+    val orderedQuickAmenities = remember(context) {
+        QUICK_AMENITIES.sortedBy { context.getString(it.labelRes).lowercase() }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -233,42 +263,40 @@ private fun QuickAmenityBar(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        QUICK_AMENITIES.forEach { amenity ->
+        // 1. Button "Filtry" jako PIERWSZY z lewej, sam ikon.
+        BadgedBox(
+            badge = {
+                if (advancedFiltersCount > 0) {
+                    Badge { Text(advancedFiltersCount.toString()) }
+                }
+            }
+        ) {
+            FilledTonalIconButton(
+                onClick = onOpenFilterSheet,
+                colors = if (advancedFiltersCount > 0) {
+                    IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                } else {
+                    IconButtonDefaults.filledTonalIconButtonColors()
+                }
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Tune,
+                    contentDescription = "Filtry"
+                )
+            }
+        }
+
+        // 2. Quick amenities (alfabetycznie).
+        orderedQuickAmenities.forEach { amenity ->
             FilterChip(
                 selected = amenity in selectedAmenities,
                 onClick = { onAmenityToggled(amenity) },
                 label = { Text(stringResource(amenity.labelRes)) }
             )
         }
-
-        AssistChip(
-            onClick = onOpenFilterSheet,
-            label = {
-                Text(
-                    text = if (advancedFiltersCount > 0) {
-                        "Filtry · $advancedFiltersCount"
-                    } else {
-                        "Filtry"
-                    },
-                    fontWeight = if (advancedFiltersCount > 0) FontWeight.SemiBold else FontWeight.Normal
-                )
-            },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Filled.Tune,
-                    contentDescription = null
-                )
-            },
-            colors = if (advancedFiltersCount > 0) {
-                AssistChipDefaults.assistChipColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    labelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    leadingIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            } else {
-                AssistChipDefaults.assistChipColors()
-            }
-        )
     }
 }
 
