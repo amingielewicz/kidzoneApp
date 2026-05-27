@@ -10,7 +10,7 @@
       "client_info": {
         "mobilesdk_app_id": "REPLACE_WITH_APP_ID",
         "android_client_info": {
-          "package_name": "com.playword"
+          "package_name": "com.playground"
         }
       },
       "api_key": [

@@ -1,8 +1,8 @@
-# PlayWord
+# Playground
 
 > Mapa miejsc przyjaznych dzieciom — aplikacja mobilna Android.
 
-PlayWord to społecznościowa aplikacja dla rodziców i opiekunów. Pozwala
+Playground to społecznościowa aplikacja dla rodziców i opiekunów. Pozwala
 dodawać i oceniać miejsca przyjazne dzieciom (place zabaw, restauracje
 z kącikiem dla dzieci, sale zabaw, parki, kawiarnie rodzinne), wyszukiwać
 je na mapie, filtrować po kategorii i sprawdzać najlepsze pozycje
@@ -26,8 +26,8 @@ zaznaczona jako `TODO` i będzie wypełniana w kolejnych iteracjach.
 ## Struktura projektu
 
 ```
-app/src/main/java/com/playword
-├── PlayWordApplication.kt   # @HiltAndroidApp
+app/src/main/java/com/playground
+├── PlaygroundApplication.kt   # @HiltAndroidApp
 ├── MainActivity.kt          # @AndroidEntryPoint, host Compose
 │
 ├── data
@@ -88,7 +88,7 @@ Alternatywnie zaimportuj projekt do Android Studio – IDE doda wrapper za Ciebi
 ### 3. Konfiguracja Firebase
 
 1. W konsoli Firebase utwórz projekt.
-2. Dodaj aplikację Android z `applicationId = com.playword`.
+2. Dodaj aplikację Android z `applicationId = com.playground`.
 3. Pobierz `google-services.json` i wrzuć do `app/google-services.json`.
    (Przykładowa struktura jest w `app/google-services.json.template`).
 4. Włącz: Authentication (e-mail/hasło, Google), Cloud Firestore, Storage.

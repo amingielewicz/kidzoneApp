@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PlayWord"
+rootProject.name = "Playground"
 include(":app")

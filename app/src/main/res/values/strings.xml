@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">PlayWord</string>
+    <string name="app_name">Playground</string>
     <string name="app_tagline">Mapa miejsc przyjaznych dzieciom</string>
 
     <!-- Auth -->

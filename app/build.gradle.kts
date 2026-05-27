@@ -8,11 +8,11 @@ plugins {
 }
 
 android {
-    namespace = "com.playword"
+    namespace = "com.playground"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.playword"
+        applicationId = "com.playground"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
