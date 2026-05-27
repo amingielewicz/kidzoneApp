@@ -89,11 +89,17 @@ class AddPlaceViewModel @Inject constructor(
         _uiState.update { it.copy(isFetchingLocation = true, errorMessage = null) }
     }
 
-    fun onLocationFetched(latitude: Double, longitude: Double) {
+    /**
+     * Po udanym pobraniu GPS (i ewentualnym reverse geocodingu) zapisuje
+     * współrzędne i nadpisuje pole adresu jeśli geocoder coś zwrócił. Jeśli
+     * [address] jest null/puste, zachowujemy to, co użytkownik wpisał ręcznie.
+     */
+    fun onLocationFetched(latitude: Double, longitude: Double, address: String? = null) {
         _uiState.update {
             it.copy(
                 latitude = latitude,
                 longitude = longitude,
+                address = address?.takeIf { it.isNotBlank() } ?: it.address,
                 isFetchingLocation = false,
                 errorMessage = null
             )

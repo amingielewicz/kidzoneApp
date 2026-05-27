@@ -221,7 +221,12 @@ fun AddPlaceScreen(
     }
 }
 
-/** Pobiera lokalizację przez [fetchCurrentLocation] i propaguje do [viewModel]. */
+/**
+ * Pobiera GPS przez [fetchCurrentLocation], a następnie best-effort
+ * reverse-geocoduje współrzędne na adres przez [reverseGeocode].
+ * Wszystko propaguje jednym wołaniem do ViewModelu, dzięki czemu spinner
+ * znika jednorazowo (a nie miga między fazami).
+ */
 private suspend fun fetchAndSetLocation(
     context: android.content.Context,
     viewModel: AddPlaceViewModel
@@ -229,11 +234,14 @@ private suspend fun fetchAndSetLocation(
     viewModel.onFetchingLocationStart()
     try {
         val coords = fetchCurrentLocation(context)
-        if (coords != null) {
-            viewModel.onLocationFetched(coords.first, coords.second)
-        } else {
+        if (coords == null) {
             viewModel.onLocationError("Brak fixu GPS – sprawdź, czy lokalizacja jest włączona")
+            return
         }
+        // Reverse geocoding jest best-effort – jego błędy nie blokują flow.
+        val address = runCatching { reverseGeocode(context, coords.first, coords.second) }
+            .getOrNull()
+        viewModel.onLocationFetched(coords.first, coords.second, address)
     } catch (e: Exception) {
         viewModel.onLocationError(e.message ?: "Błąd pobierania lokalizacji")
     }
