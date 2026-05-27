@@ -7,6 +7,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +28,9 @@ import com.playground.R
 /**
  * Ekran startowy: pokazuje logo / nazwę i decyduje, czy wypchnąć
  * użytkownika do logowania, czy do głównego shella.
+ *
+ * Wizualnie: pełny ekran w `colorScheme.primary` (BrandBlue) z białym logiem
+ * (ikona miejsca), nazwą aplikacji, taglinem i progress indicator pod spodem.
  */
 @Composable
 fun SplashScreen(
@@ -50,9 +58,18 @@ fun SplashScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            // Tymczasowe logo: ikona Place w kolorze onPrimary. Gdy będzie
+            // gotowy assets ic_logo.xml, podmienić na painterResource.
+            Icon(
+                imageVector = Icons.Filled.Place,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(96.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.displayLarge,
+                style = MaterialTheme.typography.displayMedium,
                 color = MaterialTheme.colorScheme.onPrimary
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -60,6 +77,12 @@ fun SplashScreen(
                 text = stringResource(R.string.app_tagline),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onPrimary
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+            CircularProgressIndicator(
+                color = MaterialTheme.colorScheme.onPrimary,
+                strokeWidth = 3.dp,
+                modifier = Modifier.size(32.dp)
             )
         }
     }

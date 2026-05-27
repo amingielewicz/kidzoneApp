@@ -96,7 +96,18 @@ fun MainScreen(
             modifier = Modifier.padding(padding)
         ) {
             composable(Route.Home.path) {
-                HomeScreen(onOpenPlaceDetails = onOpenPlaceDetails)
+                HomeScreen(
+                    onOpenPlaceDetails = onOpenPlaceDetails,
+                    onOpenMap = {
+                        navController.navigate(Route.Map.path) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
             }
             composable(Route.Map.path) {
                 MapScreen(onOpenPlaceDetails = onOpenPlaceDetails)
