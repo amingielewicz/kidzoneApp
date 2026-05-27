@@ -180,7 +180,7 @@ fun AddPlaceScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // --- Udogodnienia (FilterChips) ---
+            // --- Udogodnienia (FilterChips) – filtrowane po wybranej kategorii ---
             Text(
                 text = "Udogodnienia",
                 style = MaterialTheme.typography.titleMedium
@@ -188,6 +188,7 @@ fun AddPlaceScreen(
             Spacer(Modifier.height(8.dp))
             AmenitiesGrid(
                 selected = state.amenities,
+                category = state.category,
                 onToggle = viewModel::toggleAmenity,
                 enabled = !state.isSaving
             )
@@ -355,20 +356,22 @@ private fun LocationSection(
     }
 }
 
-/** Siatka FilterChip-ów do multi-select udogodnień. */
+/** Siatka FilterChip-ów do multi-select udogodnień, filtrowana po [category]. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AmenitiesGrid(
     selected: Set<Amenity>,
+    category: PlaceCategory,
     onToggle: (Amenity) -> Unit,
     enabled: Boolean
 ) {
+    val applicable = remember(category) { Amenity.forCategory(category) }
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Amenity.entries.forEach { amenity ->
+        applicable.forEach { amenity ->
             FilterChip(
                 selected = amenity in selected,
                 onClick = { onToggle(amenity) },

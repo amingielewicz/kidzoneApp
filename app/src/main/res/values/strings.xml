@@ -32,10 +32,60 @@
     <string name="category_attraction">Atrakcja</string>
     <string name="category_other">Inne</string>
 
-    <!-- Amenities -->
+    <!-- Amenities (TL;DR – wszędzie istotne) -->
     <string name="amenity_changing_table">Przewijak</string>
-    <string name="amenity_kids_menu">Menu dziecięce</string>
+    <string name="amenity_toilet">Czysta toaleta</string>
+    <string name="amenity_stroller_access">Dostęp / miejsce dla wózka</string>
     <string name="amenity_parking">Parking</string>
-    <string name="amenity_toilet">Toaleta</string>
-    <string name="amenity_stroller_access">Dostęp dla wózków</string>
+
+    <!-- Amenities – Plac zabaw -->
+    <string name="amenity_fencing">Ogrodzenie</string>
+    <string name="amenity_soft_surface">Miękka nawierzchnia</string>
+    <string name="amenity_shaded_benches">Ławki w cieniu</string>
+    <string name="amenity_toddler_zone">Strefa dla małych dzieci (0–3)</string>
+    <string name="amenity_car_free_area">Brak ruchu samochodowego</string>
+
+    <!-- Amenities – Restauracja -->
+    <string name="amenity_kids_menu">Menu dziecięce</string>
+    <string name="amenity_high_chair">Krzesełka do karmienia</string>
+    <string name="amenity_kids_tableware">Bezpieczne naczynia dziecięce</string>
+    <string name="amenity_fast_service">Szybka obsługa</string>
+    <string name="amenity_kids_entertainment">Kredki, kolorowanki, zabawki</string>
+    <string name="amenity_kids_corner_visible">Kącik zabaw widoczny od stolika</string>
+
+    <!-- Amenities – Sala zabaw -->
+    <string name="amenity_age_zones">Podział na strefy wiekowe</string>
+    <string name="amenity_animator">Opieka animatora</string>
+    <string name="amenity_monitoring">Monitoring</string>
+    <string name="amenity_toy_sanitization">Dezynfekcja zabawek</string>
+    <string name="amenity_parent_zone">Strefa dla rodziców</string>
+    <string name="amenity_lockers">Szafki na rzeczy</string>
+    <string name="amenity_soft_protection">Miękkie zabezpieczenia</string>
+
+    <!-- Amenities – Kawiarnia -->
+    <string name="amenity_quiet_feeding">Ciche miejsce do karmienia</string>
+    <string name="amenity_microwave">Mikrofalówka</string>
+    <string name="amenity_no_loud_music">Bez głośnej muzyki</string>
+    <string name="amenity_sensory_toys">Książeczki / zabawki sensoryczne</string>
+
+    <!-- Amenities – Park -->
+    <string name="amenity_picnic_area">Strefa piknikowa</string>
+    <string name="amenity_safe_paths">Bezpieczne alejki (wózek + rowerek)</string>
+    <string name="amenity_drinking_water">Woda pitna / fontanna</string>
+    <string name="amenity_breastfeeding_area">Miejsce do karmienia piersią</string>
+    <string name="amenity_good_lighting">Dobre oświetlenie wieczorem</string>
+
+    <!-- Amenities – Atrakcja -->
+    <string name="amenity_stroller_rental">Wypożyczalnia wózków</string>
+    <string name="amenity_rest_areas">Strefy odpoczynku</string>
+    <string name="amenity_family_fast_track">Priorytetowe wejście dla rodzin</string>
+    <string name="amenity_parent_child_room">Pokój rodzic + dziecko</string>
+    <string name="amenity_lost_child_point">Punkt zgubionych dzieci</string>
+
+    <!-- Amenities – Inne (ogólne) -->
+    <string name="amenity_wide_doors">Szerokie drzwi i przejścia</string>
+    <string name="amenity_family_parking">Miejsca parkingowe „family”</string>
+    <string name="amenity_kid_friendly_signs">Oznaczenia przyjazne dzieciom</string>
+    <string name="amenity_wifi">WiFi</string>
+    <string name="amenity_quiet_areas">Strefy ciszy</string>
 </resources>

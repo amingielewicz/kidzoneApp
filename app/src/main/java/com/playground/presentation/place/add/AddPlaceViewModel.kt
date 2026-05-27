@@ -68,8 +68,17 @@ class AddPlaceViewModel @Inject constructor(
     fun onDescriptionChange(value: String) =
         _uiState.update { it.copy(description = value, errorMessage = null) }
 
-    fun onCategoryChange(category: PlaceCategory) =
-        _uiState.update { it.copy(category = category, errorMessage = null) }
+    fun onCategoryChange(category: PlaceCategory) {
+        _uiState.update { state ->
+            // Po zmianie kategorii pruneujemy wybrane udogodnienia, żeby nie
+            // zostawić zaznaczonych takich, które nie pasują do nowej kategorii
+            // (są wtedy poza widokiem usera, ale nadal w state.amenities).
+            val pruned = state.amenities
+                .filter { category in it.applicableCategories }
+                .toSet()
+            state.copy(category = category, amenities = pruned, errorMessage = null)
+        }
+    }
 
     fun onAddressChange(value: String) =
         _uiState.update { it.copy(address = value, errorMessage = null) }
