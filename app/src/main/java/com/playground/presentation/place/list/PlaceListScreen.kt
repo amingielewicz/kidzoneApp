@@ -20,6 +20,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,27 +31,52 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.playground.domain.model.Amenity
 import com.playground.domain.model.Place
 import com.playground.domain.model.PlaceCategory
 import com.playground.presentation.common.style
+import kotlinx.coroutines.launch
 
 /**
- * Lista miejsc – LazyColumn kart z filtrami po kategorii.
+ * 4 najczęściej szukane udogodnienia – pokazujemy je jako quick-chipy
+ * bezpośrednio na ekranie (zawsze widoczne, multi-select). Pasują do każdej
+ * kategorii i to po nich rodzice filtrują najczęściej.
+ */
+private val QUICK_AMENITIES = listOf(
+    Amenity.CHANGING_TABLE,
+    Amenity.TOILET,
+    Amenity.STROLLER_ACCESS,
+    Amenity.PARKING
+)
+
+/**
+ * Lista miejsc – LazyColumn kart z filtrami po kategorii i udogodnieniach.
  *
  * Subskrybuje Firestore przez [PlaceListViewModel] – snapshot listener
  * w repo automatycznie aktualizuje listę po dodaniu nowego miejsca z
  * [com.playground.presentation.place.add.AddPlaceScreen], bez potrzeby
  * pull-to-refresh.
+ *
+ * Filtry:
+ *  - kategoria (single-select chipy w pierwszym rzędzie)
+ *  - 4 uniwersalne udogodnienia (multi-select chipy w drugim rzędzie)
+ *  - pełna lista udogodnień (multi-select w bottom sheecie pod "Filtry · N")
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlaceListScreen(
     onOpenPlaceDetails: (placeId: String) -> Unit,
@@ -56,10 +84,25 @@ fun PlaceListScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
+    var showFilterSheet by rememberSaveable { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+
+    // Liczba aktywnych filtrów udogodnień siedzących w sheecie
+    // (wszystko poza QUICK_AMENITIES – te są na ekranie głównym i mają osobny stan wizualny).
+    val advancedAmenitiesCount = state.selectedAmenities.count { it !in QUICK_AMENITIES }
+
     Column(modifier = Modifier.fillMaxSize()) {
         CategoryFilterBar(
             selectedCategory = state.selectedCategory,
             onCategorySelected = viewModel::onCategorySelected
+        )
+
+        QuickAmenityBar(
+            selectedAmenities = state.selectedAmenities,
+            advancedFiltersCount = advancedAmenitiesCount,
+            onAmenityToggled = viewModel::onAmenityToggled,
+            onOpenFilterSheet = { showFilterSheet = true }
         )
 
         when {
@@ -95,7 +138,7 @@ fun PlaceListScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Brak miejsc do wyświetlenia",
+                        text = "Brak miejsc pasujących do filtrów",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -117,6 +160,24 @@ fun PlaceListScreen(
                 }
             }
         }
+    }
+
+    if (showFilterSheet) {
+        AmenityFilterSheet(
+            sheetState = sheetState,
+            selectedCategory = state.selectedCategory,
+            selectedAmenities = state.selectedAmenities,
+            totalResultsCount = state.places.size,
+            onAmenityToggled = viewModel::onAmenityToggled,
+            onClearAll = viewModel::onAmenitiesCleared,
+            onDismiss = {
+                scope.launch {
+                    sheetState.hide()
+                }.invokeOnCompletion {
+                    if (!sheetState.isVisible) showFilterSheet = false
+                }
+            }
+        )
     }
 }
 
@@ -153,6 +214,61 @@ private fun CategoryFilterBar(
                 label = { Text(stringResource(category.labelRes)) }
             )
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QuickAmenityBar(
+    selectedAmenities: Set<Amenity>,
+    advancedFiltersCount: Int,
+    onAmenityToggled: (Amenity) -> Unit,
+    onOpenFilterSheet: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        QUICK_AMENITIES.forEach { amenity ->
+            FilterChip(
+                selected = amenity in selectedAmenities,
+                onClick = { onAmenityToggled(amenity) },
+                label = { Text(stringResource(amenity.labelRes)) }
+            )
+        }
+
+        AssistChip(
+            onClick = onOpenFilterSheet,
+            label = {
+                Text(
+                    text = if (advancedFiltersCount > 0) {
+                        "Filtry · $advancedFiltersCount"
+                    } else {
+                        "Filtry"
+                    },
+                    fontWeight = if (advancedFiltersCount > 0) FontWeight.SemiBold else FontWeight.Normal
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Filled.Tune,
+                    contentDescription = null
+                )
+            },
+            colors = if (advancedFiltersCount > 0) {
+                AssistChipDefaults.assistChipColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    labelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    leadingIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            } else {
+                AssistChipDefaults.assistChipColors()
+            }
+        )
     }
 }
 
