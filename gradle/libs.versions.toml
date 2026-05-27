@@ -1,6 +1,6 @@
 [versions]
 # Build
-agp = "8.5.2"
+agp = "8.13.2"
 kotlin = "2.0.20"
 ksp = "2.0.20-1.0.25"
 googleServices = "4.4.2"
