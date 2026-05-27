@@ -11,19 +11,24 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 
 /**
- * Profil użytkownika – placeholder.
- *
- * Docelowo: avatar, nazwa, e-mail, liczba dodanych miejsc, liczba opinii,
- * lista odznak, przycisk "Wyloguj".
+ * Profil uzytkownika - na razie pokazuje nazwe + e-mail i przycisk
+ * wylogowania. Statystyki (liczba miejsc / opinii) i odznaki dolozymy w
+ * kolejnej iteracji.
  */
 @Composable
 fun ProfileScreen(
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    viewModel: ProfileViewModel = hiltViewModel()
 ) {
+    val user by viewModel.currentUser.collectAsState()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -31,17 +36,25 @@ fun ProfileScreen(
         verticalArrangement = Arrangement.Top
     ) {
         Text(
-            text = "Profil",
-            style = MaterialTheme.typography.headlineMedium
+            text = user?.name?.ifBlank { "Uzytkownik" } ?: "Uzytkownik",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.primary
         )
+        user?.email?.takeIf { it.isNotBlank() }?.let { email ->
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = email,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
         Spacer(Modifier.height(16.dp))
         Text(
             text = "TODO: avatar, statystyki (miejsca/opinie), odznaki",
-            style = MaterialTheme.typography.bodyLarge
+            style = MaterialTheme.typography.bodyMedium
         )
         Spacer(Modifier.height(24.dp))
         Button(
-            onClick = onSignOut,
+            onClick = { viewModel.signOut(onSignOut) },
             modifier = Modifier.fillMaxWidth().height(48.dp)
         ) {
             Text("Wyloguj")
