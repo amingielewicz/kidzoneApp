@@ -5,15 +5,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.playground.domain.model.Place
 import com.playground.domain.model.Review
+import com.playground.domain.model.User
+import com.playground.domain.repository.AuthRepository
 import com.playground.domain.repository.PlaceRepository
 import com.playground.domain.repository.ReviewRepository
 import com.playground.navigation.Route
 import com.playground.utils.OpResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -21,33 +26,45 @@ import javax.inject.Inject
 /**
  * ViewModel ekranu szczegółów miejsca.
  *
- * Ładuje pojedyncze [Place] przez [PlaceRepository.getPlace] (jednorazowo)
- * oraz subskrybuje [ReviewRepository.observeReviewsForPlace] – snapshot
- * listener pcha nowe opinie do UI bez refresh-u.
+ * Ładuje:
+ *  - pojedyncze [Place] przez [PlaceRepository.getPlace] (one-shot),
+ *  - dane autora przez [AuthRepository.getUserById] (one-shot, po załadowaniu
+ *    place'a),
+ *  - listę opinii przez [ReviewRepository.observeReviewsForPlace] (live).
  *
- * Nie korzystamy tu z `observePlaces`, bo tej funkcji w repo nie ma w wersji
- * "pojedynczego dokumentu" – `getPlace` jest one-shot i wystarczy do
- * pierwszego wyrenderowania. Jeśli średnia ocen się zmieni (po dodaniu
- * opinii), można później dodać `observePlace(id)` w repo.
+ * Eksponuje też strumień [currentUser] do wyliczenia czy aktualny użytkownik
+ * jest właścicielem miejsca (i tym samym czy może edytować/usuwać).
+ *
+ * Akcja [delete] usuwa miejsce po potwierdzeniu w UI – zwraca przez
+ * `isDeleted=true` w state, na który ekran nawiguje.
  */
 @HiltViewModel
 class PlaceDetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val placeRepository: PlaceRepository,
+    private val authRepository: AuthRepository,
     reviewRepository: ReviewRepository
 ) : ViewModel() {
 
     /**
      * @property place załadowane miejsce; null gdy jeszcze nie wczytane lub nie istnieje
+     * @property author dane autora; null gdy jeszcze nie pobrane lub nie znaleziono
      * @property reviews opinie z snapshot listenera (już posortowane po dacie desc)
      * @property isLoading true do pierwszego wyniku `getPlace`
      * @property errorMessage komunikat błędu z `getPlace` lub strumienia opinii
+     * @property isDeleting true podczas wywoływania `deletePlace`
+     * @property isDeleted true po pomyślnym usunięciu – sygnał dla UI do nawigacji
+     * @property deleteErrorMessage komunikat błędu z `deletePlace`
      */
     data class UiState(
         val place: Place? = null,
+        val author: User? = null,
         val reviews: List<Review> = emptyList(),
         val isLoading: Boolean = true,
-        val errorMessage: String? = null
+        val errorMessage: String? = null,
+        val isDeleting: Boolean = false,
+        val isDeleted: Boolean = false,
+        val deleteErrorMessage: String? = null
     )
 
     private val placeId: String =
@@ -55,6 +72,13 @@ class PlaceDetailsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    /**
+     * Aktualnie zalogowany użytkownik – używamy go w UI do sprawdzenia
+     * czy pokazać akcje edytuj/usuń.
+     */
+    val currentUser: StateFlow<User?> = authRepository.currentUser
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     init {
         loadPlace()
@@ -100,8 +124,11 @@ class PlaceDetailsViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         viewModelScope.launch {
             when (val result = placeRepository.getPlace(placeId)) {
-                is OpResult.Success -> _uiState.update {
-                    it.copy(place = result.data, isLoading = false, errorMessage = null)
+                is OpResult.Success -> {
+                    _uiState.update {
+                        it.copy(place = result.data, isLoading = false, errorMessage = null)
+                    }
+                    loadAuthor(result.data.ownerUserId)
                 }
                 is OpResult.Failure -> _uiState.update {
                     it.copy(
@@ -111,5 +138,56 @@ class PlaceDetailsViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun loadAuthor(ownerUserId: String) {
+        if (ownerUserId.isBlank()) return
+        viewModelScope.launch {
+            // Best-effort – brak autora nie blokuje wyświetlenia szczegółów,
+            // pokazujemy wtedy tylko datę bez nicka.
+            when (val result = authRepository.getUserById(ownerUserId)) {
+                is OpResult.Success -> _uiState.update { it.copy(author = result.data) }
+                is OpResult.Failure -> { /* zostawiamy author = null */ }
+            }
+        }
+    }
+
+    /**
+     * Usuwa aktualnie wyświetlane miejsce. Powinno być wywołane TYLKO gdy
+     * [isCurrentUserOwner] = true (UI tak filtruje), ale dodatkowo tu robimy
+     * sanity-check zalogowanego użytkownika.
+     */
+    fun delete() {
+        val place = _uiState.value.place ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isDeleting = true, deleteErrorMessage = null) }
+
+            val user = authRepository.currentUser.first()
+            if (user == null || user.id != place.ownerUserId) {
+                _uiState.update {
+                    it.copy(
+                        isDeleting = false,
+                        deleteErrorMessage = "Nie masz uprawnień, by usunąć to miejsce"
+                    )
+                }
+                return@launch
+            }
+
+            when (val result = placeRepository.deletePlace(place.id)) {
+                is OpResult.Success -> _uiState.update {
+                    it.copy(isDeleting = false, isDeleted = true)
+                }
+                is OpResult.Failure -> _uiState.update {
+                    it.copy(
+                        isDeleting = false,
+                        deleteErrorMessage = result.error.message ?: "Nie udało się usunąć miejsca"
+                    )
+                }
+            }
+        }
+    }
+
+    fun consumeDeleteError() {
+        _uiState.update { it.copy(deleteErrorMessage = null) }
     }
 }

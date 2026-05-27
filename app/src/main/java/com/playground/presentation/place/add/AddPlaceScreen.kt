@@ -94,7 +94,12 @@ fun AddPlaceScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.add_place)) },
+                title = {
+                    Text(
+                        text = if (state.isEditMode) "Edytuj miejsce"
+                        else stringResource(R.string.add_place)
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
@@ -207,7 +212,7 @@ fun AddPlaceScreen(
             // --- Przycisk zapisu ---
             Button(
                 onClick = viewModel::save,
-                enabled = !state.isSaving && state.isFormValid,
+                enabled = !state.isSaving && !state.isLoadingPlace && state.isFormValid,
                 modifier = Modifier.fillMaxWidth().height(48.dp)
             ) {
                 if (state.isSaving) {
@@ -217,7 +222,10 @@ fun AddPlaceScreen(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text("Zapisz miejsce")
+                    Text(
+                        text = if (state.isEditMode) "Zaktualizuj miejsce"
+                        else "Zapisz miejsce"
+                    )
                 }
             }
 

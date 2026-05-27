@@ -1,5 +1,6 @@
 package com.playground.presentation.place.add
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.playground.domain.model.Amenity
@@ -7,6 +8,7 @@ import com.playground.domain.model.Place
 import com.playground.domain.model.PlaceCategory
 import com.playground.domain.repository.AuthRepository
 import com.playground.domain.repository.PlaceRepository
+import com.playground.navigation.Route
 import com.playground.utils.OpResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,23 +20,31 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * ViewModel ekranu dodawania miejsca.
+ * ViewModel ekranu dodawania / edycji miejsca.
  *
- * Trzyma stan formularza i obsługuje akcje użytkownika – zmiana pól,
- * pobranie GPS, toggle udogodnień, zapis do Firestore.
+ * Działa w dwóch trybach:
+ *  - **create** (placeId = null) – formularz pusty, `save()` wola
+ *    `addPlace()`.
+ *  - **edit** (placeId z nawigacji) – pre-filluje stan z `getPlace()` i
+ *    `save()` woła `updatePlace()` zachowując immutowalne pola
+ *    (id, ownerUserId, createdAtMillis, averageRating, reviewsCount).
  */
 @HiltViewModel
 class AddPlaceViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     private val placeRepository: PlaceRepository,
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
     /**
-     * Stan UI ekranu "Dodaj miejsce".
+     * Stan UI ekranu "Dodaj / edytuj miejsce".
      *
+     * @property isEditMode true gdy ładujemy istniejące miejsce (placeId != null)
+     * @property editingPlaceId id edytowanego miejsca, null w trybie create
      * @property latitude współrzędna geograficzna – null gdy nie pobrano
      * @property longitude współrzędna geograficzna – null gdy nie pobrano
      * @property isFetchingLocation true podczas pobierania GPS
+     * @property isLoadingPlace true gdy ładujemy istniejące miejsce do edycji
      * @property isSaving true podczas zapisu do Firestore
      * @property errorMessage komunikat błędu (np. brak GPS, błąd zapisu)
      * @property isSaved true po pomyślnym zapisie – sygnał do nawigacji
@@ -47,7 +57,10 @@ class AddPlaceViewModel @Inject constructor(
         val latitude: Double? = null,
         val longitude: Double? = null,
         val amenities: Set<Amenity> = emptySet(),
+        val isEditMode: Boolean = false,
+        val editingPlaceId: String? = null,
         val isFetchingLocation: Boolean = false,
+        val isLoadingPlace: Boolean = false,
         val isSaving: Boolean = false,
         val errorMessage: String? = null,
         val isSaved: Boolean = false
@@ -61,6 +74,60 @@ class AddPlaceViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    /**
+     * Pełen oryginalny obiekt edytowanego miejsca – trzymamy go po stronie
+     * VM, żeby przy save w trybie edit móc skopiować immutowalne pola
+     * (ownerUserId, createdAtMillis, ratingi) bez wystawiania ich w UiState.
+     */
+    private var editingOriginal: Place? = null
+
+    init {
+        val placeId = savedStateHandle.get<String>(Route.AddPlace.ARG_PLACE_ID)
+        if (!placeId.isNullOrBlank()) {
+            loadForEdit(placeId)
+        }
+    }
+
+    private fun loadForEdit(placeId: String) {
+        _uiState.update {
+            it.copy(
+                isEditMode = true,
+                editingPlaceId = placeId,
+                isLoadingPlace = true,
+                errorMessage = null
+            )
+        }
+        viewModelScope.launch {
+            when (val result = placeRepository.getPlace(placeId)) {
+                is OpResult.Success -> {
+                    editingOriginal = result.data
+                    _uiState.update {
+                        it.copy(
+                            name = result.data.name,
+                            description = result.data.description,
+                            category = result.data.category,
+                            address = result.data.address,
+                            latitude = result.data.latitude,
+                            longitude = result.data.longitude,
+                            amenities = result.data.amenities,
+                            isLoadingPlace = false,
+                            errorMessage = null
+                        )
+                    }
+                }
+                is OpResult.Failure -> {
+                    _uiState.update {
+                        it.copy(
+                            isLoadingPlace = false,
+                            errorMessage = result.error.message
+                                ?: "Nie udało się wczytać miejsca do edycji"
+                        )
+                    }
+                }
+            }
+        }
+    }
 
     fun onNameChange(value: String) =
         _uiState.update { it.copy(name = value, errorMessage = null) }
@@ -121,7 +188,12 @@ class AddPlaceViewModel @Inject constructor(
 
     /**
      * Buduje [Place] z aktualnego stanu UI i zapisuje przez repozytorium.
-     * Wymaga zalogowanego użytkownika – jego id staje się [Place.ownerUserId].
+     *
+     * - W trybie create: świeży [Place] z `id=""`, owner = aktualny user,
+     *   `createdAtMillis = now`. Repo nada id i wstawi do Firestore.
+     * - W trybie edit: kopia oryginału z UI-edytowalnymi polami nadpisanymi
+     *   nowymi wartościami. Niezmienne (ownerUserId, createdAtMillis,
+     *   averageRating, reviewsCount) zostają jak były.
      */
     fun save() {
         val state = _uiState.value
@@ -144,26 +216,44 @@ class AddPlaceViewModel @Inject constructor(
                 return@launch
             }
 
-            val place = Place(
-                id = "",
-                ownerUserId = currentUser.id,
-                name = state.name.trim(),
-                description = state.description.trim(),
-                category = state.category,
-                latitude = state.latitude!!,
-                longitude = state.longitude!!,
-                address = state.address.trim(),
-                amenities = state.amenities,
-                createdAtMillis = System.currentTimeMillis()
-            )
+            val result = if (state.isEditMode && editingOriginal != null) {
+                val original = editingOriginal!!
+                val updated = original.copy(
+                    name = state.name.trim(),
+                    description = state.description.trim(),
+                    category = state.category,
+                    address = state.address.trim(),
+                    latitude = state.latitude!!,
+                    longitude = state.longitude!!,
+                    amenities = state.amenities
+                    // ownerUserId, createdAtMillis, averageRating, reviewsCount,
+                    // photoUrls, id – zachowujemy z oryginału.
+                )
+                placeRepository.updatePlace(updated)
+            } else {
+                val newPlace = Place(
+                    id = "",
+                    ownerUserId = currentUser.id,
+                    name = state.name.trim(),
+                    description = state.description.trim(),
+                    category = state.category,
+                    latitude = state.latitude!!,
+                    longitude = state.longitude!!,
+                    address = state.address.trim(),
+                    amenities = state.amenities,
+                    createdAtMillis = System.currentTimeMillis()
+                )
+                placeRepository.addPlace(newPlace)
+            }
 
-            val result = placeRepository.addPlace(place)
             _uiState.update {
                 when (result) {
                     is OpResult.Success -> it.copy(isSaving = false, isSaved = true)
                     is OpResult.Failure -> it.copy(
                         isSaving = false,
-                        errorMessage = result.error.message ?: "Błąd zapisu miejsca"
+                        errorMessage = result.error.message
+                            ?: if (state.isEditMode) "Błąd aktualizacji miejsca"
+                            else "Błąd zapisu miejsca"
                     )
                 }
             }

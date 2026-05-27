@@ -1,7 +1,5 @@
 package com.playground.presentation.place.details
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,28 +18,41 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,31 +61,65 @@ import com.playground.R
 import com.playground.domain.model.Amenity
 import com.playground.domain.model.Place
 import com.playground.domain.model.Review
+import com.playground.domain.model.User
 import com.playground.presentation.common.style
-import java.text.DateFormat
+import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 
 /**
  * Szczegóły miejsca.
  *
  * Sekcje:
- *  1. Header z ikoną i nazwą kategorii + ocena + liczba opinii
- *  2. Opis (jeśli niepusty)
- *  3. Adres + przycisk „Otwórz w Mapach" (intent geo:)
- *  4. Udogodnienia (chipy)
- *  5. Opinie (lista lub empty state)
+ *  1. Header card – ikona + nazwa kategorii, ocena + liczba opinii
+ *  2. "Dodano przez" – nick autora + data dodania (z [Place.createdAtMillis])
+ *  3. Opis (jeśli niepusty)
+ *  4. Lokalizacja – adres, współrzędne, button "Otwórz na mapie"
+ *     nawigujący do [com.playground.presentation.place.map.PlaceMapScreen]
+ *  5. Udogodnienia – chipy (read-only)
+ *  6. Opinie – lista lub empty state
  *
- * Dodawania opinii tu jeszcze nie ma – `addReview` w repo jest TODO,
- * przyjedzie w osobnym PR-ze razem z transakcyjną aktualizacją
- * averageRating.
+ * Dla **właściciela miejsca** w TopAppBar pojawia się overflow menu z akcjami
+ * "Edytuj" (nawigacja do AddPlaceScreen w trybie edit) i "Usuń" (z dialog
+ * potwierdzeniem).
+ *
+ * Dodawania opinii tu jeszcze nie ma – `addReview` w repo jest TODO.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlaceDetailsScreen(
     onBack: () -> Unit,
+    onEditPlace: (placeId: String) -> Unit,
+    onOpenMap: (placeId: String) -> Unit,
+    onDeleted: () -> Unit,
     viewModel: PlaceDetailsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
+
+    val isOwner = remember(state.place, currentUser) {
+        val place = state.place
+        val user = currentUser
+        place != null && user != null && place.ownerUserId == user.id
+    }
+
+    var showOverflow by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Po pomyślnym usunięciu – wracamy do listy.
+    LaunchedEffect(state.isDeleted) {
+        if (state.isDeleted) onDeleted()
+    }
+
+    // Błąd usuwania – pokazujemy w snackbarze i czyścimy w VM.
+    LaunchedEffect(state.deleteErrorMessage) {
+        val msg = state.deleteErrorMessage
+        if (msg != null) {
+            snackbarHostState.showSnackbar(msg)
+            viewModel.consumeDeleteError()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -89,9 +134,44 @@ fun PlaceDetailsScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
+                },
+                actions = {
+                    if (isOwner && state.place != null) {
+                        IconButton(onClick = { showOverflow = true }) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = "Więcej akcji")
+                        }
+                        DropdownMenu(
+                            expanded = showOverflow,
+                            onDismissRequest = { showOverflow = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Edytuj") },
+                                leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                                onClick = {
+                                    showOverflow = false
+                                    state.place?.let { onEditPlace(it.id) }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Usuń") },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Filled.Delete,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                onClick = {
+                                    showOverflow = false
+                                    showDeleteDialog = true
+                                }
+                            )
+                        }
+                    }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Box(
             modifier = Modifier
@@ -129,11 +209,25 @@ fun PlaceDetailsScreen(
                 else -> {
                     PlaceDetailsContent(
                         place = state.place!!,
-                        reviews = state.reviews
+                        author = state.author,
+                        reviews = state.reviews,
+                        onOpenMap = { onOpenMap(state.place!!.id) }
                     )
                 }
             }
         }
+    }
+
+    if (showDeleteDialog) {
+        DeleteConfirmationDialog(
+            placeName = state.place?.name.orEmpty(),
+            isDeleting = state.isDeleting,
+            onConfirm = {
+                viewModel.delete()
+                showDeleteDialog = false
+            },
+            onDismiss = { if (!state.isDeleting) showDeleteDialog = false }
+        )
     }
 }
 
@@ -141,10 +235,10 @@ fun PlaceDetailsScreen(
 @Composable
 private fun PlaceDetailsContent(
     place: Place,
-    reviews: List<Review>
+    author: User?,
+    reviews: List<Review>,
+    onOpenMap: () -> Unit
 ) {
-    val context = LocalContext.current
-
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
@@ -155,7 +249,12 @@ private fun PlaceDetailsContent(
             HeaderCard(place = place)
         }
 
-        // 2. Opis
+        // 2. Dodano przez
+        item {
+            AddedByCard(place = place, author = author)
+        }
+
+        // 3. Opis
         if (place.description.isNotBlank()) {
             item {
                 SectionCard(title = "Opis") {
@@ -167,7 +266,7 @@ private fun PlaceDetailsContent(
             }
         }
 
-        // 3. Adres + intent
+        // 4. Lokalizacja
         item {
             SectionCard(title = "Lokalizacja") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -192,28 +291,17 @@ private fun PlaceDetailsContent(
                 )
                 Spacer(Modifier.height(12.dp))
                 Button(
-                    onClick = {
-                        val uri = Uri.parse(
-                            "geo:${place.latitude},${place.longitude}" +
-                                "?q=${place.latitude},${place.longitude}" +
-                                "(${Uri.encode(place.name)})"
-                        )
-                        val intent = Intent(Intent.ACTION_VIEW, uri)
-                        // Bez tej flagi system woła nową activity z procesu, który nie ma
-                        // task-a – w niektórych wersjach Androida by to crashnęło.
-                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        runCatching { context.startActivity(intent) }
-                    },
+                    onClick = onOpenMap,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Filled.Map, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Otwórz w Mapach")
+                    Text("Otwórz na mapie")
                 }
             }
         }
 
-        // 4. Udogodnienia
+        // 5. Udogodnienia
         if (place.amenities.isNotEmpty()) {
             item {
                 SectionCard(title = "Udogodnienia (${place.amenities.size})") {
@@ -222,7 +310,7 @@ private fun PlaceDetailsContent(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        // Stable order for amenities, na podstawie kolejności enum
+                        // Stable order na podstawie kolejności w enumie Amenity
                         // (czyli pogrupowanie z Amenity.kt: TL;DR -> plac -> jedzenie -> ...)
                         Amenity.entries
                             .filter { it in place.amenities }
@@ -238,7 +326,7 @@ private fun PlaceDetailsContent(
             }
         }
 
-        // 5. Opinie
+        // 6. Opinie
         item {
             SectionCard(title = "Opinie (${reviews.size})") {
                 if (reviews.isEmpty()) {
@@ -323,6 +411,48 @@ private fun HeaderCard(place: Place) {
     }
 }
 
+@Composable
+private fun AddedByCard(place: Place, author: User?) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Person,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Column {
+                val authorName = author?.name?.takeIf { it.isNotBlank() }
+                Text(
+                    text = if (authorName != null) "Dodano przez $authorName" else "Dodano przez nieznanego użytkownika",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                if (place.createdAtMillis > 0L) {
+                    Text(
+                        text = formatDate(place.createdAtMillis),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun formatDate(millis: Long): String {
+    // dd.MM.yyyy zgodnie z polską normą.
+    val formatter = SimpleDateFormat("dd.MM.yyyy", Locale("pl", "PL"))
+    return formatter.format(Date(millis))
+}
+
 private fun plural(count: Int): String = when {
     count == 1 -> "opinia"
     count % 10 in 2..4 && (count % 100 !in 12..14) -> "opinie"
@@ -381,9 +511,7 @@ private fun ReviewCard(review: Review) {
             }
             if (review.createdAtMillis > 0L) {
                 Text(
-                    text = DateFormat
-                        .getDateInstance(DateFormat.MEDIUM)
-                        .format(Date(review.createdAtMillis)),
+                    text = formatDate(review.createdAtMillis),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -397,4 +525,57 @@ private fun ReviewCard(review: Review) {
             }
         }
     }
+}
+
+@Composable
+private fun DeleteConfirmationDialog(
+    placeName: String,
+    isDeleting: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Filled.Delete,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+        },
+        title = { Text("Usunąć miejsce?") },
+        text = {
+            Text(
+                text = if (placeName.isNotBlank()) {
+                    "\"$placeName\" zostanie nieodwracalnie usunięte z bazy. Czy na pewno chcesz kontynuować?"
+                } else {
+                    "Miejsce zostanie nieodwracalnie usunięte z bazy. Czy na pewno chcesz kontynuować?"
+                }
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = !isDeleting
+            ) {
+                if (isDeleting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Usuń")
+                }
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDismiss,
+                enabled = !isDeleting
+            ) {
+                Text("Anuluj")
+            }
+        }
+    )
 }
