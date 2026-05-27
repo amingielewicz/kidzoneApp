@@ -244,64 +244,17 @@ private fun PlaceDetailsContent(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 1. Header
+        // Sekcja 1: cale miejsce w jednej karcie
+        // (header + opis + lokalizacja + mapa + autor)
         item {
-            HeaderCard(place = place)
+            PlaceMainCard(
+                place = place,
+                author = author,
+                onOpenMap = onOpenMap
+            )
         }
 
-        // 2. Dodano przez
-        item {
-            AddedByCard(place = place, author = author)
-        }
-
-        // 3. Opis
-        if (place.description.isNotBlank()) {
-            item {
-                SectionCard(title = "Opis") {
-                    Text(
-                        text = place.description,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-        }
-
-        // 4. Lokalizacja
-        item {
-            SectionCard(title = "Lokalizacja") {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.LocationOn,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = place.address.ifBlank { "Adres niedostępny" },
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "%.5f, %.5f".format(place.latitude, place.longitude),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = onOpenMap,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Filled.Map, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Otwórz na mapie")
-                }
-            }
-        }
-
-        // 5. Udogodnienia
+        // Sekcja 2: Udogodnienia
         if (place.amenities.isNotEmpty()) {
             item {
                 SectionCard(title = "Udogodnienia (${place.amenities.size})") {
@@ -326,7 +279,7 @@ private fun PlaceDetailsContent(
             }
         }
 
-        // 6. Opinie
+        // Sekcja 3: Opinie
         item {
             SectionCard(title = "Opinie (${reviews.size})") {
                 if (reviews.isEmpty()) {
@@ -346,8 +299,23 @@ private fun PlaceDetailsContent(
     }
 }
 
+/**
+ * Główna karta szczegółów miejsca – "jedno okno" w którym po kolei są:
+ *  1. nazwa + ikona kategorii + ocena (header),
+ *  2. opis (jeśli niepusty),
+ *  3. adres + współrzędne,
+ *  4. przycisk „Otwórz na mapie",
+ *  5. autor + data dodania (zaraz pod przyciskiem mapy, jak prosił user).
+ *
+ * Bez sub-headerów typu "Opis"/"Lokalizacja" – wizualnie jeden spójny
+ * blok, a delikatne dividery rozdzielają poszczególne kawałki.
+ */
 @Composable
-private fun HeaderCard(place: Place) {
+private fun PlaceMainCard(
+    place: Place,
+    author: User?,
+    onOpenMap: () -> Unit
+) {
     val style = place.category.style
 
     Card(
@@ -355,6 +323,7 @@ private fun HeaderCard(place: Place) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            // --- 1. Header: nazwa + kategoria + ocena ---
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = style.icon,
@@ -376,9 +345,7 @@ private fun HeaderCard(place: Place) {
                     )
                 }
             }
-
             Spacer(Modifier.height(12.dp))
-
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.Star,
@@ -407,44 +374,88 @@ private fun HeaderCard(place: Place) {
                     )
                 }
             }
+
+            // --- 2. Opis ---
+            if (place.description.isNotBlank()) {
+                SoftDivider()
+                Text(
+                    text = place.description,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            // --- 3. Lokalizacja: adres + współrzędne ---
+            SoftDivider()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.LocationOn,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = place.address.ifBlank { "Adres niedostępny" },
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "%.5f, %.5f".format(place.latitude, place.longitude),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            // --- 4. Otwórz na mapie ---
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = onOpenMap,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Filled.Map, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Otwórz na mapie")
+            }
+
+            // --- 5. Dodano przez (zaraz pod przyciskiem mapy) ---
+            SoftDivider()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Person,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                val authorName = author?.name?.takeIf { it.isNotBlank() }
+                val datePart = place.createdAtMillis
+                    .takeIf { it > 0L }
+                    ?.let { " · " + formatDate(it) }
+                    .orEmpty()
+                Text(
+                    text = if (authorName != null) {
+                        "Dodano przez $authorName$datePart"
+                    } else {
+                        "Dodano przez nieznanego użytkownika$datePart"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
 
+/** Cienki divider z marginesem góra/dół, do separacji sekcji wewnątrz karty. */
 @Composable
-private fun AddedByCard(place: Place, author: User?) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Person,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(Modifier.width(8.dp))
-            Column {
-                val authorName = author?.name?.takeIf { it.isNotBlank() }
-                Text(
-                    text = if (authorName != null) "Dodano przez $authorName" else "Dodano przez nieznanego użytkownika",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
-                )
-                if (place.createdAtMillis > 0L) {
-                    Text(
-                        text = formatDate(place.createdAtMillis),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
+private fun SoftDivider() {
+    Spacer(Modifier.height(12.dp))
+    androidx.compose.material3.HorizontalDivider(
+        thickness = 1.dp,
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    )
+    Spacer(Modifier.height(12.dp))
 }
 
 private fun formatDate(millis: Long): String {
