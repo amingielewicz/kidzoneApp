@@ -130,15 +130,15 @@ fun RegisterScreen(
                                 Icons.Filled.Visibility
                             },
                             contentDescription = if (isPasswordVisible) {
-                                "Ukryj haslo"
+                                "Ukryj hasło"
                             } else {
-                                "Pokaz haslo"
+                                "Pokaż hasło"
                             }
                         )
                     }
                 },
                 enabled = !state.isLoading,
-                supportingText = { Text("Min. 6 znakow") },
+                supportingText = { Text("Min. 6 znaków") },
                 modifier = Modifier.fillMaxWidth()
             )
 

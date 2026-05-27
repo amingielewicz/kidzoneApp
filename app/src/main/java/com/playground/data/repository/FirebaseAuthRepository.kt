@@ -9,6 +9,7 @@ import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ktx.toObject
 import com.playground.data.remote.FirestoreCollections
 import com.playground.data.remote.dto.UserDto
 import com.playground.domain.model.User
@@ -28,7 +29,8 @@ import javax.inject.Singleton
  *  - logowanie i rejestracja e-mail/haslo,
  *  - logowanie Google przez Google Sign-In (token przekazywany z UI),
  *  - reset hasla e-mailem,
- *  - obserwacja aktualnie zalogowanego uzytkownika.
+ *  - obserwacja aktualnie zalogowanego uzytkownika,
+ *  - odczyt publicznych danych innych uzytkownikow (autor miejsca itp.).
  *
  * Po pomyslnej rejestracji tworzymy dokument w kolekcji `users`
  * (zob. [FirestoreCollections.USERS]), zeby reszta aplikacji mogla go
@@ -55,7 +57,7 @@ class FirebaseAuthRepository @Inject constructor(
         runFirebase {
             val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
             val firebaseUser = result.user
-                ?: throw IllegalStateException("Logowanie sie powiodlo, ale Firebase nie zwrocil uzytkownika")
+                ?: throw IllegalStateException("Logowanie się powiodło, ale Firebase nie zwrócił użytkownika")
             firebaseUser.toDomain()
         }
 
@@ -66,7 +68,7 @@ class FirebaseAuthRepository @Inject constructor(
     ): OpResult<User> = runFirebase {
         val result = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
         val firebaseUser = result.user
-            ?: throw IllegalStateException("Rejestracja sie powiodla, ale Firebase nie zwrocil uzytkownika")
+            ?: throw IllegalStateException("Rejestracja się powiodła, ale Firebase nie zwrócił użytkownika")
 
         // Ustaw display name na FirebaseUser, zeby byl dostepny od razu w UI.
         firebaseUser.updateProfile(
@@ -93,7 +95,7 @@ class FirebaseAuthRepository @Inject constructor(
         val credential = GoogleAuthProvider.getCredential(idToken, null)
         val result = firebaseAuth.signInWithCredential(credential).await()
         val firebaseUser = result.user
-            ?: throw IllegalStateException("Logowanie Google sie powiodlo, ale Firebase nie zwrocil uzytkownika")
+            ?: throw IllegalStateException("Logowanie Google się powiodło, ale Firebase nie zwrócił użytkownika")
 
         // Jesli to pierwsze logowanie tego uzytkownika - stworz mu dokument w `users`.
         val isNewUser = result.additionalUserInfo?.isNewUser == true
@@ -120,6 +122,22 @@ class FirebaseAuthRepository @Inject constructor(
 
     override suspend fun signOut() {
         firebaseAuth.signOut()
+    }
+
+    override suspend fun getUserById(userId: String): OpResult<User> = try {
+        require(userId.isNotBlank()) { "userId nie może być puste" }
+        val snapshot = firestore.collection(FirestoreCollections.USERS)
+            .document(userId)
+            .get()
+            .await()
+        val dto = snapshot.toObject<UserDto>()
+        if (dto != null) {
+            OpResult.success(dto.toDomain())
+        } else {
+            OpResult.failure(NoSuchElementException("Brak użytkownika o id=$userId"))
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
     }
 
     // --- helpers ---
