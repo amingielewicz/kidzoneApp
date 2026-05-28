@@ -29,13 +29,15 @@ import com.kidzone.R
  * Ekran startowy: pokazuje logo aplikacji i decyduje, czy wypchnąć
  * użytkownika do logowania, czy do głównego shella.
  *
- * Wizualnie: pełny biały ekran z logiem brandowym (PNG z napisem i nazwą
- * aplikacji wewnątrz) zajmującym 75% szerokości i progress indicator
- * w kolorze brand-blue pod spodem.
+ * Wizualnie: tło w bardzo jasnym chłodnym błękicie (#F5F8FB – echo
+ * brand-blue logo) z logiem brandowym (PNG z napisem i nazwą aplikacji
+ * wewnątrz) zajmującym 75% szerokości i progress indicator w kolorze
+ * brand-blue pod spodem.
  *
- * Tło białe (a nie `colorScheme.primary`) bo logo ma napisy w kolorze
- * #666666 z transparentem – na ciemnym brand-blue znikały. Białe tło
- * pokazuje logo dokładnie tak, jak zostało zaprojektowane w SVG.
+ * Tło NIE jest `colorScheme.primary` (BrandBlue), bo logo ma napisy
+ * w kolorze szarym z transparentem – na ciemnym tle znikały. Wybrany
+ * jasny błękit jest na tyle delikatny, że logo pozostaje czytelne,
+ * a jednocześnie podkreśla błękitne akcenty z palety logo (~43% pikseli).
  *
  * Świadomie nie pokazujemy osobnego `Text(app_name)` ani `Text(app_tagline)`
  * – logo zawiera już je w sobie, dublowanie wyglądałoby krzywo.
@@ -59,12 +61,16 @@ fun SplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            // Ciepły off-white – mniej "klinicznie" niż czysty Color.White,
-            // pasuje do dziecięcej tematyki appki. Alternatywy:
-            //   Color.White         – czysty biały
-            //   Color(0xFFF5F5F5)   – jasny szary (chłodniejszy)
-            //   Color(0xFFFFFBF7)   – ciepły off-white  <- aktualny wybór
-            .background(Color(0xFFFFFBF7)),
+            // Bardzo jasny chłodny błękit – echo brand-blue logo
+            // (~43% pikseli loga to odcienie błękitu). Logo zostaje
+            // czytelne, a tło wzmacnia "techniczny" feel marki.
+            // Alternatywy gdyby ten wybór się znudził:
+            //   Color.White         – czysty biały (klinicznie)
+            //   Color(0xFFFFFBF7)   – ciepły off-white (subtelny krem)
+            //   Color(0xFFFFF8EB)   – wyraźniej kremowy (echo beżu z logo)
+            //   Color(0xFFEEF4F8)   – mocniejszy chłodny błękit
+            //   Color(0xFFF5F8FB)   – aktualny: jasny chłodny błękit
+            .background(Color(0xFFF5F8FB)),
         contentAlignment = Alignment.Center
     ) {
         Column(
