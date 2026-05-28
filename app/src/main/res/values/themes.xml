@@ -5,4 +5,26 @@
         <item name="android:windowBackground">@color/brand_white</item>
         <item name="android:statusBarColor" tools:targetApi="21">@color/brand_blue</item>
     </style>
+
+    <!--
+      Theme uzywany przez MainActivity do momentu, az Compose przejmie ekran
+      (po `installSplashScreen()` w MainActivity.onCreate). Zastepuje
+      domyslny splash Android 12+, gdzie system rysowal launcher icon w
+      kolku na bialym tle - to wlasnie kolko obcinalo logo i wygladalo
+      brzydko ("przycina nieladnie", komentarz user'a).
+
+      Po zmianie:
+        - tlo splasha = #F5F8FB (jak tlo Compose SplashScreen) -> plynne
+          przejscie bez "klatki bieli"
+        - ikona splash = dedykowana mala wersja (160 px symbolu w srodku
+          canvasu 432x432, z transparent marginesami) - kolko maskuje
+          marginesy zamiast widocznej tresci, brak przycinania
+        - postSplashScreenTheme = Theme.KidZone -> po zaladowaniu Compose
+          uzywany jest oryginalny motyw activity
+    -->
+    <style name="Theme.KidZone.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_screen_icon</item>
+        <item name="postSplashScreenTheme">@style/Theme.KidZone</item>
+    </style>
 </resources>
