@@ -59,7 +59,12 @@ fun SplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White),
+            // Ciepły off-white – mniej "klinicznie" niż czysty Color.White,
+            // pasuje do dziecięcej tematyki appki. Alternatywy:
+            //   Color.White         – czysty biały
+            //   Color(0xFFF5F5F5)   – jasny szary (chłodniejszy)
+            //   Color(0xFFFFFBF7)   – ciepły off-white  <- aktualny wybór
+            .background(Color(0xFFFFFBF7)),
         contentAlignment = Alignment.Center
     ) {
         Column(
