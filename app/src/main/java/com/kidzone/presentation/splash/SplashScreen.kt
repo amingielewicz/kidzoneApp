@@ -18,6 +18,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -28,9 +29,13 @@ import com.kidzone.R
  * Ekran startowy: pokazuje logo aplikacji i decyduje, czy wypchnąć
  * użytkownika do logowania, czy do głównego shella.
  *
- * Wizualnie: pełny ekran w `colorScheme.primary` (BrandBlue) z logiem
- * brandowym (PNG z napisem i nazwą aplikacji wewnątrz) i progress
- * indicatorem pod spodem.
+ * Wizualnie: pełny biały ekran z logiem brandowym (PNG z napisem i nazwą
+ * aplikacji wewnątrz) zajmującym 75% szerokości i progress indicator
+ * w kolorze brand-blue pod spodem.
+ *
+ * Tło białe (a nie `colorScheme.primary`) bo logo ma napisy w kolorze
+ * #666666 z transparentem – na ciemnym brand-blue znikały. Białe tło
+ * pokazuje logo dokładnie tak, jak zostało zaprojektowane w SVG.
  *
  * Świadomie nie pokazujemy osobnego `Text(app_name)` ani `Text(app_tagline)`
  * – logo zawiera już je w sobie, dublowanie wyglądałoby krzywo.
@@ -54,7 +59,7 @@ fun SplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.primary),
+            .background(Color.White),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -63,16 +68,18 @@ fun SplashScreen(
         ) {
             // Logo brandowe (zawiera w sobie napis i nazwę aplikacji),
             // dlatego pod spodem nie dajemy już osobnego Text(app_name).
-            // fillMaxWidth(0.6f) zamiast sztywnego dp – logo z napisem
+            // fillMaxWidth(0.75f) zamiast sztywnego dp – logo z napisem
             // skaluje się procentowo lepiej niż przy stałej wysokości.
             Image(
                 painter = painterResource(R.drawable.ic_splash_logo),
                 contentDescription = stringResource(R.string.app_name),
-                modifier = Modifier.fillMaxWidth(0.6f)
+                modifier = Modifier.fillMaxWidth(0.75f)
             )
             Spacer(modifier = Modifier.height(32.dp))
             CircularProgressIndicator(
-                color = MaterialTheme.colorScheme.onPrimary,
+                // Brand-blue na białym tle – kontrastowo i spójnie z resztą
+                // aplikacji (FilterChip selected, FAB itd. też używają primary).
+                color = MaterialTheme.colorScheme.primary,
                 strokeWidth = 3.dp,
                 modifier = Modifier.size(32.dp)
             )
