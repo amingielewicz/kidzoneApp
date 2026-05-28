@@ -32,11 +32,11 @@ fun resolveSecret(key: String): String =
         ?: ""
 
 android {
-    namespace = "com.playground"
+    namespace = "com.kidzone"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.playground"
+        applicationId = "com.kidzone"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
@@ -55,7 +55,7 @@ android {
         val mapsApiKey = resolveSecret("MAPS_API_KEY")
         if (mapsApiKey.isBlank()) {
             logger.warn(
-                "[playground] MAPS_API_KEY is empty. Set it in local.properties " +
+                "[kidzone] MAPS_API_KEY is empty. Set it in local.properties " +
                     "(MAPS_API_KEY=AIza...) – mapa nie będzie się renderowała."
             )
         }
