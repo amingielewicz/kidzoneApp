@@ -109,12 +109,12 @@ fun AddReviewSheet(
             OutlinedTextField(
                 value = comment,
                 onValueChange = { newValue ->
-                    // Hard-cap długości komentarza po stronie UI – odrzucamy
-                    // input ponad limitem zamiast wyświetlać błąd po wysłaniu.
-                    // Repo dodatkowo waliduje to samo (defense-in-depth).
-                    if (newValue.length <= COMMENT_MAX_LENGTH) {
-                        comment = newValue
-                    }
+                    // Hard-cap długości komentarza po stronie UI: tnij do
+                    // limitu zamiast odrzucać cały input. Dzięki temu wklejenie
+                    // tekstu dłuższego niż 1000 znaków daje pierwsze 1000
+                    // (intuicyjne), zamiast po cichu znikać. Repo dodatkowo
+                    // waliduje to samo (defense-in-depth).
+                    comment = newValue.take(COMMENT_MAX_LENGTH)
                 },
                 label = { Text("Komentarz (opcjonalnie)") },
                 placeholder = { Text("Co sądzisz o tym miejscu?") },
