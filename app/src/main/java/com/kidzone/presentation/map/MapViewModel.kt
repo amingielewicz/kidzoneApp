@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -41,14 +42,23 @@ import javax.inject.Inject
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class MapViewModel @Inject constructor(
-    private val placeRepository: PlaceRepository
+    private val placeRepository: PlaceRepository,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     /**
      * @property places aktualnie pokazywane miejsca (po filtrach)
      * @property selectedCategory filtr kategorii; null = wszystkie
      * @property topRatedOnly true = pokaż tylko `averageRating >= 4.0`
+     * @property addedByMeOnly true = pokaż tylko miejsca dodane przez
+     *   zalogowanego usera (`Place.ownerUserId == currentUser.id`).
+     *   Gdy user jest wylogowany, filtr jest "no-op" - zawsze zwraca pustą
+     *   listę, a UI normalnie chowa chip (chowanie ChIP'a robi się w
+     *   ekranie, nie tutaj).
      * @property selectedPlaceId id pinezki, na której pokazujemy bottom sheet
+     * @property currentUserId id zalogowanego usera; null = wylogowany.
+     *   Wystawiamy w state, żeby UI wiedział czy w ogóle pokazywać chip
+     *   "Dodane przez Ciebie".
      * @property isLoading true do pierwszego emita ze strumienia
      * @property errorMessage komunikat błędu z snapshot listenera
      */
@@ -56,13 +66,16 @@ class MapViewModel @Inject constructor(
         val places: List<Place> = emptyList(),
         val selectedCategory: PlaceCategory? = null,
         val topRatedOnly: Boolean = false,
+        val addedByMeOnly: Boolean = false,
         val selectedPlaceId: String? = null,
+        val currentUserId: String? = null,
         val isLoading: Boolean = true,
         val errorMessage: String? = null
     )
 
     private val selectedCategory = MutableStateFlow<PlaceCategory?>(null)
     private val topRatedOnly = MutableStateFlow(false)
+    private val addedByMeOnly = MutableStateFlow(false)
     private val selectedPlaceId = MutableStateFlow<String?>(null)
 
     /** Wewnętrzny model wyniku ze strumienia Firestore. */
@@ -82,29 +95,71 @@ class MapViewModel @Inject constructor(
                 }
         }
 
+    /**
+     * Strumień zalogowanego usera ścieśniony do samego id (lub null gdy
+     * wylogowany). Łączymy go z filtrami "addedByMeOnly", bo bez user-id
+     * filtr nie ma sensu (UI w MapScreen.kt chowa wtedy cały chip).
+     */
+    private val currentUserIdFlow: Flow<String?> = authRepository.currentUser
+        .map { it?.id }
+
+    /**
+     * Wszystkie boolean/string filtry zwijamy w jednego Triple-a, żeby zmieścić
+     * się w 4-argumentowej wersji `combine` razem z [placesLoad],
+     * [selectedCategory] i [selectedPlaceId]. Bez tego musielibyśmy iść w
+     * vararg-ową wersję `combine`, która gubi typowanie.
+     */
+    private data class Filters(
+        val topRatedOnly: Boolean,
+        val addedByMeOnly: Boolean,
+        val currentUserId: String?
+    )
+
+    private val filtersFlow: Flow<Filters> = combine(
+        topRatedOnly,
+        addedByMeOnly,
+        currentUserIdFlow
+    ) { top, mine, uid -> Filters(top, mine, uid) }
+
     val uiState: StateFlow<UiState> = combine(
         placesLoad,
         selectedCategory,
-        topRatedOnly,
+        filtersFlow,
         selectedPlaceId
-    ) { load, category, topOnly, sel ->
+    ) { load, category, filters, sel ->
         when (load) {
             PlacesLoad.Loading -> UiState(
                 selectedCategory = category,
-                topRatedOnly = topOnly,
+                topRatedOnly = filters.topRatedOnly,
+                addedByMeOnly = filters.addedByMeOnly,
+                currentUserId = filters.currentUserId,
                 selectedPlaceId = sel,
                 isLoading = true
             )
             is PlacesLoad.Success -> {
-                val filtered = if (topOnly) {
+                // Filtrowanie: najpierw kategoria (już zaaplikowana w
+                // observePlaces po stronie Firestore), potem topRated,
+                // potem addedByMe. addedByMe to "no-op" gdy user jest
+                // wylogowany - filtrujemy do pustej listy zamiast
+                // potencjalnie pokazać cudze miejsca.
+                val afterTopRated = if (filters.topRatedOnly) {
                     load.list.filter { it.averageRating >= TOP_RATED_THRESHOLD }
                 } else {
                     load.list
                 }
+                val filtered = if (filters.addedByMeOnly) {
+                    val uid = filters.currentUserId
+                    if (uid.isNullOrBlank()) emptyList()
+                    else afterTopRated.filter { it.ownerUserId == uid }
+                } else {
+                    afterTopRated
+                }
                 UiState(
                     places = filtered,
                     selectedCategory = category,
-                    topRatedOnly = topOnly,
+                    topRatedOnly = filters.topRatedOnly,
+                    addedByMeOnly = filters.addedByMeOnly,
+                    currentUserId = filters.currentUserId,
                     // Jeśli wybrane miejsce wypadło z listy po zmianie filtra –
                     // kasujemy zaznaczenie, żeby sheet się zamknął sam.
                     selectedPlaceId = sel?.takeIf { id -> filtered.any { it.id == id } },
@@ -114,7 +169,9 @@ class MapViewModel @Inject constructor(
             }
             is PlacesLoad.Error -> UiState(
                 selectedCategory = category,
-                topRatedOnly = topOnly,
+                topRatedOnly = filters.topRatedOnly,
+                addedByMeOnly = filters.addedByMeOnly,
+                currentUserId = filters.currentUserId,
                 selectedPlaceId = sel,
                 isLoading = false,
                 errorMessage = load.message
@@ -132,6 +189,15 @@ class MapViewModel @Inject constructor(
 
     fun toggleTopRated() {
         topRatedOnly.value = !topRatedOnly.value
+    }
+
+    /**
+     * Włącza/wyłącza filtr "tylko dodane przeze mnie". Bezpiecznie wołać
+     * nawet dla wylogowanego usera - filtr efektywnie wybierze pustą listę
+     * (zob. logika w `combine`), ale UI w MapScreen i tak chowa wtedy chip.
+     */
+    fun toggleAddedByMe() {
+        addedByMeOnly.value = !addedByMeOnly.value
     }
 
     /** Ustaw `null`, żeby zamknąć bottom sheet. */

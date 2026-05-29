@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -46,6 +47,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -119,6 +121,11 @@ fun AddPlaceScreen(
             verticalArrangement = Arrangement.Top
         ) {
             // --- Nazwa (wymagana) ---
+            // Title Case (KeyboardCapitalization.Words) - "Plac Zabaw Kasztanowa"
+            // wygląda lepiej niż "plac zabaw kasztanowa". Klawiatura sama
+            // zacznie każde słowo dużą literą; ostateczna normalizacja
+            // (np. gdy user wpisze małą po autocorrect) zachodzi w VM
+            // przy zapisie - patrz AddPlaceViewModel.save().
             OutlinedTextField(
                 value = state.name,
                 onValueChange = viewModel::onNameChange,
@@ -126,12 +133,17 @@ fun AddPlaceScreen(
                 singleLine = true,
                 isError = state.name.isNotEmpty() && state.name.isBlank(),
                 enabled = !state.isSaving,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Words
+                ),
                 modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(Modifier.height(8.dp))
 
             // --- Opis ---
+            // Sentences - duża litera tylko po kropce, jak w naturalnym
+            // tekście opisowym ("Fajny park z kacikiem dla maluchow.").
             OutlinedTextField(
                 value = state.description,
                 onValueChange = viewModel::onDescriptionChange,
@@ -139,6 +151,9 @@ fun AddPlaceScreen(
                 minLines = 2,
                 maxLines = 5,
                 enabled = !state.isSaving,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences
+                ),
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -174,13 +189,19 @@ fun AddPlaceScreen(
             Spacer(Modifier.height(12.dp))
 
             // --- Adres (wymagany) – po GPS, żeby reverse geocoding mógł go
-            // wypełnić, ale nadal w pełni edytowalny przez użytkownika ---
+            // wypełnić, ale nadal w pełni edytowalny przez użytkownika.
+            // Words = duża litera na początku każdego słowa ("Aleje
+            // Ujazdowskie 4, Warszawa") - zgodnie z polską konwencją
+            // adresową. ---
             OutlinedTextField(
                 value = state.address,
                 onValueChange = viewModel::onAddressChange,
                 label = { RequiredFieldLabel("Adres") },
                 singleLine = true,
                 enabled = !state.isSaving,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Words
+                ),
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -250,7 +271,12 @@ private suspend fun fetchAndSetLocation(
     try {
         val coords = fetchCurrentLocation(context)
         if (coords == null) {
-            viewModel.onLocationError("Brak fixu GPS – sprawdź, czy lokalizacja jest włączona")
+            // null = brak fixu albo timeout. Spójny komunikat dla obu
+            // przypadków (zob. LOCATION_TIMEOUT_USER_MESSAGE) - user nie
+            // potrzebuje wiedzieć, czy GPS się spóźnił, czy w ogóle nie
+            // ma sygnału, w obu sytuacjach robi się to samo (próbuje
+            // później albo wpisuje adres ręcznie).
+            viewModel.onLocationError(LOCATION_TIMEOUT_USER_MESSAGE)
             return
         }
         // Reverse geocoding jest best-effort – jego błędy nie blokują flow.
@@ -258,7 +284,7 @@ private suspend fun fetchAndSetLocation(
             .getOrNull()
         viewModel.onLocationFetched(coords.first, coords.second, address)
     } catch (e: Exception) {
-        viewModel.onLocationError(e.message ?: "Błąd pobierania lokalizacji")
+        viewModel.onLocationError(LOCATION_TIMEOUT_USER_MESSAGE)
     }
 }
 

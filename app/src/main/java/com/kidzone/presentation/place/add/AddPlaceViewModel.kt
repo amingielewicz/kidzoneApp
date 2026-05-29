@@ -10,6 +10,7 @@ import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.navigation.Route
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.TextNormalization
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -224,10 +225,10 @@ class AddPlaceViewModel @Inject constructor(
             val result = if (state.isEditMode && editingOriginal != null) {
                 val original = editingOriginal!!
                 val updated = original.copy(
-                    name = state.name.trim(),
-                    description = state.description.trim(),
+                    name = TextNormalization.toTitleCase(state.name),
+                    description = TextNormalization.toSentenceCase(state.description),
                     category = state.category,
-                    address = state.address.trim(),
+                    address = TextNormalization.toTitleCase(state.address),
                     latitude = state.latitude!!,
                     longitude = state.longitude!!,
                     amenities = state.amenities
@@ -239,12 +240,12 @@ class AddPlaceViewModel @Inject constructor(
                 val newPlace = Place(
                     id = "",
                     ownerUserId = currentUser.id,
-                    name = state.name.trim(),
-                    description = state.description.trim(),
+                    name = TextNormalization.toTitleCase(state.name),
+                    description = TextNormalization.toSentenceCase(state.description),
                     category = state.category,
                     latitude = state.latitude!!,
                     longitude = state.longitude!!,
-                    address = state.address.trim(),
+                    address = TextNormalization.toTitleCase(state.address),
                     amenities = state.amenities,
                     createdAtMillis = System.currentTimeMillis()
                 )

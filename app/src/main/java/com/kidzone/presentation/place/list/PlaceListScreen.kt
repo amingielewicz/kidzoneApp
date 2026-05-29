@@ -1,5 +1,8 @@
 package com.kidzone.presentation.place.list
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -17,24 +20,35 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,18 +59,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.presentation.common.style
+import com.kidzone.presentation.place.add.hasLocationPermission
 import kotlinx.coroutines.launch
 
 /**
- * 4 najczęściej szukane udogodnienia – pokazujemy je jako quick-chipy
+ * 4 najczęściej szukane udogodnienia - pokazujemy je jako quick-chipy
  * bezpośrednio na ekranie (zawsze widoczne, multi-select). Pasują do każdej
  * kategorii i to po nich rodzice filtrują najczęściej.
  *
@@ -71,9 +89,10 @@ private val QUICK_AMENITIES = setOf(
 )
 
 /**
- * Lista miejsc – LazyColumn kart z filtrami po kategorii i udogodnieniach.
+ * Lista miejsc - LazyColumn kart z filtrami + sortowaniem + twardym
+ * cap-em [PlaceListViewModel] do 100 najistotniejszych pozycji.
  *
- * Subskrybuje Firestore przez [PlaceListViewModel] – snapshot listener
+ * Subskrybuje Firestore przez [PlaceListViewModel] - snapshot listener
  * w repo automatycznie aktualizuje listę po dodaniu nowego miejsca z
  * [com.kidzone.presentation.place.add.AddPlaceScreen], bez potrzeby
  * pull-to-refresh.
@@ -82,6 +101,10 @@ private val QUICK_AMENITIES = setOf(
  *  - kategoria (single-select chipy w pierwszym rzędzie)
  *  - 4 uniwersalne udogodnienia (multi-select chipy w drugim rzędzie)
  *  - pełna lista udogodnień (multi-select w bottom sheecie pod "Filtry · N")
+ *
+ * Sortowanie - 5 trybów (zob. [PlaceListViewModel.SortOrder]) wybierane
+ * przez "chip" z dropdownem na pasku filtrów. Domyślny: "Najbliższe"
+ * (wymaga lokalizacji - jeżeli brak, banner zachęca do włączenia).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,8 +118,41 @@ fun PlaceListScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
+    val context = LocalContext.current
+
+    // Launcher requestu uprawnienia. Po nadaniu odświeżamy lokalizację -
+    // sortowanie "Najbliższe" zaczyna działać bez restartu ekranu.
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        if (result.values.any { it }) {
+            viewModel.refreshLocation()
+        }
+    }
+
+    // Po wejściu na ekran - jeśli user już ma permission, ale fixu jeszcze
+    // nie pobraliśmy (np. ekran się zrekonstruował po deep-linku), próbujemy
+    // ponownie. To no-op gdy lokalizacja już jest w state.
+    LaunchedEffect(Unit) {
+        if (hasLocationPermission(context) && state.userLocation == null) {
+            viewModel.refreshLocation()
+        }
+    }
+
+    // Gdy user wraca z ustawień Androida (gdzie ręcznie dał lokalizację),
+    // odświeżamy fix - banner sam zniknie.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && hasLocationPermission(context)) {
+                viewModel.refreshLocation()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+    }
+
     // Liczba aktywnych filtrów udogodnień siedzących w sheecie
-    // (wszystko poza QUICK_AMENITIES – te są na ekranie głównym i mają osobny stan wizualny).
+    // (wszystko poza QUICK_AMENITIES - te są na ekranie głównym i mają osobny stan wizualny).
     val advancedAmenitiesCount = state.selectedAmenities.count { it !in QUICK_AMENITIES }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -108,9 +164,27 @@ fun PlaceListScreen(
         QuickAmenityBar(
             selectedAmenities = state.selectedAmenities,
             advancedFiltersCount = advancedAmenitiesCount,
+            sortOrder = state.sortOrder,
+            currentUserSignedIn = state.currentUserId != null,
             onAmenityToggled = viewModel::onAmenityToggled,
-            onOpenFilterSheet = { showFilterSheet = true }
+            onOpenFilterSheet = { showFilterSheet = true },
+            onSortOrderChange = viewModel::onSortOrderChange
         )
+
+        // Banner zachęcający do włączenia lokalizacji - tylko gdy user
+        // wybrał "Najbliższe", a lokalizacji nie mamy.
+        if (state.nearestUnavailable) {
+            EnableLocationForSortingBanner(
+                onAllowClick = {
+                    locationPermissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        )
+                    )
+                }
+            )
+        }
 
         when {
             state.isLoading && state.places.isEmpty() -> {
@@ -145,7 +219,7 @@ fun PlaceListScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Brak miejsc pasujących do filtrów",
+                        text = emptyMessageFor(state.sortOrder, state.currentUserId != null),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -161,6 +235,12 @@ fun PlaceListScreen(
                     items(items = state.places, key = { it.id }) { place ->
                         PlaceCard(
                             place = place,
+                            distanceKm = state.userLocation?.let { (lat, lng) ->
+                                haversineKm(lat, lng, place.latitude, place.longitude)
+                            },
+                            showDistance = state.sortOrder ==
+                                PlaceListViewModel.SortOrder.NEAREST &&
+                                state.userLocation != null,
                             onClick = { onOpenPlaceDetails(place.id) }
                         )
                     }
@@ -188,15 +268,26 @@ fun PlaceListScreen(
     }
 }
 
+private fun emptyMessageFor(
+    sortOrder: PlaceListViewModel.SortOrder,
+    isSignedIn: Boolean
+): String = when {
+    sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME && !isSignedIn ->
+        "Zaloguj się, by zobaczyć swoje miejsca"
+    sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME ->
+        "Nie dodałaś/eś jeszcze żadnego miejsca"
+    else -> "Brak miejsc pasujących do filtrów"
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CategoryFilterBar(
     selectedCategory: PlaceCategory?,
     onCategorySelected: (PlaceCategory?) -> Unit
 ) {
-    // Kolejność jak w enum PlaceCategory (świadomie nie alfabetycznie –
-    // logiczne grupowanie: place zabaw → sale → kawiarnia/restauracja →
-    // park → atrakcje → inne). "Wszystkie" zostaje pierwsze jako reset.
+    // Kolejność jak w enum PlaceCategory (świadomie nie alfabetycznie -
+    // logiczne grupowanie: place zabaw -> sale -> kawiarnia/restauracja ->
+    // park -> atrakcje -> inne). "Wszystkie" zostaje pierwsze jako reset.
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -230,11 +321,15 @@ private fun CategoryFilterBar(
 /**
  * Drugi rząd filtrów na ekranie listy.
  *
- * Po **lewej** – ikonowy `FilledTonalIconButton` (otwiera sheet z resztą
+ * Po **lewej** - ikonowy `FilledTonalIconButton` (otwiera sheet z resztą
  * udogodnień). Z [BadgedBox] pokazującym liczbę aktywnych filtrów spoza
  * quick-set. Bez tekstu, sam ikona [Icons.Filled.Tune].
  *
- * Po prawej – 4 uniwersalne quick-amenity chipy, sortowane alfabetycznie
+ * W środku - chip "Sortuj: ..." z dropdownem. Świadomie chip a nie zwykły
+ * dropdown, żeby wizualnie pasował do quick-amenity chipów obok i nie
+ * wymagał osobnego rzędu.
+ *
+ * Po prawej - 4 uniwersalne quick-amenity chipy, sortowane alfabetycznie
  * po polskim labelu.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -242,8 +337,11 @@ private fun CategoryFilterBar(
 private fun QuickAmenityBar(
     selectedAmenities: Set<Amenity>,
     advancedFiltersCount: Int,
+    sortOrder: PlaceListViewModel.SortOrder,
+    currentUserSignedIn: Boolean,
     onAmenityToggled: (Amenity) -> Unit,
-    onOpenFilterSheet: () -> Unit
+    onOpenFilterSheet: () -> Unit,
+    onSortOrderChange: (PlaceListViewModel.SortOrder) -> Unit
 ) {
     val context = LocalContext.current
     val orderedQuickAmenities = remember(context) {
@@ -284,7 +382,16 @@ private fun QuickAmenityBar(
             }
         }
 
-        // 2. Quick amenities (alfabetycznie).
+        // 2. Sortowanie - chip-button z dropdownem. ADDED_BY_ME widoczny
+        //    w dropdownie, ale wybranie go gdy user wylogowany skutkuje
+        //    pustą listą + komunikatem (zob. emptyMessageFor).
+        SortChip(
+            current = sortOrder,
+            currentUserSignedIn = currentUserSignedIn,
+            onChange = onSortOrderChange
+        )
+
+        // 3. Quick amenities (alfabetycznie).
         orderedQuickAmenities.forEach { amenity ->
             FilterChip(
                 selected = amenity in selectedAmenities,
@@ -295,9 +402,110 @@ private fun QuickAmenityBar(
     }
 }
 
+/**
+ * Chip "Sortuj: <label>" z dropdownem 5 trybów. Implementacja przez
+ * `AssistChip` (a nie FilterChip), bo wartość nie jest binarna - wybór
+ * jednego z wielu, a kontrolka i tak otwiera natywny menu.
+ *
+ * `currentUserSignedIn` reguluje, czy "Dodane przez Ciebie" jest enabled
+ * w menu - dla wylogowanego usera ten wybór nie ma sensu (zwróciłby
+ * pustą listę), ale zostawiamy go widocznego, żeby user widział co go
+ * czeka po zalogowaniu.
+ */
+@Composable
+private fun SortChip(
+    current: PlaceListViewModel.SortOrder,
+    currentUserSignedIn: Boolean,
+    onChange: (PlaceListViewModel.SortOrder) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        AssistChip(
+            onClick = { expanded = true },
+            label = { Text("Sortuj: ${current.label}") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Sort,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+            },
+            trailingIcon = {
+                Icon(
+                    imageVector = Icons.Filled.ArrowDropDown,
+                    contentDescription = null
+                )
+            },
+            shape = RoundedCornerShape(50),
+            colors = AssistChipDefaults.assistChipColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            PlaceListViewModel.SortOrder.entries.forEach { option ->
+                val enabled = !(option == PlaceListViewModel.SortOrder.ADDED_BY_ME &&
+                    !currentUserSignedIn)
+                DropdownMenuItem(
+                    text = { Text(option.label) },
+                    enabled = enabled,
+                    onClick = {
+                        onChange(option)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Banner pokazywany pod paskiem filtrów, gdy user wybrał "Najbliższe", a
+ * lokalizacji nie mamy. Tłumaczy dlaczego sortowanie nie działa i daje
+ * przycisk requesta uprawnienia.
+ */
+@Composable
+private fun EnableLocationForSortingBanner(onAllowClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Filled.MyLocation,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "Włącz lokalizację, by sortować miejsca po odległości.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(8.dp))
+            TextButton(onClick = onAllowClick) {
+                Text("Pozwól")
+            }
+        }
+    }
+}
+
 @Composable
 private fun PlaceCard(
     place: Place,
+    distanceKm: Double?,
+    showDistance: Boolean,
     onClick: () -> Unit
 ) {
     val categoryStyle = place.category.style
@@ -359,8 +567,21 @@ private fun PlaceCard(
                     Text(
                         text = place.address,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
                     )
+                    // Odległość pokazujemy tylko gdy aktywne sortowanie po
+                    // odległości - inaczej byłoby "głośno" przy sortach
+                    // niezwiązanych z lokalizacją.
+                    if (showDistance && distanceKm != null) {
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = formatDistance(distanceKm),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
             if (place.description.isNotBlank()) {
@@ -374,4 +595,33 @@ private fun PlaceCard(
             }
         }
     }
+}
+
+/**
+ * Formatuje odległość w km do user-friendly stringu:
+ *  - < 1 km: w metrach z zaokrągleniem do 50 m ("420 m"),
+ *  - >= 1 km: z 1 miejscem po przecinku ("3.5 km"),
+ *  - >= 100 km: bez ułamka ("125 km") - taka rozdzielczość nie ma znaczenia
+ *    dla user experience na liście miejsc dla dzieci.
+ */
+private fun formatDistance(km: Double): String = when {
+    km < 1.0 -> {
+        val meters = (km * 1000).toInt()
+        val rounded = ((meters + 25) / 50) * 50
+        "$rounded m"
+    }
+    km < 100.0 -> "%.1f km".format(km)
+    else -> "%d km".format(km.toInt())
+}
+
+/** Odległość w km między dwoma punktami (formuła haversine). */
+private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val r = 6371.0
+    val dLat = Math.toRadians(lat2 - lat1)
+    val dLon = Math.toRadians(lon2 - lon1)
+    val a = kotlin.math.sin(dLat / 2).let { it * it } +
+        kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
+        kotlin.math.sin(dLon / 2).let { it * it }
+    val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+    return r * c
 }

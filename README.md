@@ -5,14 +5,20 @@
 kidZone to społecznościowa aplikacja dla rodziców i opiekunów. Pozwala
 dodawać i oceniać miejsca przyjazne dzieciom (place zabaw, restauracje
 z kącikiem dla dzieci, sale zabaw, parki, kawiarnie rodzinne), wyszukiwać
-je na mapie, filtrować po kategorii i udogodnieniach, sprawdzać miejsca
-najwyżej oceniane i te w okolicy.
+je na mapie, filtrować po kategorii i udogodnieniach, sortować po
+odległości / ocenach / dacie dodania, sprawdzać miejsca najwyżej
+oceniane i te w okolicy. Po dodaniu min. 3 opinii do miejsca pojawia
+się rozkład ocen w stylu Google Maps; pierwsza dziesiątka rankingu
+dostaje plakietkę "TOP 100" z numerem pozycji.
 
-Większość MVP jest już zaimplementowana — Firebase Auth (e-mail + Google),
-Firestore z snapshot listenerami, Google Maps z customowymi pinezkami,
-formularz dodawania/edycji/usuwania miejsc z GPS i reverse geocodingiem.
-Pozostałe `TODO` (dodawanie opinii, ranking, statystyki profilu) są
-wymienione w sekcji [Status MVP](#status-mvp).
+MVP jest zaimplementowane end-to-end: Firebase Auth (e-mail + Google
+przez Credential Manager), Firestore z snapshot listenerami, Google
+Maps z customowymi pinezkami, formularz dodawania/edycji/usuwania
+miejsc z GPS i reverse geocodingiem, pełen CRUD opinii (z transakcjami
+agregującymi `averageRating` i `reviewsCount`), profil z avatarem,
+zmianą hasła / e-maila, usunięciem konta, polityka prywatności RODO,
+ranking użytkowników i miejsc, "Moje miejsca" / "Moje opinie".
+Pozostałe TODO są w sekcji [Status MVP](#status-mvp).
 
 ## Stack
 
@@ -23,7 +29,7 @@ wymienione w sekcji [Status MVP](#status-mvp).
 - **Credential Manager** 1.3.0 + `googleid` 1.1.1 (nowoczesne Google Sign-In)
 - **androidx.core:core-splashscreen** 1.0.1 (Splash Screen API Android 12+, backportowane)
 - **Poppins** jako brand font (Google Font, OFL, bundlowany w `res/font/`, 3 weights: 400/600/700)
-- **Coil 2.7.0** (obrazy), **Retrofit 2.11.0 + OkHttp** (na przyszłość), **Room 2.6.1** (cache offline)
+- **Coil 2.7.0** (obrazy + avatar), **Retrofit 2.11.0 + OkHttp** (na przyszłość), **Room 2.6.1** (cache offline, na przyszłość)
 - **Navigation Compose** 2.8.2, **Coroutines** 1.9.0
 - Architektura: **MVVM + Clean Architecture** (warstwy `data` / `domain` / `presentation`)
 - Build tooling: **AGP 8.13.2**, **Gradle 8.13** (przez `mise.toml`), Java 17
@@ -46,6 +52,10 @@ wymienione w sekcji [Status MVP](#status-mvp).
      `SplashViewModel` decyduje na podstawie `AuthRepository.currentUser`
      czy idziemy do `Login`, czy `Main` (z minimum 800 ms display + 5 s
      timeout fallback na "niezalogowany").
+- **Login / Register** — gradient `#F5F8FB → #FFFFFF` (płynne przejście
+  ze splasha), logo brandu w nagłówku, karta z formularzem, separator
+  "lub", przycisk Google z mini-glyphem; pod polem hasła live checklist
+  wymagań ([PasswordPolicy](app/src/main/java/com/kidzone/utils/PasswordPolicy.kt)).
 - **Adaptive launcher icon** (`mipmap-anydpi-v26/ic_launcher.xml`) z trzema
   warstwami: `background`, `foreground` i `monochrome` — ten ostatni
   włącza **themed icons na Android 13+** (system tinten ikonkę pod
@@ -56,6 +66,31 @@ wymienione w sekcji [Status MVP](#status-mvp).
   jak adresy i opisy miejsc). Dzięki temu `TopAppBar` (używa `titleLarge`)
   od razu pokazuje napis "kidZone" w brand foncie.
 - **Paleta marki** — żółty / niebieski / zielony / biały (zob. `ui/theme/Color.kt`).
+
+## Polityka haseł
+
+Zdefiniowana w [`utils/PasswordPolicy.kt`](app/src/main/java/com/kidzone/utils/PasswordPolicy.kt)
+i egzekwowana w 3 miejscach (rejestracja, zmiana hasła w profilu, komunikat
+`AuthException.WeakPassword`):
+
+- minimum **8 znaków**,
+- co najmniej **1 mała** litera,
+- co najmniej **1 duża** litera,
+- co najmniej **1 znak specjalny** (znak nie-literowy i nie-cyfrowy).
+
+UI rejestracji i dialogu zmiany hasła pokazuje live checklist zbudowany
+z `PasswordPolicy.evaluate(password)`.
+
+## Normalizacja tekstów
+
+[`utils/TextNormalization.kt`](app/src/main/java/com/kidzone/utils/TextNormalization.kt)
+trzyma w jednym miejscu wspólne reguły kapitalizacji dla pól wprowadzanych
+przez użytkownika (locale `pl_PL`, żeby polskie znaki działały):
+
+- `toTitleCase` — Title Case dla nazwy miejsca i adresu (klawiatura
+  używa `KeyboardCapitalization.Words`, normalizacja dzieje się przy save).
+- `toSentenceCase` — Sentence case dla opisu (klawiatura używa
+  `KeyboardCapitalization.Sentences`).
 
 ## Struktura projektu
 
@@ -69,9 +104,14 @@ app/src/main/java/com/kidzone
 │   │   ├── FirestoreCollections.kt    # users, places, reviews, photos
 │   │   └── dto/                        # PlaceDto, ReviewDto, UserDto
 │   └── repository
-│       ├── FirebaseAuthRepository.kt   # e-mail + Google + reset, mapowanie błędów
-│       ├── FirestorePlaceRepository.kt # observe (snapshot), top, near, add/update/delete (z timeoutem)
-│       └── FirestoreReviewRepository.kt# observe (snapshot); add/report = TODO
+│       ├── FirebaseAuthRepository.kt   # e-mail + Google + reset, mapowanie błędów,
+│       │                               # zmiana hasła / e-maila, deleteAccount,
+│       │                               # uploadAvatar (Storage)
+│       ├── FirestorePlaceRepository.kt # observe (snapshot), top, near, add/update/delete
+│       │                               # (z timeoutem + atomic increment user.placesAddedCount)
+│       └── FirestoreReviewRepository.kt# observeReviewsForPlace + observeReviewsByUser,
+│                                       # addReview / updateReview / deleteReview
+│                                       # (transakcje agregujące averageRating + reviewsCount)
 │
 ├── domain
 │   ├── model/               # User, Place, Review, Photo, PlaceCategory, Amenity
@@ -80,35 +120,65 @@ app/src/main/java/com/kidzone
 ├── presentation
 │   ├── splash/              # SplashScreen + SplashViewModel
 │   ├── auth
-│   │   ├── LoginScreen.kt       # e-mail + Google + reset
+│   │   ├── LoginScreen.kt        # gradient, karta, e-mail + Google + reset
 │   │   ├── LoginViewModel.kt
-│   │   ├── RegisterScreen.kt    # nazwa + e-mail + hasło (min. 6)
+│   │   ├── RegisterScreen.kt     # nazwa + e-mail + hasło z live checklist
 │   │   ├── RegisterViewModel.kt
-│   │   └── GoogleSignInLauncher.kt  # Credential Manager + GetGoogleIdOption
+│   │   └── GoogleSignInLauncher.kt   # Credential Manager + GetGoogleIdOption
 │   ├── main/MainScreen.kt   # shell z bottom navigation + FAB "+"
 │   ├── home
-│   │   ├── HomeScreen.kt        # hero, CTA mapa, Top, Blisko Ciebie
-│   │   └── HomeViewModel.kt     # getTopPlaces + haversine sort dla nearby
+│   │   ├── HomeScreen.kt         # hero (zaokrąglony, węższy napis), CTA mapa,
+│   │   │                         # Top 20, Blisko Ciebie 20
+│   │   └── HomeViewModel.kt      # getTopPlaces(20) + haversine sort dla nearby (20),
+│   │                             # komunikat timeout lokalizacji
 │   ├── map
-│   │   ├── MapScreen.kt         # GoogleMap + MarkerComposable + filtry + bottom sheet
-│   │   └── MapViewModel.kt      # observePlaces + flatMapLatest po kategorii
+│   │   ├── MapScreen.kt          # GoogleMap + MarkerComposable + filtry +
+│   │   │                         # bottom sheet pinezki
+│   │   └── MapViewModel.kt       # observePlaces + flatMapLatest po kategorii,
+│   │                             # filtry: topRatedOnly, addedByMeOnly
 │   ├── place
 │   │   ├── list
 │   │   │   ├── PlaceListScreen.kt        # LazyColumn + chipy quick + button "Filtry"
+│   │   │   │                             # + "Sortuj: ..." dropdown, banner zachęty
+│   │   │   │                             # do włączenia lokalizacji, dystans na karcie
 │   │   │   ├── PlaceListViewModel.kt     # observePlaces + filtr udogodnień AND
+│   │   │   │                             # + 5 sort modes + cap LIST_LIMIT=100
 │   │   │   └── AmenityFilterSheet.kt     # grupowane sekcje, auto-expand po kategorii
 │   │   ├── details
-│   │   │   ├── PlaceDetailsScreen.kt     # karta główna + udogodnienia + opinie + edit/delete dla ownera
-│   │   │   └── PlaceDetailsViewModel.kt  # getPlace + observeReviews + delete + autor
-│   │   └── add
-│   │       ├── AddPlaceScreen.kt         # formularz create/edit + GPS button
-│   │       ├── AddPlaceViewModel.kt      # tryb create + edit (placeId), prune amenities po zmianie kategorii
-│   │       └── LocationHelper.kt         # FusedLocation + Geocoder (Android 13+ async API)
+│   │   │   ├── PlaceDetailsScreen.kt     # główna karta + udogodnienia + opinie
+│   │   │   │                             # + plakietka "TOP 100" dla top 10 + edit/delete
+│   │   │   │                             # dla ownera + "Dodano przez Ciebie"
+│   │   │   ├── PlaceDetailsViewModel.kt  # getPlace + observeReviews + delete + autor
+│   │   │   │                             # + topRank wyliczany z getTopPlaces(100)
+│   │   │   └── AddReviewSheet.kt         # rating 1-5 + komentarz, tryb add/edit
+│   │   ├── add
+│   │   │   ├── AddPlaceScreen.kt         # formularz create/edit + GPS + KeyboardCapitalization
+│   │   │   ├── AddPlaceViewModel.kt      # tryb create + edit (placeId), prune amenities
+│   │   │   │                             # po zmianie kategorii, normalizacja capitalization save
+│   │   │   └── LocationHelper.kt         # FusedLocation z timeoutem 15s + Geocoder
+│   │   │                                 # (Android 13+ async API)
+│   │   └── myplaces
+│   │       ├── MyPlacesScreen.kt         # lista miejsc dodanych przez zalogowanego usera
+│   │       └── MyPlacesViewModel.kt      # observePlacesByOwner z snapshot listenerem
+│   ├── review/myreviews
+│   │   ├── MyReviewsScreen.kt   # lista opinii zalogowanego usera
+│   │   └── MyReviewsViewModel.kt# observeReviewsByUser
 │   ├── profile
-│   │   ├── ProfileScreen.kt     # nazwa + email + Wyloguj (statystyki = TODO)
-│   │   └── ProfileViewModel.kt
-│   ├── ranking/RankingScreen.kt # placeholder (TODO)
-│   └── common/CategoryStyle.kt  # ikona + kolor per PlaceCategory
+│   │   ├── ProfileScreen.kt          # avatar + nazwa + statystyki + odznaki +
+│   │   │                             # sekcje: Moje miejsca / Moje opinie /
+│   │   │                             # Konto i bezpieczeństwo / Polityka / Wyloguj
+│   │   ├── ProfileViewModel.kt
+│   │   ├── EditProfileSheet.kt       # nazwa / firstName / lastName / avatar
+│   │   ├── ChangePasswordDialog.kt   # 3 pola + live PasswordPolicy checklist
+│   │   ├── ChangeEmailDialog.kt      # verifyBeforeUpdateEmail z linkiem
+│   │   ├── DeleteAccountDialog.kt    # potwierdzenie + reauth hasłem
+│   │   └── PrivacyPolicyDialog.kt    # treść RODO + admin / kontakt z AppConfig
+│   ├── ranking
+│   │   ├── RankingScreen.kt     # 2 zakładki: TOP miejsc / TOP użytkowników
+│   │   └── RankingViewModel.kt  # equal fetch one-shot (placeRepo + authRepo.getTopUsers)
+│   └── common
+│       ├── CategoryStyle.kt     # ikona + kolor per PlaceCategory
+│       └── UserBadges.kt        # odznaki: odkrywca / recenzent / ekspert
 │
 ├── ui/theme
 │   ├── Color.kt             # paleta marki + light/dark surface
@@ -124,8 +194,11 @@ app/src/main/java/com/kidzone
 │   └── RepositoryModule.kt  # @Binds dla 3 repo
 │
 └── utils
-    ├── OpResult.kt          # sealed Success/Failure + map
-    └── AuthException.kt     # typowane błędy auth (UserNotFound, InvalidCredentials, ...)
+    ├── Result.kt            # OpResult<T>: sealed Success/Failure + map
+    ├── AuthException.kt     # typowane błędy auth (UserNotFound, WeakPassword, ...)
+    ├── PasswordPolicy.kt    # min 8 + 1 mała + 1 duża + 1 specjalny
+    ├── TextNormalization.kt # toTitleCase + toSentenceCase (locale pl_PL)
+    └── AppConfig.kt         # ADMINISTRATOR_NAME, PRIVACY_CONTACT_EMAIL itp.
 ```
 
 Resources:
@@ -139,14 +212,50 @@ Resources:
 ## Mapa schematu bazy
 
 - Kolekcja `users` ↔ `domain.model.User` ↔ `data.remote.dto.UserDto`
+  (pola `placesAddedCount` / `reviewsCount` aktualizowane atomic
+  `FieldValue.increment` przy dodaniu miejsca / opinii)
 - Kolekcja `places` ↔ `domain.model.Place` ↔ `data.remote.dto.PlaceDto`
+  (pola `averageRating` / `reviewsCount` aktualizowane transakcyjnie
+  przez `FirestoreReviewRepository`)
 - Kolekcja `reviews` ↔ `domain.model.Review` ↔ `data.remote.dto.ReviewDto`
   (top-level, z polem `placeId`; filtrowanie `whereEqualTo("placeId", ...)`
   bez wymagania composite indexa — `reportedAsSpam=false` filtrujemy
   po stronie klienta)
 - Stała `FirestoreCollections.PHOTOS = "photos"` jest zarezerwowana, ale
   na dziś `photoUrls` jest trzymane jako lista URL-i bezpośrednio na
-  dokumencie miejsca (z Firebase Storage).
+  dokumencie miejsca (z Firebase Storage); avatary userów lecą do
+  `avatars/{uid}/avatar.jpg`.
+
+Reguły bezpieczeństwa są w `firestore.rules` i `storage.rules` w roocie repo.
+
+## Kluczowe decyzje architektoniczne
+
+- **MVVM + Clean** — interfejsy repo w `domain/repository`, implementacje
+  w `data/repository`, ViewModele tylko widzą interfejsy. Hilt wstrzykuje
+  konkretne `Firestore...Repository` przez `RepositoryModule`.
+- **Snapshot listenery wszędzie tam, gdzie jest sens** — lista miejsc,
+  mapa, opinie, "Moje miejsca", "Moje opinie", profil. Zmiany pojawiają
+  się live bez pull-to-refresh.
+- **One-shot fetch** dla rankingu i topu miejsc (Home, Ranking,
+  PlaceDetails.topRank) — nie potrzebują real-time, redukują liczbę
+  aktywnych listenerów.
+- **`OpResult<T>` zamiast wyjątków** w warstwie repo — UI dostaje typowany
+  Success/Failure + komunikaty `AuthException`. Wyjątki rzucamy tylko
+  w utility (np. `LocationHelper.fetchCurrentLocation`), gdzie wzorzec
+  Result byłby przesadą.
+- **Transakcje agregatów** — `averageRating` i `reviewsCount` na
+  `places` aktualizowane są w transakcji razem z dodaniem opinii;
+  `placesAddedCount` na `users` przez `FieldValue.increment`. Przy
+  równoczesnych zapisach z innych klientów może wystąpić chwilowy
+  rozjazd o 1 — akceptowalne dla MVP.
+- **`KeyboardCapitalization` + `TextNormalization`** — klawiatura sama
+  podpowiada Title/Sentence case przy wpisywaniu, a normalizacja przy
+  save sprząta reszki autocorrect / ALL CAPS.
+- **TOP 100 / TOP 10** — `PlaceDetailsViewModel.loadTopRank` pobiera
+  top 100 wg `averageRating` i wystawia plakietkę tylko dla pierwszej
+  dziesiątki. Pula jest większa niż wyróżnienie, żeby rosnąca baza
+  miejsc nie deaktywowała plakietki przy mikroskopijnych różnicach
+  ocen w pobliżu progu.
 
 ## Uruchomienie lokalne
 
@@ -170,6 +279,9 @@ Resources:
    (`./gradlew signingReport`), pobierz nowy `google-services.json`
    po włączeniu providera Google. Bez tego logowanie Google zwróci
    inline-message "Włącz Google Sign-In w Firebase Console...".
+6. Wrzuć reguły bezpieczeństwa: Firestore z `firestore.rules`, Storage
+   z `storage.rules`. Bez tego Storage `uploadAvatar` zwróci 403 i
+   "Konto i bezpieczeństwo" → zmiana avatara nie zadziała.
 
 ### 3. Konfiguracja klucza Google Maps
 
@@ -198,72 +310,83 @@ konfiguracji.
 `AndroidManifest.xml` deklaruje:
 - `INTERNET`, `ACCESS_NETWORK_STATE` — Firebase / Maps
 - `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` — natywny "Moja lokalizacja"
-  na mapie, GPS w `AddPlaceScreen`, sekcja "Blisko Ciebie" na home
-- `CAMERA`, `READ_MEDIA_IMAGES` — zarezerwowane pod uploady zdjęć (na razie
-  nieużywane w kodzie)
+  na mapie, GPS w `AddPlaceScreen`, sekcje "Blisko Ciebie" na home, sortowanie
+  "Najbliższe" na liście miejsc
+- `CAMERA`, `READ_MEDIA_IMAGES` — pod uploady zdjęć (avatar już to wykorzystuje
+  przez photo picker; zdjęcia miejsc / opinii — TODO)
 
 Prośby o uprawnienia są wykonywane in-app: `MapScreen` automatycznie
 przy pierwszym wejściu, `AddPlaceScreen` przy kliknięciu "Pobierz lokalizację",
-`HomeScreen` przez kartę "Włącz lokalizację" w sekcji "Blisko Ciebie".
+`HomeScreen` przez kartę "Włącz lokalizację" w sekcji "Blisko Ciebie",
+`PlaceListScreen` przez banner "Włącz lokalizację, by sortować po odległości".
 
 ## Status MVP
 
-| Funkcja                                       | Status |
-|-----------------------------------------------|--------|
-| Struktura projektu + Hilt DI                  | ✅     |
-| Theme (Material 3, light + dark) + nawigacja  | ✅     |
-| Brand font Poppins (3 weights, bundlowany)    | ✅     |
-| Splash systemowy (Android 12+) + Compose      | ✅     |
-| Adaptive launcher icon                        | ✅     |
-| Themed icon (monochrome, Android 13+)         | ✅     |
-| Modele i interfejsy repo                      | ✅     |
-| Logowanie e-mail/hasło                        | ✅     |
-| Logowanie Google (Credential Manager)         | ✅     |
-| Reset hasła e-mailem                          | ✅     |
-| Rejestracja + tworzenie dokumentu `users`     | ✅     |
-| Wylogowanie                                   | ✅     |
-| Home — hero, Top miejsca, Blisko Ciebie       | ✅     |
-| Mapa Google Maps + customowe pinezki kategorii| ✅     |
-| Filtry mapy (kategoria + najlepiej oceniane)  | ✅     |
-| Bottom sheet preview pinezki + "Nawiguj"      | ✅     |
-| Lista miejsc + filtr kategorii                | ✅     |
-| Filtr udogodnień (4 quick + sheet z grupami)  | ✅     |
-| Dodawanie miejsca (formularz + GPS + geocoder)| ✅     |
-| Edycja miejsca (`AddPlace?placeId=`)          | ✅     |
-| Usuwanie miejsca (z dialog potwierdzeniem)    | ✅     |
-| Szczegóły miejsca + autor + udogodnienia      | ✅     |
-| Snapshot listenery na places i reviews        | ✅     |
-| Profil — nazwa / e-mail / wyloguj             | 🟡 — statystyki, avatar i odznaki TODO |
-| Dodawanie opinii                              | ⏳ — `addReview` w repo zwraca `NotImplementedError` |
-| Zgłaszanie opinii jako spam                   | ⏳ — `reportReviewAsSpam` j.w. |
-| Ranking i odznaki                             | ⏳ — `RankingScreen` to czysty placeholder z `Text(...)` |
-| Upload zdjęć do Firebase Storage              | ⏳ — Storage dep wpięte, ale brak logiki w kodzie |
+| Funkcja                                              | Status |
+|------------------------------------------------------|--------|
+| Struktura projektu + Hilt DI                         | ✅     |
+| Theme (Material 3, light + dark) + nawigacja         | ✅     |
+| Brand font Poppins (3 weights, bundlowany)           | ✅     |
+| Splash systemowy (Android 12+) + Compose             | ✅     |
+| Adaptive launcher icon + themed (Android 13+)        | ✅     |
+| Login screen redesign (gradient, karta, Google glyph)| ✅     |
+| Polityka haseł 8+/Aa/specjalny + live checklist      | ✅     |
+| Logowanie e-mail/hasło + Google (Credential Manager) | ✅     |
+| Reset hasła e-mailem                                 | ✅     |
+| Rejestracja + tworzenie dokumentu `users`            | ✅     |
+| Wylogowanie                                          | ✅     |
+| Home — hero, Top miejsca (20), Blisko Ciebie (20)    | ✅     |
+| Mapa Google Maps + customowe pinezki kategorii       | ✅     |
+| Filtry mapy: kategoria + Najlepiej / Dodane przez Ciebie | ✅ |
+| Bottom sheet preview pinezki + "Nawiguj"             | ✅     |
+| Lista miejsc — filtry, 5 trybów sortowania, max 100  | ✅     |
+| Filtr udogodnień (4 quick + sheet z grupami)         | ✅     |
+| Dodawanie miejsca (formularz + GPS + geocoder)       | ✅     |
+| Timeout lokalizacji 15s + komunikat user-friendly    | ✅     |
+| Normalizacja kapitalizacji nazwy / adresu / opisu    | ✅     |
+| Edycja miejsca (`AddPlace?placeId=`)                 | ✅     |
+| Usuwanie miejsca (z dialog potwierdzeniem)           | ✅     |
+| Szczegóły miejsca + autor + udogodnienia             | ✅     |
+| "Dodano przez Ciebie" dla zalogowanego właściciela   | ✅     |
+| Plakietka "TOP 100" + numer pozycji dla top 10       | ✅     |
+| Snapshot listenery na places i reviews               | ✅     |
+| Dodawanie / edycja / usuwanie opinii (transakcje)    | ✅     |
+| Wykres rozkładu ocen (Google Maps style)             | ✅     |
+| Sortowanie listy opinii (4 tryby)                    | ✅     |
+| Profil — avatar, nazwa, statystyki, odznaki          | ✅     |
+| Profil — Moje miejsca, Moje opinie                   | ✅     |
+| Konto: zmiana hasła + zmiana e-maila + delete        | ✅     |
+| Polityka prywatności RODO (in-app)                   | ✅     |
+| Ranking miejsc (TOP 100) + użytkowników              | ✅     |
+| Upload avatara do Firebase Storage                   | ✅     |
+| Zgłaszanie opinii jako spam                          | ⏳ — `reportReviewAsSpam` zwraca `NotImplementedError` |
+| Upload zdjęć miejsc / opinii do Storage              | ⏳ — Storage dep wpięte, brak UI |
 
 ## Kolejne kroki
 
-1. **Opinie** — implementacja `FirestoreReviewRepository.addReview` i
-   `reportReviewAsSpam` (transakcja: dopisanie review + aktualizacja
-   `averageRating` / `reviewsCount` na dokumencie Place). UI dodawania
-   opinii w `PlaceDetailsScreen`.
-2. **Cloud Functions / agregaty** — przeniesienie utrzymywania
+1. **Zgłaszanie opinii jako spam** — wpiąć `reportReviewAsSpam`
+   (Firestore: zwiększyć `reportCount` + ustawić `reportedAsSpam`),
+   plus modal w UI nad komentarzem.
+2. **Upload zdjęć miejsc i opinii** — analogicznie do `uploadAvatar`,
+   w `AddPlaceScreen` i `AddReviewSheet`. Wykorzystać `READ_MEDIA_IMAGES`
+   i `CAMERA`, które już są w manifeście.
+3. **Cloud Functions / agregaty server-side** — przeniesienie utrzymywania
    `averageRating` i `reviewsCount` na backend (trigger na write
    w `reviews`), żeby klient nie polegał na transakcjach i nie miał
    race condition przy równoczesnych ocenach.
-3. **Upload zdjęć** — wpiąć Firebase Storage w `AddPlaceScreen`
-   (zdjęcia miejsca) i `addReview` (zdjęcia w opiniach). Wykorzystać
-   uprawnienia `CAMERA` i `READ_MEDIA_IMAGES` które są już w manifeście.
-4. **Ranking** — TOP 10 miejsc (już mamy `getTopPlaces`) + ranking
-   użytkowników (po `placesAddedCount` / `reviewsCount` w `users`)
-   + odznaki (odkrywca, recenzent, ekspert rodzinny).
-5. **Profil** — avatar (z `users.avatarUrl`, edycja przez Storage),
-   statystyki, odznaki.
+4. **Geo zapytania** — `getPlacesNear` w repo nadal pobiera wszystkie
+   miejsca i sortuje klient-side haversinem; przy rosnącej bazie
+   przepisać na geohash / GeoFirestore. Lista miejsc też skorzysta
+   (dziś bierze całą kolekcję, sortuje, cap-uje do 100 po stronie klienta).
+5. **Snapshot listener dla rankingu** — `RankingViewModel` używa one-shot;
+   po wdrożeniu Cloud Functions z denormalizowaną kolekcją `top_places`
+   można podmienić na listener bez zmiany API.
 6. **Themed icon (vector)** — obecny `ic_launcher_monochrome` jest PNG-iem;
    docelowo lepiej mieć wersję wektorową single-path, by Android mógł
    sensownie zastosować dynamic color overlay.
-7. **Snapshot listener dla "Top miejsc"** — `HomeViewModel` używa one-shot
-   `getTopPlaces`; po wdrożeniu Cloud Functions z denormalizowaną kolekcją
-   `top_places` można podmienić na listener.
-8. **Geo zapytania** — `getPlacesNear` w repo nadal pobiera wszystkie
-   miejsca i sortuje klient-side haversinem; przy rosnącej bazie warto
-   przepisać na geohash / GeoFirestore.
-9. Opcjonalnie: deep linking, push notifications, refinement dark mode.
+7. **Replace placeholder Google glyph** — przycisk "Zaloguj się przez
+   Google" używa własnego mini-glyphu "G" (placeholder bez ryzyka
+   licencyjnego); docelowo wymienić na materiał z Google Identity po
+   uzyskaniu brand approvalu.
+8. Opcjonalnie: deep linking, push notifications, refinement dark mode,
+   paginacja listy miejsc.

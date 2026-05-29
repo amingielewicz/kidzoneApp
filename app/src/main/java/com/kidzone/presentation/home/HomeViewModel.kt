@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.repository.PlaceRepository
+import com.kidzone.presentation.place.add.LOCATION_TIMEOUT_USER_MESSAGE
 import com.kidzone.presentation.place.add.fetchCurrentLocation
 import com.kidzone.presentation.place.add.hasLocationPermission
 import com.kidzone.utils.OpResult
@@ -21,11 +22,25 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/** Ile miejsc maksymalnie pokazujemy w sekcji "Top". */
-private const val TOP_PLACES_LIMIT = 5
+/**
+ * Ile miejsc maksymalnie pokazujemy w sekcji "Top miejsca".
+ *
+ * 20 to świadomy kompromis: na ekranie horyzontalnej LazyRow user widzi
+ * 1.5 karty naraz i może przewinąć do reszty. 20 daje zauważalnie więcej
+ * niż 5 (czuje się jak "ranking", nie jak "podgląd"), a Firestore
+ * `getTopPlaces(20)` mieści się w jednej operacji bez paginacji.
+ */
+private const val TOP_PLACES_LIMIT = 20
 
-/** Ile miejsc maksymalnie pokazujemy w sekcji "Blisko Ciebie". */
-private const val NEARBY_LIMIT = 5
+/**
+ * Ile miejsc maksymalnie pokazujemy w sekcji "Blisko Ciebie".
+ *
+ * Symetrycznie do [TOP_PLACES_LIMIT] - obie sekcje wyglądają tak samo,
+ * więc takie same liczby kart wzmacniają poczucie spójności. Filtrowanie
+ * po promieniu [NEARBY_RADIUS_KM] dalej obowiązuje, więc w okolicy z
+ * mniejszą bazą miejsc rząd po prostu będzie krótszy.
+ */
+private const val NEARBY_LIMIT = 20
 
 /** Promień wyszukiwania pobliskich miejsc (km). */
 private const val NEARBY_RADIUS_KM = 10.0
@@ -123,12 +138,19 @@ class HomeViewModel @Inject constructor(
             _uiState.update { it.copy(isNearbyLoading = true) }
 
             // fetchCurrentLocation może rzucić jeżeli FusedLocation explosion
-            // (np. niezainicjalizowane Play Services). Łapiemy żeby UI nie
-            // pełzł crashem.
+            // (np. niezainicjalizowane Play Services), ale zwykle zwraca null
+            // przy timeoucie / braku fixu (zob. LocationHelper.fetchCurrentLocation).
+            // Łapiemy żeby UI nie pełzł crashem; przy null/błędzie zachowujemy
+            // pustą listę "nearby" + ustawiamy delikatny komunikat zamiast
+            // wieczystego spinnera.
             val location = runCatching { fetchCurrentLocation(appContext) }.getOrNull()
             if (location == null) {
                 _uiState.update {
-                    it.copy(isNearbyLoading = false, nearbyPlaces = emptyList())
+                    it.copy(
+                        isNearbyLoading = false,
+                        nearbyPlaces = emptyList(),
+                        errorMessage = LOCATION_TIMEOUT_USER_MESSAGE
+                    )
                 }
                 return@launch
             }

@@ -232,6 +232,7 @@ fun PlaceDetailsScreen(
                         author = state.author,
                         reviews = state.reviews,
                         currentUserId = currentUser?.id,
+                        topRank = state.topRank,
                         sortOrder = state.sortOrder,
                         onSortOrderChange = viewModel::setSortOrder,
                         onAddReview = viewModel::openAddReviewSheet,
@@ -279,6 +280,7 @@ private fun PlaceDetailsContent(
     author: User?,
     reviews: List<Review>,
     currentUserId: String?,
+    topRank: Int?,
     sortOrder: PlaceDetailsViewModel.ReviewSortOrder,
     onSortOrderChange: (PlaceDetailsViewModel.ReviewSortOrder) -> Unit,
     onAddReview: () -> Unit,
@@ -306,7 +308,9 @@ private fun PlaceDetailsContent(
         item {
             PlaceMainCard(
                 place = place,
-                author = author
+                author = author,
+                currentUserId = currentUserId,
+                topRank = topRank
             )
         }
 
@@ -391,30 +395,37 @@ private fun PlaceDetailsContent(
 
 /**
  * Główna karta szczegółów miejsca – "jedno okno" w którym po kolei są:
- *  1. nazwa + ikona kategorii + ocena (header),
+ *  1. nazwa + ikona kategorii + ocena (header) + (opc.) plakietka TOP 100,
  *  2. opis (jeśli niepusty),
  *  3. adres + współrzędne,
  *  4. mały przycisk „Nawiguj" wyrzucający do Google Maps w trybie
  *     turn-by-turn navigation (intent z `maps/dir/?api=1`),
- *  5. autor + data dodania.
+ *  5. autor + data dodania (lub "Dodano przez Ciebie", gdy zalogowany user
+ *     jest właścicielem - patrz [authorLine]).
  *
  * Bez sub-headerów typu "Opis"/"Lokalizacja" – wizualnie jeden spójny
  * blok, a delikatne dividery rozdzielają poszczególne kawałki.
+ *
+ * @param topRank pozycja w rankingu TOP 100 (1-based), tylko gdy <= 10.
+ *   Null = nie pokazujemy plakietki.
  */
 @Composable
 private fun PlaceMainCard(
     place: Place,
-    author: User?
+    author: User?,
+    currentUserId: String?,
+    topRank: Int?
 ) {
     val style = place.category.style
     val context = LocalContext.current
+    val isOwnerLine = currentUserId != null && currentUserId == place.ownerUserId
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // --- 1. Header: nazwa + kategoria + ocena ---
+            // --- 1. Header: nazwa + kategoria + ocena + (opc.) plakietka TOP 100 ---
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = style.icon,
@@ -434,6 +445,13 @@ private fun PlaceMainCard(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+                // Plakietka rankingu - obok nazwy, jak gwiazdka jakości.
+                // Pokazujemy tylko dla pierwszej dziesiątki TOP 100;
+                // dla pozostałych miejsc nic nie renderujemy (brak Box-a).
+                if (topRank != null) {
+                    Spacer(Modifier.width(8.dp))
+                    TopRankBadge(rank = topRank)
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -522,6 +540,10 @@ private fun PlaceMainCard(
             }
 
             // --- 4. Dodano przez ---
+            // Dla zalogowanego usera-właściciela pokazujemy "Dodano przez Ciebie"
+            // (z datą), zamiast jego własnego nicka - taka konwencja jest
+            // czytelniejsza, bo użytkownik nie musi rozpoznawać samego siebie
+            // w nagłówku miejsca.
             SoftDivider()
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
@@ -531,21 +553,71 @@ private fun PlaceMainCard(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(6.dp))
-                val authorName = author?.name?.takeIf { it.isNotBlank() }
                 val datePart = place.createdAtMillis
                     .takeIf { it > 0L }
                     ?.let { " · " + formatDate(it) }
                     .orEmpty()
+                val authorName = author?.name?.takeIf { it.isNotBlank() }
                 Text(
-                    text = if (authorName != null) {
-                        "Dodano przez $authorName$datePart"
-                    } else {
-                        "Dodano przez nieznanego użytkownika$datePart"
+                    text = when {
+                        isOwnerLine -> "Dodano przez Ciebie$datePart"
+                        authorName != null -> "Dodano przez $authorName$datePart"
+                        else -> "Dodano przez nieznanego użytkownika$datePart"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+    }
+}
+
+/**
+ * Plakietka rankingowa "TOP 100" z numerem pozycji.
+ *
+ * Wizualnie:
+ *  - mały label "TOP 100" w `labelSmall` + bold, kolor `secondary`,
+ *  - poniżej kolorowa gwiazdka (Icons.Filled.Star tinted secondary)
+ *    z numerem pozycji nałożonym pośrodku jako biały Text z wagą Bold.
+ *
+ * Dlaczego Box ze Star + Text na wierzchu, a nie gotowy SVG: gwiazdka z
+ * Material Icons skaluje się idealnie razem z tekstem, a "TOP 100" jest
+ * brand-agnostyczny - nie chcemy custom asseta tylko po to, by zmieścić
+ * w nim dynamiczny numer.
+ *
+ * @param rank pozycja w rankingu (1..[TOP_RANKING_BADGE_LIMIT]). Powinna
+ *   być zwalidowana przez VM przed wywołaniem - nie clampujemy tutaj
+ *   na siłę, bo np. wartość 11+ to bug, lepiej go zauważyć.
+ */
+@Composable
+private fun TopRankBadge(rank: Int) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(horizontal = 4.dp)
+    ) {
+        Text(
+            text = "TOP 100",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.secondary
+        )
+        Spacer(Modifier.height(2.dp))
+        Box(
+            modifier = Modifier.size(40.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Star,
+                contentDescription = "Pozycja w rankingu TOP 100: $rank",
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.fillMaxSize()
+            )
+            Text(
+                text = rank.toString(),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSecondary
+            )
         }
     }
 }

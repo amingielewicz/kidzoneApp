@@ -14,9 +14,32 @@ import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+
+/**
+ * Maks. czas oczekiwania na fix GPS / fused location (ms).
+ *
+ * 15 sekund to świadomy kompromis: krótszy niż wewnętrzne timeouty Google
+ * Play Services (ok. 30 s) i wystarczająco długi, żeby normalny user na
+ * świeżym uruchomieniu apki nadążył (FusedLocationProviderClient zwykle
+ * dostarcza pierwszy fix w 1-5 s, gorzej tylko gdy GPS jest "zimny").
+ *
+ * Po przekroczeniu [fetchCurrentLocation] zwraca null - callsite tłumaczy
+ * to na user-friendly komunikat "Problem z ustaleniem lokalizacji.
+ * Spróbuj później." (zob. AddPlaceScreen.fetchAndSetLocation).
+ */
+private const val LOCATION_TIMEOUT_MS = 15_000L
+
+/**
+ * Wspólny komunikat dla użytkownika, gdy lokalizacji nie udało się ustalić
+ * w sensownym czasie. Trzymamy go w jednym miejscu, żeby Home, AddPlace i
+ * lista miejsc używały dokładnie tego samego brzmienia.
+ */
+const val LOCATION_TIMEOUT_USER_MESSAGE: String =
+    "Problem z ustaleniem lokalizacji. Spróbuj później."
 
 /**
  * Sprawdza, czy użytkownik nadał aplikacji uprawnienie do lokalizacji
@@ -38,38 +61,42 @@ fun hasLocationPermission(context: Context): Boolean {
  * Zakłada, że uprawnienie [Manifest.permission.ACCESS_FINE_LOCATION] zostało
  * już przyznane (callsite musi to zweryfikować przez [hasLocationPermission]).
  *
- * Zwraca parę (latitude, longitude) lub null, jeśli urządzenie nie ma fixu
- * (np. emulator bez ustawionej lokalizacji).
+ * Zwraca parę (latitude, longitude) lub `null`, jeśli:
+ *  - urządzenie nie ma fixu (np. emulator bez ustawionej lokalizacji),
+ *  - operacja przekroczyła [LOCATION_TIMEOUT_MS] - GPS w "zimnym" stanie
+ *    bywa wolny, a my nie chcemy zostawiać usera na bezterminowym spinnerze.
  */
 @SuppressLint("MissingPermission")
 suspend fun fetchCurrentLocation(context: Context): Pair<Double, Double>? =
-    suspendCancellableCoroutine { cont ->
-        val client = LocationServices.getFusedLocationProviderClient(context)
-        val cts = CancellationTokenSource()
+    withTimeoutOrNull(LOCATION_TIMEOUT_MS) {
+        suspendCancellableCoroutine<Pair<Double, Double>?> { cont ->
+            val client = LocationServices.getFusedLocationProviderClient(context)
+            val cts = CancellationTokenSource()
 
-        client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
-            .addOnSuccessListener { location ->
-                if (location != null) {
-                    cont.resume(location.latitude to location.longitude)
-                } else {
-                    // Jesli getCurrentLocation zwrocilo null, probujemy pobrac ostatnia znana lokalizacje
+            client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+                .addOnSuccessListener { location ->
+                    if (location != null) {
+                        cont.resume(location.latitude to location.longitude)
+                    } else {
+                        // Jesli getCurrentLocation zwrocilo null, probujemy pobrac ostatnia znana lokalizacje
+                        client.lastLocation.addOnSuccessListener { lastLoc ->
+                            cont.resume(lastLoc?.let { it.latitude to it.longitude })
+                        }.addOnFailureListener {
+                            cont.resume(null)
+                        }
+                    }
+                }
+                .addOnFailureListener { e ->
+                    // W razie bledu getCurrentLocation rowniez probujemy lastLocation jako fallback
                     client.lastLocation.addOnSuccessListener { lastLoc ->
                         cont.resume(lastLoc?.let { it.latitude to it.longitude })
                     }.addOnFailureListener {
-                        cont.resume(null)
+                        cont.resumeWithException(e)
                     }
                 }
-            }
-            .addOnFailureListener { e ->
-                // W razie bledu getCurrentLocation rowniez probujemy lastLocation jako fallback
-                client.lastLocation.addOnSuccessListener { lastLoc ->
-                    cont.resume(lastLoc?.let { it.latitude to it.longitude })
-                }.addOnFailureListener {
-                    cont.resumeWithException(e)
-                }
-            }
 
-        cont.invokeOnCancellation { cts.cancel() }
+            cont.invokeOnCancellation { cts.cancel() }
+        }
     }
 
 /**
