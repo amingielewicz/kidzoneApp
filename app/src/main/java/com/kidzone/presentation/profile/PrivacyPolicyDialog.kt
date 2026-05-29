@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.kidzone.utils.AppConfig
 
 /**
  * Dialog z polityką prywatności kidZone.
@@ -25,16 +26,15 @@ import androidx.compose.ui.unit.dp
  *  - na sklepie Google Play wystarczyło wskazać tę samą treść jako
  *    "in-app privacy policy" (Google akceptuje to równolegle z URL-em).
  *
- * Tekst jest **placeholderem MVP** – do uzupełnienia przez właściciela
- * aplikacji o:
- *  - dane administratora danych (nazwa firmy / osoba),
- *  - kontakt e-mail RODO,
- *  - aktualną datę wejścia w życie.
+ * Dane kontaktowe administratora i e-mail RODO pochodzą z [AppConfig] –
+ * jedno źródło prawdy, edytowalne bez modyfikowania samego dialogu.
  *
- * Świadomie pokazujemy ten zalążek od razu zamiast pustego ekranu –
- * wymóg Google Play (każda aplikacja zbierająca dane userów MUSI mieć
- * politykę prywatności widoczną w aplikacji), więc lepiej wystartować
- * z uczciwym szkicem niż z pustym TODO.
+ * **Uwaga prawna**: ten tekst jest szablonem stworzonym z perspektywy
+ * developerskiej. Dla aplikacji wprowadzanej oficjalnie do obrotu w UE
+ * (Google Play) zalecana jest weryfikacja u prawnika RODO, szczególnie:
+ *  - podstawa prawna przetwarzania (art. 6 RODO),
+ *  - klauzula o profilowaniu,
+ *  - lista podmiotów przetwarzających poza EOG (Google – serwery US).
  */
 @Composable
 fun PrivacyPolicyDialog(onDismiss: () -> Unit) {
@@ -52,11 +52,19 @@ fun PrivacyPolicyDialog(onDismiss: () -> Unit) {
                     .heightIn(max = 480.dp)
                     .verticalScroll(rememberScrollState())
             ) {
+                Text(
+                    text = "Obowiązuje od: ${AppConfig.PRIVACY_POLICY_EFFECTIVE_DATE}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+
                 SectionTitle("1. Administrator danych")
                 Text(
-                    "Administratorem Twoich danych osobowych jest zespół kidZone. " +
-                        "W sprawach dotyczących przetwarzania danych skontaktuj się " +
-                        "z nami pod adresem e-mail wskazanym w sklepie Google Play."
+                    "Administratorem Twoich danych osobowych jest " +
+                        "${AppConfig.ADMINISTRATOR_NAME}. W sprawach dotyczących " +
+                        "przetwarzania Twoich danych skontaktuj się z nami pod adresem " +
+                        "e-mail: ${AppConfig.PRIVACY_CONTACT_EMAIL}."
                 )
                 Spacer(Modifier.height(12.dp))
 
@@ -86,7 +94,10 @@ fun PrivacyPolicyDialog(onDismiss: () -> Unit) {
                 SectionTitle("4. Komu udostępniamy dane")
                 Text(
                     "• Google Firebase (Authentication, Firestore, Storage) – jako podmiot " +
-                        "przetwarzający, na potrzeby działania aplikacji.\n" +
+                        "przetwarzający, na potrzeby działania aplikacji. Serwery Google " +
+                        "mogą znajdować się poza Europejskim Obszarem Gospodarczym; " +
+                        "Google zapewnia odpowiedni poziom ochrony w ramach " +
+                        "Standardowych Klauzul Umownych UE.\n" +
                         "• Inni użytkownicy aplikacji – widzą Twój login, avatar oraz treści, " +
                         "które publicznie publikujesz (miejsca, opinie). Imię i nazwisko " +
                         "pozostają prywatne."
@@ -98,9 +109,12 @@ fun PrivacyPolicyDialog(onDismiss: () -> Unit) {
                     "Masz prawo do dostępu do swoich danych, ich sprostowania, usunięcia " +
                         "(„prawo do bycia zapomnianym”), ograniczenia przetwarzania, " +
                         "przenoszenia oraz wniesienia sprzeciwu. Większość zmian możesz " +
-                        "wprowadzić samodzielnie z poziomu zakładki Profil. Aby usunąć " +
-                        "konto wraz z opiniami i miejscami, napisz do nas na e-mail z " +
-                        "informacją o usunięciu konta."
+                        "wprowadzić samodzielnie z poziomu zakładki Profil – w tym " +
+                        "edycję danych i trwałe usunięcie konta wraz z opiniami " +
+                        "i miejscami (przycisk „Usuń konto”).\n\n" +
+                        "Jeśli z jakiegokolwiek powodu nie możesz wykonać tych operacji " +
+                        "samodzielnie – napisz na ${AppConfig.PRIVACY_CONTACT_EMAIL}, " +
+                        "a my pomożemy."
                 )
                 Spacer(Modifier.height(12.dp))
 
@@ -109,14 +123,28 @@ fun PrivacyPolicyDialog(onDismiss: () -> Unit) {
                     "Dane konta przechowujemy do momentu usunięcia konta. Treści " +
                         "publiczne (miejsca, opinie) mogą zostać zachowane w formie " +
                         "zanonimizowanej, jeśli ich usunięcie utrudniłoby działanie " +
-                        "aplikacji innym użytkownikom."
+                        "aplikacji innym użytkownikom (np. opinie innych userów na " +
+                        "Twoich miejscach – po usunięciu konta Twoje miejsca znikają, " +
+                        "ale opinie innych mogą zostać do czasu manualnego sprzątnięcia)."
                 )
                 Spacer(Modifier.height(12.dp))
 
-                SectionTitle("7. Zmiany w polityce")
+                SectionTitle("7. Bezpieczeństwo")
+                Text(
+                    "Komunikacja aplikacji z serwerami odbywa się wyłącznie przez " +
+                        "szyfrowane połączenia HTTPS. Twoje hasło nigdy nie jest " +
+                        "przesyłane ani przechowywane w postaci jawnej – Firebase Auth " +
+                        "trzyma tylko jego skrót (hash). Avatary i zdjęcia trafiają " +
+                        "do prywatnego bucketa Firebase Storage, dostępnego tylko " +
+                        "dla zalogowanych użytkowników."
+                )
+                Spacer(Modifier.height(12.dp))
+
+                SectionTitle("8. Zmiany w polityce")
                 Text(
                     "O istotnych zmianach w polityce prywatności poinformujemy w aplikacji " +
-                        "przy najbliższym uruchomieniu po wdrożeniu zmian."
+                        "przy najbliższym uruchomieniu po wdrożeniu zmian, aktualizując " +
+                        "datę „Obowiązuje od” na górze tego dokumentu."
                 )
             }
         }

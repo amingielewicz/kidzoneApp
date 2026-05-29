@@ -62,6 +62,30 @@ class FirestoreReviewRepository @Inject constructor(
         awaitClose { registration.remove() }
     }
 
+    override fun observeReviewsByUser(userId: String): Flow<List<Review>> = callbackFlow {
+        if (userId.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        val registration = reviewsCollection()
+            .whereEqualTo("userId", userId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                // Świadomie NIE filtrujemy `reportedAsSpam` – patrz komentarz
+                // w [ReviewRepository.observeReviewsByUser].
+                val reviews = snapshot?.documents
+                    ?.mapNotNull { it.toObject<ReviewDto>()?.toDomain() }
+                    ?.sortedByDescending { it.createdAtMillis }
+                    .orEmpty()
+                trySend(reviews)
+            }
+        awaitClose { registration.remove() }
+    }
+
     override suspend fun addReview(review: Review): OpResult<Review> = try {
         require(review.placeId.isNotBlank()) { "Review.placeId nie może być puste" }
         require(review.rating in 1..5) { "Review.rating musi być w zakresie 1..5" }
@@ -233,6 +257,95 @@ class FirestoreReviewRepository @Inject constructor(
         // TODO: reviewsCollection().document(reviewId).update("reportedAsSpam", true)
         //  + ewentualne przeliczenie averageRating na Place w transakcji.
         return OpResult.failure(NotImplementedError("reportReviewAsSpam – do uzupełnienia"))
+    }
+
+    override suspend fun deleteReview(reviewId: String): OpResult<Unit> = try {
+        require(reviewId.isNotBlank()) { "reviewId nie może być puste" }
+        val reviewRef = reviewsCollection().document(reviewId)
+
+        // Transakcja:
+        //  1) READ opinia – żeby znać `placeId`, `userId` i `rating` przed
+        //     skasowaniem.
+        //  2) READ miejsce – żeby znać aktualne `averageRating`/`reviewsCount`
+        //     do przeliczenia po stracie tej oceny.
+        //  3) DELETE opinia.
+        //  4) WRITE place: dekrement `reviewsCount` o 1, recompute
+        //     `averageRating` (gdy count == 1 -> 0.0; gdy 0 - nie powinno
+        //     się zdarzyć, defensywnie też 0.0).
+        //  5) WRITE user: dekrement `users/{authorId}.reviewsCount`.
+        //
+        // Błędy potencjalne:
+        //  - SecurityException z Firestore gdy `userId != auth.uid` (rules);
+        //    propagujemy na zewnątrz, VM pokaże komunikat.
+        //  - Nieistniejące miejsce (np. zostało już usunięte) – wtedy
+        //    pomijamy krok 4, opinia była orphaned i tak.
+        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+            firestore.runTransaction<Unit> { tx ->
+                val reviewSnap = tx.get(reviewRef)
+                if (!reviewSnap.exists()) {
+                    // Już skasowana – traktujemy jako sukces (idempotentność).
+                    return@runTransaction
+                }
+                val existing = reviewSnap.toObject<ReviewDto>()
+                    ?: throw IllegalStateException("Nieczytelny dokument opinii $reviewId")
+
+                val placeRef = firestore
+                    .collection(FirestoreCollections.PLACES)
+                    .document(existing.placeId)
+                val placeSnap = tx.get(placeRef)
+                val placeExists = placeSnap.exists()
+
+                val authorRef = existing.userId
+                    .takeIf { it.isNotBlank() }
+                    ?.let { firestore.collection(FirestoreCollections.USERS).document(it) }
+
+                tx.delete(reviewRef)
+
+                if (placeExists) {
+                    val oldCount = placeSnap.getLong("reviewsCount")?.toInt() ?: 0
+                    val oldAvg = placeSnap.getDouble("averageRating") ?: 0.0
+                    val newCount = (oldCount - 1).coerceAtLeast(0)
+                    val newAvg = if (newCount > 0) {
+                        // Średnia krocząca: usuwamy wkład tej oceny.
+                        ((oldAvg * oldCount) - existing.rating) / newCount
+                    } else {
+                        0.0
+                    }
+                    tx.update(
+                        placeRef,
+                        mapOf(
+                            "reviewsCount" to newCount,
+                            "averageRating" to newAvg
+                        )
+                    )
+                }
+
+                if (authorRef != null) {
+                    // FieldValue.increment(-1) jest atomowy. Nie trzymamy
+                    // licznika poniżej 0 (Firestore by pozwoliło, ale
+                    // ranking by się posypał) – server-side tu nie
+                    // wymusimy, więc liczy się dyscyplina po stronie
+                    // klienta. Założenie: każdy delete ma swojego addReview.
+                    tx.set(
+                        authorRef,
+                        mapOf("reviewsCount" to FieldValue.increment(-1)),
+                        SetOptions.merge()
+                    )
+                }
+            }.await()
+            true
+        }
+        if (completed == null) {
+            OpResult.failure(
+                java.util.concurrent.TimeoutException(
+                    "Usunięcie trwa zbyt długo. Sprawdź połączenie z Internetem."
+                )
+            )
+        } else {
+            OpResult.success(Unit)
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
     }
 
     private fun reviewsCollection() = firestore.collection(FirestoreCollections.REVIEWS)

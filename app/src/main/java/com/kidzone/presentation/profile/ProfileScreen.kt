@@ -17,10 +17,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.AlternateEmail
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PrivacyTip
@@ -33,13 +37,18 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -47,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.kidzone.domain.model.User
+import com.kidzone.domain.repository.SignInProvider
 import com.kidzone.presentation.common.BadgesList
 import com.kidzone.presentation.common.computeBadges
 import java.text.SimpleDateFormat
@@ -60,24 +70,38 @@ import java.util.Locale
  *  1. **Header** – duży avatar + login (nick) + e-mail; przycisk "Edytuj profil"
  *     otwiera [EditProfileSheet].
  *  2. **Dane osobowe** – imię i nazwisko (jeśli wypełnione). Sekcja
- *     ukrywa się, gdy oba pola są puste, żeby nie pokazywać pustego placeholdera.
+ *     ukrywa się, gdy oba pola są puste.
  *  3. **Statystyki** – liczba dodanych miejsc i opinii, oraz data dołączenia.
- *  4. **Odznaki** – wszystkie progi (zdobyte + niezdobyte) z opisami,
- *     żeby user widział, do czego dąży.
- *  5. **Ustawienia** – polityka prywatności i wylogowanie.
+ *  4. **Moje treści** – linki do "Moje miejsca" i "Moje opinie".
+ *  5. **Odznaki** – wszystkie progi (zdobyte + niezdobyte) z opisami.
+ *  6. **Konto i bezpieczeństwo** – zmiana hasła, zmiana e-maila, usunięcie
+ *     konta. Pokazujemy tylko dla [SignInProvider.EMAIL_PASSWORD].
+ *  7. **Ustawienia** – polityka prywatności i wylogowanie.
  *
- * Stan ładowania: dopóki [ProfileViewModel.user] = null pokazujemy
- * spinner. Brak zalogowanego usera nie powinien się tu zdarzyć (NavGraph
- * wcześniej przekierował na Login), ale gdyby – dostaniemy spinner i
- * MainScreen zareaguje przez sygnał z signOut → onSignOut.
+ * @param onOpenMyPlaces nawigacja do ekranu z listą własnych miejsc
+ * @param onOpenMyReviews nawigacja do ekranu z listą własnych opinii
+ * @param onSignOut wylogowanie, ale też **usunięcie konta** zachowuje się
+ *   tak samo (ostatecznie i tak wraca na ekran logowania – współdzielimy
+ *   callback, żeby nie wprowadzać drugiego)
  */
 @Composable
 fun ProfileScreen(
     onSignOut: () -> Unit,
+    onOpenMyPlaces: () -> Unit,
+    onOpenMyReviews: () -> Unit,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val user by viewModel.user.collectAsState()
     val ui by viewModel.uiState.collectAsState()
+
+    // Snackbar pokazujemy dla informacji typu "Hasło zmienione" /
+    // "Wysłaliśmy link na nowy adres". Po pokazaniu czyścimy stan.
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(ui.accountActionInfo) {
+        val msg = ui.accountActionInfo ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(msg)
+        viewModel.consumeAccountActionInfo()
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (user == null) {
@@ -87,12 +111,25 @@ fun ProfileScreen(
         } else {
             ProfileContent(
                 user = user!!,
+                signInProvider = ui.signInProvider,
                 onEdit = viewModel::openEditSheet,
+                onOpenMyPlaces = onOpenMyPlaces,
+                onOpenMyReviews = onOpenMyReviews,
+                onChangePassword = viewModel::openChangePassword,
+                onChangeEmail = viewModel::openChangeEmail,
+                onDeleteAccount = viewModel::openDeleteAccount,
                 onPrivacyPolicy = viewModel::openPrivacyPolicy,
                 onSignOut = { viewModel.signOut(onSignOut) }
             )
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
+
+    // --- Dialogi i sheety ---
 
     if (ui.isEditOpen && user != null) {
         EditProfileSheet(
@@ -112,12 +149,50 @@ fun ProfileScreen(
     if (ui.isPrivacyPolicyOpen) {
         PrivacyPolicyDialog(onDismiss = viewModel::dismissPrivacyPolicy)
     }
+
+    if (ui.isChangePasswordOpen) {
+        ChangePasswordDialog(
+            isInProgress = ui.isAccountActionInProgress,
+            errorMessage = ui.accountActionError,
+            onDismiss = viewModel::dismissChangePassword,
+            onConfirm = viewModel::changePassword
+        )
+    }
+
+    if (ui.isChangeEmailOpen) {
+        ChangeEmailDialog(
+            currentEmail = user?.email.orEmpty(),
+            isInProgress = ui.isAccountActionInProgress,
+            errorMessage = ui.accountActionError,
+            onDismiss = viewModel::dismissChangeEmail,
+            onConfirm = viewModel::changeEmail
+        )
+    }
+
+    if (ui.isDeleteAccountOpen && user != null) {
+        DeleteAccountDialog(
+            placesCount = user!!.placesAddedCount,
+            reviewsCount = user!!.reviewsCount,
+            isInProgress = ui.isAccountActionInProgress,
+            errorMessage = ui.accountActionError,
+            onDismiss = viewModel::dismissDeleteAccount,
+            onConfirm = { password ->
+                viewModel.deleteAccount(password, onDeleted = onSignOut)
+            }
+        )
+    }
 }
 
 @Composable
 private fun ProfileContent(
     user: User,
+    signInProvider: SignInProvider,
     onEdit: () -> Unit,
+    onOpenMyPlaces: () -> Unit,
+    onOpenMyReviews: () -> Unit,
+    onChangePassword: () -> Unit,
+    onChangeEmail: () -> Unit,
+    onDeleteAccount: () -> Unit,
     onPrivacyPolicy: () -> Unit,
     onSignOut: () -> Unit
 ) {
@@ -128,15 +203,36 @@ private fun ProfileContent(
     ) {
         item { ProfileHeaderCard(user = user, onEdit = onEdit) }
 
-        // Sekcja "Dane osobowe" pokazuje się tylko gdy user wypełnił imię
-        // lub nazwisko. Pusta sekcja byłaby kosmetycznym szumem.
         if (user.firstName.isNotBlank() || user.lastName.isNotBlank()) {
             item { PersonalInfoCard(user = user) }
         }
 
         item { StatsCard(user = user) }
 
+        item {
+            MyContentCard(
+                placesCount = user.placesAddedCount,
+                reviewsCount = user.reviewsCount,
+                onOpenMyPlaces = onOpenMyPlaces,
+                onOpenMyReviews = onOpenMyReviews
+            )
+        }
+
         item { BadgesCard(user = user) }
+
+        // Sekcja "Konto i bezpieczeństwo" tylko dla email/password user.
+        // Dla Google sign-in zmiana hasła jest po stronie Google,
+        // a usunięcie konta wymaga reauth przez ponowne logowanie Google,
+        // czego MVP nie obsługuje – zostawiamy info w polityce prywatności.
+        if (signInProvider == SignInProvider.EMAIL_PASSWORD) {
+            item {
+                AccountSecurityCard(
+                    onChangePassword = onChangePassword,
+                    onChangeEmail = onChangeEmail,
+                    onDeleteAccount = onDeleteAccount
+                )
+            }
+        }
 
         item {
             SettingsCard(
@@ -339,6 +435,32 @@ private fun StatItem(
     }
 }
 
+// --- Moje treści ---------------------------------------------------------
+
+@Composable
+private fun MyContentCard(
+    placesCount: Int,
+    reviewsCount: Int,
+    onOpenMyPlaces: () -> Unit,
+    onOpenMyReviews: () -> Unit
+) {
+    SectionCard(title = "Moje treści") {
+        NavRow(
+            icon = Icons.Filled.Place,
+            label = "Moje miejsca",
+            trailingText = placesCount.toString(),
+            onClick = onOpenMyPlaces
+        )
+        Spacer(Modifier.height(4.dp))
+        NavRow(
+            icon = Icons.Filled.RateReview,
+            label = "Moje opinie",
+            trailingText = reviewsCount.toString(),
+            onClick = onOpenMyReviews
+        )
+    }
+}
+
 // --- Badges --------------------------------------------------------------
 
 @Composable
@@ -360,6 +482,40 @@ private fun BadgesCard(user: User) {
     }
 }
 
+// --- Konto i bezpieczeństwo ---------------------------------------------
+
+@Composable
+private fun AccountSecurityCard(
+    onChangePassword: () -> Unit,
+    onChangeEmail: () -> Unit,
+    onDeleteAccount: () -> Unit
+) {
+    SectionCard(title = "Konto i bezpieczeństwo") {
+        NavRow(
+            icon = Icons.Filled.Lock,
+            label = "Zmień hasło",
+            onClick = onChangePassword
+        )
+        Spacer(Modifier.height(4.dp))
+        NavRow(
+            icon = Icons.Filled.AlternateEmail,
+            label = "Zmień adres e-mail",
+            onClick = onChangeEmail
+        )
+        Spacer(Modifier.height(4.dp))
+        // "Usuń konto" jest celowo wyróżnione kolorem error – działanie
+        // nieodwracalne, użytkownik powinien świadomie się zatrzymać przed
+        // kliknięciem. Konsekwencje pokażemy w dialogu potwierdzenia.
+        NavRow(
+            icon = Icons.Filled.DeleteForever,
+            label = "Usuń konto",
+            iconTint = MaterialTheme.colorScheme.error,
+            labelColor = MaterialTheme.colorScheme.error,
+            onClick = onDeleteAccount
+        )
+    }
+}
+
 // --- Settings ------------------------------------------------------------
 
 @Composable
@@ -368,7 +524,7 @@ private fun SettingsCard(
     onSignOut: () -> Unit
 ) {
     SectionCard(title = "Ustawienia") {
-        SettingsRow(
+        NavRow(
             icon = Icons.Filled.PrivacyTip,
             label = "Polityka prywatności",
             onClick = onPrivacyPolicy
@@ -391,29 +547,57 @@ private fun SettingsCard(
     }
 }
 
+/**
+ * Klikalny wiersz "ikona + tekst + chevron" lub "ikona + tekst + cyfra".
+ *
+ * Używany w sekcjach Moje treści, Konto, Ustawienia, żeby spójnie
+ * sygnalizować przejście do innego ekranu / dialogu.
+ *
+ * @param trailingText opcjonalny tekst po prawej (np. liczba elementów).
+ *   Gdy null – pokazujemy chevron `>` jako sygnał "kliknij i zobacz".
+ */
 @Composable
-private fun SettingsRow(
+private fun NavRow(
     icon: ImageVector,
     label: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    trailingText: String? = null,
+    iconTint: Color = MaterialTheme.colorScheme.primary,
+    labelColor: Color = MaterialTheme.colorScheme.onSurface
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+            .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = iconTint,
             modifier = Modifier.size(20.dp)
         )
         Spacer(Modifier.width(12.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyLarge
+            style = MaterialTheme.typography.bodyLarge,
+            color = labelColor,
+            modifier = Modifier.weight(1f)
+        )
+        if (trailingText != null) {
+            Text(
+                text = trailingText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(4.dp))
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
         )
     }
 }

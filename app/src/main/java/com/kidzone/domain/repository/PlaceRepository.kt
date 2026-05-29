@@ -18,6 +18,17 @@ interface PlaceRepository {
     /** Wszystkie miejsca, opcjonalnie filtrowane po kategorii. */
     fun observePlaces(category: PlaceCategory? = null): Flow<List<Place>>
 
+    /**
+     * Strumień miejsc dodanych przez konkretnego usera (snapshot listener).
+     *
+     * Używane przez ekran "Moje miejsca" w profilu. Sortowanie po stronie
+     * klienta (po `createdAtMillis` malejąco) – Firestore wymagałby wtedy
+     * composite indexu (ownerUserId + createdAtMillis), do uniknięcia.
+     *
+     * Emituje pustą listę gdy [ownerUserId] jest pusty.
+     */
+    fun observePlacesByOwner(ownerUserId: String): Flow<List<Place>>
+
     suspend fun getPlace(placeId: String): OpResult<Place>
 
     /**

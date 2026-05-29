@@ -44,4 +44,16 @@ sealed class Route(val path: String) {
         const val ARG_PLACE_ID = "placeId"
         fun create(placeId: String): String = "place_details/$placeId"
     }
+
+    /**
+     * Lista miejsc dodanych przez aktualnie zalogowanego usera.
+     * Otwierane stackowo z karty "Moje treści" w profilu.
+     */
+    data object MyPlaces : Route("my_places")
+
+    /**
+     * Lista opinii wystawionych przez aktualnie zalogowanego usera.
+     * Otwierane stackowo z karty "Moje treści" w profilu.
+     */
+    data object MyReviews : Route("my_reviews")
 }

@@ -40,7 +40,10 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create, update: if isSignedIn() && request.auth.uid == userId;
-      allow delete: if false;
+      // Delete tylko dla siebie samego – używane przez `deleteAccount` w
+      // AuthRepository (RODO „prawo do bycia zapomnianym"). Klient kasuje
+      // swoje opinie i miejsca przed dotarciem do tej linii.
+      allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
     // ---------- /places/{placeId} ----------

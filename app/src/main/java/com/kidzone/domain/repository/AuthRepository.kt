@@ -6,6 +6,20 @@ import com.kidzone.utils.OpResult
 import kotlinx.coroutines.flow.Flow
 
 /**
+ * Sposób, w jaki aktualnie zalogowany użytkownik się uwierzytelnił.
+ *
+ * Wpływa na to, jakie operacje zarządzania kontem są dla niego dostępne:
+ *  - [EMAIL_PASSWORD] – pełen zakres (zmiana hasła, zmiana e-maila, usunięcie
+ *    konta z hasłem jako reauth credential),
+ *  - [GOOGLE] – zmiana hasła nie ma sensu (Google nim zarządza), zmiana
+ *    e-maila wymaga zmiany konta Google. Usunięcie konta wymagałoby reauth
+ *    przez ponowny Google Sign-In (nieobsługiwane w MVP),
+ *  - [UNKNOWN] – fallback dla nieoczekiwanego providera lub gdy user jest
+ *    wylogowany. UI powinno wtedy schować całą sekcję "Konto i bezpieczeństwo".
+ */
+enum class SignInProvider { EMAIL_PASSWORD, GOOGLE, UNKNOWN }
+
+/**
  * Operacje uwierzytelniania (e-mail/hasło + Google), obserwacja
  * aktualnie zalogowanego użytkownika oraz odczyt publicznych danych
  * innych użytkowników (np. autora miejsca).
@@ -105,4 +119,91 @@ interface AuthRepository {
      * maks. 5 MB. Większe pliki dostaną błąd z Firebase.
      */
     suspend fun uploadAvatar(localUri: Uri): OpResult<String>
+
+    // ============================================================
+    // === Account management (zmiana hasła / e-maila / usunięcie) ===
+    // ============================================================
+
+    /**
+     * Zwraca, w jaki sposób aktualnie zalogowany user był uwierzytelniony.
+     *
+     * UI używa wartości do pokazania / ukrycia akcji w sekcji
+     * "Konto i bezpieczeństwo". Zwraca [SignInProvider.UNKNOWN] gdy nikt nie
+     * jest zalogowany albo provider nie jest obsługiwany.
+     *
+     * Świadomie suspend, mimo że pod spodem to synchroniczny odczyt
+     * [com.google.firebase.auth.FirebaseAuth.currentUser] – zostawiamy sobie
+     * możliwość, by w przyszłości pójść po providerData asynchronicznie
+     * (np. po refresh tokenu) bez breaking change.
+     */
+    suspend fun getCurrentSignInProvider(): SignInProvider
+
+    /**
+     * Zmienia hasło zalogowanego użytkownika.
+     *
+     * Wymaga uprzedniej re-authentication: Firebase odrzuca [FirebaseUser.updatePassword]
+     * jeśli ostatni login był "stary" (zwykle > 5 min). Reauth jest wykonywany
+     * wewnątrz tej metody – wywołujący nie musi się o to martwić.
+     *
+     * Działa tylko dla kont [SignInProvider.EMAIL_PASSWORD]. Dla Google
+     * zwraca [OpResult.Failure] z [IllegalStateException].
+     *
+     * @param currentPassword aktualne hasło – służy zarówno jako reauth
+     *   credential, jak i jako "ludzkie" potwierdzenie ("wiesz co robisz?").
+     * @param newPassword nowe hasło, min. 6 znaków (Firebase to wymusza
+     *   dodatkowo i może rzucić [com.google.firebase.auth.FirebaseAuthWeakPasswordException]).
+     */
+    suspend fun changePassword(
+        currentPassword: String,
+        newPassword: String
+    ): OpResult<Unit>
+
+    /**
+     * Inicjuje zmianę adresu e-mail zalogowanego użytkownika.
+     *
+     * **Nowy e-mail nie zostanie aktywny od razu.** Firebase wysyła link
+     * weryfikacyjny na `newEmail`; dopiero kliknięcie linku finalizuje zmianę.
+     * UI powinno o tym poinformować ("Sprawdź skrzynkę: $newEmail").
+     *
+     * Pod spodem używamy [FirebaseUser.verifyBeforeUpdateEmail] zamiast
+     * deprecated [FirebaseUser.updateEmail] – ta druga nie współpracuje
+     * z włączoną w projekcie ochroną "Email enumeration protection" (włączoną
+     * domyślnie w nowych projektach Firebase).
+     *
+     * Wymaga reauth – analogicznie jak [changePassword]. Działa tylko dla
+     * kont [SignInProvider.EMAIL_PASSWORD].
+     */
+    suspend fun changeEmail(
+        currentPassword: String,
+        newEmail: String
+    ): OpResult<Unit>
+
+    /**
+     * Trwałe usunięcie konta wraz z danymi użytkownika z aplikacji.
+     *
+     * Wykonuje (w tej kolejności):
+     *  1. **Reauth** – wymagany przez Firebase do `firebaseUser.delete()`.
+     *  2. Usunięcie wszystkich opinii usera (`reviews.userId == uid`).
+     *  3. Usunięcie wszystkich miejsc usera (`places.ownerUserId == uid`).
+     *     Świadomie **nie kasujemy** opinii innych userów na tych miejscach –
+     *     reguły Firestore na to nie pozwalają (kasować można tylko swoje
+     *     opinie). Te opinie zostają jako "orphans". Pełną kaskadę dałaby
+     *     dopiero Cloud Function z Admin SDK (Blaze plan), do dorobienia
+     *     w przyszłości.
+     *  4. Usunięcie dokumentu `users/{uid}`.
+     *  5. Usunięcie avatara w Storage (`avatars/{uid}/avatar.jpg`) – best
+     *     effort, błąd nie zatrzymuje procesu.
+     *  6. `firebaseUser.delete()` – ostatecznie odbiera użytkownikowi tożsamość.
+     *
+     * Po sukcesie strumień [currentUser] wyemituje `null`, więc UI naturalnie
+     * wyląduje na ekranie logowania (NavGraph reaguje na auth state).
+     *
+     * Operacja **nie jest atomowa**. Jeśli przerwie się w połowie (np. brak
+     * Internetu między krokami 3 a 4), część danych może już zniknąć, a
+     * konto Auth dalej istnieje – kolejna próba usunięcia dokończy resztę.
+     *
+     * @param currentPassword aktualne hasło dla reauth (wymagane dla email/password
+     *   user). Dla Google user MVP nie obsługuje – zwraca błąd.
+     */
+    suspend fun deleteAccount(currentPassword: String): OpResult<Unit>
 }
