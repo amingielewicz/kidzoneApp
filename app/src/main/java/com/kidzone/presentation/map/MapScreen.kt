@@ -419,12 +419,10 @@ private fun FiltersOverlay(
     onToggleTopRated: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    // Kategorie alfabetycznie po polskim labelu (Context-bound, więc remember
-    // z kluczem context). Spójnie z PlaceListScreen.
-    val orderedCategories = remember(context) {
-        PlaceCategory.entries.sortedBy { context.getString(it.labelRes).lowercase() }
-    }
+    // Kolejność jak w enum PlaceCategory (świadomie nie alfabetycznie –
+    // logiczne grupowanie: place zabaw → sale → kawiarnia/restauracja →
+    // park → atrakcje → inne). Spójnie z PlaceListScreen.
+    val orderedCategories = PlaceCategory.entries
 
     Surface(
         modifier = modifier,
