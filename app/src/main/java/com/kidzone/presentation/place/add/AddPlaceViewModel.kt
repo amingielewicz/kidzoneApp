@@ -69,7 +69,17 @@ class AddPlaceViewModel @Inject constructor(
         val errorMessage: String? = null,
         val isSaved: Boolean = false,
         val savedNewLatitude: Double? = null,
-        val savedNewLongitude: Double? = null
+        val savedNewLongitude: Double? = null,
+        /**
+         * Mapa: udogodnienie -> liczba istniejących miejsc, w których jest
+         * zaznaczone. Używana przez UI do sortowania chipów udogodnień
+         * od najczęściej do najrzadziej używanych.
+         *
+         * Pusta mapa = jeszcze nie wczytane (lub fetch padł). UI w tym
+         * stanie pokazuje udogodnienia w kolejności z enuma (logiczne
+         * grupowanie wg PlaceCategory) - to bezpieczny fallback.
+         */
+        val amenityFrequency: Map<Amenity, Int> = emptyMap()
     ) {
         /** Wszystkie wymagane pola wypełnione – można kliknąć "Zapisz". */
         val isFormValid: Boolean
@@ -92,6 +102,39 @@ class AddPlaceViewModel @Inject constructor(
         val placeId = savedStateHandle.get<String>(Route.AddPlace.ARG_PLACE_ID)
         if (!placeId.isNullOrBlank()) {
             loadForEdit(placeId)
+        }
+        loadAmenityFrequency()
+    }
+
+    /**
+     * Liczy częstość występowania każdego udogodnienia we wszystkich
+     * miejscach w bazie - jednorazowo, na początku ekranu.
+     *
+     * Strategia: bierzemy 1 snapshot ze strumienia [PlaceRepository.observePlaces]
+     * (przez `.first()`), zliczamy `amenities`, wpychamy do state.
+     *
+     * Best-effort - błąd / brak miejsc = pusta mapa, UI fallbackuje wtedy
+     * na kolejność z enuma. Świadomie nie blokujemy ekranu (`isLoading`),
+     * bo bez frequency formularz dalej działa, tylko mniej "smart".
+     *
+     * Uwaga skali: dla MVP (~100 miejsc) full-scan jest OK; przy rosnącej
+     * bazie warto przepisać na dedykowaną kolekcję `amenity_counts`
+     * utrzymywaną przez Cloud Functions.
+     */
+    private fun loadAmenityFrequency() {
+        viewModelScope.launch {
+            val frequency = runCatching {
+                val places = placeRepository.observePlaces(category = null).first()
+                val counts = mutableMapOf<Amenity, Int>()
+                for (place in places) {
+                    for (amenity in place.amenities) {
+                        counts[amenity] = (counts[amenity] ?: 0) + 1
+                    }
+                }
+                counts.toMap()
+            }.getOrElse { emptyMap() }
+
+            _uiState.update { it.copy(amenityFrequency = frequency) }
         }
     }
 

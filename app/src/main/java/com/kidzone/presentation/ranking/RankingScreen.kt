@@ -138,7 +138,10 @@ private fun TopPlacesList(
     if (places.isEmpty()) {
         FullScreenCentered {
             Text(
-                text = "Brak ocenionych miejsc – dodaj pierwsze i wystaw opinię!",
+                // Po wprowadzeniu filtra "tylko miejsca z >0 opinii" pusta
+                // lista znaczy, że jeszcze nikt nie wystawił żadnej opinii -
+                // komunikat sugeruje konkretną akcję.
+                text = "Żadne miejsce nie ma jeszcze opinii. Wystaw pierwszą!",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -167,7 +170,9 @@ private fun TopUsersList(users: List<User>) {
     if (users.isEmpty()) {
         FullScreenCentered {
             Text(
-                text = "Brak użytkowników z dodanymi miejscami.",
+                // Po filtrze "min. 1 dodane miejsce LUB 1 opinia" pusta lista
+                // = jeszcze nikt nie zaczął żadnej aktywności w aplikacji.
+                text = "Brak aktywnych użytkowników. Bądź pierwszy - dodaj miejsce lub opinię!",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

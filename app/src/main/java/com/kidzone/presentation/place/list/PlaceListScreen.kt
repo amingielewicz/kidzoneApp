@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -119,6 +120,20 @@ fun PlaceListScreen(
     val scope = rememberCoroutineScope()
 
     val context = LocalContext.current
+
+    // Stan przewijania listy - dzielony przez wszystkie stany (loading,
+    // empty, content), żeby przy zmianie sortowania zawsze móc go
+    // animować do top-u (zob. LaunchedEffect poniżej).
+    val lazyListState = rememberLazyListState()
+
+    // Po zmianie sortowania automatycznie przewijamy listę na górę.
+    // Bez tego user widziałby "tę samą pozycję pod palcem", ale w nowym
+    // porządku - co jest mylące (nie wiadomo, czy to jeszcze ten sam wynik
+    // czy nowy item w środku rankingu). animateScrollToItem(0) jest
+    // bezpieczny gdy lista jest pusta - po prostu nic nie robi.
+    LaunchedEffect(state.sortOrder) {
+        lazyListState.animateScrollToItem(0)
+    }
 
     // Launcher requestu uprawnienia. Po nadaniu odświeżamy lokalizację -
     // sortowanie "Najbliższe" zaczyna działać bez restartu ekranu.
@@ -228,6 +243,7 @@ fun PlaceListScreen(
 
             else -> {
                 LazyColumn(
+                    state = lazyListState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)

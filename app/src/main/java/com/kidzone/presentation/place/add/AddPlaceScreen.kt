@@ -216,6 +216,7 @@ fun AddPlaceScreen(
             AmenitiesGrid(
                 selected = state.amenities,
                 category = state.category,
+                amenityFrequency = state.amenityFrequency,
                 onToggle = viewModel::toggleAmenity,
                 enabled = !state.isSaving
             )
@@ -391,16 +392,35 @@ private fun LocationSection(
     }
 }
 
-/** Siatka FilterChip-ów do multi-select udogodnień, filtrowana po [category]. */
+/**
+ * Siatka FilterChip-ów do multi-select udogodnień, filtrowana po [category].
+ *
+ * Sortowanie chipów:
+ *  1. najczęściej używane na początku (wg [amenityFrequency] - mapa
+ *     liczby miejsc, w których dane udogodnienie jest zaznaczone),
+ *  2. tiebreak: kolejność z enuma (tj. logiczne grupowanie z [Amenity]).
+ *
+ * Gdy mapa jest pusta (świeży start, brak miejsc w bazie, błąd fetcha) -
+ * spadamy na kolejność z enuma. Dzięki temu ekran nie czeka na asynchroniczny
+ * count, tylko płynnie przechodzi z "logicznej" kolejności do
+ * "od najczęstszego" gdy frequency dotrze.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AmenitiesGrid(
     selected: Set<Amenity>,
     category: PlaceCategory,
+    amenityFrequency: Map<Amenity, Int>,
     onToggle: (Amenity) -> Unit,
     enabled: Boolean
 ) {
-    val applicable = remember(category) { Amenity.forCategory(category) }
+    val applicable = remember(category, amenityFrequency) {
+        Amenity.forCategory(category)
+            .sortedWith(
+                compareByDescending<Amenity> { amenityFrequency[it] ?: 0 }
+                    .thenBy { it.ordinal }
+            )
+    }
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
