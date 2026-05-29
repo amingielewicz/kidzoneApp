@@ -211,7 +211,9 @@ fun PlaceDetailsScreen(
                     PlaceDetailsContent(
                         place = state.place!!,
                         author = state.author,
-                        reviews = state.reviews
+                        reviews = state.reviews,
+                        currentUserId = currentUser?.id,
+                        onAddReview = viewModel::openAddReviewSheet
                     )
                 }
             }
@@ -229,6 +231,19 @@ fun PlaceDetailsScreen(
             onDismiss = { if (!state.isDeleting) showDeleteDialog = false }
         )
     }
+
+    // Sheet dodawania opinii – sterowany przez VM (state.showAddReviewSheet),
+    // żeby błąd zapisu mógł go utrzymać otwartym (user widzi błąd, próbuje
+    // ponownie). Po sukcesie VM ustawia flagę na false → sheet znika.
+    if (state.showAddReviewSheet) {
+        AddReviewSheet(
+            placeName = state.place?.name.orEmpty(),
+            isSubmitting = state.isAddingReview,
+            errorMessage = state.addReviewError,
+            onDismiss = viewModel::dismissAddReviewSheet,
+            onSubmit = viewModel::submitReview
+        )
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -236,8 +251,15 @@ fun PlaceDetailsScreen(
 private fun PlaceDetailsContent(
     place: Place,
     author: User?,
-    reviews: List<Review>
+    reviews: List<Review>,
+    currentUserId: String?,
+    onAddReview: () -> Unit
 ) {
+    // Jedna opinia per user per miejsce (MVP). Przycisk "Dodaj opinię" znika,
+    // gdy zalogowany user już wystawił ocenę. Edycję dorobimy w osobnym PR-ze.
+    val alreadyReviewed = currentUserId != null && reviews.any { it.userId == currentUserId }
+    val canAddReview = currentUserId != null && !alreadyReviewed
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
@@ -277,12 +299,25 @@ private fun PlaceDetailsContent(
             }
         }
 
-        // Sekcja 3: Opinie
+        // Sekcja 3: Opinie z przyciskiem "Dodaj opinię" w nagłówku.
         item {
-            SectionCard(title = "Opinie (${reviews.size})") {
+            SectionCard(
+                title = "Opinie (${reviews.size})",
+                trailing = if (canAddReview) {
+                    {
+                        TextButton(onClick = onAddReview) {
+                            Text("Dodaj opinię")
+                        }
+                    }
+                } else null
+            ) {
                 if (reviews.isEmpty()) {
                     Text(
-                        text = "Brak opinii. Bądź pierwszy!",
+                        text = if (canAddReview) {
+                            "Brak opinii. Bądź pierwszy!"
+                        } else {
+                            "Brak opinii."
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -292,7 +327,10 @@ private fun PlaceDetailsContent(
 
         // Każda opinia jako osobny item, żeby LazyColumn dobrze recyklował przy długich listach
         items(items = reviews, key = { it.id }) { review ->
-            ReviewCard(review = review)
+            ReviewCard(
+                review = review,
+                isMine = currentUserId != null && review.userId == currentUserId
+            )
         }
     }
 }
@@ -484,6 +522,7 @@ private fun plural(count: Int): String = when {
 @Composable
 private fun SectionCard(
     title: String,
+    trailing: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     Card(
@@ -491,11 +530,15 @@ private fun SectionCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                trailing?.invoke()
+            }
             Spacer(Modifier.height(8.dp))
             content()
         }
@@ -503,19 +546,34 @@ private fun SectionCard(
 }
 
 @Composable
-private fun ReviewCard(review: Review) {
+private fun ReviewCard(
+    review: Review,
+    isMine: Boolean = false
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        // Subtelny outline na opinii zalogowanego usera, żeby ją łatwo
+        // zlokalizował na dłuższej liście.
+        border = if (isMine) {
+            androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+            )
+        } else null
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = review.authorName.ifBlank { "Anonim" },
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f)
+                    fontWeight = FontWeight.Medium
                 )
+                if (isMine) {
+                    Spacer(Modifier.width(6.dp))
+                    MyReviewBadge()
+                }
+                Spacer(Modifier.weight(1f))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     repeat(5) { index ->
                         Icon(
@@ -546,6 +604,23 @@ private fun ReviewCard(review: Review) {
                 )
             }
         }
+    }
+}
+
+/** Mała plakietka pod nickiem, oznaczająca własną opinię na liście. */
+@Composable
+private fun MyReviewBadge() {
+    androidx.compose.material3.Surface(
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+    ) {
+        Text(
+            text = "Twoja opinia",
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
