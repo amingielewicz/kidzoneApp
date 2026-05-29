@@ -2,11 +2,14 @@ package com.kidzone.presentation.profile
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -22,21 +25,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
-
-/**
- * Minimalna długość nowego hasła egzekwowana po stronie UI.
- *
- * Ta sama wartość obowiązuje w Firebase Auth (FirebaseAuthWeakPasswordException
- * leci poniżej 6 znaków) – walidacja UI to "uprzejma" warstwa, żeby user nie
- * musiał czekać na round-trip po naturalnym błędzie.
- */
-private const val MIN_PASSWORD_LENGTH = 6
+import com.kidzone.utils.PasswordPolicy
 
 /**
  * Dialog zmiany hasła.
@@ -46,18 +41,22 @@ private const val MIN_PASSWORD_LENGTH = 6
  *  - nowe hasło,
  *  - powtórz nowe hasło.
  *
- * Walidacje (klient-side):
+ * Walidacje (klient-side, jednolite z rejestracją - zob. [PasswordPolicy]):
  *  - wszystkie 3 pola niepuste,
- *  - nowe hasło >= 6 znaków,
+ *  - nowe hasło spełnia [PasswordPolicy] (8+ znaków, mała + duża litera,
+ *    znak specjalny),
  *  - oba "nowe" pola identyczne.
  *
- * Błędy z repo (np. niepoprawne aktualne hasło) lądują w [errorMessage] –
+ * Pod polem "Nowe hasło" pokazujemy dynamiczny checklist wymagań -
+ * user widzi w czasie rzeczywistym, co jeszcze musi spełnić.
+ *
+ * Błędy z repo (np. niepoprawne aktualne hasło) lądują w [errorMessage] -
  * dialog pozostaje otwarty, user widzi co poprawić.
  *
- * Pola przeżywają rotację (rememberSaveable), ale **dialog nie pamięta
- * wpisanego hasła między otwarciami** – kolejny `open` resetuje state
- * (rememberSaveable jest scope'owany do composition, dialog znika z drzewa
- * gdy `isOpen=false`).
+ * Pola przeżywają rotację (rememberSaveable), ale dialog nie pamięta
+ * wpisanego hasła między otwarciami - kolejny `open` resetuje state
+ * (rememberSaveable jest scope'owany do composition, dialog znika
+ * z drzewa gdy `isOpen=false`).
  */
 @Composable
 fun ChangePasswordDialog(
@@ -71,12 +70,10 @@ fun ChangePasswordDialog(
     var confirmPassword by rememberSaveable { mutableStateOf("") }
     var showPasswords by rememberSaveable { mutableStateOf(false) }
 
-    // Walidacja "soft" – pokazujemy supportingText dopiero gdy pole jest
-    // dotknięte (niepuste), żeby pusty formularz nie był od razu czerwony.
-    val newPasswordTooShort = newPassword.isNotEmpty() && newPassword.length < MIN_PASSWORD_LENGTH
+    val isNewPasswordValid = PasswordPolicy.isValid(newPassword)
     val passwordsMismatch = confirmPassword.isNotEmpty() && confirmPassword != newPassword
     val isFormValid = currentPassword.isNotBlank() &&
-        newPassword.length >= MIN_PASSWORD_LENGTH &&
+        isNewPasswordValid &&
         confirmPassword == newPassword
 
     AlertDialog(
@@ -92,18 +89,21 @@ fun ChangePasswordDialog(
                     onToggleVisibility = { showPasswords = !showPasswords },
                     enabled = !isInProgress
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.size(8.dp))
                 PasswordField(
                     value = newPassword,
                     onValueChange = { newPassword = it },
                     label = "Nowe hasło",
-                    isError = newPasswordTooShort,
-                    supportingText = "Min. $MIN_PASSWORD_LENGTH znaków",
+                    isError = newPassword.isNotEmpty() && !isNewPasswordValid,
                     showText = showPasswords,
                     onToggleVisibility = { showPasswords = !showPasswords },
                     enabled = !isInProgress
                 )
-                Spacer(Modifier.height(8.dp))
+                if (newPassword.isNotEmpty()) {
+                    Spacer(Modifier.size(6.dp))
+                    PasswordRequirements(password = newPassword)
+                }
+                Spacer(Modifier.size(8.dp))
                 PasswordField(
                     value = confirmPassword,
                     onValueChange = { confirmPassword = it },
@@ -115,7 +115,7 @@ fun ChangePasswordDialog(
                     enabled = !isInProgress
                 )
                 if (errorMessage != null) {
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.size(8.dp))
                     Text(
                         text = errorMessage,
                         color = MaterialTheme.colorScheme.error,
@@ -151,9 +151,50 @@ fun ChangePasswordDialog(
 }
 
 /**
+ * Wewnętrzna lista wymagań - "lokalna" wersja checklisty z rejestracji
+ * (RegisterScreen.PasswordRequirementsChecklist), trzymana osobno żeby
+ * dialog mógł się kompilować bez kross-modułowych zależności na ekranie
+ * auth. Treść identyczna - obie korzystają z [PasswordPolicy.evaluate].
+ */
+@Composable
+private fun PasswordRequirements(password: String) {
+    val statuses = PasswordPolicy.evaluate(password)
+    Column(
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        statuses.forEach { status ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val (icon, color) = if (status.isSatisfied) {
+                    Icons.Filled.CheckCircle to MaterialTheme.colorScheme.secondary
+                } else {
+                    Icons.Filled.Cancel to MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                }
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    text = status.label,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (status.isSatisfied) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    }
+                )
+            }
+        }
+    }
+}
+
+/**
  * Pojedyncze pole hasła z wspólnym toggle "pokaż/ukryj".
  *
- * Świadomie współdzielimy [showText] między 3 pola – jeśli user kliknie
+ * Świadomie współdzielimy [showText] między 3 pola - jeśli user kliknie
  * na jakimkolwiek "oczku", pokazują się wszystkie 3. Tak jest mniej
  * frustrująco niż per-field, kiedy walczy z mismatch i chce sprawdzić
  * co wpisał w obu polach "nowego" hasła.
@@ -176,12 +217,20 @@ private fun PasswordField(
         singleLine = true,
         isError = isError,
         enabled = enabled,
-        visualTransformation = if (showText) VisualTransformation.None else PasswordVisualTransformation(),
+        visualTransformation = if (showText) {
+            VisualTransformation.None
+        } else {
+            PasswordVisualTransformation()
+        },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         trailingIcon = {
             IconButton(onClick = onToggleVisibility, enabled = enabled) {
                 Icon(
-                    imageVector = if (showText) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                    imageVector = if (showText) {
+                        Icons.Filled.VisibilityOff
+                    } else {
+                        Icons.Filled.Visibility
+                    },
                     contentDescription = if (showText) "Ukryj hasło" else "Pokaż hasło"
                 )
             }

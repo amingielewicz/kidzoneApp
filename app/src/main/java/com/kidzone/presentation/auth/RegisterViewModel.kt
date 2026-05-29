@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.PasswordPolicy
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,7 +42,7 @@ class RegisterViewModel @Inject constructor(
             }
 
         val isPasswordValid: Boolean
-            get() = password.length >= 6
+            get() = PasswordPolicy.isValid(password)
 
         /** Wszystkie pola spełniają warunki – można klikać "Zarejestruj się". */
         val isFormValid: Boolean
@@ -78,8 +79,12 @@ class RegisterViewModel @Inject constructor(
                 _uiState.update { it.copy(errorMessage = "Podaj e-mail") }
                 return
             }
-            password.length < 6 -> {
-                _uiState.update { it.copy(errorMessage = "Hasło musi mieć min. 6 znaków") }
+            password.isBlank() -> {
+                _uiState.update { it.copy(errorMessage = "Podaj hasło") }
+                return
+            }
+            !PasswordPolicy.isValid(password) -> {
+                _uiState.update { it.copy(errorMessage = PasswordPolicy.DEFAULT_ERROR_MESSAGE) }
                 return
             }
         }

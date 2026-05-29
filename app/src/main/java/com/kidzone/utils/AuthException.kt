@@ -16,8 +16,12 @@ sealed class AuthException(message: String) : Exception(message) {
     /** Konto z tym e-mailem już istnieje (rejestracja). */
     data object EmailAlreadyInUse : AuthException("Ten e-mail jest już zajęty")
 
-    /** Hasło nie spełnia wymagań Firebase (zwykle min. 6 znaków). */
-    data object WeakPassword : AuthException("Hasło jest za słabe (min. 6 znaków)")
+    /**
+     * Hasło nie spełnia wymagań siły. Komunikat zsynchronizowany z lokalną
+     * polityką (zob. [PasswordPolicy]) - Firebase server-side wymaga tylko
+     * 6 znaków, ale my egzekwujemy mocniejszą politykę przed wysłaniem.
+     */
+    data object WeakPassword : AuthException(PasswordPolicy.DEFAULT_ERROR_MESSAGE)
 
     /** Niepoprawny format adresu e-mail. */
     data object InvalidEmail : AuthException("Niepoprawny format adresu e-mail")
