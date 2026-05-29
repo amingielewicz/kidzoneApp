@@ -214,9 +214,14 @@ class FirebaseAuthRepository @Inject constructor(
         // Sprawdź unikalność loginu (case-insensitive). Jeśli user zostawił
         // ten sam display name co poprzednio, query znajdzie tylko jego
         // własny dokument - excludeUid go odfiltrowuje.
+        //
+        // Świadomie throw zamiast `return OpResult.failure(...)`: cała funkcja
+        // ma expression body (`= try { ... } catch ...`), w którym `return`
+        // jest niedozwolony. AuthException łapie się niżej w `catch (e: AuthException)`
+        // i mapuje na OpResult.failure(e) bez tracenia typu błędu.
         val nameLowercase = displayName.toUserNameLowercase()
         if (isUsernameTaken(nameLowercase, excludeUid = firebaseUser.uid)) {
-            return OpResult.failure(AuthException.UsernameAlreadyTaken)
+            throw AuthException.UsernameAlreadyTaken
         }
 
         // 1) Zapis do Firestore – merge, żeby nie nadpisać `placesAddedCount`,
