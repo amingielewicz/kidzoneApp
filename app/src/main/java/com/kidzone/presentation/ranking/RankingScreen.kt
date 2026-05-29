@@ -60,8 +60,8 @@ import com.kidzone.presentation.common.style
  * Ranking miejsc i użytkowników.
  *
  * Dwie zakładki w [PrimaryTabRow]:
- *  - **Miejsca** – TOP 10 miejsc wg [Place.averageRating],
- *  - **Użytkownicy** – TOP 10 najbardziej aktywnych użytkowników, z odznakami
+ *  - **Miejsca** – top miejsc wg [Place.averageRating] (do 100 pozycji),
+ *  - **Użytkownicy** – top najbardziej aktywnych użytkowników (do 100 pozycji), z odznakami
  *    wyliczanymi klient-side z [User.placesAddedCount] i [User.reviewsCount].
  *
  * Stany ładowanie / błąd / pusta lista trzymamy spójnie z resztą aplikacji

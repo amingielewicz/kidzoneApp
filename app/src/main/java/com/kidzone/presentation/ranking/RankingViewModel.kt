@@ -35,8 +35,8 @@ class RankingViewModel @Inject constructor(
 ) : ViewModel() {
 
     /**
-     * @property topPlaces TOP 10 miejsc wg średniej oceny (malejąco)
-     * @property topUsers  TOP 10 użytkowników wg liczby dodanych miejsc, drugorzędnie po liczbie opinii
+     * @property topPlaces top miejsc wg średniej oceny (malejąco), do [TOP_LIMIT] pozycji
+     * @property topUsers  top użytkowników wg liczby dodanych miejsc, drugorzędnie po liczbie opinii, do [TOP_LIMIT] pozycji
      * @property isLoading aktywne podczas pierwszego ładowania i każdego refreshu
      * @property errorMessage komunikat błędu (jeśli któraś z list nie wczytała się)
      */
@@ -86,6 +86,19 @@ class RankingViewModel @Inject constructor(
     }
 
     private companion object {
-        const val TOP_LIMIT = 10
+        /**
+         * Twardy sufit liczby pozycji na każdej z list rankingu.
+         *
+         * Świadomie 100 zamiast np. 10:
+         *  - userzy z 0 miejsc i 0 opinii nadal pojawiają się na liście
+         *    (są na końcu sortu, ale w obrębie limitu),
+         *  - nowo dodane miejsca z `averageRating == 0.0` (jeszcze bez
+         *    opinii) też się mieszczą,
+         *  - 100 wystarczy dla obecnej skali aplikacji bez konieczności
+         *    paginacji; przy znaczącym wzroście bazy userów / miejsc
+         *    przejdziemy na pagedSource lub osobne sekcje "aktywni" /
+         *    "pozostali".
+         */
+        const val TOP_LIMIT = 100
     }
 }
