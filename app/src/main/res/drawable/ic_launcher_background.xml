@@ -1,5 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Tlo adaptive icon - jasny blekit (Material Blue 100, #BBDEFB).
+
+  Zmiana z #1E88E5 (BrandBlue, ciemniejszy) na #BBDEFB (jasniejszy)
+  na prosbe usera "mis na ikonie ... na jasnym blekitnym tle". Mis
+  z nowego SVG ma cieple kolory (kremowy/zolty/pomaranczowy), wiec
+  na jasnym blekicie kontrast jest lepszy niz na BrandBlue.
+
+  Alternatywy gdyby ten odcien sie znudzil:
+    #F5F8FB - prawie bialy (jak tlo Compose splash)
+    #E3F2FD - Material Blue 50 (jeszcze jasniejszy)
+    #BBDEFB - aktualny: Material Blue 100, balansowany jasny blekit
+    #90CAF9 - Material Blue 200 (intensywniejszy)
+    #1E88E5 - poprzedni: BrandBlue (ciemny)
+-->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="#1E88E5" />
+    <solid android:color="#BBDEFB" />
 </shape>
