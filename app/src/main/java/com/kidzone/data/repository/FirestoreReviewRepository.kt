@@ -2,6 +2,7 @@ package com.kidzone.data.repository
 
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.toObject
 import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.ReviewDto
@@ -99,12 +100,16 @@ class FirestoreReviewRepository @Inject constructor(
                 // Pomijamy gdy userRef = null (anonimowy / brak uid), żeby
                 // nie wywalać całej transakcji.
                 //
-                // Używamy `if` zamiast `?.let { tx.update(...) }`, bo
-                // `tx.update` zwraca `Transaction`, a lambda runTransaction<Unit>
-                // wymaga ostatniego wyrażenia typu Unit. `if` bez else jest
-                // traktowane jako statement i zwraca Unit.
+                // set + merge zamiast update: nie wywali się jeśli doc usera
+                // nie istnieje – po prostu utworzy minimalny doc z samym
+                // licznikiem. Brakujące pola dopełni ensureUserDoc() przy
+                // najbliższym logowaniu.
                 if (userRef != null) {
-                    tx.update(userRef, "reviewsCount", FieldValue.increment(1))
+                    tx.set(
+                        userRef,
+                        mapOf("reviewsCount" to FieldValue.increment(1)),
+                        SetOptions.merge()
+                    )
                 }
             }.await()
             true

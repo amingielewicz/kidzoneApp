@@ -2,6 +2,7 @@ package com.kidzone.data.repository
 
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.toObject
 import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.PlaceDto
@@ -119,7 +120,17 @@ class FirestorePlaceRepository @Inject constructor(
                     val userRef = firestore
                         .collection(FirestoreCollections.USERS)
                         .document(ownerUserId)
-                    tx.update(userRef, "placesAddedCount", FieldValue.increment(1))
+                    // set + merge zamiast update: jeśli doc istnieje, tylko
+                    // inkrementuje pole `placesAddedCount`; jeśli go brak
+                    // (legacy user / nieudana rejestracja), tworzy minimalny
+                    // doc z samym licznikiem, żeby user zaczął się pojawiać
+                    // w rankingu. Brakujące pola (name, email, avatar) zostaną
+                    // dopełnione przy najbliższym logowaniu przez ensureUserDoc().
+                    tx.set(
+                        userRef,
+                        mapOf("placesAddedCount" to FieldValue.increment(1)),
+                        SetOptions.merge()
+                    )
                 }
             }.await()
             true
