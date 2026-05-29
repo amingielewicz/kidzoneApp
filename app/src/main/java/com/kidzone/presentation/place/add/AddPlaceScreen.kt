@@ -67,7 +67,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPlaceScreen(
-    onSaved: () -> Unit,
+    onSaved: (newPlaceLat: Double?, newPlaceLng: Double?) -> Unit,
     onBack: () -> Unit,
     viewModel: AddPlaceViewModel = hiltViewModel()
 ) {
@@ -75,9 +75,11 @@ fun AddPlaceScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // Po pomyślnym zapisie – wracamy poziom wyżej.
+    // Po pomyślnym zapisie – wracamy poziom wyżej. W trybie create
+    // dodatkowo przekazujemy współrzędne nowego pinu, żeby Main mógł
+    // wycentrować na nim mapę.
     LaunchedEffect(state.isSaved) {
-        if (state.isSaved) onSaved()
+        if (state.isSaved) onSaved(state.savedNewLatitude, state.savedNewLongitude)
     }
 
     // Launcher prośby o uprawnienie lokalizacji.
