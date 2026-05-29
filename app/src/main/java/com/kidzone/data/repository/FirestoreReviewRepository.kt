@@ -207,6 +207,12 @@ class FirestoreReviewRepository @Inject constructor(
                 )
                 tx.set(reviewRef, merged)
                 tx.update(placeRef, mapOf("averageRating" to newAvg))
+                // tx.update zwraca Transaction; lambda runTransaction<Unit>
+                // wymaga ostatniego wyrażenia typu Unit, więc jawnie kończymy
+                // blok Unitem. (Analogiczny problem w addReview rozwiązany
+                // tam przez `if (userRef != null) { ... }` jako ostatni
+                // statement – tu nie ma naturalnego warunku.)
+                Unit
             }.await()
             true
         }
