@@ -98,8 +98,13 @@ class FirestoreReviewRepository @Inject constructor(
                 // FieldValue.increment jest atomowy po stronie serwera.
                 // Pomijamy gdy userRef = null (anonimowy / brak uid), żeby
                 // nie wywalać całej transakcji.
-                userRef?.let {
-                    tx.update(it, "reviewsCount", FieldValue.increment(1))
+                //
+                // Używamy `if` zamiast `?.let { tx.update(...) }`, bo
+                // `tx.update` zwraca `Transaction`, a lambda runTransaction<Unit>
+                // wymaga ostatniego wyrażenia typu Unit. `if` bez else jest
+                // traktowane jako statement i zwraca Unit.
+                if (userRef != null) {
+                    tx.update(userRef, "reviewsCount", FieldValue.increment(1))
                 }
             }.await()
             true
