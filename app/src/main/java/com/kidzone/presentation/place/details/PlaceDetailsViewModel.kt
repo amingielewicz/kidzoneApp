@@ -61,6 +61,12 @@ class PlaceDetailsViewModel @Inject constructor(
      * @property editingReview gdy != null, sheet jest w trybie edycji tej opinii
      *   (pre-fill ratingu i komentarza). Decyduje też, którą metodę repo
      *   zawoła [submitReview] – `updateReview` zamiast `addReview`.
+     * @property sortOrder aktualne sortowanie listy opinii (dla UI – sort robi
+     *   się klient-side, lista w `reviews` jest "surowa").
+     * @property reviewActionEvent jednorazowy event "opinia zapisana" do
+     *   wyświetlenia przez UI Snackbara. Ekran konsumuje go przez
+     *   [consumeReviewActionEvent], dzięki czemu rotacja / re-kompozycja nie
+     *   pokażą snackbara dwa razy.
      */
     data class UiState(
         val place: Place? = null,
@@ -74,8 +80,39 @@ class PlaceDetailsViewModel @Inject constructor(
         val showAddReviewSheet: Boolean = false,
         val isAddingReview: Boolean = false,
         val addReviewError: String? = null,
-        val editingReview: Review? = null
+        val editingReview: Review? = null,
+        val sortOrder: ReviewSortOrder = ReviewSortOrder.NEWEST,
+        val reviewActionEvent: ReviewActionEvent? = null
     )
+
+    /**
+     * Sposoby sortowania listy opinii. Etykiety po polsku, bo idą wprost
+     * do `DropdownMenuItem`'ów w UI. Selektor [comparator] dostarcza
+     * [java.util.Comparator] gotowy do `sortedWith`.
+     */
+    enum class ReviewSortOrder(val label: String, val comparator: Comparator<Review>) {
+        NEWEST(
+            label = "Najnowsze",
+            comparator = compareByDescending { it.createdAtMillis }
+        ),
+        OLDEST(
+            label = "Najstarsze",
+            comparator = compareBy { it.createdAtMillis }
+        ),
+        HIGHEST(
+            label = "Najwyżej oceniane",
+            comparator = compareByDescending<Review> { it.rating }
+                .thenByDescending { it.createdAtMillis }
+        ),
+        LOWEST(
+            label = "Najniżej oceniane",
+            comparator = compareBy<Review> { it.rating }
+                .thenByDescending { it.createdAtMillis }
+        )
+    }
+
+    /** Rodzaj zakończonej akcji – decyduje o treści Snackbara w UI. */
+    enum class ReviewActionEvent { ADDED, UPDATED }
 
     private val placeId: String =
         savedStateHandle.get<String>(Route.PlaceDetails.ARG_PLACE_ID).orEmpty()
@@ -201,6 +238,14 @@ class PlaceDetailsViewModel @Inject constructor(
         _uiState.update { it.copy(deleteErrorMessage = null) }
     }
 
+    fun setSortOrder(order: ReviewSortOrder) {
+        _uiState.update { it.copy(sortOrder = order) }
+    }
+
+    fun consumeReviewActionEvent() {
+        _uiState.update { it.copy(reviewActionEvent = null) }
+    }
+
     // --- Dodawanie / edycja opinii ---
 
     fun openAddReviewSheet() {
@@ -301,7 +346,8 @@ class PlaceDetailsViewModel @Inject constructor(
                         isAddingReview = false,
                         showAddReviewSheet = false,
                         addReviewError = null,
-                        editingReview = null
+                        editingReview = null,
+                        reviewActionEvent = ReviewActionEvent.ADDED
                     )
                 }
             }
@@ -345,7 +391,8 @@ class PlaceDetailsViewModel @Inject constructor(
                         isAddingReview = false,
                         showAddReviewSheet = false,
                         addReviewError = null,
-                        editingReview = null
+                        editingReview = null,
+                        reviewActionEvent = ReviewActionEvent.UPDATED
                     )
                 }
             }
