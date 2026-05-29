@@ -1,5 +1,6 @@
 package com.kidzone.data.repository
 
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.toObject
 import com.kidzone.data.remote.FirestoreCollections
@@ -101,8 +102,26 @@ class FirestorePlaceRepository @Inject constructor(
         // pozniej moc czytac id z samego DTO bez polegania na nazwie dokumentu.
         val docRef = placesCollection().document()
         val placeWithId = place.copy(id = docRef.id)
+        val ownerUserId = placeWithId.ownerUserId
+
+        // Transakcja: zapis miejsca + atomowa inkrementacja licznika
+        // `placesAddedCount` na dokumencie autora. Dzieki transakcji albo oba
+        // zapisy sie powioda, albo zaden - nie zostawimy "osierodonego" miejsca
+        // bez zliczenia w rankingu, ani odwrotnie.
+        //
+        // Jezeli `ownerUserId` jest puste (nie powinno sie zdarzyc, ale lepiej
+        // sie zabezpieczyc), pomijamy update usera - zapis miejsca i tak
+        // sie odbedzie.
         val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
-            docRef.set(PlaceDto.fromDomain(placeWithId)).await()
+            firestore.runTransaction<Unit> { tx ->
+                tx.set(docRef, PlaceDto.fromDomain(placeWithId))
+                if (ownerUserId.isNotBlank()) {
+                    val userRef = firestore
+                        .collection(FirestoreCollections.USERS)
+                        .document(ownerUserId)
+                    tx.update(userRef, "placesAddedCount", FieldValue.increment(1))
+                }
+            }.await()
             true
         }
         if (completed == null) {
