@@ -101,7 +101,7 @@ interface AuthRepository {
      * **nie aktualizuje** dokumentu usera, żeby UI mogło pokazać preview
      * przed zapisem ("Zapisz" / "Anuluj" w sheecie edycji).
      *
-     * Limity (egzekwowane też w `storage.rules`): tylko obrazek (`image/*`),
+     * Limity (egzekwowane też w `storage.rules`): tylko obrazki (MIME image/...),
      * maks. 5 MB. Większe pliki dostaną błąd z Firebase.
      */
     suspend fun uploadAvatar(localUri: Uri): OpResult<String>
