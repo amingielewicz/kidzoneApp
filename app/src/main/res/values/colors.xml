@@ -6,4 +6,9 @@
     <color name="brand_green">#43A047</color>
     <color name="brand_white">#FFFFFF</color>
     <color name="brand_dark">#1A1A1A</color>
+
+    <!-- Tlo systemowego splash screena (Android 12+ Splash API). Identyczne
+         jak tlo Compose SplashScreen (#F5F8FB) zeby przejscie miedzy systemowym
+         splashem a Compose splashem bylo plynne, bez "klatki bieli". -->
+    <color name="splash_background">#F5F8FB</color>
 </resources>
