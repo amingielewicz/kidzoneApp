@@ -1,19 +1,24 @@
 package com.kidzone.presentation.profile
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.SignInProvider
+import com.kidzone.presentation.common.UserBadge
+import com.kidzone.presentation.common.computeBadges
 import com.kidzone.utils.OpResult
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -42,7 +47,8 @@ import javax.inject.Inject
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     /**
@@ -59,6 +65,16 @@ class ProfileViewModel @Inject constructor(
      * @property accountActionError tekst błędu pokazywany w aktywnym dialogu
      * @property accountActionInfo informacja typu "Sprawdź skrzynkę..." po
      *   zmianie e-maila; pokazywana jako snack/toast po zamknięciu dialogu
+     * @property isBadgesInfoOpen true gdy user otworzył info-dialog odznak
+     *   (kliknął "?" obok sekcji "Odznaki" w profilu).
+     * @property newlyEarnedBadge nowo zdobyta odznaka, którą trzeba pokazać
+     *   userowi w dialogu gratulacyjnym. Konsumujemy przez
+     *   [consumeNewlyEarnedBadge] po pokazaniu, żeby rotacja / re-kompozycja
+     *   nie powtórzyły dialogu. Jeśli user zdobył wiele odznak naraz
+     *   (mało prawdopodobne, ale możliwe gdy backfill liczników), pokazujemy
+     *   po jednej kolejno z buforem [pendingNewBadges].
+     * @property pendingNewBadges kolejka kolejnych nowych odznak czekających
+     *   na pokazanie po skonsumowaniu [newlyEarnedBadge].
      */
     data class UiState(
         val isEditOpen: Boolean = false,
@@ -71,7 +87,10 @@ class ProfileViewModel @Inject constructor(
         val isDeleteAccountOpen: Boolean = false,
         val isAccountActionInProgress: Boolean = false,
         val accountActionError: String? = null,
-        val accountActionInfo: String? = null
+        val accountActionInfo: String? = null,
+        val isBadgesInfoOpen: Boolean = false,
+        val newlyEarnedBadge: UserBadge? = null,
+        val pendingNewBadges: List<UserBadge> = emptyList()
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -102,6 +121,17 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             val provider = authRepository.getCurrentSignInProvider()
             _uiState.update { it.copy(signInProvider = provider) }
+        }
+
+        // Detekcja nowych odznak. Subskrybujemy strumień bogatego usera i
+        // przy każdej emisji liczymy odznaki, porównując do persisted
+        // "ostatnio widzianych" (SharedPreferences per uid). Diff trafia
+        // do UiState - UI pokazuje jeden dialog gratulacyjny na odznakę,
+        // kolejne czekają w `pendingNewBadges`.
+        viewModelScope.launch {
+            user.filterNotNull().collect { u ->
+                checkForNewBadges(u)
+            }
         }
     }
 
@@ -326,5 +356,97 @@ class ProfileViewModel @Inject constructor(
             authRepository.signOut()
             onComplete()
         }
+    }
+
+    // -------- Odznaki --------
+
+    fun openBadgesInfo() {
+        _uiState.update { it.copy(isBadgesInfoOpen = true) }
+    }
+
+    fun dismissBadgesInfo() {
+        _uiState.update { it.copy(isBadgesInfoOpen = false) }
+    }
+
+    /**
+     * Konsumuje aktualnie pokazywaną odznakę (gratulacyjny dialog został
+     * zamknięty przez usera). Jeśli w buforze [UiState.pendingNewBadges]
+     * są kolejne, przesuwamy następną do [UiState.newlyEarnedBadge] -
+     * UI od razu pokaże kolejny dialog.
+     */
+    fun consumeNewlyEarnedBadge() {
+        _uiState.update { current ->
+            val (head, rest) = current.pendingNewBadges.firstOrNull() to
+                current.pendingNewBadges.drop(1)
+            current.copy(
+                newlyEarnedBadge = head,
+                pendingNewBadges = rest
+            )
+        }
+    }
+
+    /**
+     * Porównuje aktualnie zdobyte odznaki z tymi, o których powiadomiliśmy
+     * usera już wcześniej (zapisane w SharedPreferences per uid). Jeśli
+     * pojawiły się nowe - wpycha je do UiState (pierwszą do
+     * [UiState.newlyEarnedBadge], resztę do [UiState.pendingNewBadges]) i
+     * od razu persistuje pełen aktualny zestaw.
+     *
+     * Persist robimy ZA każdym razem, gdy detekcja zachodzi - jeśli user
+     * straci odznakę (np. usunął miejsca), nie chcemy mu jej znów pokazywać
+     * w przyszłości jako "nowo zdobyta" przy ponownym wbiciu progu.
+     *
+     * SharedPreferences zamiast DataStore - prostsze API, ten store jest
+     * mikroskopijny (kilka stringów per user), więc nie potrzebujemy
+     * korutyn DataStore'owych. Klucz `seen_badges_$uid` izoluje stany
+     * różnych userów na tym samym urządzeniu (dwóch rodziców logujących
+     * się z jednego telefonu).
+     */
+    private fun checkForNewBadges(user: User) {
+        val current = user.computeBadges().toSet()
+        val key = "$BADGE_PREFS_KEY_PREFIX${user.id}"
+        val seenNames = prefs.getStringSet(key, emptySet()).orEmpty()
+        val seen = seenNames.mapNotNull { runCatching { UserBadge.valueOf(it) }.getOrNull() }
+            .toSet()
+
+        val newlyEarned = (current - seen)
+            // Stabilna kolejność według enum.ordinal - jeśli user wbił
+            // kilka odznak naraz, pokazujemy je w "logicznej" kolejności
+            // (Odkrywca przed Recenzent przed Ekspert).
+            .sortedBy { it.ordinal }
+
+        if (newlyEarned.isNotEmpty()) {
+            _uiState.update { state ->
+                // Jeśli akurat już pokazujemy jakąś odznakę, dorzucamy nowe
+                // do końca kolejki - inaczej promujemy pierwszą na widoczną.
+                if (state.newlyEarnedBadge != null) {
+                    state.copy(pendingNewBadges = state.pendingNewBadges + newlyEarned)
+                } else {
+                    state.copy(
+                        newlyEarnedBadge = newlyEarned.first(),
+                        pendingNewBadges = newlyEarned.drop(1)
+                    )
+                }
+            }
+        }
+
+        // Persist aktualny set odznak - również gdy user nic nowego nie
+        // zdobył (idempotent), żeby state SharedPreferences zawsze
+        // odzwierciedlał ostatnio zaobserwowany stan.
+        if (seen != current) {
+            prefs.edit()
+                .putStringSet(key, current.map { it.name }.toSet())
+                .apply()
+        }
+    }
+
+    /** Lazy-initialized SharedPreferences dla detekcji odznak. */
+    private val prefs by lazy {
+        appContext.getSharedPreferences(BADGE_PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
+    private companion object {
+        const val BADGE_PREFS_NAME = "badge_notifications"
+        const val BADGE_PREFS_KEY_PREFIX = "seen_badges_"
     }
 }

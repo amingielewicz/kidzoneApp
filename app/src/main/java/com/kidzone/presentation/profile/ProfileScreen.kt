@@ -24,17 +24,20 @@ import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.RateReview
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
@@ -57,7 +60,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.SignInProvider
-import com.kidzone.presentation.common.BadgesList
+import com.kidzone.presentation.common.BadgeRowItem
+import com.kidzone.presentation.common.BadgesRow
+import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.computeBadges
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -115,6 +120,7 @@ fun ProfileScreen(
                 onEdit = viewModel::openEditSheet,
                 onOpenMyPlaces = onOpenMyPlaces,
                 onOpenMyReviews = onOpenMyReviews,
+                onOpenBadgesInfo = viewModel::openBadgesInfo,
                 onChangePassword = viewModel::openChangePassword,
                 onChangeEmail = viewModel::openChangeEmail,
                 onDeleteAccount = viewModel::openDeleteAccount,
@@ -181,6 +187,24 @@ fun ProfileScreen(
             }
         )
     }
+
+    // Info-dialog: lista wszystkich odznak + opisy progów. Wywoływany
+    // z ikony "?" przy nagłówku sekcji "Odznaki".
+    if (ui.isBadgesInfoOpen && user != null) {
+        BadgesInfoDialog(
+            obtained = user!!.computeBadges().toSet(),
+            onDismiss = viewModel::dismissBadgesInfo
+        )
+    }
+
+    // Dialog gratulacyjny po zdobyciu nowej odznaki - jedna naraz, kolejne
+    // czekają w kolejce w VM (consumeNewlyEarnedBadge promuje następną).
+    ui.newlyEarnedBadge?.let { badge ->
+        BadgeEarnedDialog(
+            badge = badge,
+            onDismiss = viewModel::consumeNewlyEarnedBadge
+        )
+    }
 }
 
 @Composable
@@ -190,6 +214,7 @@ private fun ProfileContent(
     onEdit: () -> Unit,
     onOpenMyPlaces: () -> Unit,
     onOpenMyReviews: () -> Unit,
+    onOpenBadgesInfo: () -> Unit,
     onChangePassword: () -> Unit,
     onChangeEmail: () -> Unit,
     onDeleteAccount: () -> Unit,
@@ -218,7 +243,7 @@ private fun ProfileContent(
             )
         }
 
-        item { BadgesCard(user = user) }
+        item { BadgesCard(user = user, onOpenInfo = onOpenBadgesInfo) }
 
         // Sekcja "Konto i bezpieczeństwo" tylko dla email/password user.
         // Dla Google sign-in zmiana hasła jest po stronie Google,
@@ -463,23 +488,169 @@ private fun MyContentCard(
 
 // --- Badges --------------------------------------------------------------
 
+/**
+ * Sekcja "Odznaki" na profilu.
+ *
+ * Pokazujemy tylko **zdobyte** odznaki (jako [BadgesRow] z półprzezroczystym
+ * tłem chipów w kolorze odznaki). Po prawej stronie nagłówka ikona "?"
+ * otwiera [BadgesInfoDialog] z pełną listą dostępnych odznak i opisem,
+ * jak je zdobyć - dzięki temu user widzi swoje progresy bez ściany
+ * "wyszarzonych" niezdobytych odznak na ekranie.
+ *
+ * Empty state: tekst "Nie masz jeszcze żadnych odznak. Sprawdź jak je zdobyć!"
+ * - sam tooltip `?` służy jako CTA, więc nie potrzebujemy osobnego buttona.
+ */
 @Composable
-private fun BadgesCard(user: User) {
-    val obtained = user.computeBadges().toSet()
+private fun BadgesCard(
+    user: User,
+    onOpenInfo: () -> Unit
+) {
+    val obtained = user.computeBadges()
     SectionCard(
         title = "Odznaki",
-        leadingIcon = Icons.Filled.EmojiEvents
+        leadingIcon = Icons.Filled.EmojiEvents,
+        trailing = {
+            IconButton(
+                onClick = onOpenInfo,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.HelpOutline,
+                    contentDescription = "Jak zdobyć odznaki?",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
     ) {
         if (obtained.isEmpty()) {
             Text(
-                text = "Dodaj miejsca i opinie, żeby zdobywać odznaki!",
+                text = "Nie masz jeszcze żadnych odznak. Kliknij \"?\" obok, " +
+                    "żeby sprawdzić, jak je zdobyć.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.height(12.dp))
+        } else {
+            BadgesRow(badges = obtained)
         }
-        BadgesList(obtained = obtained)
     }
+}
+
+/**
+ * Dialog z listą wszystkich odznak (zdobyte + niezdobyte) + opisem
+ * progów. Używamy ikony +/- w opisach progów - kolorowo dla zdobytych
+ * (pełen kolor odznaki), wyszarzone dla pozostałych.
+ */
+@Composable
+private fun BadgesInfoDialog(
+    obtained: Set<UserBadge>,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Filled.EmojiEvents,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        },
+        title = { Text("Jak zdobyć odznaki?") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Aktywność w aplikacji nagradzamy odznakami. " +
+                        "Im więcej miejsc i opinii dodasz, tym więcej odznak zdobędziesz.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                UserBadge.entries.forEach { badge ->
+                    BadgeRowItem(
+                        badge = badge,
+                        highlighted = badge in obtained
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text("Rozumiem")
+            }
+        }
+    )
+}
+
+/**
+ * Dialog gratulacyjny pokazywany, gdy user właśnie zdobył nową odznakę.
+ *
+ * Wizualnie: duża okrągła ikona w kolorze odznaki + nazwa + krótki opis
+ * jakie warunki spełnił. Pokazywany jeden naraz - jeśli user wbił kilka
+ * odznak (np. backfill licznika reviews), kolejne czekają w VM-owym
+ * buforze i pojawią się po zamknięciu poprzedniego.
+ *
+ * Świadomie blokujący - user musi kliknąć "Super!" żeby zamknąć, bo to
+ * pozytywne wydarzenie powinno się wyróżnić względem zwykłej nawigacji.
+ */
+@Composable
+private fun BadgeEarnedDialog(
+    badge: UserBadge,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(badge.color.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = badge.icon,
+                    contentDescription = null,
+                    tint = badge.color,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        },
+        title = {
+            Text(
+                text = "Gratulacje!",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+        },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "Zdobyłaś/eś nową odznakę:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = badge.label,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = badge.color
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = badge.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text("Super!")
+            }
+        }
+    )
 }
 
 // --- Konto i bezpieczeństwo ---------------------------------------------
@@ -608,6 +779,7 @@ private fun NavRow(
 private fun SectionCard(
     title: String,
     leadingIcon: ImageVector? = null,
+    trailing: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     Card(
@@ -628,8 +800,10 @@ private fun SectionCard(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
                 )
+                trailing?.invoke()
             }
             Spacer(Modifier.height(12.dp))
             content()

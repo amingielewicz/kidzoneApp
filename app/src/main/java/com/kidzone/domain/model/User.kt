@@ -24,5 +24,17 @@ data class User(
     val avatarUrl: String? = null,
     val placesAddedCount: Int = 0,
     val reviewsCount: Int = 0,
-    val createdAtMillis: Long = 0L
+    val createdAtMillis: Long = 0L,
+    /**
+     * Lowercase wersja [name] (locale pl_PL). Zapisywana w Firestore obok
+     * [name] po to, by można było robić zapytanie `whereEqualTo("nameLowercase", ...)`
+     * i sprawdzać unikalność loginu case-insensitive (Firestore nie ma natywnego
+     * collation). Pole jest zarządzane przez warstwę data; UI nie powinien go
+     * modyfikować bezpośrednio.
+     *
+     * Pusty string = legacy doc bez tego pola; warstwa data uzupełnia
+     * automatycznie przy najbliższym save / sign-in (zob. `ensureUserDoc`
+     * i `backfillNameLowercase` w FirebaseAuthRepository).
+     */
+    val nameLowercase: String = ""
 )
