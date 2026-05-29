@@ -1,0 +1,39 @@
+rules_version = '2';
+
+// Reguły bezpieczeństwa Firebase Storage dla aplikacji KidZone.
+//
+// Deploy: `firebase deploy --only storage` (wymaga firebase.json z sekcją
+// `storage` + Firebase CLI zalogowanego do projektu) ALBO ręczne wklejenie
+// całej zawartości tego pliku w konsoli:
+//   Firebase Console -> Storage -> Rules -> Publish.
+//
+// Założenia:
+//  - aplikacja jest "post-login", więc do odczytu wymagamy zalogowania
+//    (avatary innych userów ładujemy w UI po zalogowaniu),
+//  - zapis tylko do "swojego" folderu `avatars/{uid}/...`,
+//  - twardy limit 5 MB i tylko obrazki – defense in depth wobec walidacji
+//    po stronie aplikacji (telefon zawsze może próbować bypassować).
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ---------- /avatars/{userId}/{file} ----------
+    //
+    // Avatar użytkownika jest publiczny dla zalogowanych userów (pokazujemy
+    // go w rankingu, na opiniach, na karcie autora miejsca). Zapis tylko
+    // dla właściciela folderu.
+    match /avatars/{userId}/{fileName} {
+      allow read: if request.auth != null;
+
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      // Usuwanie własnego avatara też dozwolone (na wypadek przyszłej
+      // funkcji "Usuń avatar"). Brak `allow delete` traktowany jest jako
+      // false – więc obecnie nikt nie usunie pliku, ale uploadAvatar i tak
+      // nadpisuje istniejący.
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

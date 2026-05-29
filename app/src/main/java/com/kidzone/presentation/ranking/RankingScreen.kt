@@ -20,12 +20,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Verified
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -46,7 +42,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -54,6 +49,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.User
+import com.kidzone.presentation.common.BadgesRow
+import com.kidzone.presentation.common.computeBadges
 import com.kidzone.presentation.common.style
 
 /**
@@ -351,66 +348,6 @@ private fun PositionMedal(position: Int) {
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
-    }
-}
-
-// --- Odznaki ---------------------------------------------------------
-
-/**
- * Odznaki wyliczane lokalnie z liczników na [User].
- *
- * Trzymane w UI (a nie w domain), bo same w sobie nie są częścią modelu –
- * to tylko prezentacja agregatów. Progi można później wyciągnąć do configa.
- */
-private enum class UserBadge(
-    val label: String,
-    val icon: ImageVector,
-    val color: Color
-) {
-    EXPLORER("Odkrywca", Icons.Filled.EmojiEvents, Color(0xFF43A047)),
-    REVIEWER("Recenzent", Icons.Filled.RateReview, Color(0xFF1E88E5)),
-    FAMILY_EXPERT("Ekspert rodzinny", Icons.Filled.Verified, Color(0xFF8E24AA))
-}
-
-private fun User.computeBadges(): List<UserBadge> {
-    val list = mutableListOf<UserBadge>()
-    if (placesAddedCount >= 5) list += UserBadge.EXPLORER
-    if (reviewsCount >= 10) list += UserBadge.REVIEWER
-    if (placesAddedCount >= 10 && reviewsCount >= 20) list += UserBadge.FAMILY_EXPERT
-    return list
-}
-
-@Composable
-private fun BadgesRow(badges: List<UserBadge>) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        badges.forEach { badge ->
-            AssistChip(
-                onClick = {},
-                enabled = false,
-                label = {
-                    Text(
-                        text = badge.label,
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = badge.icon,
-                        contentDescription = null,
-                        tint = badge.color,
-                        modifier = Modifier.size(16.dp)
-                    )
-                },
-                colors = AssistChipDefaults.assistChipColors(
-                    disabledContainerColor = badge.color.copy(alpha = 0.10f),
-                    disabledLabelColor = MaterialTheme.colorScheme.onSurface,
-                    disabledLeadingIconContentColor = badge.color
-                )
-            )
-        }
     }
 }
 

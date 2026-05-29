@@ -1,5 +1,6 @@
 package com.kidzone.data.repository
 
+import android.net.Uri
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
@@ -9,7 +10,9 @@ import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.toObject
+import com.google.firebase.storage.FirebaseStorage
 import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.UserDto
 import com.kidzone.domain.model.User
@@ -40,7 +43,8 @@ import javax.inject.Singleton
 @Singleton
 class FirebaseAuthRepository @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val firebaseStorage: FirebaseStorage
 ) : AuthRepository {
 
     override val currentUser: Flow<User?> = callbackFlow {
@@ -51,6 +55,24 @@ class FirebaseAuthRepository @Inject constructor(
         // Wyemituj aktualna wartosc natychmiast (listener emituje dopiero przy zmianach).
         trySend(firebaseAuth.currentUser?.toDomain())
         awaitClose { firebaseAuth.removeAuthStateListener(listener) }
+    }
+
+    override fun observeUser(userId: String): Flow<User?> = callbackFlow {
+        if (userId.isBlank()) {
+            trySend(null)
+            close()
+            return@callbackFlow
+        }
+        val docRef = firestore.collection(FirestoreCollections.USERS).document(userId)
+        val registration = docRef.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
+            val user = snapshot?.toObject<UserDto>()?.toDomain()
+            trySend(user)
+        }
+        awaitClose { registration.remove() }
     }
 
     override suspend fun signInWithEmail(email: String, password: String): OpResult<User> =
@@ -151,6 +173,79 @@ class FirebaseAuthRepository @Inject constructor(
                     .thenByDescending { it.reviewsCount }
             )
         OpResult.success(users)
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
+    override suspend fun updateUserProfile(
+        displayName: String,
+        firstName: String,
+        lastName: String,
+        avatarUrl: String?
+    ): OpResult<User> = try {
+        val firebaseUser = firebaseAuth.currentUser
+            ?: throw IllegalStateException("Brak zalogowanego użytkownika")
+
+        // 1) Zapis do Firestore – merge, żeby nie nadpisać `placesAddedCount`,
+        //    `reviewsCount`, `createdAtMillis` ani `email` (które tu nie są
+        //    edytowane przez usera). Mapa zamiast pełnego DTO, bo merge na
+        //    DTO też by działał, ale wprost mapa lepiej dokumentuje, co
+        //    faktycznie zmieniamy.
+        val updates = mapOf(
+            "name" to displayName,
+            "firstName" to firstName,
+            "lastName" to lastName,
+            "avatarUrl" to avatarUrl
+        )
+        firestore.collection(FirestoreCollections.USERS)
+            .document(firebaseUser.uid)
+            .set(updates, SetOptions.merge())
+            .await()
+
+        // 2) Aktualizacja FirebaseAuth – żeby strumień [currentUser] (oparty
+        //    o FirebaseUser) zobaczył nowy nick i avatar od razu, zanim
+        //    obserwator Firestore wyemituje pełny dokument.
+        //    Uwaga: setPhotoUri(null) NIE czyści photoUrl – Firebase Auth
+        //    interpretuje null jako "nie zmieniaj". Żeby usunąć avatar
+        //    musielibyśmy użyć `userProfileChangeRequest.setPhotoUri(Uri.EMPTY)`,
+        //    co dla naszego MVP nie jest potrzebne (brak guzika "Usuń avatar").
+        val request = userProfileChangeRequest {
+            this.displayName = displayName
+            avatarUrl?.let { this.photoUri = Uri.parse(it) }
+        }
+        firebaseUser.updateProfile(request).await()
+
+        // 3) Zwracamy "świeżego" usera – ProfileViewModel używa głównie
+        //    observeUser, ale ten return type jest przydatny w testach
+        //    i ewentualnych one-shot wywołaniach.
+        OpResult.success(
+            firebaseUser.toDomain().copy(
+                name = displayName,
+                firstName = firstName,
+                lastName = lastName,
+                avatarUrl = avatarUrl
+            )
+        )
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
+    override suspend fun uploadAvatar(localUri: Uri): OpResult<String> = try {
+        val firebaseUser = firebaseAuth.currentUser
+            ?: throw IllegalStateException("Brak zalogowanego użytkownika")
+
+        // Stała ścieżka – nadpisywanie istniejącego avatara zamiast tworzenia
+        // nowego pliku przy każdym uploadzie. Plus: nie generujemy "śmieci"
+        // w bucketcie ani nie musimy ich kasować po edycji.
+        // Minus: stary URL z download tokenem przestaje działać dla
+        // userów, którzy mieli go zacache'owanego (Coil to zauważa, bo URL
+        // ma świeży `?alt=media&token=...`).
+        val storageRef = firebaseStorage.reference
+            .child("avatars/${firebaseUser.uid}/avatar.jpg")
+
+        storageRef.putFile(localUri).await()
+        val downloadUrl = storageRef.downloadUrl.await().toString()
+        OpResult.success(downloadUrl)
     } catch (e: Exception) {
         OpResult.failure(e)
     }
