@@ -18,8 +18,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
@@ -39,6 +42,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -56,9 +60,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
@@ -120,6 +126,19 @@ fun PlaceDetailsScreen(
             snackbarHostState.showSnackbar(msg)
             viewModel.consumeDeleteError()
         }
+    }
+
+    // Snackbar po pomyślnym dodaniu / aktualizacji opinii. Event z VM
+    // (jednorazowy) – po pokazaniu konsumujemy, żeby rotacja / re-kompozycja
+    // nie pokazały go drugi raz.
+    LaunchedEffect(state.reviewActionEvent) {
+        val event = state.reviewActionEvent ?: return@LaunchedEffect
+        val message = when (event) {
+            PlaceDetailsViewModel.ReviewActionEvent.ADDED -> "Dziękujemy za opinię!"
+            PlaceDetailsViewModel.ReviewActionEvent.UPDATED -> "Opinia zaktualizowana"
+        }
+        snackbarHostState.showSnackbar(message)
+        viewModel.consumeReviewActionEvent()
     }
 
     Scaffold(
@@ -211,7 +230,12 @@ fun PlaceDetailsScreen(
                     PlaceDetailsContent(
                         place = state.place!!,
                         author = state.author,
-                        reviews = state.reviews
+                        reviews = state.reviews,
+                        currentUserId = currentUser?.id,
+                        sortOrder = state.sortOrder,
+                        onSortOrderChange = viewModel::setSortOrder,
+                        onAddReview = viewModel::openAddReviewSheet,
+                        onEditReview = viewModel::openEditReviewSheet
                     )
                 }
             }
@@ -229,6 +253,23 @@ fun PlaceDetailsScreen(
             onDismiss = { if (!state.isDeleting) showDeleteDialog = false }
         )
     }
+
+    // Sheet dodawania opinii – sterowany przez VM (state.showAddReviewSheet),
+    // żeby błąd zapisu mógł go utrzymać otwartym (user widzi błąd, próbuje
+    // ponownie). Po sukcesie VM ustawia flagę na false → sheet znika.
+    if (state.showAddReviewSheet) {
+        val editing = state.editingReview
+        AddReviewSheet(
+            placeName = state.place?.name.orEmpty(),
+            isSubmitting = state.isAddingReview,
+            errorMessage = state.addReviewError,
+            onDismiss = viewModel::dismissAddReviewSheet,
+            onSubmit = viewModel::submitReview,
+            initialRating = editing?.rating ?: 0,
+            initialComment = editing?.comment.orEmpty(),
+            isEditing = editing != null
+        )
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -236,8 +277,25 @@ fun PlaceDetailsScreen(
 private fun PlaceDetailsContent(
     place: Place,
     author: User?,
-    reviews: List<Review>
+    reviews: List<Review>,
+    currentUserId: String?,
+    sortOrder: PlaceDetailsViewModel.ReviewSortOrder,
+    onSortOrderChange: (PlaceDetailsViewModel.ReviewSortOrder) -> Unit,
+    onAddReview: () -> Unit,
+    onEditReview: (Review) -> Unit
 ) {
+    // Jedna opinia per user per miejsce (MVP). Przycisk "Dodaj opinię" znika,
+    // gdy zalogowany user już wystawił ocenę – w jego miejsce daje
+    // ikona ołówka na karcie własnej opinii (patrz ReviewCard).
+    val alreadyReviewed = currentUserId != null && reviews.any { it.userId == currentUserId }
+    val canAddReview = currentUserId != null && !alreadyReviewed
+
+    // Klient-side sort. `remember` z kluczami chroni przed niepotrzebnym
+    // re-sortowaniem – wykonuje się tylko gdy zmieni się lista albo sortOrder.
+    val sortedReviews = remember(reviews, sortOrder) {
+        reviews.sortedWith(sortOrder.comparator)
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
@@ -277,22 +335,56 @@ private fun PlaceDetailsContent(
             }
         }
 
-        // Sekcja 3: Opinie
+        // Sekcja 3: Opinie z przyciskiem "Dodaj opinię" w nagłówku.
         item {
-            SectionCard(title = "Opinie (${reviews.size})") {
+            SectionCard(
+                title = "Opinie (${reviews.size})",
+                trailing = if (canAddReview) {
+                    {
+                        TextButton(onClick = onAddReview) {
+                            Text("Dodaj opinię")
+                        }
+                    }
+                } else null
+            ) {
                 if (reviews.isEmpty()) {
                     Text(
-                        text = "Brak opinii. Bądź pierwszy!",
+                        text = if (canAddReview) {
+                            "Brak opinii. Bądź pierwszy!"
+                        } else {
+                            "Brak opinii."
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                } else {
+                    // Wykres rozkładu ocen pokazujemy od 3 opinii w górę –
+                    // przy 1-2 wygląda jak prawie pusty placeholder i nie
+                    // niesie żadnej informacji.
+                    if (reviews.size >= 3) {
+                        ReviewDistributionChart(reviews = reviews)
+                        Spacer(Modifier.height(12.dp))
+                    }
+                    if (reviews.size >= 2) {
+                        ReviewSortDropdown(
+                            current = sortOrder,
+                            onChange = onSortOrderChange
+                        )
+                    }
                 }
             }
         }
 
         // Każda opinia jako osobny item, żeby LazyColumn dobrze recyklował przy długich listach
-        items(items = reviews, key = { it.id }) { review ->
-            ReviewCard(review = review)
+        items(items = sortedReviews, key = { it.id }) { review ->
+            val isMine = currentUserId != null && review.userId == currentUserId
+            ReviewCard(
+                review = review,
+                isMine = isMine,
+                onEdit = if (isMine) {
+                    { onEditReview(review) }
+                } else null
+            )
         }
     }
 }
@@ -484,6 +576,7 @@ private fun plural(count: Int): String = when {
 @Composable
 private fun SectionCard(
     title: String,
+    trailing: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     Card(
@@ -491,11 +584,15 @@ private fun SectionCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                trailing?.invoke()
+            }
             Spacer(Modifier.height(8.dp))
             content()
         }
@@ -503,19 +600,35 @@ private fun SectionCard(
 }
 
 @Composable
-private fun ReviewCard(review: Review) {
+private fun ReviewCard(
+    review: Review,
+    isMine: Boolean = false,
+    onEdit: (() -> Unit)? = null
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        // Subtelny outline na opinii zalogowanego usera, żeby ją łatwo
+        // zlokalizował na dłuższej liście.
+        border = if (isMine) {
+            androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+            )
+        } else null
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = review.authorName.ifBlank { "Anonim" },
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f)
+                    fontWeight = FontWeight.Medium
                 )
+                if (isMine) {
+                    Spacer(Modifier.width(6.dp))
+                    MyReviewBadge()
+                }
+                Spacer(Modifier.weight(1f))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     repeat(5) { index ->
                         Icon(
@@ -529,15 +642,29 @@ private fun ReviewCard(review: Review) {
                             modifier = Modifier.size(16.dp)
                         )
                     }
+                    // Ołówek edycji – tylko dla własnej opinii. Klik otwiera
+                    // ten sam sheet co "Dodaj opinię", ale w trybie edit
+                    // (pre-filled aktualnymi wartościami).
+                    if (onEdit != null) {
+                        Spacer(Modifier.width(4.dp))
+                        IconButton(
+                            onClick = onEdit,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Edit,
+                                contentDescription = "Edytuj swoją opinię",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
                 }
             }
-            if (review.createdAtMillis > 0L) {
-                Text(
-                    text = formatDate(review.createdAtMillis),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            ReviewTimestampRow(
+                createdAtMillis = review.createdAtMillis,
+                updatedAtMillis = review.updatedAtMillis
+            )
             if (review.comment.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -546,6 +673,200 @@ private fun ReviewCard(review: Review) {
                 )
             }
         }
+    }
+}
+
+/**
+ * Wiersz z datą utworzenia opinii i opcjonalnym znacznikiem "edytowana".
+ * Pokazujemy obie informacje, żeby nikt nie podmienił 1★ -> 5★ po cichu –
+ * data edycji jest widoczna i niezatajalna.
+ */
+@Composable
+private fun ReviewTimestampRow(
+    createdAtMillis: Long,
+    updatedAtMillis: Long
+) {
+    if (createdAtMillis <= 0L && updatedAtMillis <= 0L) return
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (createdAtMillis > 0L) {
+            Text(
+                text = formatDate(createdAtMillis),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (updatedAtMillis > createdAtMillis && updatedAtMillis > 0L) {
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "· edytowana ${formatDate(updatedAtMillis)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+            )
+        }
+    }
+}
+
+/**
+ * Wykres rozkładu opinii (Google Maps style): średnia + 5 wierszy
+ * 5★/4★/3★/2★/1★ z poziomym paskiem proporcjonalnym do najwyższej liczby
+ * w grupie. Renderujemy gdy reviews.size >= 3 (próg czytelności).
+ */
+@Composable
+private fun ReviewDistributionChart(reviews: List<Review>) {
+    val total = reviews.size
+    if (total <= 0) return
+    // Mapa rating(1..5) -> count. Nawet jeśli jakaś gwiazdka ma 0 wystąpień,
+    // chcemy ją pokazać w wierszu (czytelność).
+    val counts = (1..5).associateWith { star -> reviews.count { it.rating == star } }
+    // Skalowanie pasków do najwyższej grupy (a nie totalu) – wizualnie
+    // lepiej porównuje proporcje, jak robi to Google Maps.
+    val maxCount = counts.values.max().coerceAtLeast(1)
+    val avg = reviews.map { it.rating }.average()
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "%.1f".format(avg),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                imageVector = Icons.Filled.Star,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = "$total ${pluralOpinii(total)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        // Wiersze 5★..1★ – top-down (najwyższa ocena na górze).
+        (5 downTo 1).forEach { star ->
+            val count = counts.getValue(star)
+            DistributionRow(
+                star = star,
+                count = count,
+                fraction = count.toFloat() / maxCount
+            )
+        }
+    }
+}
+
+@Composable
+private fun DistributionRow(
+    star: Int,
+    count: Int,
+    fraction: Float
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "$star",
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.width(12.dp),
+            textAlign = TextAlign.End
+        )
+        Spacer(Modifier.width(2.dp))
+        Icon(
+            imageVector = Icons.Filled.Star,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            modifier = Modifier.size(12.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        LinearProgressIndicator(
+            progress = { fraction },
+            modifier = Modifier
+                .weight(1f)
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp)),
+            color = MaterialTheme.colorScheme.secondary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = count.toString(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(28.dp),
+            textAlign = TextAlign.End
+        )
+    }
+}
+
+/** Polska odmiana rzeczownika "opinia" w zależności od liczby. */
+private fun pluralOpinii(n: Int): String = when {
+    n == 1 -> "opinia"
+    n % 10 in 2..4 && n % 100 !in 12..14 -> "opinie"
+    else -> "opinii"
+}
+
+/**
+ * Mały selektor sortowania nad listą opinii (Najnowsze / Najstarsze /
+ * Najwyżej / Najniżej oceniane). Renderowany jako TextButton z ikoną
+ * sortowania + label aktualnego trybu + ArrowDropDown.
+ */
+@Composable
+private fun ReviewSortDropdown(
+    current: PlaceDetailsViewModel.ReviewSortOrder,
+    onChange: (PlaceDetailsViewModel.ReviewSortOrder) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { expanded = true }) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.Sort,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(text = current.label)
+            Icon(
+                imageVector = Icons.Filled.ArrowDropDown,
+                contentDescription = null
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            PlaceDetailsViewModel.ReviewSortOrder.entries.forEach { order ->
+                DropdownMenuItem(
+                    text = { Text(order.label) },
+                    onClick = {
+                        onChange(order)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+/** Mała plakietka pod nickiem, oznaczająca własną opinię na liście. */
+@Composable
+private fun MyReviewBadge() {
+    androidx.compose.material3.Surface(
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+    ) {
+        Text(
+            text = "Twoja opinia",
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 

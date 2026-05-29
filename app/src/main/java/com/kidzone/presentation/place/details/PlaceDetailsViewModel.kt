@@ -43,7 +43,7 @@ class PlaceDetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val placeRepository: PlaceRepository,
     private val authRepository: AuthRepository,
-    reviewRepository: ReviewRepository
+    private val reviewRepository: ReviewRepository
 ) : ViewModel() {
 
     /**
@@ -55,6 +55,18 @@ class PlaceDetailsViewModel @Inject constructor(
      * @property isDeleting true podczas wywoływania `deletePlace`
      * @property isDeleted true po pomyślnym usunięciu – sygnał dla UI do nawigacji
      * @property deleteErrorMessage komunikat błędu z `deletePlace`
+     * @property showAddReviewSheet true gdy user otworzył formularz dodawania opinii
+     * @property isAddingReview true podczas wywołania `addReview` (spinner w sheet)
+     * @property addReviewError komunikat błędu z `addReview` (do pokazania w sheet)
+     * @property editingReview gdy != null, sheet jest w trybie edycji tej opinii
+     *   (pre-fill ratingu i komentarza). Decyduje też, którą metodę repo
+     *   zawoła [submitReview] – `updateReview` zamiast `addReview`.
+     * @property sortOrder aktualne sortowanie listy opinii (dla UI – sort robi
+     *   się klient-side, lista w `reviews` jest "surowa").
+     * @property reviewActionEvent jednorazowy event "opinia zapisana" do
+     *   wyświetlenia przez UI Snackbara. Ekran konsumuje go przez
+     *   [consumeReviewActionEvent], dzięki czemu rotacja / re-kompozycja nie
+     *   pokażą snackbara dwa razy.
      */
     data class UiState(
         val place: Place? = null,
@@ -64,8 +76,43 @@ class PlaceDetailsViewModel @Inject constructor(
         val errorMessage: String? = null,
         val isDeleting: Boolean = false,
         val isDeleted: Boolean = false,
-        val deleteErrorMessage: String? = null
+        val deleteErrorMessage: String? = null,
+        val showAddReviewSheet: Boolean = false,
+        val isAddingReview: Boolean = false,
+        val addReviewError: String? = null,
+        val editingReview: Review? = null,
+        val sortOrder: ReviewSortOrder = ReviewSortOrder.NEWEST,
+        val reviewActionEvent: ReviewActionEvent? = null
     )
+
+    /**
+     * Sposoby sortowania listy opinii. Etykiety po polsku, bo idą wprost
+     * do `DropdownMenuItem`'ów w UI. Selektor [comparator] dostarcza
+     * [java.util.Comparator] gotowy do `sortedWith`.
+     */
+    enum class ReviewSortOrder(val label: String, val comparator: Comparator<Review>) {
+        NEWEST(
+            label = "Najnowsze",
+            comparator = compareByDescending { it.createdAtMillis }
+        ),
+        OLDEST(
+            label = "Najstarsze",
+            comparator = compareBy { it.createdAtMillis }
+        ),
+        HIGHEST(
+            label = "Najwyżej oceniane",
+            comparator = compareByDescending<Review> { it.rating }
+                .thenByDescending { it.createdAtMillis }
+        ),
+        LOWEST(
+            label = "Najniżej oceniane",
+            comparator = compareBy<Review> { it.rating }
+                .thenByDescending { it.createdAtMillis }
+        )
+    }
+
+    /** Rodzaj zakończonej akcji – decyduje o treści Snackbara w UI. */
+    enum class ReviewActionEvent { ADDED, UPDATED }
 
     private val placeId: String =
         savedStateHandle.get<String>(Route.PlaceDetails.ARG_PLACE_ID).orEmpty()
@@ -189,5 +236,173 @@ class PlaceDetailsViewModel @Inject constructor(
 
     fun consumeDeleteError() {
         _uiState.update { it.copy(deleteErrorMessage = null) }
+    }
+
+    fun setSortOrder(order: ReviewSortOrder) {
+        _uiState.update { it.copy(sortOrder = order) }
+    }
+
+    fun consumeReviewActionEvent() {
+        _uiState.update { it.copy(reviewActionEvent = null) }
+    }
+
+    // --- Dodawanie / edycja opinii ---
+
+    fun openAddReviewSheet() {
+        _uiState.update {
+            it.copy(showAddReviewSheet = true, addReviewError = null, editingReview = null)
+        }
+    }
+
+    /** Otwiera ten sam sheet w trybie edycji – pre-fill ratingu i komentarza. */
+    fun openEditReviewSheet(review: Review) {
+        _uiState.update {
+            it.copy(showAddReviewSheet = true, addReviewError = null, editingReview = review)
+        }
+    }
+
+    fun dismissAddReviewSheet() {
+        // W trakcie zapisu nie pozwalamy zamknąć (uniknij gubienia spinnera /
+        // nieoczekiwanego dismissa po dwukliku), użytkownik może wrócić.
+        if (_uiState.value.isAddingReview) return
+        _uiState.update {
+            it.copy(showAddReviewSheet = false, addReviewError = null, editingReview = null)
+        }
+    }
+
+    /**
+     * Wysyła nową opinię LUB aktualizuje istniejącą – zależy od
+     * `state.editingReview`. Dwa flow celowo dzielą jeden submit, żeby
+     * sheet UI był jednym miejscem prawdy o formularzu.
+     *
+     * Optymistyczne odświeżenie agregatów miejsca tak, jak by zrobiło to
+     * repo w transakcji – dzięki temu karta główna pokazuje aktualne dane
+     * od razu, bez re-fetcha.
+     *
+     * @param rating 1..5
+     * @param comment treść opinii (opcjonalna; trim-ujemy whitespace).
+     */
+    fun submitReview(rating: Int, comment: String) {
+        val place = _uiState.value.place ?: return
+        val user = currentUser.value
+        if (user == null) {
+            _uiState.update {
+                it.copy(addReviewError = "Musisz być zalogowany, by dodać opinię")
+            }
+            return
+        }
+        if (rating !in 1..5) {
+            _uiState.update {
+                it.copy(addReviewError = "Wybierz ocenę 1–5 gwiazdek")
+            }
+            return
+        }
+
+        val editing = _uiState.value.editingReview
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAddingReview = true, addReviewError = null) }
+
+            if (editing == null) {
+                submitNewReview(place, user, rating, comment)
+            } else {
+                submitEditedReview(place, editing, rating, comment)
+            }
+        }
+    }
+
+    private suspend fun submitNewReview(
+        place: Place,
+        user: User,
+        rating: Int,
+        comment: String
+    ) {
+        val review = Review(
+            id = "",
+            placeId = place.id,
+            userId = user.id,
+            authorName = user.name,
+            rating = rating,
+            comment = comment.trim(),
+            createdAtMillis = System.currentTimeMillis()
+        )
+
+        when (val result = reviewRepository.addReview(review)) {
+            is OpResult.Success -> {
+                val oldCount = place.reviewsCount
+                val oldAvg = place.averageRating
+                val newCount = oldCount + 1
+                // Średnia krocząca (taki sam wzór jak w transakcji repo);
+                // przy współbieżnych zapisach z innych klientów stan może
+                // chwilowo się rozjechać o 1 – akceptowalne dla MVP, naprawi
+                // się przy najbliższym (re-)wejściu na ekran.
+                val newAvg = (oldAvg * oldCount + rating) / newCount
+
+                _uiState.update {
+                    it.copy(
+                        place = place.copy(
+                            reviewsCount = newCount,
+                            averageRating = newAvg
+                        ),
+                        isAddingReview = false,
+                        showAddReviewSheet = false,
+                        addReviewError = null,
+                        editingReview = null,
+                        reviewActionEvent = ReviewActionEvent.ADDED
+                    )
+                }
+            }
+            is OpResult.Failure -> _uiState.update {
+                it.copy(
+                    isAddingReview = false,
+                    addReviewError = result.error.message
+                        ?: "Nie udało się dodać opinii"
+                )
+            }
+        }
+    }
+
+    private suspend fun submitEditedReview(
+        place: Place,
+        existing: Review,
+        rating: Int,
+        comment: String
+    ) {
+        // Update – zachowujemy id / userId / authorName / placeId / createdAt
+        // z istniejącej opinii, nadpisując tylko user-edytowalne pola.
+        val updated = existing.copy(
+            rating = rating,
+            comment = comment.trim()
+        )
+
+        when (val result = reviewRepository.updateReview(updated)) {
+            is OpResult.Success -> {
+                val count = place.reviewsCount
+                val oldAvg = place.averageRating
+                val oldRating = existing.rating
+                // Delta-form: count się nie zmienia, więc (avg*count - old + new)/count.
+                val newAvg = if (count > 0) {
+                    (oldAvg * count - oldRating + rating) / count
+                } else {
+                    rating.toDouble()
+                }
+                _uiState.update {
+                    it.copy(
+                        place = place.copy(averageRating = newAvg),
+                        isAddingReview = false,
+                        showAddReviewSheet = false,
+                        addReviewError = null,
+                        editingReview = null,
+                        reviewActionEvent = ReviewActionEvent.UPDATED
+                    )
+                }
+            }
+            is OpResult.Failure -> _uiState.update {
+                it.copy(
+                    isAddingReview = false,
+                    addReviewError = result.error.message
+                        ?: "Nie udało się zaktualizować opinii"
+                )
+            }
+        }
     }
 }

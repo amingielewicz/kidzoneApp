@@ -23,6 +23,13 @@ import javax.inject.Singleton
 private const val WRITE_TIMEOUT_MS = 30_000L
 
 /**
+ * Maksymalna długość komentarza w opinii. Trzymane jako stała w warstwie
+ * data, bo to ostateczny strażnik – UI również cappuje (AddReviewSheet),
+ * ale walidacja po stronie repo gwarantuje kontrakt domeny.
+ */
+private const val REVIEW_COMMENT_MAX_LENGTH = 1000
+
+/**
  * Implementacja [ReviewRepository] oparta o Firestore.
  *
  * `reportReviewAsSpam` jest jeszcze placeholderem – do uzupełnienia w
@@ -58,6 +65,12 @@ class FirestoreReviewRepository @Inject constructor(
     override suspend fun addReview(review: Review): OpResult<Review> = try {
         require(review.placeId.isNotBlank()) { "Review.placeId nie może być puste" }
         require(review.rating in 1..5) { "Review.rating musi być w zakresie 1..5" }
+        // Defense-in-depth: UI też cappuje na 1000 (AddReviewSheet),
+        // ale walidujemy tu na wypadek gdyby ktoś zawołał repo z innego
+        // miejsca lub spreparował dane z poziomu testu.
+        require(review.comment.length <= REVIEW_COMMENT_MAX_LENGTH) {
+            "Review.comment przekracza limit $REVIEW_COMMENT_MAX_LENGTH znaków"
+        }
 
         val reviewRef = reviewsCollection().document()
         val placeRef = firestore.collection(FirestoreCollections.PLACES).document(review.placeId)
@@ -122,6 +135,95 @@ class FirestoreReviewRepository @Inject constructor(
             )
         } else {
             OpResult.success(reviewWithId)
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
+    override suspend fun updateReview(review: Review): OpResult<Review> = try {
+        require(review.id.isNotBlank()) { "Review.id musi być znane przy update" }
+        require(review.rating in 1..5) { "Review.rating musi być w zakresie 1..5" }
+        require(review.comment.length <= REVIEW_COMMENT_MAX_LENGTH) {
+            "Review.comment przekracza limit $REVIEW_COMMENT_MAX_LENGTH znaków"
+        }
+
+        val reviewRef = reviewsCollection().document(review.id)
+
+        // Transakcja:
+        //  1) READ aktualna opinia (po `oldRating`) – jest też walidacją,
+        //     że doc istnieje i należy do `userId` z payload-u (rules to
+        //     egzekwują, ale lepiej rzucić jasny błąd zamiast czekać na
+        //     PERMISSION_DENIED).
+        //  2) READ miejsce – musimy znać aktualne `averageRating` i
+        //     `reviewsCount`, żeby przeliczyć średnią po edycji.
+        //  3) WRITE opinia z nowymi polami + `updatedAtMillis = now`.
+        //  4) WRITE place z nowym `averageRating` (count bez zmian).
+        //
+        // `users.reviewsCount` zostaje – edycja to nadal jedna opinia.
+        val updatedReview = review.copy(updatedAtMillis = System.currentTimeMillis())
+        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+            firestore.runTransaction<Unit> { tx ->
+                val reviewSnap = tx.get(reviewRef)
+                if (!reviewSnap.exists()) {
+                    throw NoSuchElementException("Brak opinii o id=${review.id}")
+                }
+                val existing = reviewSnap.toObject<ReviewDto>()
+                    ?: throw IllegalStateException("Nieczytelny dokument opinii ${review.id}")
+                if (existing.userId != review.userId) {
+                    // Defensywnie – właściwie zatrzymają to security rules,
+                    // ale eksplicytny komunikat jest dla nas czytelniejszy.
+                    throw SecurityException("Można edytować tylko własne opinie")
+                }
+                val placeId = existing.placeId.ifBlank { review.placeId }
+                val placeRef = firestore
+                    .collection(FirestoreCollections.PLACES)
+                    .document(placeId)
+                val placeSnap = tx.get(placeRef)
+                if (!placeSnap.exists()) {
+                    throw NoSuchElementException("Brak miejsca o id=$placeId")
+                }
+                val count = placeSnap.getLong("reviewsCount")?.toInt() ?: 0
+                val oldAvg = placeSnap.getDouble("averageRating") ?: 0.0
+                val oldRating = existing.rating
+                val newRating = updatedReview.rating
+
+                // Średnia krocząca – delta z różnicy ratingów.
+                // Gdyby z jakiegoś powodu count == 0 (sytuacja niespójna –
+                // doc opinii istnieje, ale licznik miejsca = 0), traktujemy
+                // edycję jak pierwszą ocenę: average = newRating.
+                val newAvg = if (count > 0) {
+                    (oldAvg * count - oldRating + newRating) / count
+                } else {
+                    newRating.toDouble()
+                }
+
+                // Składamy DTO zachowując pola immutowalne z istniejącego
+                // dokumentu (placeId, userId, authorName, createdAtMillis,
+                // photoUrls), nadpisując tylko to, co user mógł zmienić.
+                val merged = existing.copy(
+                    rating = newRating,
+                    comment = updatedReview.comment,
+                    updatedAtMillis = updatedReview.updatedAtMillis
+                )
+                tx.set(reviewRef, merged)
+                tx.update(placeRef, mapOf("averageRating" to newAvg))
+                // tx.update zwraca Transaction; lambda runTransaction<Unit>
+                // wymaga ostatniego wyrażenia typu Unit, więc jawnie kończymy
+                // blok Unitem. (Analogiczny problem w addReview rozwiązany
+                // tam przez `if (userRef != null) { ... }` jako ostatni
+                // statement – tu nie ma naturalnego warunku.)
+                Unit
+            }.await()
+            true
+        }
+        if (completed == null) {
+            OpResult.failure(
+                java.util.concurrent.TimeoutException(
+                    "Zapis trwa zbyt długo. Sprawdź połączenie z Internetem."
+                )
+            )
+        } else {
+            OpResult.success(updatedReview)
         }
     } catch (e: Exception) {
         OpResult.failure(e)

@@ -14,6 +14,7 @@ data class ReviewDto(
     val comment: String = "",
     val photoUrls: List<String> = emptyList(),
     val createdAtMillis: Long = 0L,
+    val updatedAtMillis: Long = 0L,
     val reportedAsSpam: Boolean = false
 ) {
     fun toDomain(): Review = Review(
@@ -24,7 +25,8 @@ data class ReviewDto(
         rating = rating,
         comment = comment,
         photoUrls = photoUrls,
-        createdAtMillis = createdAtMillis
+        createdAtMillis = createdAtMillis,
+        updatedAtMillis = updatedAtMillis
     )
 
     companion object {
@@ -36,7 +38,8 @@ data class ReviewDto(
             rating = review.rating,
             comment = review.comment,
             photoUrls = review.photoUrls,
-            createdAtMillis = review.createdAtMillis
+            createdAtMillis = review.createdAtMillis,
+            updatedAtMillis = review.updatedAtMillis
         )
     }
 }
