@@ -38,6 +38,17 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
+ * Maksymalna długość komentarza opinii. Świadomy kompromis między swobodą
+ * wypowiedzi a UX listy (długie opinie psują skanowanie karty miejsca)
+ * oraz kosztem Firestore (1MB hard limit per dokument).
+ *
+ * Walidacja jest egzekwowana w dwóch miejscach (defense-in-depth):
+ *  - tu w UI – cap w `onValueChange` + licznik + kolor erroru,
+ *  - w `FirestoreReviewRepository.addReview` – `require(...)`.
+ */
+private const val COMMENT_MAX_LENGTH = 1000
+
+/**
  * Bottom sheet z formularzem dodawania opinii o miejscu.
  *
  * - Stan formularza (rating + comment) trzymany lokalnie przez `rememberSaveable`,
@@ -97,12 +108,30 @@ fun AddReviewSheet(
 
             OutlinedTextField(
                 value = comment,
-                onValueChange = { comment = it },
+                onValueChange = { newValue ->
+                    // Hard-cap długości komentarza po stronie UI – odrzucamy
+                    // input ponad limitem zamiast wyświetlać błąd po wysłaniu.
+                    // Repo dodatkowo waliduje to samo (defense-in-depth).
+                    if (newValue.length <= COMMENT_MAX_LENGTH) {
+                        comment = newValue
+                    }
+                },
                 label = { Text("Komentarz (opcjonalnie)") },
                 placeholder = { Text("Co sądzisz o tym miejscu?") },
                 minLines = 3,
                 maxLines = 6,
                 enabled = !isSubmitting,
+                supportingText = {
+                    Text(
+                        text = "${comment.length} / $COMMENT_MAX_LENGTH",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (comment.length >= COMMENT_MAX_LENGTH) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                },
                 modifier = Modifier.fillMaxWidth()
             )
 

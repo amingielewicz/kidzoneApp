@@ -23,6 +23,13 @@ import javax.inject.Singleton
 private const val WRITE_TIMEOUT_MS = 30_000L
 
 /**
+ * Maksymalna długość komentarza w opinii. Trzymane jako stała w warstwie
+ * data, bo to ostateczny strażnik – UI również cappuje (AddReviewSheet),
+ * ale walidacja po stronie repo gwarantuje kontrakt domeny.
+ */
+private const val REVIEW_COMMENT_MAX_LENGTH = 1000
+
+/**
  * Implementacja [ReviewRepository] oparta o Firestore.
  *
  * `reportReviewAsSpam` jest jeszcze placeholderem – do uzupełnienia w
@@ -58,6 +65,12 @@ class FirestoreReviewRepository @Inject constructor(
     override suspend fun addReview(review: Review): OpResult<Review> = try {
         require(review.placeId.isNotBlank()) { "Review.placeId nie może być puste" }
         require(review.rating in 1..5) { "Review.rating musi być w zakresie 1..5" }
+        // Defense-in-depth: UI też cappuje na 1000 (AddReviewSheet),
+        // ale walidujemy tu na wypadek gdyby ktoś zawołał repo z innego
+        // miejsca lub spreparował dane z poziomu testu.
+        require(review.comment.length <= REVIEW_COMMENT_MAX_LENGTH) {
+            "Review.comment przekracza limit $REVIEW_COMMENT_MAX_LENGTH znaków"
+        }
 
         val reviewRef = reviewsCollection().document()
         val placeRef = firestore.collection(FirestoreCollections.PLACES).document(review.placeId)
