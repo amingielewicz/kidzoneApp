@@ -140,6 +140,27 @@ class FirebaseAuthRepository @Inject constructor(
         OpResult.failure(e)
     }
 
+    override suspend fun getTopUsers(limit: Int): OpResult<List<User>> = try {
+        require(limit > 0) { "limit musi być > 0" }
+        // Sortowanie po `placesAddedCount` desc – „kto dodał najwięcej miejsc”.
+        // Drugorzędny sort po `reviewsCount` w kliencie poniżej (Firestore
+        // wymagałby kompozytowego indeksu).
+        val snapshot = firestore.collection(FirestoreCollections.USERS)
+            .orderBy("placesAddedCount", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .limit(limit.toLong())
+            .get()
+            .await()
+        val users = snapshot.documents
+            .mapNotNull { it.toObject<UserDto>()?.toDomain() }
+            .sortedWith(
+                compareByDescending<User> { it.placesAddedCount }
+                    .thenByDescending { it.reviewsCount }
+            )
+        OpResult.success(users)
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
     // --- helpers ---
 
     private fun FirebaseUser.toDomain(): User = User(
