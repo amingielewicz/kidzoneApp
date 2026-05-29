@@ -502,32 +502,36 @@ class FirebaseAuthRepository @Inject constructor(
         if (nameLowercase.isBlank()) return false
         return try {
             // 1) Fast path - po backfillu wszyscy userzy mają to pole.
+            //    Świadomie nie używamy `return@try` (Kotlin nie zna labela
+            //    `try`) - zamiast tego if/else z fallbackiem w gałęzi else.
             val byField = firestore.collection(FirestoreCollections.USERS)
                 .whereEqualTo("nameLowercase", nameLowercase)
                 .limit(2)
                 .get()
                 .await()
-            if (byField.documents.any { it.id != excludeUid }) {
-                return@try true
-            }
+            val fastPathHit = byField.documents.any { it.id != excludeUid }
 
-            // 2) Legacy fallback - dokumenty bez wypełnionego nameLowercase
-            //    (zarejestrowane przed wprowadzeniem tego pola). Bierzemy
-            //    z cap-em, porównujemy lowercase'y `name` po stronie klienta.
-            //    Jeśli match, zwracamy true.
-            val legacyScan = firestore.collection(FirestoreCollections.USERS)
-                .limit(LEGACY_SCAN_LIMIT.toLong())
-                .get()
-                .await()
-            legacyScan.documents.any { doc ->
-                if (doc.id == excludeUid) return@any false
-                val storedNameLc = doc.getString("nameLowercase").orEmpty()
-                if (storedNameLc.isNotBlank()) {
-                    // Już objęty fast path-em (1) - tu liczy się tylko legacy.
-                    return@any false
+            if (fastPathHit) {
+                true
+            } else {
+                // 2) Legacy fallback - dokumenty bez wypełnionego nameLowercase
+                //    (zarejestrowane przed wprowadzeniem tego pola). Bierzemy
+                //    z cap-em, porównujemy lowercase'y `name` po stronie klienta.
+                //    Jeśli match, zwracamy true.
+                val legacyScan = firestore.collection(FirestoreCollections.USERS)
+                    .limit(LEGACY_SCAN_LIMIT.toLong())
+                    .get()
+                    .await()
+                legacyScan.documents.any { doc ->
+                    if (doc.id == excludeUid) return@any false
+                    val storedNameLc = doc.getString("nameLowercase").orEmpty()
+                    if (storedNameLc.isNotBlank()) {
+                        // Już objęty fast path-em (1) - tu liczy się tylko legacy.
+                        return@any false
+                    }
+                    val storedName = doc.getString("name").orEmpty()
+                    storedName.toUserNameLowercase() == nameLowercase
                 }
-                val storedName = doc.getString("name").orEmpty()
-                storedName.toUserNameLowercase() == nameLowercase
             }
         } catch (_: Exception) {
             false
