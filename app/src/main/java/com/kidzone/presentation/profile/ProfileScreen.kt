@@ -63,7 +63,6 @@ import com.kidzone.domain.repository.SignInProvider
 import com.kidzone.presentation.common.BadgeRowItem
 import com.kidzone.presentation.common.BadgesRow
 import com.kidzone.presentation.common.UserBadge
-import com.kidzone.presentation.common.computeBadges
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -117,6 +116,7 @@ fun ProfileScreen(
             ProfileContent(
                 user = user!!,
                 signInProvider = ui.signInProvider,
+                obtainedBadges = ui.obtainedBadges,
                 onEdit = viewModel::openEditSheet,
                 onOpenMyPlaces = onOpenMyPlaces,
                 onOpenMyReviews = onOpenMyReviews,
@@ -189,10 +189,13 @@ fun ProfileScreen(
     }
 
     // Info-dialog: lista wszystkich odznak + opisy progów. Wywoływany
-    // z ikony "?" przy nagłówku sekcji "Odznaki".
+    // z ikony "?" przy nagłówku sekcji "Odznaki". Bierzemy z VM-owego
+    // `obtainedBadges`, żeby highlight w dialogu zgadzał się z chipami
+    // na karcie (uwzględnia też ranking-based badges, które mogłyby się
+    // nie zgodzić z naiwnym `user.computeBadges()` bez kontekstu).
     if (ui.isBadgesInfoOpen && user != null) {
         BadgesInfoDialog(
-            obtained = user!!.computeBadges().toSet(),
+            obtained = ui.obtainedBadges.toSet(),
             onDismiss = viewModel::dismissBadgesInfo
         )
     }
@@ -211,6 +214,7 @@ fun ProfileScreen(
 private fun ProfileContent(
     user: User,
     signInProvider: SignInProvider,
+    obtainedBadges: List<UserBadge>,
     onEdit: () -> Unit,
     onOpenMyPlaces: () -> Unit,
     onOpenMyReviews: () -> Unit,
@@ -243,7 +247,7 @@ private fun ProfileContent(
             )
         }
 
-        item { BadgesCard(user = user, onOpenInfo = onOpenBadgesInfo) }
+        item { BadgesCard(obtainedBadges = obtainedBadges, onOpenInfo = onOpenBadgesInfo) }
 
         // Sekcja "Konto i bezpieczeństwo" tylko dla email/password user.
         // Dla Google sign-in zmiana hasła jest po stronie Google,
@@ -499,13 +503,15 @@ private fun MyContentCard(
  *
  * Empty state: tekst "Nie masz jeszcze żadnych odznak. Sprawdź jak je zdobyć!"
  * - sam tooltip `?` służy jako CTA, więc nie potrzebujemy osobnego buttona.
+ *
+ * @param obtainedBadges już zdobyte odznaki, wyliczone w VM z uwzględnieniem
+ *   kontekstu rankingowego (zob. ProfileViewModel.computeBadgeContext).
  */
 @Composable
 private fun BadgesCard(
-    user: User,
+    obtainedBadges: List<UserBadge>,
     onOpenInfo: () -> Unit
 ) {
-    val obtained = user.computeBadges()
     SectionCard(
         title = "Odznaki",
         leadingIcon = Icons.Filled.EmojiEvents,
@@ -523,7 +529,7 @@ private fun BadgesCard(
             }
         }
     ) {
-        if (obtained.isEmpty()) {
+        if (obtainedBadges.isEmpty()) {
             Text(
                 text = "Nie masz jeszcze żadnych odznak. Kliknij \"?\" obok, " +
                     "żeby sprawdzić, jak je zdobyć.",
@@ -531,7 +537,7 @@ private fun BadgesCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
-            BadgesRow(badges = obtained)
+            BadgesRow(badges = obtainedBadges)
         }
     }
 }

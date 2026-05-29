@@ -470,13 +470,30 @@ class FirebaseAuthRepository @Inject constructor(
      * @param excludeUid pominąć dokument o tym uid - używane przy edycji
      *   profilu, żeby user mógł zachować tę samą nazwę.
      *
-     * Limit query do 2: nie potrzebujemy więcej niż jednego "konkurenta".
-     * Pomaga gdy duplikat już istnieje (legacy data) - zwracamy true od razu.
+     * Strategia dwustopniowa:
+     *  1. **Fast path** - `whereEqualTo("nameLowercase", X)`. Działa dla
+     *     wszystkich userów zarejestrowanych po wprowadzeniu pola
+     *     [UserDto.nameLowercase] oraz dla legacy userów po backfillu
+     *     w `ensureUserDoc` (przy ich pierwszym kolejnym sign-inie).
+     *  2. **Legacy fallback** - skan do [LEGACY_SCAN_LIMIT] doców bez
+     *     wypełnionego `nameLowercase` i porównanie ich `name`
+     *     case-insensitive po stronie klienta. Bez tego user "Adam"
+     *     z legacy bazy mógłby zostać "zduplikowany" przez nową
+     *     rejestrację jako "adam" / "ADAM" - dokładnie ten bug, który
+     *     zgłaszamy w Issue #username-uniqueness.
+     *
+     *     Skan jest cap-owany, bo przy dużej bazie userów nie chcemy
+     *     ciągnąć wszystkich na klient - legacy doców z czasem ubywa
+     *     (każdy login to backfill), więc fallback w naturalny sposób
+     *     staje się "tańszy".
      *
      * Best-effort: błąd Firestore (np. brak sieci) traktujemy jako
-     * "nie wiemy, więc puszczamy" zamiast blokować całą rejestrację.
-     * To trade-off na korzyść UX - alternatywnie można by failować, ale
-     * wtedy każdy timeout sieci skutkowałby "nazwa zajęta" co mylące.
+     * "nie wiemy, więc puszczamy" zamiast blokować całą rejestrację -
+     * alternatywnie każdy timeout sieci skutkowałby "nazwa zajęta",
+     * co mylące. Race condition (dwóch userów rejestrujących to samo
+     * imię równocześnie) świadomie ignorujemy dla MVP - przy małej
+     * skali ryzyko znikome, a alternatywą jest osobna kolekcja
+     * `usernames/{lowercaseName}` z transakcyjnym zapisem.
      */
     private suspend fun isUsernameTaken(
         nameLowercase: String,
@@ -484,15 +501,48 @@ class FirebaseAuthRepository @Inject constructor(
     ): Boolean {
         if (nameLowercase.isBlank()) return false
         return try {
-            val snap = firestore.collection(FirestoreCollections.USERS)
+            // 1) Fast path - po backfillu wszyscy userzy mają to pole.
+            val byField = firestore.collection(FirestoreCollections.USERS)
                 .whereEqualTo("nameLowercase", nameLowercase)
                 .limit(2)
                 .get()
                 .await()
-            snap.documents.any { it.id != excludeUid }
+            if (byField.documents.any { it.id != excludeUid }) {
+                return@try true
+            }
+
+            // 2) Legacy fallback - dokumenty bez wypełnionego nameLowercase
+            //    (zarejestrowane przed wprowadzeniem tego pola). Bierzemy
+            //    z cap-em, porównujemy lowercase'y `name` po stronie klienta.
+            //    Jeśli match, zwracamy true.
+            val legacyScan = firestore.collection(FirestoreCollections.USERS)
+                .limit(LEGACY_SCAN_LIMIT.toLong())
+                .get()
+                .await()
+            legacyScan.documents.any { doc ->
+                if (doc.id == excludeUid) return@any false
+                val storedNameLc = doc.getString("nameLowercase").orEmpty()
+                if (storedNameLc.isNotBlank()) {
+                    // Już objęty fast path-em (1) - tu liczy się tylko legacy.
+                    return@any false
+                }
+                val storedName = doc.getString("name").orEmpty()
+                storedName.toUserNameLowercase() == nameLowercase
+            }
         } catch (_: Exception) {
             false
         }
+    }
+
+    private companion object {
+        /**
+         * Maks. liczba dokumentów `users` skanowanych przez legacy fallback
+         * w [isUsernameTaken]. Gdy baza userów dramatycznie urośnie a
+         * legacy doców nadal będzie wiele, lepiej jednorazowo zmigrować
+         * (skrypt admin SDK setujący `nameLowercase` dla wszystkich) -
+         * wtedy ten cap można obniżyć / usunąć.
+         */
+        const val LEGACY_SCAN_LIMIT = 500
     }
 
     /**

@@ -6,7 +6,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
+import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.repository.SignInProvider
+import com.kidzone.presentation.common.BadgeContext
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.computeBadges
 import com.kidzone.utils.OpResult
@@ -48,6 +50,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val authRepository: AuthRepository,
+    private val placeRepository: PlaceRepository,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -67,6 +70,9 @@ class ProfileViewModel @Inject constructor(
      *   zmianie e-maila; pokazywana jako snack/toast po zamknięciu dialogu
      * @property isBadgesInfoOpen true gdy user otworzył info-dialog odznak
      *   (kliknął "?" obok sekcji "Odznaki" w profilu).
+     * @property obtainedBadges aktualnie zdobyte odznaki (po uwzględnieniu
+     *   kontekstu rankingowego). Wyliczane przez VM, żeby UI nie musiał
+     *   znać szczegółów [BadgeContext].
      * @property newlyEarnedBadge nowo zdobyta odznaka, którą trzeba pokazać
      *   userowi w dialogu gratulacyjnym. Konsumujemy przez
      *   [consumeNewlyEarnedBadge] po pokazaniu, żeby rotacja / re-kompozycja
@@ -89,6 +95,7 @@ class ProfileViewModel @Inject constructor(
         val accountActionError: String? = null,
         val accountActionInfo: String? = null,
         val isBadgesInfoOpen: Boolean = false,
+        val obtainedBadges: List<UserBadge> = emptyList(),
         val newlyEarnedBadge: UserBadge? = null,
         val pendingNewBadges: List<UserBadge> = emptyList()
     )
@@ -124,14 +131,65 @@ class ProfileViewModel @Inject constructor(
         }
 
         // Detekcja nowych odznak. Subskrybujemy strumień bogatego usera i
-        // przy każdej emisji liczymy odznaki, porównując do persisted
-        // "ostatnio widzianych" (SharedPreferences per uid). Diff trafia
-        // do UiState - UI pokazuje jeden dialog gratulacyjny na odznakę,
-        // kolejne czekają w `pendingNewBadges`.
+        // przy każdej emisji liczymy odznaki (z udziałem aktualnego rankingu),
+        // porównując do persisted "ostatnio widzianych" (SharedPreferences
+        // per uid). Diff trafia do UiState - UI pokazuje jeden dialog
+        // gratulacyjny na odznakę, kolejne czekają w `pendingNewBadges`.
         viewModelScope.launch {
             user.filterNotNull().collect { u ->
-                checkForNewBadges(u)
+                val context = computeBadgeContext(u)
+                val obtained = u.computeBadges(context)
+                _uiState.update { it.copy(obtainedBadges = obtained) }
+                checkForNewBadges(uid = u.id, current = obtained.toSet())
             }
+        }
+    }
+
+    /**
+     * Jednorazowy fetch rankingów potrzebnych do wyliczenia odznak
+     * "rankingowych" ([UserBadge.LEADER_GOLD] / [UserBadge.PLACE_TOP1] itp.).
+     *
+     * Reguły są zgodne z tym, co [com.kidzone.presentation.ranking.RankingViewModel]
+     * pokazuje w UI:
+     *  - **userów** filtrujemy do tych, którzy mają choć 1 dodane miejsce
+     *    LUB 1 opinię (czyli "aktywnych"), i bierzemy ich pozycję 1-based
+     *    do [BadgeContext.userRank];
+     *  - **miejsca** filtrujemy do tych z >0 opiniami i >0.0 średnią ocen,
+     *    bierzemy najlepszą pozycję jakiegokolwiek miejsca tego usera
+     *    do [BadgeContext.bestPlaceRank].
+     *
+     * Spójność z RankingScreen jest celowa - jeśli user widzi siebie na
+     * #1 w rankingu, dostaje odznakę "Złoty lider". Inaczej "wiszące"
+     * pozycje (np. user #1 w surowym fetchu, ale poza filtrem aktywności)
+     * dostawałyby odznakę bez bycia widocznym w rankingu - mylące.
+     *
+     * Best-effort: przy błędzie fetcha zwracamy pusty kontekst, czyli
+     * po prostu nie przyznajemy odznak rankingowych. Pozostałe (count-based)
+     * lecą normalnie.
+     */
+    private suspend fun computeBadgeContext(user: User): BadgeContext {
+        return try {
+            val users = (authRepository.getTopUsers(BADGE_RANK_POOL) as? OpResult.Success)
+                ?.data
+                .orEmpty()
+                .filter { it.placesAddedCount > 0 || it.reviewsCount > 0 }
+            val userRank = users.indexOfFirst { it.id == user.id }
+                .takeIf { it >= 0 }
+                ?.plus(1)
+
+            val topPlaces = (placeRepository.getTopPlaces(BADGE_RANK_POOL) as? OpResult.Success)
+                ?.data
+                .orEmpty()
+                .filter { it.reviewsCount > 0 && it.averageRating > 0.0 }
+            val bestPlaceRank = topPlaces
+                .mapIndexedNotNull { idx, place ->
+                    if (place.ownerUserId == user.id) idx + 1 else null
+                }
+                .minOrNull()
+
+            BadgeContext(userRank = userRank, bestPlaceRank = bestPlaceRank)
+        } catch (_: Exception) {
+            BadgeContext()
         }
     }
 
@@ -402,9 +460,8 @@ class ProfileViewModel @Inject constructor(
      * różnych userów na tym samym urządzeniu (dwóch rodziców logujących
      * się z jednego telefonu).
      */
-    private fun checkForNewBadges(user: User) {
-        val current = user.computeBadges().toSet()
-        val key = "$BADGE_PREFS_KEY_PREFIX${user.id}"
+    private fun checkForNewBadges(uid: String, current: Set<UserBadge>) {
+        val key = "$BADGE_PREFS_KEY_PREFIX$uid"
         val seenNames = prefs.getStringSet(key, emptySet()).orEmpty()
         val seen = seenNames.mapNotNull { runCatching { UserBadge.valueOf(it) }.getOrNull() }
             .toSet()
@@ -412,7 +469,7 @@ class ProfileViewModel @Inject constructor(
         val newlyEarned = (current - seen)
             // Stabilna kolejność według enum.ordinal - jeśli user wbił
             // kilka odznak naraz, pokazujemy je w "logicznej" kolejności
-            // (Odkrywca przed Recenzent przed Ekspert).
+            // (Pierwszy ślad przed Odkrywca przed Kartograf itd.).
             .sortedBy { it.ordinal }
 
         if (newlyEarned.isNotEmpty()) {
@@ -448,5 +505,15 @@ class ProfileViewModel @Inject constructor(
     private companion object {
         const val BADGE_PREFS_NAME = "badge_notifications"
         const val BADGE_PREFS_KEY_PREFIX = "seen_badges_"
+
+        /**
+         * Pula rankingu używana do wyliczenia [BadgeContext]. 100 jest
+         * zgodne z [com.kidzone.presentation.ranking.RankingViewModel.TOP_LIMIT] -
+         * to gwarantuje, że "twoje miejsce w TOP 3" / "ty w TOP 3
+         * userów" odzwierciedla dokładnie to, co user widzi na zakładce
+         * Ranking. Większa pula nic by nie dała (i tak interesują nas
+         * tylko pozycje 1-3).
+         */
+        const val BADGE_RANK_POOL = 100
     }
 }
