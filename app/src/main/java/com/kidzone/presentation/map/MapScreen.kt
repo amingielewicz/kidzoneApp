@@ -180,9 +180,17 @@ fun MapScreen(
     // na zakładkę "Mapa" user wyraża jasną intencję chęci zobaczenia siebie
     // na mapie – timing dialogu jest naturalny. Jeśli wcześniej trwale
     // odmówił, system po cichu zwróci `granted=false` bez UI.
+    //
+    // Jeśli uprawnienie JUŻ jest – od razu centrujemy kamerę na bieżącej
+    // lokalizacji, żeby user widział najbliższe miejsca bez ręcznego
+    // klikania natywnego "Moja lokalizacja". Pomijamy to gdy nadszedł
+    // sygnał `focusOn` (przyszliśmy tu z "właśnie dodałem miejsce") –
+    // tam kamera ma jechać na nowy pin, nie na usera.
     LaunchedEffect(Unit) {
         if (!locationPermissionGranted) {
             locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        } else if (focusOn == null) {
+            recenterOnUser(context, cameraPositionState)
         }
     }
 
