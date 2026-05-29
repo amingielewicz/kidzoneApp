@@ -49,14 +49,19 @@ import androidx.compose.ui.unit.dp
 private const val COMMENT_MAX_LENGTH = 1000
 
 /**
- * Bottom sheet z formularzem dodawania opinii o miejscu.
+ * Bottom sheet z formularzem dodawania LUB edycji opinii o miejscu.
  *
  * - Stan formularza (rating + comment) trzymany lokalnie przez `rememberSaveable`,
- *   żeby przeżył rotację ekranu i tymczasowe schowanie sheetu.
+ *   żeby przeżył rotację ekranu i tymczasowe schowanie sheetu. Pre-fill z
+ *   `initialRating` / `initialComment` – w trybie edycji pochodzą z istniejącej
+ *   opinii.
  * - Stan wysyłki (`isSubmitting`, `errorMessage`) przychodzi z parent-VM przez
  *   parametry – sheet jest "głupi", VM steruje cyklem życia operacji.
  * - Po pomyślnym zapisie parent ustawia w VM `showAddReviewSheet = false`,
  *   wtedy sheet znika z drzewa kompozycji – stan formularza się czyści.
+ *
+ * @param isEditing wpływa tylko na teksty (tytuł / button) – cała logika
+ *   "add vs update" jest po stronie ViewModelu.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,12 +70,25 @@ fun AddReviewSheet(
     isSubmitting: Boolean,
     errorMessage: String?,
     onDismiss: () -> Unit,
-    onSubmit: (rating: Int, comment: String) -> Unit
+    onSubmit: (rating: Int, comment: String) -> Unit,
+    initialRating: Int = 0,
+    initialComment: String = "",
+    isEditing: Boolean = false
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    var rating by rememberSaveable { mutableIntStateOf(0) }
-    var comment by rememberSaveable { mutableStateOf("") }
+    // Klucze (initialRating / initialComment) gwarantują że jak parent zmieni
+    // tryb (np. user otworzy edycję innej opinii) – formularz się zresetuje
+    // do nowych wartości startowych.
+    var rating by rememberSaveable(initialRating) { mutableIntStateOf(initialRating) }
+    var comment by rememberSaveable(initialComment) { mutableStateOf(initialComment) }
+
+    val title = when {
+        isEditing -> "Edytuj swoją opinię"
+        placeName.isNotBlank() -> "Oceń \"$placeName\""
+        else -> "Dodaj opinię"
+    }
+    val submitLabel = if (isEditing) "Zapisz zmiany" else "Opublikuj opinię"
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -87,7 +105,7 @@ fun AddReviewSheet(
                 .navigationBarsPadding()
         ) {
             Text(
-                text = if (placeName.isNotBlank()) "Oceń \"$placeName\"" else "Dodaj opinię",
+                text = title,
                 style = MaterialTheme.typography.titleLarge
             )
             Spacer(Modifier.height(16.dp))
@@ -160,7 +178,7 @@ fun AddReviewSheet(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text("Opublikuj opinię")
+                    Text(submitLabel)
                 }
             }
             Spacer(Modifier.height(8.dp))

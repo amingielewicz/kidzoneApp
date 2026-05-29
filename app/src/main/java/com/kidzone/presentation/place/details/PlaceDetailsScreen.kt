@@ -213,7 +213,8 @@ fun PlaceDetailsScreen(
                         author = state.author,
                         reviews = state.reviews,
                         currentUserId = currentUser?.id,
-                        onAddReview = viewModel::openAddReviewSheet
+                        onAddReview = viewModel::openAddReviewSheet,
+                        onEditReview = viewModel::openEditReviewSheet
                     )
                 }
             }
@@ -236,12 +237,16 @@ fun PlaceDetailsScreen(
     // żeby błąd zapisu mógł go utrzymać otwartym (user widzi błąd, próbuje
     // ponownie). Po sukcesie VM ustawia flagę na false → sheet znika.
     if (state.showAddReviewSheet) {
+        val editing = state.editingReview
         AddReviewSheet(
             placeName = state.place?.name.orEmpty(),
             isSubmitting = state.isAddingReview,
             errorMessage = state.addReviewError,
             onDismiss = viewModel::dismissAddReviewSheet,
-            onSubmit = viewModel::submitReview
+            onSubmit = viewModel::submitReview,
+            initialRating = editing?.rating ?: 0,
+            initialComment = editing?.comment.orEmpty(),
+            isEditing = editing != null
         )
     }
 }
@@ -253,10 +258,12 @@ private fun PlaceDetailsContent(
     author: User?,
     reviews: List<Review>,
     currentUserId: String?,
-    onAddReview: () -> Unit
+    onAddReview: () -> Unit,
+    onEditReview: (Review) -> Unit
 ) {
     // Jedna opinia per user per miejsce (MVP). Przycisk "Dodaj opinię" znika,
-    // gdy zalogowany user już wystawił ocenę. Edycję dorobimy w osobnym PR-ze.
+    // gdy zalogowany user już wystawił ocenę – w jego miejsce daje
+    // ikona ołówka na karcie własnej opinii (patrz ReviewCard).
     val alreadyReviewed = currentUserId != null && reviews.any { it.userId == currentUserId }
     val canAddReview = currentUserId != null && !alreadyReviewed
 
@@ -327,9 +334,13 @@ private fun PlaceDetailsContent(
 
         // Każda opinia jako osobny item, żeby LazyColumn dobrze recyklował przy długich listach
         items(items = reviews, key = { it.id }) { review ->
+            val isMine = currentUserId != null && review.userId == currentUserId
             ReviewCard(
                 review = review,
-                isMine = currentUserId != null && review.userId == currentUserId
+                isMine = isMine,
+                onEdit = if (isMine) {
+                    { onEditReview(review) }
+                } else null
             )
         }
     }
@@ -548,7 +559,8 @@ private fun SectionCard(
 @Composable
 private fun ReviewCard(
     review: Review,
-    isMine: Boolean = false
+    isMine: Boolean = false,
+    onEdit: (() -> Unit)? = null
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -587,15 +599,29 @@ private fun ReviewCard(
                             modifier = Modifier.size(16.dp)
                         )
                     }
+                    // Ołówek edycji – tylko dla własnej opinii. Klik otwiera
+                    // ten sam sheet co "Dodaj opinię", ale w trybie edit
+                    // (pre-filled aktualnymi wartościami).
+                    if (onEdit != null) {
+                        Spacer(Modifier.width(4.dp))
+                        IconButton(
+                            onClick = onEdit,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Edit,
+                                contentDescription = "Edytuj swoją opinię",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
                 }
             }
-            if (review.createdAtMillis > 0L) {
-                Text(
-                    text = formatDate(review.createdAtMillis),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            ReviewTimestampRow(
+                createdAtMillis = review.createdAtMillis,
+                updatedAtMillis = review.updatedAtMillis
+            )
             if (review.comment.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -603,6 +629,37 @@ private fun ReviewCard(
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
+        }
+    }
+}
+
+/**
+ * Wiersz z datą utworzenia opinii i opcjonalnym znacznikiem "edytowana".
+ * Pokazujemy obie informacje, żeby nikt nie podmienił 1★ -> 5★ po cichu –
+ * data edycji jest widoczna i niezatajalna.
+ */
+@Composable
+private fun ReviewTimestampRow(
+    createdAtMillis: Long,
+    updatedAtMillis: Long
+) {
+    if (createdAtMillis <= 0L && updatedAtMillis <= 0L) return
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (createdAtMillis > 0L) {
+            Text(
+                text = formatDate(createdAtMillis),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (updatedAtMillis > createdAtMillis && updatedAtMillis > 0L) {
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "· edytowana ${formatDate(updatedAtMillis)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+            )
         }
     }
 }

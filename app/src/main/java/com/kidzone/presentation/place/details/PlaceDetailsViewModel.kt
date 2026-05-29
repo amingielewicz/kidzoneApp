@@ -58,6 +58,9 @@ class PlaceDetailsViewModel @Inject constructor(
      * @property showAddReviewSheet true gdy user otworzył formularz dodawania opinii
      * @property isAddingReview true podczas wywołania `addReview` (spinner w sheet)
      * @property addReviewError komunikat błędu z `addReview` (do pokazania w sheet)
+     * @property editingReview gdy != null, sheet jest w trybie edycji tej opinii
+     *   (pre-fill ratingu i komentarza). Decyduje też, którą metodę repo
+     *   zawoła [submitReview] – `updateReview` zamiast `addReview`.
      */
     data class UiState(
         val place: Place? = null,
@@ -70,7 +73,8 @@ class PlaceDetailsViewModel @Inject constructor(
         val deleteErrorMessage: String? = null,
         val showAddReviewSheet: Boolean = false,
         val isAddingReview: Boolean = false,
-        val addReviewError: String? = null
+        val addReviewError: String? = null,
+        val editingReview: Review? = null
     )
 
     private val placeId: String =
@@ -197,30 +201,40 @@ class PlaceDetailsViewModel @Inject constructor(
         _uiState.update { it.copy(deleteErrorMessage = null) }
     }
 
-    // --- Dodawanie opinii ---
+    // --- Dodawanie / edycja opinii ---
 
     fun openAddReviewSheet() {
-        _uiState.update { it.copy(showAddReviewSheet = true, addReviewError = null) }
+        _uiState.update {
+            it.copy(showAddReviewSheet = true, addReviewError = null, editingReview = null)
+        }
+    }
+
+    /** Otwiera ten sam sheet w trybie edycji – pre-fill ratingu i komentarza. */
+    fun openEditReviewSheet(review: Review) {
+        _uiState.update {
+            it.copy(showAddReviewSheet = true, addReviewError = null, editingReview = review)
+        }
     }
 
     fun dismissAddReviewSheet() {
         // W trakcie zapisu nie pozwalamy zamknąć (uniknij gubienia spinnera /
         // nieoczekiwanego dismissa po dwukliku), użytkownik może wrócić.
         if (_uiState.value.isAddingReview) return
-        _uiState.update { it.copy(showAddReviewSheet = false, addReviewError = null) }
+        _uiState.update {
+            it.copy(showAddReviewSheet = false, addReviewError = null, editingReview = null)
+        }
     }
 
     /**
-     * Wysyła nową opinię i optymistycznie odświeża agregaty miejsca w lokalnym
-     * state, żeby UI od razu pokazało nową ocenę bez re-fetcha.
+     * Wysyła nową opinię LUB aktualizuje istniejącą – zależy od
+     * `state.editingReview`. Dwa flow celowo dzielą jeden submit, żeby
+     * sheet UI był jednym miejscem prawdy o formularzu.
      *
-     * Repo (w transakcji) już zaktualizowało `averageRating` i `reviewsCount`
-     * w Firestore – my robimy ten sam krok klient-side, używając tego samego
-     * wzoru średniej kroczącej. Dzięki temu po zamknięciu sheetu user
-     * natychmiast widzi nowy rating na karcie głównej.
+     * Optymistyczne odświeżenie agregatów miejsca tak, jak by zrobiło to
+     * repo w transakcji – dzięki temu karta główna pokazuje aktualne dane
+     * od razu, bez re-fetcha.
      *
-     * @param rating 1..5; przy złej wartości ustawiamy [UiState.addReviewError]
-     *   bez wywoływania repo.
+     * @param rating 1..5
      * @param comment treść opinii (opcjonalna; trim-ujemy whitespace).
      */
     fun submitReview(rating: Int, comment: String) {
@@ -239,49 +253,108 @@ class PlaceDetailsViewModel @Inject constructor(
             return
         }
 
+        val editing = _uiState.value.editingReview
         viewModelScope.launch {
             _uiState.update { it.copy(isAddingReview = true, addReviewError = null) }
 
-            val review = Review(
-                id = "",
-                placeId = place.id,
-                userId = user.id,
-                authorName = user.name,
-                rating = rating,
-                comment = comment.trim(),
-                createdAtMillis = System.currentTimeMillis()
-            )
+            if (editing == null) {
+                submitNewReview(place, user, rating, comment)
+            } else {
+                submitEditedReview(place, editing, rating, comment)
+            }
+        }
+    }
 
-            when (val result = reviewRepository.addReview(review)) {
-                is OpResult.Success -> {
-                    val oldCount = place.reviewsCount
-                    val oldAvg = place.averageRating
-                    val newCount = oldCount + 1
-                    // Średnia krocząca (taki sam wzór jak w transakcji repo);
-                    // przy współbieżnych zapisach z innych klientów stan może
-                    // chwilowo się rozjechać o 1 – akceptowalne dla MVP, naprawi
-                    // się przy najbliższym (re-)wejściu na ekran.
-                    val newAvg = (oldAvg * oldCount + rating) / newCount
+    private suspend fun submitNewReview(
+        place: Place,
+        user: User,
+        rating: Int,
+        comment: String
+    ) {
+        val review = Review(
+            id = "",
+            placeId = place.id,
+            userId = user.id,
+            authorName = user.name,
+            rating = rating,
+            comment = comment.trim(),
+            createdAtMillis = System.currentTimeMillis()
+        )
 
-                    _uiState.update {
-                        it.copy(
-                            place = place.copy(
-                                reviewsCount = newCount,
-                                averageRating = newAvg
-                            ),
-                            isAddingReview = false,
-                            showAddReviewSheet = false,
-                            addReviewError = null
-                        )
-                    }
-                }
-                is OpResult.Failure -> _uiState.update {
+        when (val result = reviewRepository.addReview(review)) {
+            is OpResult.Success -> {
+                val oldCount = place.reviewsCount
+                val oldAvg = place.averageRating
+                val newCount = oldCount + 1
+                // Średnia krocząca (taki sam wzór jak w transakcji repo);
+                // przy współbieżnych zapisach z innych klientów stan może
+                // chwilowo się rozjechać o 1 – akceptowalne dla MVP, naprawi
+                // się przy najbliższym (re-)wejściu na ekran.
+                val newAvg = (oldAvg * oldCount + rating) / newCount
+
+                _uiState.update {
                     it.copy(
+                        place = place.copy(
+                            reviewsCount = newCount,
+                            averageRating = newAvg
+                        ),
                         isAddingReview = false,
-                        addReviewError = result.error.message
-                            ?: "Nie udało się dodać opinii"
+                        showAddReviewSheet = false,
+                        addReviewError = null,
+                        editingReview = null
                     )
                 }
+            }
+            is OpResult.Failure -> _uiState.update {
+                it.copy(
+                    isAddingReview = false,
+                    addReviewError = result.error.message
+                        ?: "Nie udało się dodać opinii"
+                )
+            }
+        }
+    }
+
+    private suspend fun submitEditedReview(
+        place: Place,
+        existing: Review,
+        rating: Int,
+        comment: String
+    ) {
+        // Update – zachowujemy id / userId / authorName / placeId / createdAt
+        // z istniejącej opinii, nadpisując tylko user-edytowalne pola.
+        val updated = existing.copy(
+            rating = rating,
+            comment = comment.trim()
+        )
+
+        when (val result = reviewRepository.updateReview(updated)) {
+            is OpResult.Success -> {
+                val count = place.reviewsCount
+                val oldAvg = place.averageRating
+                val oldRating = existing.rating
+                // Delta-form: count się nie zmienia, więc (avg*count - old + new)/count.
+                val newAvg = if (count > 0) {
+                    (oldAvg * count - oldRating + rating) / count
+                } else {
+                    rating.toDouble()
+                }
+                _uiState.update {
+                    it.copy(
+                        place = place.copy(averageRating = newAvg),
+                        isAddingReview = false,
+                        showAddReviewSheet = false,
+                        addReviewError = null,
+                        editingReview = null
+                    )
+                }
+            }
+            is OpResult.Failure -> _uiState.update {
+                it.copy(
+                    isAddingReview = false,
+                    addReviewError = result.error.message
+                        ?: "Nie udało się zaktualizować opinii"
+                )
             }
         }
     }
