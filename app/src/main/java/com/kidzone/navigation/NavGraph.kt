@@ -1,6 +1,8 @@
 package com.kidzone.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -13,6 +15,15 @@ import com.kidzone.presentation.main.MainScreen
 import com.kidzone.presentation.place.add.AddPlaceScreen
 import com.kidzone.presentation.place.details.PlaceDetailsScreen
 import com.kidzone.presentation.splash.SplashScreen
+
+/**
+ * Klucze sygnalizujące "po dodaniu miejsca skacz na Map i wycentruj kamerę".
+ * Używane przez [Route.AddPlace] (write) i [Route.Main] (read), oba przez
+ * `savedStateHandle` na NavBackStackEntry – to standardowa droga przekazywania
+ * jednorazowych "wyników" w Navigation Compose, bez globalnego SharedFlow.
+ */
+private const val NEW_PLACE_LAT = "newPlaceLat"
+private const val NEW_PLACE_LNG = "newPlaceLng"
 
 /**
  * Główny graf nawigacji aplikacji – obsługuje przejścia pre-auth oraz
@@ -63,8 +74,26 @@ fun KidZoneNavGraph(
             )
         }
 
-        composable(Route.Main.path) {
+        composable(Route.Main.path) { backStackEntry ->
+            // Po pomyślnym `addPlace` (tryb create) NavGraph zapisuje
+            // współrzędne nowego miejsca w savedStateHandle tego wpisu –
+            // MainScreen je odczytuje i nawiguje na zakładkę Map +
+            // wyświetla toast.
+            val savedHandle = backStackEntry.savedStateHandle
+            val focusLat by savedHandle
+                .getStateFlow<Double?>(NEW_PLACE_LAT, null)
+                .collectAsState()
+            val focusLng by savedHandle
+                .getStateFlow<Double?>(NEW_PLACE_LNG, null)
+                .collectAsState()
+
             MainScreen(
+                focusLatitude = focusLat,
+                focusLongitude = focusLng,
+                onFocusConsumed = {
+                    savedHandle[NEW_PLACE_LAT] = null
+                    savedHandle[NEW_PLACE_LNG] = null
+                },
                 onOpenPlaceDetails = { placeId ->
                     navController.navigate(Route.PlaceDetails.create(placeId))
                 },
@@ -95,10 +124,21 @@ fun KidZoneNavGraph(
                 ?.getString(Route.AddPlace.ARG_PLACE_ID)
                 ?.isNotBlank() == true
             AddPlaceScreen(
-                onSaved = {
+                onSaved = { newLat, newLng ->
                     if (isEdit) {
                         navController.popBackStack(Route.Main.path, inclusive = false)
                     } else {
+                        // Tryb create: zapisujemy współrzędne w savedStateHandle
+                        // poprzedniego wpisu (czyli Main), żeby MainScreen po
+                        // popBackStack mógł przełączyć na Map i wycentrować.
+                        if (newLat != null && newLng != null) {
+                            navController.previousBackStackEntry
+                                ?.savedStateHandle
+                                ?.apply {
+                                    set(NEW_PLACE_LAT, newLat)
+                                    set(NEW_PLACE_LNG, newLng)
+                                }
+                        }
                         navController.popBackStack()
                     }
                 },

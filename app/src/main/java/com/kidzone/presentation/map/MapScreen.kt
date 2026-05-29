@@ -97,6 +97,12 @@ private const val DEFAULT_CAMERA_ZOOM = 11f
 private const val NEAR_ME_ZOOM = 14f
 
 /**
+ * Zoom kamery po dodaniu nowego miejsca – bliżej niż "Blisko mnie", żeby
+ * świeży pin był wyraźnie widoczny pośrodku ekranu z otoczeniem ulicznym.
+ */
+private const val FOCUS_PLACE_ZOOM = 16f
+
+/**
  * Ekran mapy z pinezkami miejsc.
  *
  *  - Pinezki to [MarkerComposable] z maps-compose – każdy marker renderuje
@@ -126,6 +132,8 @@ private const val NEAR_ME_ZOOM = 14f
 @Composable
 fun MapScreen(
     onOpenPlaceDetails: (placeId: String) -> Unit,
+    focusOn: LatLng? = null,
+    onFocusConsumed: () -> Unit = {},
     viewModel: MapViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -140,6 +148,20 @@ fun MapScreen(
 
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(DEFAULT_CAMERA_TARGET, DEFAULT_CAMERA_ZOOM)
+    }
+
+    // Po pomyślnym `addPlace` parent przekazuje współrzędne nowego miejsca
+    // przez [focusOn] – animujemy kamerę na ten punkt na poziomie
+    // [FOCUS_PLACE_ZOOM] (bliżej niż domyślny widok miasta, żeby nowy pin
+    // był wyraźnie widoczny). Po skończonej animacji konsumujemy sygnał,
+    // żeby przy zmianie konfiguracji / rekompozycji nie nawigować ponownie.
+    LaunchedEffect(focusOn) {
+        focusOn?.let { target ->
+            cameraPositionState.animate(
+                CameraUpdateFactory.newLatLngZoom(target, FOCUS_PLACE_ZOOM)
+            )
+            onFocusConsumed()
+        }
     }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -158,9 +180,17 @@ fun MapScreen(
     // na zakładkę "Mapa" user wyraża jasną intencję chęci zobaczenia siebie
     // na mapie – timing dialogu jest naturalny. Jeśli wcześniej trwale
     // odmówił, system po cichu zwróci `granted=false` bez UI.
+    //
+    // Jeśli uprawnienie JUŻ jest – od razu centrujemy kamerę na bieżącej
+    // lokalizacji, żeby user widział najbliższe miejsca bez ręcznego
+    // klikania natywnego "Moja lokalizacja". Pomijamy to gdy nadszedł
+    // sygnał `focusOn` (przyszliśmy tu z "właśnie dodałem miejsce") –
+    // tam kamera ma jechać na nowy pin, nie na usera.
     LaunchedEffect(Unit) {
         if (!locationPermissionGranted) {
             locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        } else if (focusOn == null) {
+            recenterOnUser(context, cameraPositionState)
         }
     }
 

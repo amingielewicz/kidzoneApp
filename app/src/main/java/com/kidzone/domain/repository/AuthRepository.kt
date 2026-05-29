@@ -33,4 +33,13 @@ interface AuthRepository {
      * zalogowanym użytkownikiem.
      */
     suspend fun getUserById(userId: String): OpResult<User>
+
+    /**
+     * Top użytkowników wg [User.placesAddedCount] (sort malejąco).
+     *
+     * Używane przez ekran Ranking. Drugorzędne sortowanie
+     * (np. po `reviewsCount`) wykonuje strona klienta, bo composite index
+     * wymagałby ręcznej konfiguracji w konsoli Firebase.
+     */
+    suspend fun getTopUsers(limit: Int = 10): OpResult<List<User>>
 }

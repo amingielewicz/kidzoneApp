@@ -48,6 +48,9 @@ class AddPlaceViewModel @Inject constructor(
      * @property isSaving true podczas zapisu do Firestore
      * @property errorMessage komunikat błędu (np. brak GPS, błąd zapisu)
      * @property isSaved true po pomyślnym zapisie – sygnał do nawigacji
+     * @property savedNewLatitude współrzędne nowo utworzonego miejsca (tylko create);
+     *           pozwalają wyświetlić mapę wycentrowaną na pinie po popBackStack
+     * @property savedNewLongitude jak wyżej
      */
     data class UiState(
         val name: String = "",
@@ -63,7 +66,9 @@ class AddPlaceViewModel @Inject constructor(
         val isLoadingPlace: Boolean = false,
         val isSaving: Boolean = false,
         val errorMessage: String? = null,
-        val isSaved: Boolean = false
+        val isSaved: Boolean = false,
+        val savedNewLatitude: Double? = null,
+        val savedNewLongitude: Double? = null
     ) {
         /** Wszystkie wymagane pola wypełnione – można kliknąć "Zapisz". */
         val isFormValid: Boolean
@@ -248,7 +253,18 @@ class AddPlaceViewModel @Inject constructor(
 
             _uiState.update {
                 when (result) {
-                    is OpResult.Success -> it.copy(isSaving = false, isSaved = true)
+                    is OpResult.Success -> {
+                        // W trybie create publikujemy współrzędne nowego miejsca –
+                        // MainScreen użyje ich do wycentrowania mapy. W edit
+                        // zostawiamy null, bo tam nie chcemy zmieniać widoku mapy.
+                        val isCreate = !state.isEditMode
+                        it.copy(
+                            isSaving = false,
+                            isSaved = true,
+                            savedNewLatitude = if (isCreate) result.data.latitude else null,
+                            savedNewLongitude = if (isCreate) result.data.longitude else null
+                        )
+                    }
                     is OpResult.Failure -> it.copy(
                         isSaving = false,
                         errorMessage = result.error.message

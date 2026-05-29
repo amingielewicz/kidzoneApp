@@ -58,6 +58,10 @@ class FirebaseAuthRepository @Inject constructor(
             val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
             val firebaseUser = result.user
                 ?: throw IllegalStateException("Logowanie się powiodło, ale Firebase nie zwrócił użytkownika")
+            // Self-heal: jeśli ten user nie ma jeszcze doca w `users` (np. konto
+            // utworzone zanim ten kod istniał, albo rejestracja zakończyła się
+            // częściowym błędem), dotworzymy go teraz na podstawie FirebaseUser.
+            ensureUserDoc(firebaseUser)
             firebaseUser.toDomain()
         }
 
@@ -97,21 +101,11 @@ class FirebaseAuthRepository @Inject constructor(
         val firebaseUser = result.user
             ?: throw IllegalStateException("Logowanie Google się powiodło, ale Firebase nie zwrócił użytkownika")
 
-        // Jesli to pierwsze logowanie tego uzytkownika - stworz mu dokument w `users`.
-        val isNewUser = result.additionalUserInfo?.isNewUser == true
-        if (isNewUser) {
-            val userDto = UserDto(
-                id = firebaseUser.uid,
-                name = firebaseUser.displayName.orEmpty(),
-                email = firebaseUser.email.orEmpty(),
-                avatarUrl = firebaseUser.photoUrl?.toString(),
-                createdAtMillis = System.currentTimeMillis()
-            )
-            firestore.collection(FirestoreCollections.USERS)
-                .document(firebaseUser.uid)
-                .set(userDto)
-                .await()
-        }
+        // Self-heal: niezależnie czy to nowy user (isNewUser==true) czy istniejący,
+        // upewnij się, że jest dla niego doc w `users`. Ta gałąź zastępuje wcześniejszą
+        // logikę "twórz tylko gdy isNewUser" – była zawodna dla legacy userów, którzy
+        // logowali się Google'em zanim tworzyliśmy doc.
+        ensureUserDoc(firebaseUser)
 
         firebaseUser.toDomain()
     }
@@ -140,7 +134,64 @@ class FirebaseAuthRepository @Inject constructor(
         OpResult.failure(e)
     }
 
+    override suspend fun getTopUsers(limit: Int): OpResult<List<User>> = try {
+        require(limit > 0) { "limit musi być > 0" }
+        // Sortowanie po `placesAddedCount` desc – „kto dodał najwięcej miejsc”.
+        // Drugorzędny sort po `reviewsCount` w kliencie poniżej (Firestore
+        // wymagałby kompozytowego indeksu).
+        val snapshot = firestore.collection(FirestoreCollections.USERS)
+            .orderBy("placesAddedCount", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .limit(limit.toLong())
+            .get()
+            .await()
+        val users = snapshot.documents
+            .mapNotNull { it.toObject<UserDto>()?.toDomain() }
+            .sortedWith(
+                compareByDescending<User> { it.placesAddedCount }
+                    .thenByDescending { it.reviewsCount }
+            )
+        OpResult.success(users)
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
     // --- helpers ---
+
+    /**
+     * Upewnia się, że istnieje dokument w `users/{uid}` dla zalogowanego usera.
+     *
+     * Jeśli doc już istnieje – nic nie robi (żadnego zapisu, żeby nie nadpisać
+     * np. zmienionego przez usera display name w Firestore).
+     * Jeśli go brak – tworzy go z danych z [FirebaseUser]. Kontuery
+     * (`placesAddedCount`, `reviewsCount`) zostawiamy domyślne (0) z [UserDto].
+     *
+     * Ta metoda jest najtańszą formą self-healingu po stronie klienta:
+     * jeden read + warunkowy write. Wywoływana po pomyślnym `signInWith…`.
+     * Błędy zapisu są logowane, ale nie blokują logowania.
+     */
+    private suspend fun ensureUserDoc(firebaseUser: FirebaseUser) {
+        val docRef = firestore.collection(FirestoreCollections.USERS)
+            .document(firebaseUser.uid)
+        try {
+            val snap = docRef.get().await()
+            if (!snap.exists()) {
+                val userDto = UserDto(
+                    id = firebaseUser.uid,
+                    name = firebaseUser.displayName.orEmpty(),
+                    email = firebaseUser.email.orEmpty(),
+                    avatarUrl = firebaseUser.photoUrl?.toString(),
+                    createdAtMillis = System.currentTimeMillis()
+                )
+                docRef.set(userDto).await()
+            }
+        } catch (_: Exception) {
+            // Świadomie tłumimy: brak doca w users to *nie* powód, by uniemożliwić
+            // logowanie. Liczniki w rankingu zadziałają i tak (set+merge w
+            // FirestorePlaceRepository / FirestoreReviewRepository tworzy
+            // minimalny doc), a przy najbliższej okazji zalogowania spróbujemy
+            // uzupełnić ponownie.
+        }
+    }
 
     private fun FirebaseUser.toDomain(): User = User(
         id = uid,
