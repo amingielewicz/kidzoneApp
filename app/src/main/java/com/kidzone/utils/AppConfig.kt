@@ -34,7 +34,7 @@ object AppConfig {
      * tym kanałem zażądać usunięcia konta nawet gdyby in-app delete
      * przestał działać.
      */
-    const val PRIVACY_CONTACT_EMAIL: String = "kontakt@kidzone.app"
+    const val PRIVACY_CONTACT_EMAIL: String = "bonoboczemunie@gmail.com"
 
     /**
      * Data wejścia w życie aktualnej wersji polityki prywatności.

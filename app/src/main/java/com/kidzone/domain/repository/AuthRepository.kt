@@ -150,8 +150,10 @@ interface AuthRepository {
      *
      * @param currentPassword aktualne hasło – służy zarówno jako reauth
      *   credential, jak i jako "ludzkie" potwierdzenie ("wiesz co robisz?").
-     * @param newPassword nowe hasło, min. 6 znaków (Firebase to wymusza
-     *   dodatkowo i może rzucić [com.google.firebase.auth.FirebaseAuthWeakPasswordException]).
+     * @param newPassword nowe hasło zgodne z [com.kidzone.utils.PasswordPolicy]
+     *   (min. 8 znaków, mała + duża litera, znak specjalny). Walidację po stronie
+     *   klienta wykonują ChangePasswordDialog i RegisterViewModel - tutaj
+     *   pozostaje fallback Firebase server-side ([com.google.firebase.auth.FirebaseAuthWeakPasswordException]).
      */
     suspend fun changePassword(
         currentPassword: String,
