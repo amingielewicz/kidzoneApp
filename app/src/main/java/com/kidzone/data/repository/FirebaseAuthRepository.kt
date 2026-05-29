@@ -1,6 +1,7 @@
 package com.kidzone.data.repository
 
 import android.net.Uri
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
@@ -17,6 +18,7 @@ import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.UserDto
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
+import com.kidzone.domain.repository.SignInProvider
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
 import kotlinx.coroutines.channels.awaitClose
@@ -246,6 +248,159 @@ class FirebaseAuthRepository @Inject constructor(
         storageRef.putFile(localUri).await()
         val downloadUrl = storageRef.downloadUrl.await().toString()
         OpResult.success(downloadUrl)
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
+    // ============================================================
+    // === Account management
+    // ============================================================
+
+    override suspend fun getCurrentSignInProvider(): SignInProvider {
+        val user = firebaseAuth.currentUser ?: return SignInProvider.UNKNOWN
+        // FirebaseUser.providerData zawiera firebase (firebaseProviderId="firebase")
+        // PLUS faktyczny provider (password, google.com, ...). Sprawdzamy oba
+        // możliwe znaczniki – jak user się logował obu sposobami (linkowane konto),
+        // priorytetyzujemy email/password, bo wtedy zmiana hasła ma sens.
+        val providerIds = user.providerData.map { it.providerId }
+        return when {
+            EmailAuthProvider.PROVIDER_ID in providerIds -> SignInProvider.EMAIL_PASSWORD
+            GoogleAuthProvider.PROVIDER_ID in providerIds -> SignInProvider.GOOGLE
+            else -> SignInProvider.UNKNOWN
+        }
+    }
+
+    override suspend fun changePassword(
+        currentPassword: String,
+        newPassword: String
+    ): OpResult<Unit> = try {
+        val user = firebaseAuth.currentUser
+            ?: throw IllegalStateException("Brak zalogowanego użytkownika")
+        val email = user.email
+            ?: throw IllegalStateException("Konto bez e-maila – nie można zmienić hasła")
+
+        // Reauth – Firebase wymaga "fresh" credentialu do zmiany hasła.
+        // EmailAuthProvider.getCredential(email, password) działa tylko dla
+        // kont z password providerem. Dla Google by się sypnęło na samym
+        // reauthenticate – zostawiamy ten naturalny błąd zamiast
+        // pre-emptywnej walidacji, żeby nie duplikować logiki z
+        // [getCurrentSignInProvider] (UI i tak ukrywa akcję).
+        val credential = EmailAuthProvider.getCredential(email, currentPassword)
+        user.reauthenticate(credential).await()
+
+        user.updatePassword(newPassword).await()
+        OpResult.success(Unit)
+    } catch (e: FirebaseAuthInvalidCredentialsException) {
+        // Niepoprawne aktualne hasło (reauth padł).
+        OpResult.failure(AuthException.InvalidCredentials)
+    } catch (e: FirebaseAuthWeakPasswordException) {
+        OpResult.failure(AuthException.WeakPassword)
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
+    override suspend fun changeEmail(
+        currentPassword: String,
+        newEmail: String
+    ): OpResult<Unit> = try {
+        val user = firebaseAuth.currentUser
+            ?: throw IllegalStateException("Brak zalogowanego użytkownika")
+        val email = user.email
+            ?: throw IllegalStateException("Konto bez e-maila – nie można zmienić e-maila")
+
+        val credential = EmailAuthProvider.getCredential(email, currentPassword)
+        user.reauthenticate(credential).await()
+
+        // verifyBeforeUpdateEmail (zamiast deprecated updateEmail):
+        //  - wysyła link weryfikacyjny na NOWY adres,
+        //  - zmiana w Auth zachodzi dopiero po kliknięciu linku przez usera,
+        //  - działa nawet z włączoną "Email enumeration protection".
+        // UI musi wprost zakomunikować, że jeszcze NIE jest zmienione.
+        user.verifyBeforeUpdateEmail(newEmail).await()
+        OpResult.success(Unit)
+    } catch (e: FirebaseAuthInvalidCredentialsException) {
+        // Może być: zły aktualny password (reauth) albo niepoprawny format newEmail.
+        // Firebase nie rozróżnia w typie – sprawdzamy message, jak w runFirebase.
+        val msg = e.message.orEmpty().lowercase()
+        if (msg.contains("email")) {
+            OpResult.failure(AuthException.InvalidEmail)
+        } else {
+            OpResult.failure(AuthException.InvalidCredentials)
+        }
+    } catch (e: FirebaseAuthUserCollisionException) {
+        OpResult.failure(AuthException.EmailAlreadyInUse)
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
+    override suspend fun deleteAccount(currentPassword: String): OpResult<Unit> = try {
+        val user = firebaseAuth.currentUser
+            ?: throw IllegalStateException("Brak zalogowanego użytkownika")
+
+        // MVP: tylko email/password. Dla Google reauth musiałby przejść
+        // przez UI launcher – wymaga większej zmiany VM/UI niż mamy czas
+        // dziś, dorobimy w następnym PR.
+        val email = user.email
+        val isPasswordUser = user.providerData.any { it.providerId == EmailAuthProvider.PROVIDER_ID }
+        if (email == null || !isPasswordUser) {
+            throw IllegalStateException(
+                "Usuwanie konta jest dostępne tylko dla logowania e-mail/hasłem. " +
+                    "Dla logowania przez Google – usuń konto z poziomu konta Google " +
+                    "lub napisz do nas na e-mail z prośbą o usunięcie."
+            )
+        }
+
+        val credential = EmailAuthProvider.getCredential(email, currentPassword)
+        user.reauthenticate(credential).await()
+
+        val uid = user.uid
+
+        // 2) Usuń wszystkie opinie usera.
+        // Reguły Firestore allow delete: userId == auth.uid – pasuje 1:1.
+        val reviewsSnap = firestore.collection(FirestoreCollections.REVIEWS)
+            .whereEqualTo("userId", uid)
+            .get()
+            .await()
+        reviewsSnap.documents.forEach { it.reference.delete().await() }
+
+        // 3) Usuń wszystkie miejsca usera. Świadomie nie kasujemy cudzych
+        //    opinii na tych miejscach – reguły by tego nie pozwoliły, a
+        //    Cloud Function admin SDK wymaga Blaze. Zostają jako orphans
+        //    (placeId wskazujący na nieistniejący doc); UI listy opinii
+        //    użytkowników już dziś tego nie pokazuje, bo z poziomu
+        //    PlaceDetailsScreen nie wejdzie się na nieistniejące miejsce.
+        val placesSnap = firestore.collection(FirestoreCollections.PLACES)
+            .whereEqualTo("ownerUserId", uid)
+            .get()
+            .await()
+        placesSnap.documents.forEach { it.reference.delete().await() }
+
+        // 4) Doc /users/{uid}. Wymaga, żeby firestore.rules pozwalały
+        //    na `delete: if request.auth.uid == userId` – patrz fix w
+        //    firestore.rules (PR #profile-account-management).
+        firestore.collection(FirestoreCollections.USERS)
+            .document(uid)
+            .delete()
+            .await()
+
+        // 5) Avatar w Storage – best effort. Brak pliku == sukces (404 i
+        //    tak wolimy zignorować). Inne błędy też tłumimy: priorytetem
+        //    jest dotrzeć do kroku 6.
+        runCatching {
+            firebaseStorage.reference
+                .child("avatars/$uid/avatar.jpg")
+                .delete()
+                .await()
+        }
+
+        // 6) Konto Auth – ostatnie, bo po nim user nie ma uprawnień do
+        //    żadnego z poprzednich kroków. Po tym strumień [currentUser]
+        //    wyemituje null i NavGraph przejdzie na Login.
+        user.delete().await()
+
+        OpResult.success(Unit)
+    } catch (e: FirebaseAuthInvalidCredentialsException) {
+        OpResult.failure(AuthException.InvalidCredentials)
     } catch (e: Exception) {
         OpResult.failure(e)
     }

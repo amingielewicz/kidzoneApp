@@ -63,6 +63,8 @@ import com.kidzone.presentation.ranking.RankingScreen
 fun MainScreen(
     onOpenPlaceDetails: (placeId: String) -> Unit,
     onOpenAddPlace: () -> Unit,
+    onOpenMyPlaces: () -> Unit,
+    onOpenMyReviews: () -> Unit,
     onSignOut: () -> Unit,
     focusLatitude: Double? = null,
     focusLongitude: Double? = null,
@@ -166,7 +168,11 @@ fun MainScreen(
                 RankingScreen(onOpenPlaceDetails = onOpenPlaceDetails)
             }
             composable(Route.Profile.path) {
-                ProfileScreen(onSignOut = onSignOut)
+                ProfileScreen(
+                    onSignOut = onSignOut,
+                    onOpenMyPlaces = onOpenMyPlaces,
+                    onOpenMyReviews = onOpenMyReviews
+                )
             }
         }
     }

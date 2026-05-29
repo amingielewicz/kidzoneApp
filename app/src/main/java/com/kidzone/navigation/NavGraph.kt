@@ -14,6 +14,8 @@ import com.kidzone.presentation.auth.RegisterScreen
 import com.kidzone.presentation.main.MainScreen
 import com.kidzone.presentation.place.add.AddPlaceScreen
 import com.kidzone.presentation.place.details.PlaceDetailsScreen
+import com.kidzone.presentation.place.myplaces.MyPlacesScreen
+import com.kidzone.presentation.review.myreviews.MyReviewsScreen
 import com.kidzone.presentation.splash.SplashScreen
 
 /**
@@ -98,6 +100,8 @@ fun KidZoneNavGraph(
                     navController.navigate(Route.PlaceDetails.create(placeId))
                 },
                 onOpenAddPlace = { navController.navigate(Route.AddPlace.create()) },
+                onOpenMyPlaces = { navController.navigate(Route.MyPlaces.path) },
+                onOpenMyReviews = { navController.navigate(Route.MyReviews.path) },
                 onSignOut = {
                     navController.navigate(Route.Login.path) {
                         popUpTo(Route.Main.path) { inclusive = true }
@@ -161,6 +165,24 @@ fun KidZoneNavGraph(
                     // Po usunięciu wracamy do shellu Main – snapshot listener
                     // na liście usunie kartę sam.
                     navController.popBackStack(Route.Main.path, inclusive = false)
+                }
+            )
+        }
+
+        composable(Route.MyPlaces.path) {
+            MyPlacesScreen(
+                onBack = { navController.popBackStack() },
+                onOpenPlaceDetails = { placeId ->
+                    navController.navigate(Route.PlaceDetails.create(placeId))
+                }
+            )
+        }
+
+        composable(Route.MyReviews.path) {
+            MyReviewsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenPlaceDetails = { placeId ->
+                    navController.navigate(Route.PlaceDetails.create(placeId))
                 }
             )
         }

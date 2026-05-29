@@ -58,6 +58,30 @@ class FirestorePlaceRepository @Inject constructor(
         awaitClose { registration.remove() }
     }
 
+    override fun observePlacesByOwner(ownerUserId: String): Flow<List<Place>> = callbackFlow {
+        if (ownerUserId.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        val registration = placesCollection()
+            .whereEqualTo("ownerUserId", ownerUserId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                // Sortowanie po stronie klienta – patrz komentarz w
+                // [PlaceRepository.observePlacesByOwner].
+                val places = snapshot?.documents
+                    ?.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
+                    ?.sortedByDescending { it.createdAtMillis }
+                    .orEmpty()
+                trySend(places)
+            }
+        awaitClose { registration.remove() }
+    }
+
     override suspend fun getPlace(placeId: String): OpResult<Place> = try {
         val snapshot = placesCollection().document(placeId).get().await()
         val dto = snapshot.toObject<PlaceDto>()
