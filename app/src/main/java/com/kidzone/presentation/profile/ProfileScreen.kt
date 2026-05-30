@@ -354,7 +354,7 @@ private fun ProfileHeaderCard(
             if (userRank != null && userRank in 1..USER_RANK_BADGE_LIMIT) {
                 RankBadge(
                     rank = userRank,
-                    label = "TOP",
+                    label = "TOP 100",
                     modifier = Modifier.align(Alignment.TopEnd)
                 )
             }
