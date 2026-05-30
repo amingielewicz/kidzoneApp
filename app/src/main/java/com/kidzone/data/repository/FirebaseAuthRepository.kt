@@ -123,7 +123,8 @@ class FirebaseAuthRepository @Inject constructor(
                 nameLowercase = nameLowercase,
                 email = email,
                 avatarUrl = firebaseUser.photoUrl?.toString(),
-                createdAtMillis = System.currentTimeMillis()
+                createdAtMillis = System.currentTimeMillis(),
+                badgeEarnedAt = emptyMap()
             )
             firestore.collection(FirestoreCollections.USERS)
                 .document(firebaseUser.uid)
@@ -446,6 +447,47 @@ class FirebaseAuthRepository @Inject constructor(
     }
 
     // --- helpers ---
+
+    override suspend fun recordBadgesEarned(
+        badgeNames: List<String>
+    ): OpResult<Unit> = try {
+        if (badgeNames.isEmpty()) {
+            OpResult.success(Unit)
+        } else {
+            val firebaseUser = firebaseAuth.currentUser
+                ?: throw IllegalStateException("Brak zalogowanego użytkownika")
+
+            // First-write-wins: czytamy istniejące timestampy i zapisujemy
+            // pole `badgeEarnedAt.NAME` TYLKO dla odznak, których nie ma
+            // jeszcze w mapie. Bez tego dwóch klientów (np. dwa urządzenia
+            // tego samego usera) nadpisałoby chronologię, gdyby uruchomili
+            // detekcję w różnych momentach.
+            //
+            // Uwaga: dot-notation w SetOptions.merge() pozwala aktualizować
+            // pojedyncze klucze mapy bez nadpisania całej mapy. Klucz
+            // `badgeEarnedAt.FIRST_PLACE` to standardowy zapis Firestore
+            // dla "podpole o tej nazwie".
+            val docRef = firestore.collection(FirestoreCollections.USERS)
+                .document(firebaseUser.uid)
+            val snap = docRef.get().await()
+            @Suppress("UNCHECKED_CAST")
+            val existing = (snap.get("badgeEarnedAt") as? Map<String, Long>).orEmpty()
+
+            val now = System.currentTimeMillis()
+            val updates = badgeNames
+                .filter { it !in existing }
+                .associate { name -> "badgeEarnedAt.$name" to now }
+
+            if (updates.isEmpty()) {
+                OpResult.success(Unit)
+            } else {
+                docRef.set(updates, SetOptions.merge()).await()
+                OpResult.success(Unit)
+            }
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
 
     /**
      * Lowercase nazwy użytkownika dla case-insensitive zapytań w Firestore.

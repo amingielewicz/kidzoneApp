@@ -49,7 +49,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.User
-import com.kidzone.presentation.common.BadgesRow
+import com.kidzone.presentation.common.BadgesIconRow
+import com.kidzone.presentation.common.chronologicalOrder
 import com.kidzone.presentation.common.computeBadges
 import com.kidzone.presentation.common.style
 
@@ -293,7 +294,13 @@ private fun TopUserCard(
             }
             if (badges.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                BadgesRow(badges = badges)
+                // Icon-only row, sortowane chronologicznie (od najwcześniej
+                // zdobytej do najnowszej). Bez tekstu - cała karta usera
+                // jest już ciasna (rank + nazwa + statystyki), opisy by się
+                // nie zmieściły. Pełna lista dostępna w profilu.
+                BadgesIconRow(
+                    badges = chronologicalOrder(badges, user.badgeEarnedAt)
+                )
             }
         }
     }

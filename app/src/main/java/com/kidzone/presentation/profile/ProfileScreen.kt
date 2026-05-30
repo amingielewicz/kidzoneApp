@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Logout
@@ -50,6 +52,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -546,6 +549,12 @@ private fun BadgesCard(
  * Dialog z listą wszystkich odznak (zdobyte + niezdobyte) + opisem
  * progów. Używamy ikony +/- w opisach progów - kolorowo dla zdobytych
  * (pełen kolor odznaki), wyszarzone dla pozostałych.
+ *
+ * Lista jest scrollowalna pionowo - przy 15+ odznakach nie zmieści się
+ * cała na ekranie telefonu, a Material 3 AlertDialog domyślnie tnie
+ * overflow zamiast scrollować. `verticalScroll` na wewnętrznej Column
+ * to najprostszy wzorzec, który nie wymaga LazyColumn (ten ostatni
+ * konfliktuje z mierzeniem wysokości w AlertDialog).
  */
 @Composable
 private fun BadgesInfoDialog(
@@ -564,6 +573,7 @@ private fun BadgesInfoDialog(
         title = { Text("Jak zdobyć odznaki?") },
         text = {
             Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
@@ -596,6 +606,11 @@ private fun BadgesInfoDialog(
  * odznak (np. backfill licznika reviews), kolejne czekają w VM-owym
  * buforze i pojawią się po zamknięciu poprzedniego.
  *
+ * Wszystkie teksty (title + content) są wyśrodkowane horyzontalnie -
+ * standardowy AlertDialog M3 trzyma title po lewej, ale dla okna typu
+ * "achievement unlock" symetria czyta się znacznie lepiej. Tylko
+ * confirmButton zostaje w naturalnej pozycji (prawy dolny róg dialogu).
+ *
  * Świadomie blokujący - user musi kliknąć "Super!" żeby zamknąć, bo to
  * pozytywne wydarzenie powinno się wyróżnić względem zwykłej nawigacji.
  */
@@ -626,28 +641,39 @@ private fun BadgeEarnedDialog(
             Text(
                 text = "Gratulacje!",
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
         },
         text = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text(
                     text = "Zdobyłaś/eś nową odznakę:",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = badge.label,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = badge.color
+                    color = badge.color,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = badge.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         },

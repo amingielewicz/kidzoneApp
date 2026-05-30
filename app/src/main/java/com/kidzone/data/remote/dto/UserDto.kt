@@ -27,7 +27,17 @@ data class UserDto(
      * kompatybilność z dokumentami z legacy schema; FirebaseAuthRepository
      * uzupełnia pole przy najbliższej operacji write.
      */
-    val nameLowercase: String = ""
+    val nameLowercase: String = "",
+    /**
+     * Mapa odznak (UserBadge.name) -> timestamp zdobycia (millis).
+     * Wypełniana przez ProfileViewModel via AuthRepository.recordBadgesEarned
+     * w momencie pierwszej detekcji nowej odznaki na danym urządzeniu.
+     *
+     * Default emptyMap() = legacy / brak danych; sortowanie chronologiczne
+     * w UI traktuje brak wpisu jako "nieznana data" i sortuje takie
+     * odznaki na koniec.
+     */
+    val badgeEarnedAt: Map<String, Long> = emptyMap()
 ) {
     fun toDomain(): User = User(
         id = id,
@@ -39,7 +49,8 @@ data class UserDto(
         placesAddedCount = placesAddedCount,
         reviewsCount = reviewsCount,
         createdAtMillis = createdAtMillis,
-        nameLowercase = nameLowercase
+        nameLowercase = nameLowercase,
+        badgeEarnedAt = badgeEarnedAt
     )
 
     companion object {
@@ -53,7 +64,8 @@ data class UserDto(
             placesAddedCount = user.placesAddedCount,
             reviewsCount = user.reviewsCount,
             createdAtMillis = user.createdAtMillis,
-            nameLowercase = user.nameLowercase
+            nameLowercase = user.nameLowercase,
+            badgeEarnedAt = user.badgeEarnedAt
         )
     }
 }

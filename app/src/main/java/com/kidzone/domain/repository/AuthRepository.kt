@@ -208,4 +208,24 @@ interface AuthRepository {
      *   user). Dla Google user MVP nie obsługuje – zwraca błąd.
      */
     suspend fun deleteAccount(currentPassword: String): OpResult<Unit>
+
+    /**
+     * Zapisuje na dokumencie `users/{uid}` znaczniki czasu zdobycia podanych
+     * odznak.
+     *
+     * Wywoływane przez [com.kidzone.presentation.profile.ProfileViewModel]
+     * w momencie, gdy lokalny diff (`current - seen` w SharedPreferences)
+     * wykryje, że użytkownik właśnie wbił nowy próg. Zapis jest **idempotent
+     * "first-write-wins"** - jeśli dane pole `badgeEarnedAt.NAME` już istnieje
+     * w Firestore (bo inny klient już je zapisał), nie nadpisujemy go.
+     *
+     * Po co to jest: chcemy mieć **chronologiczny porządek odznak** widoczny
+     * we wszystkich klientach (na karcie usera w rankingu user widzi
+     * "od najstarszej do najnowszej"). SharedPreferences trzymane lokalnie
+     * nie wystarczą, bo karta usera A jest renderowana na urządzeniu usera B.
+     *
+     * @param badgeNames lista [com.kidzone.presentation.common.UserBadge.name]
+     *   nowo zdobytych odznak. Pusta lista = no-op (zwraca Success(Unit)).
+     */
+    suspend fun recordBadgesEarned(badgeNames: List<String>): OpResult<Unit>
 }

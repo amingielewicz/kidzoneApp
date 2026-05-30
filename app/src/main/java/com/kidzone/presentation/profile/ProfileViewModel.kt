@@ -447,12 +447,21 @@ class ProfileViewModel @Inject constructor(
      * Porównuje aktualnie zdobyte odznaki z tymi, o których powiadomiliśmy
      * usera już wcześniej (zapisane w SharedPreferences per uid). Jeśli
      * pojawiły się nowe - wpycha je do UiState (pierwszą do
-     * [UiState.newlyEarnedBadge], resztę do [UiState.pendingNewBadges]) i
-     * od razu persistuje pełen aktualny zestaw.
+     * [UiState.newlyEarnedBadge], resztę do [UiState.pendingNewBadges]),
+     * persistuje do SharedPrefs i zapisuje timestampy zdobycia w Firestore.
      *
      * Persist robimy ZA każdym razem, gdy detekcja zachodzi - jeśli user
      * straci odznakę (np. usunął miejsca), nie chcemy mu jej znów pokazywać
      * w przyszłości jako "nowo zdobyta" przy ponownym wbiciu progu.
+     *
+     * Dwa źródła prawdy:
+     *  - **SharedPreferences** (`seen_badges_<uid>`): "czy już pokazaliśmy
+     *    dialog gratulacyjny na TYM urządzeniu?". Per-device, bo dialog ma
+     *    sens raz na user-device, niezależnie od synchronizacji ze servera.
+     *  - **Firestore** (`users/{uid}.badgeEarnedAt`): "kiedy ta odznaka
+     *    została zdobyta?". Globalne, do chronologicznego sortu w ranking
+     *    cards na dowolnym kliencie. First-write-wins (zob.
+     *    [com.kidzone.domain.repository.AuthRepository.recordBadgesEarned]).
      *
      * SharedPreferences zamiast DataStore - prostsze API, ten store jest
      * mikroskopijny (kilka stringów per user), więc nie potrzebujemy
@@ -484,6 +493,14 @@ class ProfileViewModel @Inject constructor(
                         pendingNewBadges = newlyEarned.drop(1)
                     )
                 }
+            }
+
+            // Asynchroniczny zapis timestampów do Firestore. Best-effort -
+            // błąd nie blokuje UI ani SharedPreferences (lokalnie i tak
+            // wiemy, że odznakę widzieliśmy). Brak timestampu w Firestore
+            // skutkuje tylko sortem na koniec w `chronologicalOrder`.
+            viewModelScope.launch {
+                authRepository.recordBadgesEarned(newlyEarned.map { it.name })
             }
         }
 

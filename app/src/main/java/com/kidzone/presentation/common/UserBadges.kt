@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddLocationAlt
-import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Groups
@@ -22,8 +22,10 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MilitaryTech
 import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material.icons.filled.Reviews
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Stars
+import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -93,7 +95,11 @@ enum class UserBadge(
     ),
     FIRST_REVIEW(
         label = "Pierwsza opinia",
-        icon = Icons.Filled.RateReview,
+        // ChatBubble (a nie RateReview jak REVIEWER) - w 24dp ikon-only
+        // na karcie rankingu chcemy wizualnie odróżnić "pierwszą opinię"
+        // od "10 opinii". RateReview to kartka z gwiazdką (jak REVIEWER),
+        // ChatBubble to dymek - inne sylwetki, łatwo rozróżnialne.
+        icon = Icons.Filled.ChatBubble,
         color = Color(0xFFEF6C00),
         description = "Wystaw swoją pierwszą opinię"
     ),
@@ -113,7 +119,10 @@ enum class UserBadge(
     ),
     PATHFINDER(
         label = "Tropiciel",
-        icon = Icons.Filled.AutoAwesome,
+        // Terrain (góry) lepiej oddaje "tropiciela" w dziczy niż AutoAwesome
+        // (sparkles - generyczny "magia/wow"). Też wizualnie lepiej skaluje
+        // się w 24dp ikon-only.
+        icon = Icons.Filled.Terrain,
         color = Color(0xFF2E7D32),
         description = "Dodaj co najmniej 30 miejsc"
     ),
@@ -133,7 +142,10 @@ enum class UserBadge(
     ),
     SENIOR_REVIEWER(
         label = "Wytrawny recenzent",
-        icon = Icons.Filled.Star,
+        // Stars (mnoga) sygnalizuje "mistrzostwo" (multiple stars),
+        // jest wizualnie odróżnialny od pojedynczej Star, którą rezerwujemy
+        // dla generycznego rating-icon w innych miejscach UI.
+        icon = Icons.Filled.Stars,
         color = Color(0xFF0D47A1),
         description = "Wystaw co najmniej 50 opinii"
     ),
@@ -173,9 +185,13 @@ enum class UserBadge(
     ),
 
     // ----- Ranking miejsc (twoje miejsca w TOP 100) -----
+    // PLACE_TOP3: Whatshot (flame) - "twoje miejsce jest gorące, ludzie
+    // je polecają". Wizualnie odróżnia się od PLACE_TOP1 (premium star) -
+    // w 24dp ikon-only nie chcemy dwóch identycznych gwiazdek różniących
+    // się tylko kolorem.
     PLACE_TOP3(
         label = "Lokalny faworyt",
-        icon = Icons.Filled.WorkspacePremium,
+        icon = Icons.Filled.Whatshot,
         color = Color(0xFFB87333),
         description = "Twoje miejsce trafiło do TOP 3 najlepiej ocenianych"
     ),
@@ -309,6 +325,80 @@ fun BadgesRow(
         }
     }
 }
+
+/**
+ * Kompaktowy rząd ikon-only odznak - kolorowe okrągłe kafelki, każda
+ * wielkości [iconSize]. Bez tekstu. Używana na karcie użytkownika
+ * w [com.kidzone.presentation.ranking.RankingScreen], gdzie chcemy
+ * pokazać wszystkie zdobyte odznaki bez zajmowania miejsca pod opisy.
+ *
+ * Layout: [FlowRow] - przy 15 max odznakach o szerokości 24dp + 4dp gap
+ * mieści się w 2 rzędach na typowym telefonie (~360dp content width).
+ * Wartość [iconSize] jest wybrana świadomie: 24dp daje dobry balans
+ * "widoczne, ale nie dominujące nad nazwą usera + statystykami".
+ *
+ * Brak akcji on-click - karta usera w rankingu jako całość jest klikalna
+ * (otwiera profil), więc dodatkowy click handler na ikonkach by tylko
+ * blokował to globalne zachowanie.
+ *
+ * @param badges lista odznak DO WYŚWIETLENIA. Wywołujący decyduje
+ *   o sortowaniu (zwykle [chronologicalOrder]).
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun BadgesIconRow(
+    badges: List<UserBadge>,
+    modifier: Modifier = Modifier,
+    iconSize: androidx.compose.ui.unit.Dp = 24.dp
+) {
+    if (badges.isEmpty()) return
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        badges.forEach { badge ->
+            Box(
+                modifier = Modifier
+                    .size(iconSize)
+                    .clip(CircleShape)
+                    .background(badge.color.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = badge.icon,
+                    // contentDescription daje a11y "label" dla TalkBacka,
+                    // jednoczesnie nie zaburzajac wizualnie kompaktowego rzedu.
+                    contentDescription = badge.label,
+                    tint = badge.color,
+                    modifier = Modifier.size(iconSize * 0.6f)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Sortuje listę odznak chronologicznie - od najwcześniej zdobytej do
+ * najnowszej - na podstawie [com.kidzone.domain.model.User.badgeEarnedAt].
+ *
+ * Odznaki bez zarejestrowanego timestampu (legacy users sprzed wprowadzenia
+ * tego pola, lub odznaki nigdy "nie wykryte" przez ProfileViewModel)
+ * lądują na końcu, w porządku [UserBadge.ordinal] (czyli "naturalnym"
+ * porządku zdefiniowanym w enumie - drabinka: pierwsze kroki, drabinka
+ * miejsc, drabinka opinii, ...).
+ *
+ * Tiebreak: dwie odznaki zdobyte w tym samym millis (typowy przypadek -
+ * user wbił wiele progów naraz, np. po imporcie / liczniki się
+ * zaktualizowały) sortowane po enum.ordinal.
+ */
+fun chronologicalOrder(
+    badges: List<UserBadge>,
+    badgeEarnedAt: Map<String, Long>
+): List<UserBadge> = badges.sortedWith(
+    compareBy<UserBadge> { badgeEarnedAt[it.name] ?: Long.MAX_VALUE }
+        .thenBy { it.ordinal }
+)
 
 /**
  * Pełen wiersz odznaki - duża okrągła ikona w kolorowym tle + nazwa + opis.

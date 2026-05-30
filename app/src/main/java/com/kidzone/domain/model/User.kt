@@ -36,5 +36,21 @@ data class User(
      * automatycznie przy najbliższym save / sign-in (zob. `ensureUserDoc`
      * i `backfillNameLowercase` w FirebaseAuthRepository).
      */
-    val nameLowercase: String = ""
+    val nameLowercase: String = "",
+    /**
+     * Mapa: nazwa odznaki ([com.kidzone.presentation.common.UserBadge.name]) ->
+     * timestamp zdobycia w millis (System.currentTimeMillis na kliencie,
+     * który wykrył nową odznakę po raz pierwszy).
+     *
+     * Wykorzystywane do sortowania chronologicznego ikon w
+     * [com.kidzone.presentation.common.BadgesIconRow] na karcie usera w
+     * rankingu - wszyscy klienci widzą ten sam porządek "kto co kiedy
+     * zdobył", niezależnie od tego, na którym urządzeniu user przekroczył
+     * próg.
+     *
+     * Brak wpisu = odznaka jeszcze nie zdobyta lub legacy user, którego
+     * profilu nigdy nie otwarto w wersji z tym polem. Sort fallback w
+     * UI ustawia takich userów na koniec (sortedBy z Long.MAX_VALUE).
+     */
+    val badgeEarnedAt: Map<String, Long> = emptyMap()
 )
