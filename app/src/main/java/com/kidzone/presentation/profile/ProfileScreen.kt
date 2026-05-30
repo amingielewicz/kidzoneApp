@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.RateReview
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -120,6 +121,7 @@ fun ProfileScreen(
                 user = user!!,
                 signInProvider = ui.signInProvider,
                 obtainedBadges = ui.obtainedBadges,
+                userRank = ui.userRank,
                 onEdit = viewModel::openEditSheet,
                 onOpenMyPlaces = onOpenMyPlaces,
                 onOpenMyReviews = onOpenMyReviews,
@@ -218,6 +220,7 @@ private fun ProfileContent(
     user: User,
     signInProvider: SignInProvider,
     obtainedBadges: List<UserBadge>,
+    userRank: Int?,
     onEdit: () -> Unit,
     onOpenMyPlaces: () -> Unit,
     onOpenMyReviews: () -> Unit,
@@ -233,7 +236,7 @@ private fun ProfileContent(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { ProfileHeaderCard(user = user, onEdit = onEdit) }
+        item { ProfileHeaderCard(user = user, userRank = userRank, onEdit = onEdit) }
 
         if (user.firstName.isNotBlank() || user.lastName.isNotBlank()) {
             item { PersonalInfoCard(user = user) }
@@ -280,58 +283,132 @@ private fun ProfileContent(
 @Composable
 private fun ProfileHeaderCard(
     user: User,
+    userRank: Int?,
     onEdit: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(
+        // Box zamiast samej Column - potrzebujemy warstwy do nakładki
+        // (plakietka TOP w prawym górnym rogu) niezależnej od centralnej
+        // kolumny z avatarem / nazwą / akcją "Edytuj profil".
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(20.dp)
         ) {
-            ProfileAvatar(avatarUrl = user.avatarUrl, size = 96.dp)
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = user.name.ifBlank { "Użytkownik" },
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            if (user.email.isNotBlank()) {
-                Spacer(Modifier.height(2.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                ProfileAvatar(avatarUrl = user.avatarUrl, size = 96.dp)
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = user.name.ifBlank { "Użytkownik" },
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                if (user.email.isNotBlank()) {
+                    Spacer(Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Filled.Email,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = user.email,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                FilledTonalButton(
+                    onClick = onEdit,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                ) {
                     Icon(
-                        imageVector = Icons.Filled.Email,
+                        imageVector = Icons.Filled.Edit,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = user.email,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Edytuj profil")
                 }
             }
-            Spacer(Modifier.height(16.dp))
-            FilledTonalButton(
-                onClick = onEdit,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(44.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Edit,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+
+            // Plakietka rangi w TOP 100 - tylko jeśli user mieści się
+            // w pierwszej setce. VM trzyma userRank ograniczony do tej
+            // puli (BADGE_RANK_POOL=100 w computeBadgeContext), ale dla
+            // bezpieczeństwa dorzucamy tu jeszcze guard.
+            if (userRank != null && userRank in 1..USER_RANK_BADGE_LIMIT) {
+                UserRankBadge(
+                    rank = userRank,
+                    modifier = Modifier.align(Alignment.TopEnd)
                 )
-                Spacer(Modifier.width(8.dp))
-                Text("Edytuj profil")
             }
+        }
+    }
+}
+
+/** Górny próg rangi, dla której pokazujemy plakietkę "TOP" na profilu. */
+private const val USER_RANK_BADGE_LIMIT = 100
+
+/**
+ * Plakietka "TOP <rank>" w prawym górnym rogu nagłówka profilu.
+ *
+ * Wizualnie analogicznie do `TopRankBadge` w PlaceDetailsScreen (gwiazdka
+ * `Icons.Filled.Star` 40dp tinted `secondary` z numerem na środku w
+ * `onSecondary`), z mniejszym labelem "TOP" nad nią. Świadomie
+ * "TOP" zamiast "TOP 100" - na profilu ranka pokazujemy wprost w środku
+ * gwiazdki, label nad nią ma być krótki i czytelny w 24dp wysokości.
+ *
+ * Dlaczego osobny composable a nie reuse z PlaceDetailsScreen.kt:
+ *  - PlaceDetailsScreen.TopRankBadge jest `private` w tamtym pliku,
+ *  - tam label brzmi "TOP 100" (bo plakietka nadawana tylko top 10
+ *    z puli 100 - "TOP 100" odnosi się do **puli**),
+ *  - tu plakietka jest dla całej puli 100, więc label "TOP" jest
+ *    semantycznie poprawny.
+ *
+ * Można w przyszłości wyciągnąć obie wersje do common gdy zaczniemy
+ * dorabiać kolejne miejsca z badge'ami rang - na razie KISS.
+ */
+@Composable
+private fun UserRankBadge(rank: Int, modifier: Modifier = Modifier) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+    ) {
+        Text(
+            text = "TOP",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.secondary
+        )
+        Spacer(Modifier.height(2.dp))
+        Box(
+            modifier = Modifier.size(40.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Star,
+                contentDescription = "Pozycja w rankingu TOP $USER_RANK_BADGE_LIMIT: $rank",
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.fillMaxSize()
+            )
+            Text(
+                text = rank.toString(),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSecondary
+            )
         }
     }
 }

@@ -73,6 +73,10 @@ class ProfileViewModel @Inject constructor(
      * @property obtainedBadges aktualnie zdobyte odznaki (po uwzględnieniu
      *   kontekstu rankingowego). Wyliczane przez VM, żeby UI nie musiał
      *   znać szczegółów [BadgeContext].
+     * @property userRank 1-based pozycja w rankingu TOP 100 użytkowników
+     *   (w obrębie filtrów aktywności tożsamych z RankingViewModel - tylko
+     *   userzy z >=1 miejscem lub opinią). Null = poza TOP 100. Używane
+     *   przez UI do plakietki "TOP" w prawym górnym rogu nagłówka profilu.
      * @property newlyEarnedBadge nowo zdobyta odznaka, którą trzeba pokazać
      *   userowi w dialogu gratulacyjnym. Konsumujemy przez
      *   [consumeNewlyEarnedBadge] po pokazaniu, żeby rotacja / re-kompozycja
@@ -96,6 +100,7 @@ class ProfileViewModel @Inject constructor(
         val accountActionInfo: String? = null,
         val isBadgesInfoOpen: Boolean = false,
         val obtainedBadges: List<UserBadge> = emptyList(),
+        val userRank: Int? = null,
         val newlyEarnedBadge: UserBadge? = null,
         val pendingNewBadges: List<UserBadge> = emptyList()
     )
@@ -139,7 +144,15 @@ class ProfileViewModel @Inject constructor(
             user.filterNotNull().collect { u ->
                 val context = computeBadgeContext(u)
                 val obtained = u.computeBadges(context)
-                _uiState.update { it.copy(obtainedBadges = obtained) }
+                _uiState.update {
+                    it.copy(
+                        obtainedBadges = obtained,
+                        // BadgeContext.userRank trzymane juz 1..100 z
+                        // computeBadgeContext (BADGE_RANK_POOL = 100); UI
+                        // pokazuje plakietke gdy != null.
+                        userRank = context.userRank
+                    )
+                }
                 checkForNewBadges(uid = u.id, current = obtained.toSet())
             }
         }
