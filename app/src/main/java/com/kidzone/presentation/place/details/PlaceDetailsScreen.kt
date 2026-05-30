@@ -72,6 +72,7 @@ import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.model.User
+import com.kidzone.presentation.common.RankBadge
 import com.kidzone.presentation.common.style
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -451,7 +452,11 @@ private fun PlaceMainCard(
                 // dla pozostałych miejsc nic nie renderujemy (brak Box-a).
                 if (topRank != null) {
                     Spacer(Modifier.width(8.dp))
-                    TopRankBadge(rank = topRank)
+                    RankBadge(
+                        rank = topRank,
+                        label = "TOP 100",
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -568,56 +573,6 @@ private fun PlaceMainCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        }
-    }
-}
-
-/**
- * Plakietka rankingowa "TOP 100" z numerem pozycji.
- *
- * Wizualnie:
- *  - mały label "TOP 100" w `labelSmall` + bold, kolor `secondary`,
- *  - poniżej kolorowa gwiazdka (Icons.Filled.Star tinted secondary)
- *    z numerem pozycji nałożonym pośrodku jako biały Text z wagą Bold.
- *
- * Dlaczego Box ze Star + Text na wierzchu, a nie gotowy SVG: gwiazdka z
- * Material Icons skaluje się idealnie razem z tekstem, a "TOP 100" jest
- * brand-agnostyczny - nie chcemy custom asseta tylko po to, by zmieścić
- * w nim dynamiczny numer.
- *
- * @param rank pozycja w rankingu (1..[TOP_RANKING_BADGE_LIMIT]). Powinna
- *   być zwalidowana przez VM przed wywołaniem - nie clampujemy tutaj
- *   na siłę, bo np. wartość 11+ to bug, lepiej go zauważyć.
- */
-@Composable
-private fun TopRankBadge(rank: Int) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(horizontal = 4.dp)
-    ) {
-        Text(
-            text = "TOP 100",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.secondary
-        )
-        Spacer(Modifier.height(2.dp))
-        Box(
-            modifier = Modifier.size(40.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Star,
-                contentDescription = "Pozycja w rankingu TOP 100: $rank",
-                tint = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.fillMaxSize()
-            )
-            Text(
-                text = rank.toString(),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSecondary
-            )
         }
     }
 }

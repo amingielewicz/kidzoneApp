@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.RateReview
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -66,6 +65,7 @@ import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.SignInProvider
 import com.kidzone.presentation.common.BadgeRowItem
 import com.kidzone.presentation.common.BadgesRow
+import com.kidzone.presentation.common.RankBadge
 import com.kidzone.presentation.common.UserBadge
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -348,9 +348,13 @@ private fun ProfileHeaderCard(
             // w pierwszej setce. VM trzyma userRank ograniczony do tej
             // puli (BADGE_RANK_POOL=100 w computeBadgeContext), ale dla
             // bezpieczeństwa dorzucamy tu jeszcze guard.
+            //
+            // Kolor gwiazdki: gold dla 1..3, silver dla 4..10, zielony
+            // (brand-secondary) dla 11..100 - logika w [RankBadge].
             if (userRank != null && userRank in 1..USER_RANK_BADGE_LIMIT) {
-                UserRankBadge(
+                RankBadge(
                     rank = userRank,
+                    label = "TOP",
                     modifier = Modifier.align(Alignment.TopEnd)
                 )
             }
@@ -360,58 +364,6 @@ private fun ProfileHeaderCard(
 
 /** Górny próg rangi, dla której pokazujemy plakietkę "TOP" na profilu. */
 private const val USER_RANK_BADGE_LIMIT = 100
-
-/**
- * Plakietka "TOP <rank>" w prawym górnym rogu nagłówka profilu.
- *
- * Wizualnie analogicznie do `TopRankBadge` w PlaceDetailsScreen (gwiazdka
- * `Icons.Filled.Star` 40dp tinted `secondary` z numerem na środku w
- * `onSecondary`), z mniejszym labelem "TOP" nad nią. Świadomie
- * "TOP" zamiast "TOP 100" - na profilu ranka pokazujemy wprost w środku
- * gwiazdki, label nad nią ma być krótki i czytelny w 24dp wysokości.
- *
- * Dlaczego osobny composable a nie reuse z PlaceDetailsScreen.kt:
- *  - PlaceDetailsScreen.TopRankBadge jest `private` w tamtym pliku,
- *  - tam label brzmi "TOP 100" (bo plakietka nadawana tylko top 10
- *    z puli 100 - "TOP 100" odnosi się do **puli**),
- *  - tu plakietka jest dla całej puli 100, więc label "TOP" jest
- *    semantycznie poprawny.
- *
- * Można w przyszłości wyciągnąć obie wersje do common gdy zaczniemy
- * dorabiać kolejne miejsca z badge'ami rang - na razie KISS.
- */
-@Composable
-private fun UserRankBadge(rank: Int, modifier: Modifier = Modifier) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier
-    ) {
-        Text(
-            text = "TOP",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.secondary
-        )
-        Spacer(Modifier.height(2.dp))
-        Box(
-            modifier = Modifier.size(40.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Star,
-                contentDescription = "Pozycja w rankingu TOP $USER_RANK_BADGE_LIMIT: $rank",
-                tint = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.fillMaxSize()
-            )
-            Text(
-                text = rank.toString(),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSecondary
-            )
-        }
-    }
-}
 
 @Composable
 private fun ProfileAvatar(
