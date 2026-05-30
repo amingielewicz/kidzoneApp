@@ -81,6 +81,99 @@ i egzekwowana w 3 miejscach (rejestracja, zmiana hasła w profilu, komunikat
 UI rejestracji i dialogu zmiany hasła pokazuje live checklist zbudowany
 z `PasswordPolicy.evaluate(password)`.
 
+## Unikalność loginu
+
+`User.name` (publiczny nick widoczny w opiniach, miejscach, rankingu)
+musi być unikalny **case-insensitive** w skali apki — „Adam" i „adam"
+to ten sam login.
+
+Mechanizm:
+- `UserDto.nameLowercase` — pole pomocnicze ustawiane przy każdym save
+  (`name.lowercase(pl_PL)`); pozwala na zapytanie
+  `whereEqualTo("nameLowercase", X)` bez potrzeby natywnego collation.
+- `FirebaseAuthRepository.isUsernameTaken` — **dwustopniowe sprawdzanie**:
+  1. fast path po `nameLowercase` (po backfillu wszyscy userzy mają),
+  2. legacy fallback do 500 doców bez wypełnionego `nameLowercase` z
+     porównaniem `name` po stronie klienta — gwarantuje, że duplikat
+     starego usera „Adam" zostanie wykryty, zanim wszyscy się przelogują.
+- `ensureUserDoc` — przy każdym `signIn` uzupełnia `nameLowercase` jeśli
+  legacy doc go nie ma; backfill „w tle" zmniejszający koszt fallbacku
+  z czasem.
+- `AuthException.UsernameAlreadyTaken` — typowany błąd; UI rejestracji
+  i edycji profilu pokazuje „Ta nazwa użytkownika jest już zajęta".
+
+Race condition (dwóch userów rejestrujących to samo imię równocześnie)
+świadomie pomijamy dla MVP — przy małej skali ryzyko znikome,
+alternatywą jest osobna kolekcja `usernames/{lowercase}` z transakcyjnym
+zapisem.
+
+## Odznaki
+
+15 odznak pogrupowanych w 6 kategorii — wszystkie zdefiniowane w
+[`presentation/common/UserBadges.kt`](app/src/main/java/com/kidzone/presentation/common/UserBadges.kt).
+Każda odznaka ma unikalną ikonę z Material Icons Extended (świadomie
+wybrane tak, by 24dp ikon-only były jednoznacznie odróżnialne).
+
+| Kategoria | Odznaka | Próg | Ikona |
+|---|---|---|---|
+| Pierwsze kroki | Pierwszy ślad | 1 miejsce | `AddLocationAlt` |
+| | Pierwsza opinia | 1 opinia | `ChatBubble` |
+| Drabinka miejsc | Odkrywca | 5 miejsc | `Explore` |
+| | Kartograf | 15 miejsc | `Map` |
+| | Tropiciel | 30 miejsc | `Terrain` |
+| Drabinka opinii | Recenzent | 10 opinii | `RateReview` |
+| | Krytyk | 25 opinii | `Reviews` |
+| | Wytrawny recenzent | 50 opinii | `Stars` |
+| Wszechstronność | Filar społeczności | 5+ miejsc i 5+ opinii | `Groups` |
+| | Ekspert rodzinny | 10+ miejsc i 20+ opinii | `Verified` |
+| Ranking użytkowników | Brązowy lider | 3. miejsce w TOP 100 userów | `MilitaryTech` (bronze) |
+| | Srebrny lider | 2. miejsce | `MilitaryTech` (silver) |
+| | Złoty lider | 1. miejsce | `EmojiEvents` (gold trophy) |
+| Ranking miejsc | Lokalny faworyt | twoje miejsce w TOP 3 | `Whatshot` |
+| | Architekt zabawy | twoje miejsce na #1 | `WorkspacePremium` |
+
+### Kontekst rankingowy
+
+`User.computeBadges(context)` przyjmuje opcjonalny
+[`BadgeContext`](app/src/main/java/com/kidzone/presentation/common/UserBadges.kt)
+z `userRank` (1-based pozycja w TOP 100 userów) i `bestPlaceRank`
+(najlepsza pozycja jakiegokolwiek miejsca usera w TOP 100 miejsc).
+Bez kontekstu (default empty) liczone są tylko odznaki count-based.
+
+Filtry aktywności rankingu (zob. `RankingViewModel`) — tylko userzy
+z ≥1 miejscem lub opinią, miejsca z >0 opiniami i >0.0 średnią — są
+spójne z definicją odznak rankingowych: jeśli widzisz siebie #1 w
+rankingu, dostajesz „Złotego lidera".
+
+### Powiadomienia + chronologia
+
+- **Detekcja**: `ProfileViewModel` przy każdej emisji usera oblicza
+  pełen zestaw odznak (z `BadgeContext`), porównuje z
+  `seen_badges_<uid>` w SharedPreferences (per-device, lokalne
+  „czy pokazałem dialog?"). Nowe → kolejka `pendingNewBadges`
+  → `BadgeEarnedDialog` (gratulacyjny).
+- **Chronologia globalna**: nowe pole `UserDto.badgeEarnedAt:
+  Map<String, Long>` w Firestore. `AuthRepository.recordBadgesEarned`
+  zapisuje timestampy **first-write-wins** (dot-notation merge,
+  żeby drugie urządzenie tego samego usera nie nadpisało). Dzięki
+  temu na karcie usera w rankingu odznaki sortują się chronologicznie
+  na każdym kliencie tak samo (`chronologicalOrder` z fallback na
+  `enum.ordinal` dla legacy timestampów).
+
+### Wyświetlanie
+
+- **Profil** (sekcja „Odznaki") — pokazuje **tylko zdobyte** jako chipy
+  z labelem (`BadgesRow`). Po prawej ikona „?" → `BadgesInfoDialog`
+  (scrollowalny) z listą wszystkich odznak i progami; zdobyte
+  podświetlone kolorem.
+- **Ranking — karta usera** — `BadgesIconRow`: kompaktowe okrągłe
+  kafelki 24dp (alpha 0.18 tła), bez tekstu, sortowane chronologicznie.
+  `FlowRow` zawija na 2 rzędy przy 15 odznakach na typowym telefonie.
+  Odznaki rankingowe (LEADER_*, PLACE_*) precomputowane w VM
+  (`RankingViewModel.userBadges: Map<uid, List<UserBadge>>`), żeby
+  karta usera w rankingu pokazywała te same odznaki co user widzi
+  na własnym profilu.
+
 ## Normalizacja tekstów
 
 [`utils/TextNormalization.kt`](app/src/main/java/com/kidzone/utils/TextNormalization.kt)
@@ -174,11 +267,15 @@ app/src/main/java/com/kidzone
 │   │   ├── DeleteAccountDialog.kt    # potwierdzenie + reauth hasłem
 │   │   └── PrivacyPolicyDialog.kt    # treść RODO + admin / kontakt z AppConfig
 │   ├── ranking
-│   │   ├── RankingScreen.kt     # 2 zakładki: TOP miejsc / TOP użytkowników
-│   │   └── RankingViewModel.kt  # equal fetch one-shot (placeRepo + authRepo.getTopUsers)
+│   │   ├── RankingScreen.kt     # 2 zakładki: TOP miejsc / TOP użytkowników;
+│   │   │                        # karta usera z BadgesIconRow (ikon-only,
+│   │   │                        # chronologicznie, FlowRow ~2 rzędy)
+│   │   └── RankingViewModel.kt  # one-shot fetch + filtry aktywności +
+│   │                            # precomputed userBadges per uid (z BadgeContext)
 │   └── common
 │       ├── CategoryStyle.kt     # ikona + kolor per PlaceCategory
-│       └── UserBadges.kt        # odznaki: odkrywca / recenzent / ekspert
+│       └── UserBadges.kt        # 15 odznak (6 kategorii) + BadgeContext
+│                                # + BadgesRow / BadgesIconRow / chronologicalOrder
 │
 ├── ui/theme
 │   ├── Color.kt             # paleta marki + light/dark surface
@@ -212,8 +309,12 @@ Resources:
 ## Mapa schematu bazy
 
 - Kolekcja `users` ↔ `domain.model.User` ↔ `data.remote.dto.UserDto`
-  (pola `placesAddedCount` / `reviewsCount` aktualizowane atomic
-  `FieldValue.increment` przy dodaniu miejsca / opinii)
+  - liczniki `placesAddedCount` / `reviewsCount` aktualizowane atomic
+    `FieldValue.increment` przy dodaniu miejsca / opinii,
+  - `nameLowercase` — pomocnicze pole dla case-insensitive sprawdzania
+    unikalności loginu (zob. [Unikalność loginu](#unikalność-loginu)),
+  - `badgeEarnedAt: Map<String, Long>` — timestampy zdobycia odznak
+    (first-write-wins, do chronologicznego sortu na karcie rankingu).
 - Kolekcja `places` ↔ `domain.model.Place` ↔ `data.remote.dto.PlaceDto`
   (pola `averageRating` / `reviewsCount` aktualizowane transakcyjnie
   przez `FirestoreReviewRepository`)
@@ -357,6 +458,9 @@ przy pierwszym wejściu, `AddPlaceScreen` przy kliknięciu "Pobierz lokalizację
 | Profil — Moje miejsca, Moje opinie                   | ✅     |
 | Konto: zmiana hasła + zmiana e-maila + delete        | ✅     |
 | Polityka prywatności RODO (in-app)                   | ✅     |
+| Unikalność loginu (case-insensitive + legacy fallback)| ✅    |
+| 15 odznak (count + ranking) + dialog gratulacyjny    | ✅     |
+| Chronologiczny sort odznak w rankingu (Firestore)    | ✅     |
 | Ranking miejsc (TOP 100) + użytkowników              | ✅     |
 | Upload avatara do Firebase Storage                   | ✅     |
 | Zgłaszanie opinii jako spam                          | ⏳ — `reportReviewAsSpam` zwraca `NotImplementedError` |

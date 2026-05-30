@@ -50,8 +50,8 @@ import coil.compose.AsyncImage
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.User
 import com.kidzone.presentation.common.BadgesIconRow
+import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.chronologicalOrder
-import com.kidzone.presentation.common.computeBadges
 import com.kidzone.presentation.common.style
 
 /**
@@ -125,7 +125,10 @@ fun RankingScreen(
                     places = state.topPlaces,
                     onOpenPlaceDetails = onOpenPlaceDetails
                 )
-                else -> TopUsersList(users = state.topUsers)
+                else -> TopUsersList(
+                    users = state.topUsers,
+                    badgesByUserId = state.userBadges
+                )
             }
         }
     }
@@ -167,7 +170,10 @@ private fun TopPlacesList(
 }
 
 @Composable
-private fun TopUsersList(users: List<User>) {
+private fun TopUsersList(
+    users: List<User>,
+    badgesByUserId: Map<String, List<UserBadge>>
+) {
     if (users.isEmpty()) {
         FullScreenCentered {
             Text(
@@ -188,7 +194,12 @@ private fun TopUsersList(users: List<User>) {
     ) {
         items(items = users, key = { it.id }) { user ->
             val position = users.indexOf(user) + 1
-            TopUserCard(position = position, user = user)
+            // Z mapy precomputed badges (z BadgeContext z VM) bierzemy
+            // pełny zestaw - count-based + ranking-based. Fallback na
+            // pustą listę, gdyby VM jeszcze nie zdążył zapełnić mapy
+            // (np. w trakcie pierwszego ładowania).
+            val badges = badgesByUserId[user.id].orEmpty()
+            TopUserCard(position = position, user = user, badges = badges)
         }
     }
 }
@@ -264,10 +275,9 @@ private fun TopPlaceCard(
 @Composable
 private fun TopUserCard(
     position: Int,
-    user: User
+    user: User,
+    badges: List<UserBadge>
 ) {
-    val badges = user.computeBadges()
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)

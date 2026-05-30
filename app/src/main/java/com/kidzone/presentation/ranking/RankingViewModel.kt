@@ -6,6 +6,9 @@ import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
+import com.kidzone.presentation.common.BadgeContext
+import com.kidzone.presentation.common.UserBadge
+import com.kidzone.presentation.common.computeBadges
 import com.kidzone.utils.OpResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
@@ -37,12 +40,17 @@ class RankingViewModel @Inject constructor(
     /**
      * @property topPlaces top miejsc wg średniej oceny (malejąco), do [TOP_LIMIT] pozycji
      * @property topUsers  top użytkowników wg liczby dodanych miejsc, drugorzędnie po liczbie opinii, do [TOP_LIMIT] pozycji
+     * @property userBadges precomputowane odznaki per user (uid -> lista odznak),
+     *   uwzględniają KONTEKST rankingowy (LEADER_*, PLACE_TOP*) - inaczej karta
+     *   usera w rankingu pokazywałaby mniej odznak niż ten sam user widzi na
+     *   swoim profilu, co jest mylące. UI tylko odczytuje, nie liczy.
      * @property isLoading aktywne podczas pierwszego ładowania i każdego refreshu
      * @property errorMessage komunikat błędu (jeśli któraś z list nie wczytała się)
      */
     data class UiState(
         val topPlaces: List<Place> = emptyList(),
         val topUsers: List<User> = emptyList(),
+        val userBadges: Map<String, List<UserBadge>> = emptyMap(),
         val isLoading: Boolean = true,
         val errorMessage: String? = null
     )
@@ -95,9 +103,30 @@ class RankingViewModel @Inject constructor(
                 (usersResult as? OpResult.Failure)?.error?.message
             ).joinToString("\n").ifBlank { null }
 
+            // Precomputuj odznaki per user z pełnym BadgeContext (rank w
+            // rankingu userów + najlepsza pozycja jakiegokolwiek miejsca
+            // tego usera w rankingu miejsc). Dzięki temu karta usera w
+            // rankingu pokazuje TE SAME odznaki co user widzi na swoim
+            // profilu - żadnego "tu mam 5, tam tylko 3" mylącego.
+            //
+            // Reguły spójne z ProfileViewModel.computeBadgeContext: filtry
+            // aktywności już zaaplikowane w `users` / `places` powyżej,
+            // więc indeks 1-based w tych listach to dokładnie ranga, którą
+            // user widzi w UI.
+            val userBadges: Map<String, List<UserBadge>> = users.mapIndexed { idx, u ->
+                val userRank = (idx + 1).takeIf { it in 1..3 }
+                val bestPlaceRank = places
+                    .mapIndexedNotNull { pIdx, p ->
+                        if (p.ownerUserId == u.id) pIdx + 1 else null
+                    }
+                    .minOrNull()
+                u.id to u.computeBadges(BadgeContext(userRank, bestPlaceRank))
+            }.toMap()
+
             _uiState.value = UiState(
                 topPlaces = places,
                 topUsers = users,
+                userBadges = userBadges,
                 isLoading = false,
                 errorMessage = error
             )
