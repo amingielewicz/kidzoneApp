@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Logout
@@ -24,17 +26,20 @@ import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.RateReview
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
@@ -47,6 +52,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -57,8 +63,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.SignInProvider
-import com.kidzone.presentation.common.BadgesList
-import com.kidzone.presentation.common.computeBadges
+import com.kidzone.presentation.common.BadgeRowItem
+import com.kidzone.presentation.common.BadgesRow
+import com.kidzone.presentation.common.RankBadge
+import com.kidzone.presentation.common.UserBadge
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -112,9 +120,12 @@ fun ProfileScreen(
             ProfileContent(
                 user = user!!,
                 signInProvider = ui.signInProvider,
+                obtainedBadges = ui.obtainedBadges,
+                userRank = ui.userRank,
                 onEdit = viewModel::openEditSheet,
                 onOpenMyPlaces = onOpenMyPlaces,
                 onOpenMyReviews = onOpenMyReviews,
+                onOpenBadgesInfo = viewModel::openBadgesInfo,
                 onChangePassword = viewModel::openChangePassword,
                 onChangeEmail = viewModel::openChangeEmail,
                 onDeleteAccount = viewModel::openDeleteAccount,
@@ -181,15 +192,39 @@ fun ProfileScreen(
             }
         )
     }
+
+    // Info-dialog: lista wszystkich odznak + opisy progów. Wywoływany
+    // z ikony "?" przy nagłówku sekcji "Odznaki". Bierzemy z VM-owego
+    // `obtainedBadges`, żeby highlight w dialogu zgadzał się z chipami
+    // na karcie (uwzględnia też ranking-based badges, które mogłyby się
+    // nie zgodzić z naiwnym `user.computeBadges()` bez kontekstu).
+    if (ui.isBadgesInfoOpen && user != null) {
+        BadgesInfoDialog(
+            obtained = ui.obtainedBadges.toSet(),
+            onDismiss = viewModel::dismissBadgesInfo
+        )
+    }
+
+    // Dialog gratulacyjny po zdobyciu nowej odznaki - jedna naraz, kolejne
+    // czekają w kolejce w VM (consumeNewlyEarnedBadge promuje następną).
+    ui.newlyEarnedBadge?.let { badge ->
+        BadgeEarnedDialog(
+            badge = badge,
+            onDismiss = viewModel::consumeNewlyEarnedBadge
+        )
+    }
 }
 
 @Composable
 private fun ProfileContent(
     user: User,
     signInProvider: SignInProvider,
+    obtainedBadges: List<UserBadge>,
+    userRank: Int?,
     onEdit: () -> Unit,
     onOpenMyPlaces: () -> Unit,
     onOpenMyReviews: () -> Unit,
+    onOpenBadgesInfo: () -> Unit,
     onChangePassword: () -> Unit,
     onChangeEmail: () -> Unit,
     onDeleteAccount: () -> Unit,
@@ -201,7 +236,7 @@ private fun ProfileContent(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { ProfileHeaderCard(user = user, onEdit = onEdit) }
+        item { ProfileHeaderCard(user = user, userRank = userRank, onEdit = onEdit) }
 
         if (user.firstName.isNotBlank() || user.lastName.isNotBlank()) {
             item { PersonalInfoCard(user = user) }
@@ -218,7 +253,7 @@ private fun ProfileContent(
             )
         }
 
-        item { BadgesCard(user = user) }
+        item { BadgesCard(obtainedBadges = obtainedBadges, onOpenInfo = onOpenBadgesInfo) }
 
         // Sekcja "Konto i bezpieczeństwo" tylko dla email/password user.
         // Dla Google sign-in zmiana hasła jest po stronie Google,
@@ -248,61 +283,87 @@ private fun ProfileContent(
 @Composable
 private fun ProfileHeaderCard(
     user: User,
+    userRank: Int?,
     onEdit: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(
+        // Box zamiast samej Column - potrzebujemy warstwy do nakładki
+        // (plakietka TOP w prawym górnym rogu) niezależnej od centralnej
+        // kolumny z avatarem / nazwą / akcją "Edytuj profil".
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(20.dp)
         ) {
-            ProfileAvatar(avatarUrl = user.avatarUrl, size = 96.dp)
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = user.name.ifBlank { "Użytkownik" },
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            if (user.email.isNotBlank()) {
-                Spacer(Modifier.height(2.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                ProfileAvatar(avatarUrl = user.avatarUrl, size = 96.dp)
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = user.name.ifBlank { "Użytkownik" },
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                if (user.email.isNotBlank()) {
+                    Spacer(Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Filled.Email,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = user.email,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                FilledTonalButton(
+                    onClick = onEdit,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                ) {
                     Icon(
-                        imageVector = Icons.Filled.Email,
+                        imageVector = Icons.Filled.Edit,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = user.email,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Edytuj profil")
                 }
             }
-            Spacer(Modifier.height(16.dp))
-            FilledTonalButton(
-                onClick = onEdit,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(44.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Edit,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+
+            // Plakietka rangi w TOP 100 - tylko jeśli user mieści się
+            // w pierwszej setce. VM trzyma userRank ograniczony do tej
+            // puli (BADGE_RANK_POOL=100 w computeBadgeContext), ale dla
+            // bezpieczeństwa dorzucamy tu jeszcze guard.
+            //
+            // Kolor gwiazdki: gold dla 1..3, silver dla 4..10, zielony
+            // (brand-secondary) dla 11..100 - logika w [RankBadge].
+            if (userRank != null && userRank in 1..USER_RANK_BADGE_LIMIT) {
+                RankBadge(
+                    rank = userRank,
+                    label = "TOP 100",
+                    modifier = Modifier.align(Alignment.TopEnd)
                 )
-                Spacer(Modifier.width(8.dp))
-                Text("Edytuj profil")
             }
         }
     }
 }
+
+/** Górny próg rangi, dla której pokazujemy plakietkę "TOP" na profilu. */
+private const val USER_RANK_BADGE_LIMIT = 100
 
 @Composable
 private fun ProfileAvatar(
@@ -463,23 +524,194 @@ private fun MyContentCard(
 
 // --- Badges --------------------------------------------------------------
 
+/**
+ * Sekcja "Odznaki" na profilu.
+ *
+ * Pokazujemy tylko **zdobyte** odznaki (jako [BadgesRow] z półprzezroczystym
+ * tłem chipów w kolorze odznaki). Po prawej stronie nagłówka ikona "?"
+ * otwiera [BadgesInfoDialog] z pełną listą dostępnych odznak i opisem,
+ * jak je zdobyć - dzięki temu user widzi swoje progresy bez ściany
+ * "wyszarzonych" niezdobytych odznak na ekranie.
+ *
+ * Empty state: tekst "Nie masz jeszcze żadnych odznak. Sprawdź jak je zdobyć!"
+ * - sam tooltip `?` służy jako CTA, więc nie potrzebujemy osobnego buttona.
+ *
+ * @param obtainedBadges już zdobyte odznaki, wyliczone w VM z uwzględnieniem
+ *   kontekstu rankingowego (zob. ProfileViewModel.computeBadgeContext).
+ */
 @Composable
-private fun BadgesCard(user: User) {
-    val obtained = user.computeBadges().toSet()
+private fun BadgesCard(
+    obtainedBadges: List<UserBadge>,
+    onOpenInfo: () -> Unit
+) {
     SectionCard(
         title = "Odznaki",
-        leadingIcon = Icons.Filled.EmojiEvents
+        leadingIcon = Icons.Filled.EmojiEvents,
+        trailing = {
+            IconButton(
+                onClick = onOpenInfo,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.HelpOutline,
+                    contentDescription = "Jak zdobyć odznaki?",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
     ) {
-        if (obtained.isEmpty()) {
+        if (obtainedBadges.isEmpty()) {
             Text(
-                text = "Dodaj miejsca i opinie, żeby zdobywać odznaki!",
+                text = "Nie masz jeszcze żadnych odznak. Kliknij \"?\" obok, " +
+                    "żeby sprawdzić, jak je zdobyć.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.height(12.dp))
+        } else {
+            BadgesRow(badges = obtainedBadges)
         }
-        BadgesList(obtained = obtained)
     }
+}
+
+/**
+ * Dialog z listą wszystkich odznak (zdobyte + niezdobyte) + opisem
+ * progów. Używamy ikony +/- w opisach progów - kolorowo dla zdobytych
+ * (pełen kolor odznaki), wyszarzone dla pozostałych.
+ *
+ * Lista jest scrollowalna pionowo - przy 15+ odznakach nie zmieści się
+ * cała na ekranie telefonu, a Material 3 AlertDialog domyślnie tnie
+ * overflow zamiast scrollować. `verticalScroll` na wewnętrznej Column
+ * to najprostszy wzorzec, który nie wymaga LazyColumn (ten ostatni
+ * konfliktuje z mierzeniem wysokości w AlertDialog).
+ */
+@Composable
+private fun BadgesInfoDialog(
+    obtained: Set<UserBadge>,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Filled.EmojiEvents,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        },
+        title = { Text("Jak zdobyć odznaki?") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Aktywność w aplikacji nagradzamy odznakami. " +
+                        "Im więcej miejsc i opinii dodasz, tym więcej odznak zdobędziesz.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                UserBadge.entries.forEach { badge ->
+                    BadgeRowItem(
+                        badge = badge,
+                        highlighted = badge in obtained
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text("Rozumiem")
+            }
+        }
+    )
+}
+
+/**
+ * Dialog gratulacyjny pokazywany, gdy user właśnie zdobył nową odznakę.
+ *
+ * Wizualnie: duża okrągła ikona w kolorze odznaki + nazwa + krótki opis
+ * jakie warunki spełnił. Pokazywany jeden naraz - jeśli user wbił kilka
+ * odznak (np. backfill licznika reviews), kolejne czekają w VM-owym
+ * buforze i pojawią się po zamknięciu poprzedniego.
+ *
+ * Wszystkie teksty (title + content) są wyśrodkowane horyzontalnie -
+ * standardowy AlertDialog M3 trzyma title po lewej, ale dla okna typu
+ * "achievement unlock" symetria czyta się znacznie lepiej. Tylko
+ * confirmButton zostaje w naturalnej pozycji (prawy dolny róg dialogu).
+ *
+ * Świadomie blokujący - user musi kliknąć "Super!" żeby zamknąć, bo to
+ * pozytywne wydarzenie powinno się wyróżnić względem zwykłej nawigacji.
+ */
+@Composable
+private fun BadgeEarnedDialog(
+    badge: UserBadge,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(badge.color.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = badge.icon,
+                    contentDescription = null,
+                    tint = badge.color,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        },
+        title = {
+            Text(
+                text = "Gratulacje!",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Zdobyłaś/eś nową odznakę:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = badge.label,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = badge.color,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = badge.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text("Super!")
+            }
+        }
+    )
 }
 
 // --- Konto i bezpieczeństwo ---------------------------------------------
@@ -608,6 +840,7 @@ private fun NavRow(
 private fun SectionCard(
     title: String,
     leadingIcon: ImageVector? = null,
+    trailing: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     Card(
@@ -628,8 +861,10 @@ private fun SectionCard(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
                 )
+                trailing?.invoke()
             }
             Spacer(Modifier.height(12.dp))
             content()

@@ -25,6 +25,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -98,25 +99,48 @@ class FirebaseAuthRepository @Inject constructor(
         val firebaseUser = result.user
             ?: throw IllegalStateException("Rejestracja się powiodła, ale Firebase nie zwrócił użytkownika")
 
-        // Ustaw display name na FirebaseUser, zeby byl dostepny od razu w UI.
-        firebaseUser.updateProfile(
-            userProfileChangeRequest { displayName = name }
-        ).await()
+        // Z perspektywy Firebase Auth user jest już utworzony i zalogowany -
+        // dlatego dopiero tutaj możemy odpytać Firestore o unikalność loginu
+        // (reguły wymagają isSignedIn). Jeśli login okaże się zajęty, robimy
+        // rollback przez `firebaseUser.delete()`, żeby nie zostawiać konta
+        // Auth-only wiszącego bez doca w `users`.
+        try {
+            val nameLowercase = name.toUserNameLowercase()
+            if (isUsernameTaken(nameLowercase, excludeUid = firebaseUser.uid)) {
+                runCatching { firebaseUser.delete().await() }
+                throw AuthException.UsernameAlreadyTaken
+            }
 
-        // Zapisz pelen profil do kolekcji `users` (zrodlo prawdy o statystykach itp.).
-        val userDto = UserDto(
-            id = firebaseUser.uid,
-            name = name,
-            email = email,
-            avatarUrl = firebaseUser.photoUrl?.toString(),
-            createdAtMillis = System.currentTimeMillis()
-        )
-        firestore.collection(FirestoreCollections.USERS)
-            .document(firebaseUser.uid)
-            .set(userDto)
-            .await()
+            // Ustaw display name na FirebaseUser, zeby byl dostepny od razu w UI.
+            firebaseUser.updateProfile(
+                userProfileChangeRequest { displayName = name }
+            ).await()
 
-        userDto.toDomain()
+            // Zapisz pelen profil do kolekcji `users` (zrodlo prawdy o statystykach itp.).
+            val userDto = UserDto(
+                id = firebaseUser.uid,
+                name = name,
+                nameLowercase = nameLowercase,
+                email = email,
+                avatarUrl = firebaseUser.photoUrl?.toString(),
+                createdAtMillis = System.currentTimeMillis(),
+                badgeEarnedAt = emptyMap()
+            )
+            firestore.collection(FirestoreCollections.USERS)
+                .document(firebaseUser.uid)
+                .set(userDto)
+                .await()
+
+            userDto.toDomain()
+        } catch (e: Throwable) {
+            // Awaria po createUser - sprzątamy konto Auth, by user mógł
+            // spróbować ponownie z innymi danymi bez "duchów" w Auth.
+            // `runCatching` żeby błąd cleanupu nie zasłonił oryginalnego.
+            if (e !is AuthException.UsernameAlreadyTaken) {
+                runCatching { firebaseUser.delete().await() }
+            }
+            throw e
+        }
     }
 
     override suspend fun signInWithGoogle(idToken: String): OpResult<User> = runFirebase {
@@ -188,6 +212,19 @@ class FirebaseAuthRepository @Inject constructor(
         val firebaseUser = firebaseAuth.currentUser
             ?: throw IllegalStateException("Brak zalogowanego użytkownika")
 
+        // Sprawdź unikalność loginu (case-insensitive). Jeśli user zostawił
+        // ten sam display name co poprzednio, query znajdzie tylko jego
+        // własny dokument - excludeUid go odfiltrowuje.
+        //
+        // Świadomie throw zamiast `return OpResult.failure(...)`: cała funkcja
+        // ma expression body (`= try { ... } catch ...`), w którym `return`
+        // jest niedozwolony. AuthException łapie się niżej w `catch (e: AuthException)`
+        // i mapuje na OpResult.failure(e) bez tracenia typu błędu.
+        val nameLowercase = displayName.toUserNameLowercase()
+        if (isUsernameTaken(nameLowercase, excludeUid = firebaseUser.uid)) {
+            throw AuthException.UsernameAlreadyTaken
+        }
+
         // 1) Zapis do Firestore – merge, żeby nie nadpisać `placesAddedCount`,
         //    `reviewsCount`, `createdAtMillis` ani `email` (które tu nie są
         //    edytowane przez usera). Mapa zamiast pełnego DTO, bo merge na
@@ -195,6 +232,7 @@ class FirebaseAuthRepository @Inject constructor(
         //    faktycznie zmieniamy.
         val updates = mapOf(
             "name" to displayName,
+            "nameLowercase" to nameLowercase,
             "firstName" to firstName,
             "lastName" to lastName,
             "avatarUrl" to avatarUrl
@@ -225,9 +263,12 @@ class FirebaseAuthRepository @Inject constructor(
                 name = displayName,
                 firstName = firstName,
                 lastName = lastName,
-                avatarUrl = avatarUrl
+                avatarUrl = avatarUrl,
+                nameLowercase = nameLowercase
             )
         )
+    } catch (e: AuthException) {
+        OpResult.failure(e)
     } catch (e: Exception) {
         OpResult.failure(e)
     }
@@ -407,12 +448,158 @@ class FirebaseAuthRepository @Inject constructor(
 
     // --- helpers ---
 
+    override suspend fun recordBadgesEarned(
+        badgeNames: List<String>
+    ): OpResult<Unit> = try {
+        if (badgeNames.isEmpty()) {
+            OpResult.success(Unit)
+        } else {
+            val firebaseUser = firebaseAuth.currentUser
+                ?: throw IllegalStateException("Brak zalogowanego użytkownika")
+
+            // First-write-wins: czytamy istniejące timestampy i zapisujemy
+            // pole `badgeEarnedAt.NAME` TYLKO dla odznak, których nie ma
+            // jeszcze w mapie. Bez tego dwóch klientów (np. dwa urządzenia
+            // tego samego usera) nadpisałoby chronologię, gdyby uruchomili
+            // detekcję w różnych momentach.
+            //
+            // Uwaga: dot-notation w SetOptions.merge() pozwala aktualizować
+            // pojedyncze klucze mapy bez nadpisania całej mapy. Klucz
+            // `badgeEarnedAt.FIRST_PLACE` to standardowy zapis Firestore
+            // dla "podpole o tej nazwie".
+            val docRef = firestore.collection(FirestoreCollections.USERS)
+                .document(firebaseUser.uid)
+            val snap = docRef.get().await()
+            @Suppress("UNCHECKED_CAST")
+            val existing = (snap.get("badgeEarnedAt") as? Map<String, Long>).orEmpty()
+
+            val now = System.currentTimeMillis()
+            val updates = badgeNames
+                .filter { it !in existing }
+                .associate { name -> "badgeEarnedAt.$name" to now }
+
+            if (updates.isEmpty()) {
+                OpResult.success(Unit)
+            } else {
+                docRef.set(updates, SetOptions.merge()).await()
+                OpResult.success(Unit)
+            }
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
+    /**
+     * Lowercase nazwy użytkownika dla case-insensitive zapytań w Firestore.
+     *
+     * Trim + locale `pl_PL`, żeby polskie znaki (Ą/Ć/Ę/Ł/Ń/Ó/Ś/Ź/Ż) zostały
+     * znormalizowane spójnie z [com.kidzone.utils.TextNormalization]. Dla
+     * pustego inputa zwraca pusty string - nie zapisujemy w bazie "ducha"
+     * (puste `nameLowercase` w Firestore nie matchuje żadnemu zapytaniu
+     * `whereEqualTo("nameLowercase", X)`).
+     */
+    private fun String.toUserNameLowercase(): String =
+        trim().lowercase(Locale("pl", "PL"))
+
+    /**
+     * True gdy istnieje inny użytkownik z taką samą lowercase nazwą.
+     *
+     * Wymaga, by aktualnie wołający był zalogowany - reguły Firestore
+     * dla `users` mają `read: if isSignedIn()`. W praktyce wołamy z
+     * - register (po `createUserWithEmailAndPassword` user już jest signed-in),
+     * - updateUserProfile (zalogowany z definicji).
+     *
+     * @param excludeUid pominąć dokument o tym uid - używane przy edycji
+     *   profilu, żeby user mógł zachować tę samą nazwę.
+     *
+     * Strategia dwustopniowa:
+     *  1. **Fast path** - `whereEqualTo("nameLowercase", X)`. Działa dla
+     *     wszystkich userów zarejestrowanych po wprowadzeniu pola
+     *     [UserDto.nameLowercase] oraz dla legacy userów po backfillu
+     *     w `ensureUserDoc` (przy ich pierwszym kolejnym sign-inie).
+     *  2. **Legacy fallback** - skan do [LEGACY_SCAN_LIMIT] doców bez
+     *     wypełnionego `nameLowercase` i porównanie ich `name`
+     *     case-insensitive po stronie klienta. Bez tego user "Adam"
+     *     z legacy bazy mógłby zostać "zduplikowany" przez nową
+     *     rejestrację jako "adam" / "ADAM" - dokładnie ten bug, który
+     *     zgłaszamy w Issue #username-uniqueness.
+     *
+     *     Skan jest cap-owany, bo przy dużej bazie userów nie chcemy
+     *     ciągnąć wszystkich na klient - legacy doców z czasem ubywa
+     *     (każdy login to backfill), więc fallback w naturalny sposób
+     *     staje się "tańszy".
+     *
+     * Best-effort: błąd Firestore (np. brak sieci) traktujemy jako
+     * "nie wiemy, więc puszczamy" zamiast blokować całą rejestrację -
+     * alternatywnie każdy timeout sieci skutkowałby "nazwa zajęta",
+     * co mylące. Race condition (dwóch userów rejestrujących to samo
+     * imię równocześnie) świadomie ignorujemy dla MVP - przy małej
+     * skali ryzyko znikome, a alternatywą jest osobna kolekcja
+     * `usernames/{lowercaseName}` z transakcyjnym zapisem.
+     */
+    private suspend fun isUsernameTaken(
+        nameLowercase: String,
+        excludeUid: String?
+    ): Boolean {
+        if (nameLowercase.isBlank()) return false
+        return try {
+            // 1) Fast path - po backfillu wszyscy userzy mają to pole.
+            //    Świadomie nie używamy `return@try` (Kotlin nie zna labela
+            //    `try`) - zamiast tego if/else z fallbackiem w gałęzi else.
+            val byField = firestore.collection(FirestoreCollections.USERS)
+                .whereEqualTo("nameLowercase", nameLowercase)
+                .limit(2)
+                .get()
+                .await()
+            val fastPathHit = byField.documents.any { it.id != excludeUid }
+
+            if (fastPathHit) {
+                true
+            } else {
+                // 2) Legacy fallback - dokumenty bez wypełnionego nameLowercase
+                //    (zarejestrowane przed wprowadzeniem tego pola). Bierzemy
+                //    z cap-em, porównujemy lowercase'y `name` po stronie klienta.
+                //    Jeśli match, zwracamy true.
+                val legacyScan = firestore.collection(FirestoreCollections.USERS)
+                    .limit(LEGACY_SCAN_LIMIT.toLong())
+                    .get()
+                    .await()
+                legacyScan.documents.any { doc ->
+                    if (doc.id == excludeUid) return@any false
+                    val storedNameLc = doc.getString("nameLowercase").orEmpty()
+                    if (storedNameLc.isNotBlank()) {
+                        // Już objęty fast path-em (1) - tu liczy się tylko legacy.
+                        return@any false
+                    }
+                    val storedName = doc.getString("name").orEmpty()
+                    storedName.toUserNameLowercase() == nameLowercase
+                }
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private companion object {
+        /**
+         * Maks. liczba dokumentów `users` skanowanych przez legacy fallback
+         * w [isUsernameTaken]. Gdy baza userów dramatycznie urośnie a
+         * legacy doców nadal będzie wiele, lepiej jednorazowo zmigrować
+         * (skrypt admin SDK setujący `nameLowercase` dla wszystkich) -
+         * wtedy ten cap można obniżyć / usunąć.
+         */
+        const val LEGACY_SCAN_LIMIT = 500
+    }
+
     /**
      * Upewnia się, że istnieje dokument w `users/{uid}` dla zalogowanego usera.
      *
-     * Jeśli doc już istnieje – nic nie robi (żadnego zapisu, żeby nie nadpisać
-     * np. zmienionego przez usera display name w Firestore).
-     * Jeśli go brak – tworzy go z danych z [FirebaseUser]. Kontuery
+     * Jeśli doc już istnieje – sprawdzamy też, czy ma uzupełnione pole
+     * [UserDto.nameLowercase] i ewentualnie je dorzucamy (backfill dla
+     * legacy doców sprzed wprowadzenia tego pola). Inne pola zostają
+     * nietknięte, żeby nie nadpisać zmienionego przez usera display name.
+     *
+     * Jeśli go brak – tworzy go z danych z [FirebaseUser]. Liczniki
      * (`placesAddedCount`, `reviewsCount`) zostawiamy domyślne (0) z [UserDto].
      *
      * Ta metoda jest najtańszą formą self-healingu po stronie klienta:
@@ -425,14 +612,28 @@ class FirebaseAuthRepository @Inject constructor(
         try {
             val snap = docRef.get().await()
             if (!snap.exists()) {
+                val displayName = firebaseUser.displayName.orEmpty()
                 val userDto = UserDto(
                     id = firebaseUser.uid,
-                    name = firebaseUser.displayName.orEmpty(),
+                    name = displayName,
+                    nameLowercase = displayName.toUserNameLowercase(),
                     email = firebaseUser.email.orEmpty(),
                     avatarUrl = firebaseUser.photoUrl?.toString(),
                     createdAtMillis = System.currentTimeMillis()
                 )
                 docRef.set(userDto).await()
+            } else {
+                // Backfill `nameLowercase` jeśli stary doc go nie ma (a jest
+                // niepuste `name`). Idempotentne - jak już jest wypełnione,
+                // nie generuje write'a.
+                val existingNameLc = snap.getString("nameLowercase").orEmpty()
+                val existingName = snap.getString("name").orEmpty()
+                if (existingNameLc.isBlank() && existingName.isNotBlank()) {
+                    docRef.set(
+                        mapOf("nameLowercase" to existingName.toUserNameLowercase()),
+                        SetOptions.merge()
+                    ).await()
+                }
             }
         } catch (_: Exception) {
             // Świadomie tłumimy: brak doca w users to *nie* powód, by uniemożliwić
@@ -457,6 +658,11 @@ class FirebaseAuthRepository @Inject constructor(
      */
     private inline fun <T> runFirebase(block: () -> T): OpResult<T> = try {
         OpResult.success(block())
+    } catch (e: AuthException) {
+        // Domain error rzucony przez nas (np. UsernameAlreadyTaken z
+        // registerWithEmail). Przepuszczamy bez wrapowania w Network,
+        // żeby UI dostał typowany błąd.
+        OpResult.failure(e)
     } catch (e: FirebaseAuthInvalidUserException) {
         OpResult.failure(AuthException.UserNotFound)
     } catch (e: FirebaseAuthInvalidCredentialsException) {

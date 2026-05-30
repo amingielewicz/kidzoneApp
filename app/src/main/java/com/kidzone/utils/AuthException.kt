@@ -14,7 +14,17 @@ sealed class AuthException(message: String) : Exception(message) {
     data object InvalidCredentials : AuthException("Nieprawidłowy e-mail lub hasło")
 
     /** Konto z tym e-mailem już istnieje (rejestracja). */
-    data object EmailAlreadyInUse : AuthException("Ten e-mail jest już zajęty")
+    data object EmailAlreadyInUse : AuthException("Konto z tym adresem e-mail już istnieje")
+
+    /**
+     * Wybrany login (publiczny nick) jest już używany przez innego użytkownika.
+     * Ekran rejestracji / edycji profilu pyta usera o inną nazwę.
+     *
+     * Niezależny od [EmailAlreadyInUse] - email kontroluje Firebase Auth,
+     * login kontrolujemy my po stronie Firestore (kolekcja `users`).
+     */
+    data object UsernameAlreadyTaken :
+        AuthException("Ta nazwa użytkownika jest już zajęta. Wybierz inną.")
 
     /**
      * Hasło nie spełnia wymagań siły. Komunikat zsynchronizowany z lokalną

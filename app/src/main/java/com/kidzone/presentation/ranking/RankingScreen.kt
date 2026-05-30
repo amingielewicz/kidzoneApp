@@ -49,8 +49,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.User
-import com.kidzone.presentation.common.BadgesRow
-import com.kidzone.presentation.common.computeBadges
+import com.kidzone.presentation.common.BadgesIconRow
+import com.kidzone.presentation.common.UserBadge
+import com.kidzone.presentation.common.chronologicalOrder
 import com.kidzone.presentation.common.style
 
 /**
@@ -124,7 +125,10 @@ fun RankingScreen(
                     places = state.topPlaces,
                     onOpenPlaceDetails = onOpenPlaceDetails
                 )
-                else -> TopUsersList(users = state.topUsers)
+                else -> TopUsersList(
+                    users = state.topUsers,
+                    badgesByUserId = state.userBadges
+                )
             }
         }
     }
@@ -138,7 +142,10 @@ private fun TopPlacesList(
     if (places.isEmpty()) {
         FullScreenCentered {
             Text(
-                text = "Brak ocenionych miejsc – dodaj pierwsze i wystaw opinię!",
+                // Po wprowadzeniu filtra "tylko miejsca z >0 opinii" pusta
+                // lista znaczy, że jeszcze nikt nie wystawił żadnej opinii -
+                // komunikat sugeruje konkretną akcję.
+                text = "Żadne miejsce nie ma jeszcze opinii. Wystaw pierwszą!",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -163,11 +170,16 @@ private fun TopPlacesList(
 }
 
 @Composable
-private fun TopUsersList(users: List<User>) {
+private fun TopUsersList(
+    users: List<User>,
+    badgesByUserId: Map<String, List<UserBadge>>
+) {
     if (users.isEmpty()) {
         FullScreenCentered {
             Text(
-                text = "Brak użytkowników z dodanymi miejscami.",
+                // Po filtrze "min. 1 dodane miejsce LUB 1 opinia" pusta lista
+                // = jeszcze nikt nie zaczął żadnej aktywności w aplikacji.
+                text = "Brak aktywnych użytkowników. Bądź pierwszy - dodaj miejsce lub opinię!",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -182,7 +194,12 @@ private fun TopUsersList(users: List<User>) {
     ) {
         items(items = users, key = { it.id }) { user ->
             val position = users.indexOf(user) + 1
-            TopUserCard(position = position, user = user)
+            // Z mapy precomputed badges (z BadgeContext z VM) bierzemy
+            // pełny zestaw - count-based + ranking-based. Fallback na
+            // pustą listę, gdyby VM jeszcze nie zdążył zapełnić mapy
+            // (np. w trakcie pierwszego ładowania).
+            val badges = badgesByUserId[user.id].orEmpty()
+            TopUserCard(position = position, user = user, badges = badges)
         }
     }
 }
@@ -258,10 +275,9 @@ private fun TopPlaceCard(
 @Composable
 private fun TopUserCard(
     position: Int,
-    user: User
+    user: User,
+    badges: List<UserBadge>
 ) {
-    val badges = user.computeBadges()
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -288,7 +304,13 @@ private fun TopUserCard(
             }
             if (badges.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                BadgesRow(badges = badges)
+                // Icon-only row, sortowane chronologicznie (od najwcześniej
+                // zdobytej do najnowszej). Bez tekstu - cała karta usera
+                // jest już ciasna (rank + nazwa + statystyki), opisy by się
+                // nie zmieściły. Pełna lista dostępna w profilu.
+                BadgesIconRow(
+                    badges = chronologicalOrder(badges, user.badgeEarnedAt)
+                )
             }
         }
     }

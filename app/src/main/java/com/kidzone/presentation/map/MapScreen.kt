@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -272,8 +273,11 @@ fun MapScreen(
             FiltersOverlay(
                 selectedCategory = state.selectedCategory,
                 topRatedOnly = state.topRatedOnly,
+                addedByMeOnly = state.addedByMeOnly,
+                showAddedByMeChip = state.currentUserId != null,
                 onCategorySelected = viewModel::onCategorySelected,
                 onToggleTopRated = viewModel::toggleTopRated,
+                onToggleAddedByMe = viewModel::toggleAddedByMe,
                 modifier = Modifier.fillMaxWidth()
             )
             if (!locationPermissionGranted) {
@@ -440,13 +444,21 @@ private fun LocationPermissionBanner(
 /**
  * Pasek z chipami filtrów nad mapą – wystylowany jako lekko podniesiona
  * powierzchnia, żeby był czytelny zarówno na jasnym, jak i ciemnym tle mapy.
+ *
+ * Drugi rząd zawiera dodatkowe filtry boolean:
+ *  - "Najlepiej oceniane" – zawsze widoczny,
+ *  - "Dodane przez Ciebie" – tylko gdy [showAddedByMeChip] = true (czyli
+ *    user jest zalogowany; dla wylogowanego chip nie ma sensu).
  */
 @Composable
 private fun FiltersOverlay(
     selectedCategory: PlaceCategory?,
     topRatedOnly: Boolean,
+    addedByMeOnly: Boolean,
+    showAddedByMeChip: Boolean,
     onCategorySelected: (PlaceCategory?) -> Unit,
     onToggleTopRated: () -> Unit,
+    onToggleAddedByMe: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Kolejność jak w enum PlaceCategory (świadomie nie alfabetycznie –
@@ -492,11 +504,13 @@ private fun FiltersOverlay(
                 }
             }
 
-            // Rząd 2: dodatkowe toggle (na razie tylko "najlepiej oceniane").
-            // "Darmowe" wymagałoby pola w `Place` – patrz docs MapViewModel.
+            // Rząd 2: dodatkowe toggle. Scrollowany horyzontalnie, żeby
+            // przy włączeniu obu chipów + węższym ekranie nic się nie chowało
+            // za krawędź.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 8.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -514,6 +528,21 @@ private fun FiltersOverlay(
                     },
                     label = { Text("Najlepiej oceniane") }
                 )
+                if (showAddedByMeChip) {
+                    FilterChip(
+                        selected = addedByMeOnly,
+                        onClick = onToggleAddedByMe,
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.Person,
+                                contentDescription = null,
+                                tint = if (addedByMeOnly) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        label = { Text("Dodane przez Ciebie") }
+                    )
+                }
             }
         }
     }

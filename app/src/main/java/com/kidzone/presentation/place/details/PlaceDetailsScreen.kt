@@ -72,6 +72,7 @@ import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.model.User
+import com.kidzone.presentation.common.RankBadge
 import com.kidzone.presentation.common.style
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -232,6 +233,7 @@ fun PlaceDetailsScreen(
                         author = state.author,
                         reviews = state.reviews,
                         currentUserId = currentUser?.id,
+                        topRank = state.topRank,
                         sortOrder = state.sortOrder,
                         onSortOrderChange = viewModel::setSortOrder,
                         onAddReview = viewModel::openAddReviewSheet,
@@ -279,6 +281,7 @@ private fun PlaceDetailsContent(
     author: User?,
     reviews: List<Review>,
     currentUserId: String?,
+    topRank: Int?,
     sortOrder: PlaceDetailsViewModel.ReviewSortOrder,
     onSortOrderChange: (PlaceDetailsViewModel.ReviewSortOrder) -> Unit,
     onAddReview: () -> Unit,
@@ -306,7 +309,9 @@ private fun PlaceDetailsContent(
         item {
             PlaceMainCard(
                 place = place,
-                author = author
+                author = author,
+                currentUserId = currentUserId,
+                topRank = topRank
             )
         }
 
@@ -391,30 +396,37 @@ private fun PlaceDetailsContent(
 
 /**
  * Główna karta szczegółów miejsca – "jedno okno" w którym po kolei są:
- *  1. nazwa + ikona kategorii + ocena (header),
+ *  1. nazwa + ikona kategorii + ocena (header) + (opc.) plakietka TOP 100,
  *  2. opis (jeśli niepusty),
  *  3. adres + współrzędne,
  *  4. mały przycisk „Nawiguj" wyrzucający do Google Maps w trybie
  *     turn-by-turn navigation (intent z `maps/dir/?api=1`),
- *  5. autor + data dodania.
+ *  5. autor + data dodania (lub "Dodano przez Ciebie", gdy zalogowany user
+ *     jest właścicielem - patrz [authorLine]).
  *
  * Bez sub-headerów typu "Opis"/"Lokalizacja" – wizualnie jeden spójny
  * blok, a delikatne dividery rozdzielają poszczególne kawałki.
+ *
+ * @param topRank pozycja w rankingu TOP 100 (1-based), tylko gdy <= 10.
+ *   Null = nie pokazujemy plakietki.
  */
 @Composable
 private fun PlaceMainCard(
     place: Place,
-    author: User?
+    author: User?,
+    currentUserId: String?,
+    topRank: Int?
 ) {
     val style = place.category.style
     val context = LocalContext.current
+    val isOwnerLine = currentUserId != null && currentUserId == place.ownerUserId
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // --- 1. Header: nazwa + kategoria + ocena ---
+            // --- 1. Header: nazwa + kategoria + ocena + (opc.) plakietka TOP 100 ---
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = style.icon,
@@ -433,6 +445,17 @@ private fun PlaceMainCard(
                         text = stringResource(place.category.labelRes),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                // Plakietka rankingu - obok nazwy, jak gwiazdka jakości.
+                // Pokazujemy tylko dla pierwszej dziesiątki TOP 100;
+                // dla pozostałych miejsc nic nie renderujemy (brak Box-a).
+                if (topRank != null) {
+                    Spacer(Modifier.width(8.dp))
+                    RankBadge(
+                        rank = topRank,
+                        label = "TOP 100",
+                        modifier = Modifier.padding(horizontal = 4.dp)
                     )
                 }
             }
@@ -522,6 +545,10 @@ private fun PlaceMainCard(
             }
 
             // --- 4. Dodano przez ---
+            // Dla zalogowanego usera-właściciela pokazujemy "Dodano przez Ciebie"
+            // (z datą), zamiast jego własnego nicka - taka konwencja jest
+            // czytelniejsza, bo użytkownik nie musi rozpoznawać samego siebie
+            // w nagłówku miejsca.
             SoftDivider()
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
@@ -531,16 +558,16 @@ private fun PlaceMainCard(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(6.dp))
-                val authorName = author?.name?.takeIf { it.isNotBlank() }
                 val datePart = place.createdAtMillis
                     .takeIf { it > 0L }
                     ?.let { " · " + formatDate(it) }
                     .orEmpty()
+                val authorName = author?.name?.takeIf { it.isNotBlank() }
                 Text(
-                    text = if (authorName != null) {
-                        "Dodano przez $authorName$datePart"
-                    } else {
-                        "Dodano przez nieznanego użytkownika$datePart"
+                    text = when {
+                        isOwnerLine -> "Dodano przez Ciebie$datePart"
+                        authorName != null -> "Dodano przez $authorName$datePart"
+                        else -> "Dodano przez nieznanego użytkownika$datePart"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant

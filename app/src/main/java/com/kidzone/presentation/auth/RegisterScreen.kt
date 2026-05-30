@@ -1,5 +1,6 @@
 package com.kidzone.presentation.auth
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +38,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -50,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -66,9 +69,14 @@ import com.kidzone.utils.PasswordPolicy
 /**
  * Ekran rejestracji - nazwa, e-mail, hasło zgodne z [PasswordPolicy].
  *
- * Layout dopasowany do [LoginScreen]: gradient tła, karta z formularzem,
- * leading-iconki w polach. Pod polem hasła pokazujemy checklist wymagań,
- * dzięki któremu user widzi w czasie rzeczywistym, co jeszcze musi zrobić.
+ * Layout dopasowany do [LoginScreen]: gradient tła, logo brandu w nagłówku,
+ * karta z formularzem, leading-iconki w polach. Pod polem hasła pokazujemy
+ * checklist wymagań, dzięki któremu user widzi w czasie rzeczywistym, co
+ * jeszcze musi zrobić.
+ *
+ * Tytuł karty "Stwórz konto" + subtitle "Dołącz do społeczności kidZone".
+ * Stopka pod kartą - skrót "Masz już konto? Zaloguj się" prowadzi z
+ * powrotem do LoginScreen przez [onBack] (Navigation popBackStack).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,10 +104,10 @@ fun RegisterScreen(
         containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.register)) },
+                title = { /* tytuł świadomie pusty - hierarchia w karcie */ },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Wstecz")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -118,9 +126,22 @@ fun RegisterScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Logo brandu - mniejsze niż na LoginScreen, bo ekran ma
+                // jeszcze TopAppBar i nagłówek karty pod spodem. fillMaxWidth(0.4f)
+                // daje proporcję ~120-180dp na typowych telefonach.
+                Image(
+                    painter = painterResource(R.drawable.ic_splash_logo),
+                    contentDescription = stringResource(R.string.app_name),
+                    modifier = Modifier
+                        .fillMaxWidth(0.4f)
+                        .widthIn(max = 180.dp)
+                )
+
+                Spacer(Modifier.height(8.dp))
+
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -137,11 +158,12 @@ fun RegisterScreen(
                         Text(
                             text = "Stwórz konto",
                             style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            text = "Wpisz dane, by dołączyć do społeczności kidZone",
+                            text = "Dołącz do społeczności kidZone i zacznij odkrywać miejsca przyjazne dzieciom",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
@@ -151,17 +173,33 @@ fun RegisterScreen(
                         OutlinedTextField(
                             value = state.name,
                             onValueChange = viewModel::onNameChange,
-                            label = { RequiredFieldLabel("Nazwa") },
+                            label = { RequiredFieldLabel("Nazwa użytkownika") },
                             leadingIcon = {
                                 Icon(Icons.Filled.Person, contentDescription = null)
+                            },
+                            trailingIcon = {
+                                if (state.name.isNotEmpty() && state.isNameValid) {
+                                    Icon(
+                                        imageVector = Icons.Filled.CheckCircle,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.secondary
+                                    )
+                                }
                             },
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             isError = state.name.isNotEmpty() && !state.isNameValid,
+                            supportingText = {
+                                Text(
+                                    text = "Widoczna w opiniach, miejscach i rankingu",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                )
+                            },
                             enabled = !state.isLoading,
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(8.dp))
 
                         OutlinedTextField(
                             value = state.email,
@@ -169,6 +207,15 @@ fun RegisterScreen(
                             label = { RequiredFieldLabel(stringResource(R.string.email)) },
                             leadingIcon = {
                                 Icon(Icons.Filled.Email, contentDescription = null)
+                            },
+                            trailingIcon = {
+                                if (state.email.isNotEmpty() && state.isEmailValid) {
+                                    Icon(
+                                        imageVector = Icons.Filled.CheckCircle,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.secondary
+                                    )
+                                }
                             },
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
@@ -182,7 +229,7 @@ fun RegisterScreen(
                             enabled = !state.isLoading,
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(8.dp))
 
                         OutlinedTextField(
                             value = state.password,
@@ -261,7 +308,29 @@ fun RegisterScreen(
                     }
                 }
 
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(16.dp))
+
+                // Stopka - powrót do logowania.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Masz już konto?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                    )
+                    TextButton(
+                        onClick = onBack,
+                        enabled = !state.isLoading
+                    ) {
+                        Text(
+                            text = stringResource(R.string.login),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
             }
         }
     }

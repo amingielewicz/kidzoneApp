@@ -38,6 +38,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -166,14 +167,23 @@ fun HomeScreen(
 }
 
 /**
- * Pełnoszerokościowy hero – gradient z primary do primaryContainer
- * + powitanie i tagline. Pełni rolę "loga" ekranu Start.
+ * Hero ekranu Start - powitanie + tagline na tle gradientu w brand-blue.
+ *
+ * Wizualnie celowo "uniesiony": nie pełnoszerokościowy bar przyklejony do
+ * krawędzi ekranu, tylko karta z marginesami po bokach i zaokrąglonymi
+ * rogami. Daje to "troszkę węższy" niebieski blok z tekstem, który
+ * lepiej dialoguje z kartami "Top miejsca" / "Blisko Ciebie" pod spodem
+ * (one też mają boczne paddingi 16 dp). Tekst wewnątrz dodatkowo nie
+ * rozciąga się na 100% szerokości karty - ograniczamy go do ~88%, żeby
+ * długie taglines nie dotykały prawej krawędzi gradientu.
  */
 @Composable
 private fun HeroSection() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .clip(RoundedCornerShape(20.dp))
             .height(160.dp)
             .background(
                 brush = Brush.verticalGradient(
@@ -186,7 +196,11 @@ private fun HeroSection() {
             .padding(horizontal = 24.dp, vertical = 24.dp),
         contentAlignment = Alignment.CenterStart
     ) {
-        Column {
+        Column(
+            // ~88% szerokości karty - tekst zostaje czytelny, a niebieski blok
+            // wygląda "troszkę węższy" niż gdyby napis biegł od krawędzi do krawędzi.
+            modifier = Modifier.fillMaxWidth(0.88f)
+        ) {
             Text(
                 text = stringResource(R.string.home_welcome),
                 style = MaterialTheme.typography.headlineSmall,

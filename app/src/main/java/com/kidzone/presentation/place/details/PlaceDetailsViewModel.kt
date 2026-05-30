@@ -24,6 +24,26 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
+ * Rozmiar puli "ranking TOP 100" - tyle najlepiej ocenianych miejsc bierzemy
+ * pod uwagę przy wyliczaniu pozycji w plakietce na ekranie szczegółów.
+ *
+ * Spójne z labelem "TOP 100" pokazywanym nad gwiazdką - user ma świadomość,
+ * że plakietka odnosi się do rankingu setki najlepszych miejsc, mimo że
+ * sama wyświetla się tylko dla pierwszej dziesiątki ([TOP_RANKING_BADGE_LIMIT]).
+ */
+private const val TOP_RANKING_POOL = 100
+
+/**
+ * Górna granica pozycji, dla której pokazujemy plakietkę "TOP 100" z numerem.
+ *
+ * Świadoma decyzja: tylko miejsca w pierwszej 10 dostają wizualne wyróżnienie -
+ * w przeciwnym wypadku plakietka byłaby na każdej karcie i straciłaby
+ * znaczenie. "TOP 100" w treści labelu odnosi się do puli rankingowej
+ * (zob. [TOP_RANKING_POOL]), nie do liczby plakietek.
+ */
+private const val TOP_RANKING_BADGE_LIMIT = 10
+
+/**
  * ViewModel ekranu szczegółów miejsca.
  *
  * Ładuje:
@@ -67,6 +87,10 @@ class PlaceDetailsViewModel @Inject constructor(
      *   wyświetlenia przez UI Snackbara. Ekran konsumuje go przez
      *   [consumeReviewActionEvent], dzięki czemu rotacja / re-kompozycja nie
      *   pokażą snackbara dwa razy.
+     * @property topRank pozycja miejsca w rankingu TOP 100 (1-based) jeżeli
+     *   miejsce mieści się w pierwszej dziesiątce; null w pozostałych
+     *   przypadkach (poza top 10, brak ocen, błąd fetcha rankingu). UI
+     *   pokazuje plakietkę z numerem tylko gdy != null.
      */
     data class UiState(
         val place: Place? = null,
@@ -82,7 +106,8 @@ class PlaceDetailsViewModel @Inject constructor(
         val addReviewError: String? = null,
         val editingReview: Review? = null,
         val sortOrder: ReviewSortOrder = ReviewSortOrder.NEWEST,
-        val reviewActionEvent: ReviewActionEvent? = null
+        val reviewActionEvent: ReviewActionEvent? = null,
+        val topRank: Int? = null
     )
 
     /**
@@ -176,12 +201,48 @@ class PlaceDetailsViewModel @Inject constructor(
                         it.copy(place = result.data, isLoading = false, errorMessage = null)
                     }
                     loadAuthor(result.data.ownerUserId)
+                    loadTopRank()
                 }
                 is OpResult.Failure -> _uiState.update {
                     it.copy(
                         isLoading = false,
                         errorMessage = result.error.message ?: "Nie udało się wczytać miejsca"
                     )
+                }
+            }
+        }
+    }
+
+    /**
+     * Pobiera ranking top 100 miejsc i wylicza pozycję bieżącego miejsca.
+     *
+     * Reguła wyświetlania plakietki TOP 100 (zob. [UiState.topRank]):
+     *  - bierzemy [TOP_RANKING_POOL] (100) najlepiej ocenianych miejsc,
+     *  - sprawdzamy pozycję (1-based) bieżącego miejsca,
+     *  - jeżeli mieści się w [TOP_RANKING_BADGE_LIMIT] (10) - ustawiamy
+     *    `topRank = pozycja` i UI pokazuje plakietkę,
+     *  - w przeciwnym wypadku zostawiamy `topRank = null`.
+     *
+     * Best-effort: błąd fetcha (np. brak sieci) tylko zostawia `topRank = null`,
+     * ekran szczegółów się przez to nie psuje.
+     *
+     * Świadomie one-shot fetch zamiast snapshot listenera - ranking nie musi
+     * być real-time na ekranie szczegółów, a unikamy dodatkowego listenera
+     * na całej kolekcji `places`.
+     */
+    private fun loadTopRank() {
+        val placeIdSnapshot = _uiState.value.place?.id ?: return
+        viewModelScope.launch {
+            when (val result = placeRepository.getTopPlaces(TOP_RANKING_POOL)) {
+                is OpResult.Success -> {
+                    val rank = result.data.indexOfFirst { it.id == placeIdSnapshot }
+                    val rankOrNull = if (rank in 0 until TOP_RANKING_BADGE_LIMIT) {
+                        rank + 1 // 1-based
+                    } else null
+                    _uiState.update { it.copy(topRank = rankOrNull) }
+                }
+                is OpResult.Failure -> {
+                    // brak rankingu = brak plakietki, ale ekran nadal działa
                 }
             }
         }

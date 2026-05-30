@@ -24,5 +24,33 @@ data class User(
     val avatarUrl: String? = null,
     val placesAddedCount: Int = 0,
     val reviewsCount: Int = 0,
-    val createdAtMillis: Long = 0L
+    val createdAtMillis: Long = 0L,
+    /**
+     * Lowercase wersja [name] (locale pl_PL). Zapisywana w Firestore obok
+     * [name] po to, by można było robić zapytanie `whereEqualTo("nameLowercase", ...)`
+     * i sprawdzać unikalność loginu case-insensitive (Firestore nie ma natywnego
+     * collation). Pole jest zarządzane przez warstwę data; UI nie powinien go
+     * modyfikować bezpośrednio.
+     *
+     * Pusty string = legacy doc bez tego pola; warstwa data uzupełnia
+     * automatycznie przy najbliższym save / sign-in (zob. `ensureUserDoc`
+     * i `backfillNameLowercase` w FirebaseAuthRepository).
+     */
+    val nameLowercase: String = "",
+    /**
+     * Mapa: nazwa odznaki ([com.kidzone.presentation.common.UserBadge.name]) ->
+     * timestamp zdobycia w millis (System.currentTimeMillis na kliencie,
+     * który wykrył nową odznakę po raz pierwszy).
+     *
+     * Wykorzystywane do sortowania chronologicznego ikon w
+     * [com.kidzone.presentation.common.BadgesIconRow] na karcie usera w
+     * rankingu - wszyscy klienci widzą ten sam porządek "kto co kiedy
+     * zdobył", niezależnie od tego, na którym urządzeniu user przekroczył
+     * próg.
+     *
+     * Brak wpisu = odznaka jeszcze nie zdobyta lub legacy user, którego
+     * profilu nigdy nie otwarto w wersji z tym polem. Sort fallback w
+     * UI ustawia takich userów na koniec (sortedBy z Long.MAX_VALUE).
+     */
+    val badgeEarnedAt: Map<String, Long> = emptyMap()
 )

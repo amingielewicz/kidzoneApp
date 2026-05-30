@@ -20,7 +20,24 @@ data class UserDto(
     val avatarUrl: String? = null,
     val placesAddedCount: Int = 0,
     val reviewsCount: Int = 0,
-    val createdAtMillis: Long = 0L
+    val createdAtMillis: Long = 0L,
+    /**
+     * Lowercase wersja [name] dla case-insensitive zapytań w Firestore
+     * (whereEqualTo("nameLowercase", ...)). Default "" zachowuje wsteczną
+     * kompatybilność z dokumentami z legacy schema; FirebaseAuthRepository
+     * uzupełnia pole przy najbliższej operacji write.
+     */
+    val nameLowercase: String = "",
+    /**
+     * Mapa odznak (UserBadge.name) -> timestamp zdobycia (millis).
+     * Wypełniana przez ProfileViewModel via AuthRepository.recordBadgesEarned
+     * w momencie pierwszej detekcji nowej odznaki na danym urządzeniu.
+     *
+     * Default emptyMap() = legacy / brak danych; sortowanie chronologiczne
+     * w UI traktuje brak wpisu jako "nieznana data" i sortuje takie
+     * odznaki na koniec.
+     */
+    val badgeEarnedAt: Map<String, Long> = emptyMap()
 ) {
     fun toDomain(): User = User(
         id = id,
@@ -31,7 +48,9 @@ data class UserDto(
         avatarUrl = avatarUrl,
         placesAddedCount = placesAddedCount,
         reviewsCount = reviewsCount,
-        createdAtMillis = createdAtMillis
+        createdAtMillis = createdAtMillis,
+        nameLowercase = nameLowercase,
+        badgeEarnedAt = badgeEarnedAt
     )
 
     companion object {
@@ -44,7 +63,9 @@ data class UserDto(
             avatarUrl = user.avatarUrl,
             placesAddedCount = user.placesAddedCount,
             reviewsCount = user.reviewsCount,
-            createdAtMillis = user.createdAtMillis
+            createdAtMillis = user.createdAtMillis,
+            nameLowercase = user.nameLowercase,
+            badgeEarnedAt = user.badgeEarnedAt
         )
     }
 }
