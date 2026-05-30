@@ -29,9 +29,14 @@ import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kidzone.domain.model.User
 
@@ -337,9 +343,15 @@ fun BadgesRow(
  * Wartość [iconSize] jest wybrana świadomie: 24dp daje dobry balans
  * "widoczne, ale nie dominujące nad nazwą usera + statystykami".
  *
+ * **Tooltip**: każda ikona owinięta jest w [TooltipBox] z [PlainTooltip]
+ * pokazującym nazwę odznaki. Na touch screenie pojawia się po long-press,
+ * na urządzeniach z myszką (Chromebook / Samsung DeX) po hover. Bez tego
+ * user nie wie co znaczy ikona, bo nie pokazujemy labeli.
+ *
  * Brak akcji on-click - karta usera w rankingu jako całość jest klikalna
  * (otwiera profil), więc dodatkowy click handler na ikonkach by tylko
- * blokował to globalne zachowanie.
+ * blokował to globalne zachowanie. Long-press i tap są obsługiwane
+ * niezależnie - tooltip nie konsumuje tap-u, tylko long-press.
  *
  * @param badges lista odznak DO WYŚWIETLENIA. Wywołujący decyduje
  *   o sortowaniu (zwykle [chronologicalOrder]).
@@ -349,7 +361,7 @@ fun BadgesRow(
 fun BadgesIconRow(
     badges: List<UserBadge>,
     modifier: Modifier = Modifier,
-    iconSize: androidx.compose.ui.unit.Dp = 24.dp
+    iconSize: Dp = 24.dp
 ) {
     if (badges.isEmpty()) return
     FlowRow(
@@ -358,22 +370,52 @@ fun BadgesIconRow(
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         badges.forEach { badge ->
-            Box(
-                modifier = Modifier
-                    .size(iconSize)
-                    .clip(CircleShape)
-                    .background(badge.color.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = badge.icon,
-                    // contentDescription daje a11y "label" dla TalkBacka,
-                    // jednoczesnie nie zaburzajac wizualnie kompaktowego rzedu.
-                    contentDescription = badge.label,
-                    tint = badge.color,
-                    modifier = Modifier.size(iconSize * 0.6f)
-                )
+            BadgeIconTile(badge = badge, iconSize = iconSize)
+        }
+    }
+}
+
+/**
+ * Pojedyncza okrągła ikona odznaki + Material 3 [TooltipBox] z nazwą.
+ *
+ * Wyciągnięte z [BadgesIconRow] do osobnego composable, bo:
+ *  - `rememberTooltipState()` musi być wywołane raz per ikona (nie raz
+ *    dla całego rzędu),
+ *  - keeps `forEach { ... }` w BadgesIconRow czytelnym (jedna linia).
+ *
+ * `TooltipDefaults.rememberPlainTooltipPositionProvider()` ustawia
+ * tooltip nad/pod ikoną automatycznie wybierając lepszą pozycję względem
+ * krawędzi ekranu - nie musimy się martwić o ikonki przy prawej krawędzi
+ * karty.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BadgeIconTile(badge: UserBadge, iconSize: Dp) {
+    val tooltipState = rememberTooltipState()
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = {
+            PlainTooltip {
+                Text(text = badge.label)
             }
+        },
+        state = tooltipState
+    ) {
+        Box(
+            modifier = Modifier
+                .size(iconSize)
+                .clip(CircleShape)
+                .background(badge.color.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = badge.icon,
+                // contentDescription daje a11y "label" dla TalkBacka,
+                // jednoczesnie nie zaburzajac wizualnie kompaktowego rzedu.
+                contentDescription = badge.label,
+                tint = badge.color,
+                modifier = Modifier.size(iconSize * 0.6f)
+            )
         }
     }
 }
