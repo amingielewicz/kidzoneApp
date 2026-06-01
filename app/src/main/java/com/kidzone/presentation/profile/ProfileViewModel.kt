@@ -77,14 +77,9 @@ class ProfileViewModel @Inject constructor(
      *   (w obrębie filtrów aktywności tożsamych z RankingViewModel - tylko
      *   userzy z >=1 miejscem lub opinią). Null = poza TOP 100. Używane
      *   przez UI do plakietki "TOP" w prawym górnym rogu nagłówka profilu.
-     * @property newlyEarnedBadge nowo zdobyta odznaka, którą trzeba pokazać
-     *   userowi w dialogu gratulacyjnym. Konsumujemy przez
-     *   [consumeNewlyEarnedBadge] po pokazaniu, żeby rotacja / re-kompozycja
-     *   nie powtórzyły dialogu. Jeśli user zdobył wiele odznak naraz
-     *   (mało prawdopodobne, ale możliwe gdy backfill liczników), pokazujemy
-     *   po jednej kolejno z buforem [pendingNewBadges].
-     * @property pendingNewBadges kolejka kolejnych nowych odznak czekających
-     *   na pokazanie po skonsumowaniu [newlyEarnedBadge].
+     * @property newlyEarnedBadges nowo zdobyte odznaki do pokazania w zbiorczym
+     *   dialogu gratulacyjnym. Konsumujemy całą listę naraz przez
+     *   [consumeNewlyEarnedBadge] po zamknięciu dialogu.
      */
     data class UiState(
         val isEditOpen: Boolean = false,
@@ -101,8 +96,7 @@ class ProfileViewModel @Inject constructor(
         val isBadgesInfoOpen: Boolean = false,
         val obtainedBadges: List<UserBadge> = emptyList(),
         val userRank: Int? = null,
-        val newlyEarnedBadge: UserBadge? = null,
-        val pendingNewBadges: List<UserBadge> = emptyList()
+        val newlyEarnedBadges: List<UserBadge> = emptyList()
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -445,14 +439,14 @@ class ProfileViewModel @Inject constructor(
      * są kolejne, przesuwamy następną do [UiState.newlyEarnedBadge] -
      * UI od razu pokaże kolejny dialog.
      */
+    /**
+     * Zamyka dialog gratulacyjny (użytkownik go obejrzał / zamknął).
+     * Czyści całą listę na raz — wszystkie nowe odznaki były widoczne
+     * w jednym zbiorczym dialogu.
+     */
     fun consumeNewlyEarnedBadge() {
         _uiState.update { current ->
-            val (head, rest) = current.pendingNewBadges.firstOrNull() to
-                current.pendingNewBadges.drop(1)
-            current.copy(
-                newlyEarnedBadge = head,
-                pendingNewBadges = rest
-            )
+            current.copy(newlyEarnedBadges = emptyList())
         }
     }
 
@@ -496,16 +490,9 @@ class ProfileViewModel @Inject constructor(
 
         if (newlyEarned.isNotEmpty()) {
             _uiState.update { state ->
-                // Jeśli akurat już pokazujemy jakąś odznakę, dorzucamy nowe
-                // do końca kolejki - inaczej promujemy pierwszą na widoczną.
-                if (state.newlyEarnedBadge != null) {
-                    state.copy(pendingNewBadges = state.pendingNewBadges + newlyEarned)
-                } else {
-                    state.copy(
-                        newlyEarnedBadge = newlyEarned.first(),
-                        pendingNewBadges = newlyEarned.drop(1)
-                    )
-                }
+                state.copy(
+                    newlyEarnedBadges = state.newlyEarnedBadges + newlyEarned
+                )
             }
 
             // Asynchroniczny zapis timestampów do Firestore. Best-effort -
