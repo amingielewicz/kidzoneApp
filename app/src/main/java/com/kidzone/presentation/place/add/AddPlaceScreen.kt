@@ -218,6 +218,12 @@ fun AddPlaceScreen(
                 enabled = !state.isSaving
             )
 
+            // --- Miejsca w pobliżu (ochrona przed duplikatami) ---
+            if (state.nearbyPlaces.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                NearbyPlacesList(places = state.nearbyPlaces)
+            }
+
             Spacer(Modifier.height(12.dp))
 
             // --- Adres (wymagany) – po GPS, żeby reverse geocoding mógł go
@@ -287,6 +293,16 @@ fun AddPlaceScreen(
 
             Spacer(Modifier.height(16.dp))
         }
+    }
+
+    // --- Dialog ostrzeżenia o potencjalnym duplikacie ---
+    val duplicateCandidate = state.duplicateCandidate
+    if (state.showDuplicateWarning && duplicateCandidate != null) {
+        DuplicateWarningDialog(
+            candidate = duplicateCandidate,
+            onConfirm = viewModel::confirmSaveDespiteDuplicate,
+            onDismiss = viewModel::dismissDuplicateWarning
+        )
     }
 }
 
@@ -478,6 +494,98 @@ private fun RequiredFieldLabel(text: String) {
             append(text)
             withStyle(SpanStyle(color = errorColor)) {
                 append(" *")
+            }
+        }
+    )
+}
+
+
+/**
+ * Mini-lista istniejących miejsc w pobliżu, wyświetlana po pobraniu GPS.
+ * Pomaga użytkownikowi zauważyć, że podobne miejsce już istnieje.
+ */
+@Composable
+private fun NearbyPlacesList(places: List<AddPlaceViewModel.NearbyPlace>) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = "Miejsca w pobli\u017Cu:",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(6.dp))
+            places.take(5).forEach { place ->
+                val style = place.category.style
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = style.icon,
+                        contentDescription = null,
+                        tint = style.color,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.size(6.dp))
+                    Text(
+                        text = place.name,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1
+                    )
+                    Text(
+                        text = "${place.distanceMeters}m",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Dialog ostrzegawczy wyświetlany gdy w promieniu 100m od pobranej lokalizacji
+ * istnieje już miejsce tej samej kategorii (potencjalny duplikat).
+ */
+@Composable
+private fun DuplicateWarningDialog(
+    candidate: AddPlaceViewModel.NearbyPlace,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val style = candidate.category.style
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = style.icon,
+                contentDescription = null,
+                tint = style.color
+            )
+        },
+        title = { Text("Potencjalny duplikat") },
+        text = {
+            Text(
+                text = "W pobli\u017Cu (~${candidate.distanceMeters}m) istnieje ju\u017C miejsce " +
+                    "\u201E${candidate.name}\u201D (${stringResource(candidate.category.labelRes)}). " +
+                    "Czy na pewno chcesz doda\u0107 nowe?"
+            )
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text("Dodaj mimo to")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Anuluj")
             }
         }
     )
