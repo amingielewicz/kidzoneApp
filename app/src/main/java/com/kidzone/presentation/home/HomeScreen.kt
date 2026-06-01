@@ -25,7 +25,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,6 +35,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,15 +54,21 @@ import com.kidzone.R
 import com.kidzone.domain.model.Place
 import com.kidzone.presentation.common.style
 
+private val PLACE_ROW_HEIGHT = 148.dp
+private val PLACE_CARD_WIDTH = 164.dp
+private val PLACE_CARD_HEADER_HEIGHT = 56.dp
+private val PLACE_CARD_ICON_SIZE = 28.dp
+private val PLACE_CARD_CONTENT_PADDING = 10.dp
+
 /**
  * Ekran "Start" – pierwsza zakładka po zalogowaniu.
  *
  * Sekcje (w kolejności):
  *  1. Hero – kolorowe powitanie z taglinem.
  *  2. CTA do mapy – pełnoszerokościowa karta zachęcająca do otwarcia mapy.
- *  3. "Top miejsca" – LazyRow z najwyżej ocenianymi.
- *  4. "Blisko Ciebie" – LazyRow z miejscami w okolicy; jeżeli brak permission,
- *     pokazujemy rationale + przycisk requesta.
+ *  3. Systemowy dialog Androida o lokalizację, jeśli permission nie jest jeszcze nadany.
+ *  4. "Blisko Ciebie" – LazyRow z miejscami w okolicy.
+ *  5. "Top miejsca" – LazyRow z najwyżej ocenianymi miejscami w pobliżu.
  */
 @Composable
 fun HomeScreen(
@@ -83,6 +91,7 @@ fun HomeScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
     }
 
+    var hasAskedForLocationPermission by remember { mutableStateOf(false) }
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
@@ -90,6 +99,18 @@ fun HomeScreen(
         // dokładność z grubsza jest tu OK (radius 10km).
         if (result.values.any { it }) {
             viewModel.onLocationPermissionGranted()
+        }
+    }
+
+    LaunchedEffect(state.locationGranted) {
+        if (!state.locationGranted && !hasAskedForLocationPermission) {
+            hasAskedForLocationPermission = true
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
         }
     }
 
@@ -111,43 +132,33 @@ fun HomeScreen(
 
         item {
             SectionHeader(
-                title = stringResource(R.string.home_top_places),
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-        }
-        item {
-            HorizontalPlacesRow(
-                places = state.topPlaces,
-                isLoading = state.isTopLoading,
-                emptyMessage = stringResource(R.string.home_no_top_places),
-                onPlaceClick = onOpenPlaceDetails
-            )
-        }
-
-        item {
-            SectionHeader(
                 title = stringResource(R.string.home_nearby_places),
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
-        item {
-            if (!state.locationGranted) {
-                EnableLocationCard(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    onClick = {
-                        locationPermissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION
-                            )
-                        )
-                    }
-                )
-            } else {
+        if (state.locationGranted) {
+            item {
                 HorizontalPlacesRow(
                     places = state.nearbyPlaces,
                     isLoading = state.isNearbyLoading,
                     emptyMessage = stringResource(R.string.home_no_nearby_places),
+                    onPlaceClick = onOpenPlaceDetails
+                )
+            }
+        }
+
+        item {
+            SectionHeader(
+                title = stringResource(R.string.home_top_places),
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
+        if (state.locationGranted) {
+            item {
+                HorizontalPlacesRow(
+                    places = state.topPlaces,
+                    isLoading = state.isTopLoading,
+                    emptyMessage = stringResource(R.string.home_no_top_places),
                     onPlaceClick = onOpenPlaceDetails
                 )
             }
@@ -182,9 +193,9 @@ private fun HeroSection() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(20.dp))
-            .height(160.dp)
+            .height(112.dp)
             .background(
                 brush = Brush.verticalGradient(
                     listOf(
@@ -193,7 +204,7 @@ private fun HeroSection() {
                     )
                 )
             )
-            .padding(horizontal = 24.dp, vertical = 24.dp),
+            .padding(horizontal = 20.dp, vertical = 16.dp),
         contentAlignment = Alignment.CenterStart
     ) {
         Column(
@@ -296,7 +307,7 @@ private fun HorizontalPlacesRow(
     emptyMessage: String,
     onPlaceClick: (placeId: String) -> Unit
 ) {
-    val rowHeight = 180.dp
+    val rowHeight = PLACE_ROW_HEIGHT
     when {
         isLoading -> {
             Box(
@@ -327,7 +338,7 @@ private fun HorizontalPlacesRow(
             LazyRow(
                 modifier = Modifier.height(rowHeight),
                 contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(places, key = { it.id }) { place ->
                     PlaceCard(place = place, onClick = { onPlaceClick(place.id) })
@@ -354,7 +365,8 @@ private fun PlaceCard(
     val style = place.category.style
     Card(
         modifier = Modifier
-            .width(220.dp)
+            .width(PLACE_CARD_WIDTH)
+            .height(PLACE_ROW_HEIGHT)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
@@ -367,7 +379,7 @@ private fun PlaceCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(72.dp)
+                    .height(PLACE_CARD_HEADER_HEIGHT)
                     .background(style.color),
                 contentAlignment = Alignment.Center
             ) {
@@ -375,13 +387,13 @@ private fun PlaceCard(
                     imageVector = style.icon,
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(PLACE_CARD_ICON_SIZE)
                 )
             }
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(12.dp),
+                    .padding(PLACE_CARD_CONTENT_PADDING),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
@@ -420,34 +432,3 @@ private fun PlaceCard(
         }
     }
 }
-
-/**
- * Karta z prośbą o włączenie lokalizacji. Pokazywana w sekcji "Blisko Ciebie"
- * gdy user nie nadał uprawnienia – tłumaczy po co nam to + button do requesta.
- */
-@Composable
-private fun EnableLocationCard(
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-        ),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = stringResource(R.string.home_location_rationale),
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Spacer(Modifier.height(12.dp))
-            Button(onClick = onClick) {
-                Text(stringResource(R.string.home_enable_location))
-            }
-        }
-    }
-}
-

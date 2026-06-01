@@ -103,6 +103,11 @@ private const val NEAR_ME_ZOOM = 14f
  */
 private const val FOCUS_PLACE_ZOOM = 16f
 
+private val MAP_ZOOM_CONTROLS_BOTTOM_PADDING = 152.dp
+private val MAP_MY_LOCATION_BUTTON_END_PADDING = 16.dp
+private val MAP_MY_LOCATION_BUTTON_BOTTOM_PADDING = 96.dp
+private val MAP_MY_LOCATION_BUTTON_SIZE = 48.dp
+
 /**
  * Ekran mapy z pinezkami miejsc.
  *
@@ -111,10 +116,9 @@ private const val FOCUS_PLACE_ZOOM = 16f
  *    (spójne z [com.kidzone.presentation.common.CategoryStyle], czyli
  *    tym co user widzi na chipach / kartach miejsc).
  *  - Filtry na overlayu nad mapą: kategoria + przełącznik "Najlepiej oceniane".
- *  - Natywne kontrolki Maps SDK: przycisk "Moja lokalizacja" (top-right) i
- *    zoom +/- (bottom-right) – żeby mapa wyglądała "po Google'owemu".
- *    Kontrolki są przesunięte przez `contentPadding`, żeby nie wpadały pod
- *    globalny `+` FAB z [com.kidzone.presentation.main.MainScreen].
+ *  - Kontrolki Maps SDK: natywne zoom +/- oraz własny przycisk "Moja
+ *    lokalizacja" po prawej stronie mapy. Własny przycisk siedzi między
+ *    zoomem a globalnym `+` FAB z [com.kidzone.presentation.main.MainScreen].
  *  - Permission ACCESS_FINE_LOCATION jest proszona automatycznie przy
  *    pierwszym wejściu na ekran ([LaunchedEffect]) – natywny crosshair
  *    pokaże się dopiero gdy `isMyLocationEnabled == true`.
@@ -222,10 +226,9 @@ fun MapScreen(
                 isMyLocationEnabled = locationPermissionGranted
             ),
             uiSettings = MapUiSettings(
-                // Natywny przycisk lokalizacji w prawym górnym rogu mapy –
-                // pojawia się dopiero gdy isMyLocationEnabled == true (czyli
-                // gdy permission jest granted, patrz LaunchedEffect powyżej).
-                myLocationButtonEnabled = true,
+                // Własny przycisk lokalizacji renderujemy niżej jako Compose overlay,
+                // bo natywny przycisk Maps SDK siedzi w prawym górnym rogu.
+                myLocationButtonEnabled = false,
                 // Natywne +/- w prawym dolnym rogu mapy. contentPadding
                 // poniżej przesuwa je tak, by nie kolidowały z `+` FAB-em
                 // z MainScreena (też BottomEnd).
@@ -234,13 +237,10 @@ fun MapScreen(
                 compassEnabled = true
             ),
             // Native zoom controls + atrybucja Google'a domyślnie siedzą w
-            // prawym dolnym rogu canvasu mapy, czyli pod globalnym FAB-em
-            // "+" z MainScreena. Przesuwamy je o ok. wysokość FAB-a +
-            // bottom navigation, żeby były dostępne palcem.
-            //
-            // 96.dp ≈ 56 (FAB) + 16 (margin Scaffolda wokół FAB) + 24 (luz
-            // wizualny + bottom nav). Dobierane na oko, łatwo skorygować.
-            contentPadding = PaddingValues(bottom = 96.dp),
+            // prawym dolnym rogu canvasu mapy. Podbijamy je wyżej, żeby poniżej
+            // zmieścił się nasz przycisk "Moja lokalizacja", a jeszcze niżej
+            // globalny `+` FAB z MainScreena.
+            contentPadding = PaddingValues(bottom = MAP_ZOOM_CONTROLS_BOTTOM_PADDING),
             // Tap w pustą część mapy = zamykamy bottom sheet (jeśli otwarty).
             onMapClick = { viewModel.onPlaceSelected(null) }
         ) {
@@ -261,6 +261,23 @@ fun MapScreen(
                 }
             }
         }
+
+
+        MapMyLocationButton(
+            onClick = {
+                if (locationPermissionGranted) {
+                    scope.launch { recenterOnUser(context, cameraPositionState) }
+                } else {
+                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(
+                    end = MAP_MY_LOCATION_BUTTON_END_PADDING,
+                    bottom = MAP_MY_LOCATION_BUTTON_BOTTOM_PADDING
+                )
+        )
 
         // --- Overlay z filtrami + (opcjonalnie) banner permission u góry ---
         Column(
@@ -341,6 +358,36 @@ fun MapScreen(
                     // jest trzymany w VM i przeżyje config change).
                     viewModel.onPlaceSelected(null)
                 }
+            )
+        }
+    }
+}
+
+
+@Composable
+private fun MapMyLocationButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .size(MAP_MY_LOCATION_BUTTON_SIZE)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 6.dp,
+        shadowElevation = 6.dp
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.MyLocation,
+                contentDescription = stringResource(R.string.map_my_location),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
             )
         }
     }
