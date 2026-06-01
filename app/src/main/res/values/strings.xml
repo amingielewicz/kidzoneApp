@@ -23,7 +23,7 @@
     <string name="home_nearby_places">Blisko Ciebie</string>
     <string name="home_open_map">Otwórz mapę</string>
     <string name="home_open_map_subtitle">Zobacz wszystkie miejsca w okolicy</string>
-    <string name="home_no_top_places">Brak miejsc – dodaj pierwsze!</string>
+    <string name="home_no_top_places">Brak ocenionych miejsc w pobliżu</string>
     <string name="home_no_nearby_places">Nie znaleźliśmy miejsc w pobliżu</string>
     <string name="home_enable_location">Włącz lokalizację</string>
     <string name="home_location_rationale">Pokażemy Ci miejsca przyjazne dzieciom w pobliżu, gdy zezwolisz na dostęp do lokalizacji.</string>

@@ -25,10 +25,8 @@ import kotlin.math.sqrt
 /**
  * Ile miejsc maksymalnie pokazujemy w sekcji "Top miejsca".
  *
- * 20 to świadomy kompromis: na ekranie horyzontalnej LazyRow user widzi
- * 1.5 karty naraz i może przewinąć do reszty. 20 daje zauważalnie więcej
- * niż 5 (czuje się jak "ranking", nie jak "podgląd"), a Firestore
- * `getTopPlaces(20)` mieści się w jednej operacji bez paginacji.
+ * To lokalny ranking: najpierw ograniczamy bazę do miejsc w pobliżu usera,
+ * a potem wybieramy 20 najlepiej ocenianych.
  */
 private const val TOP_PLACES_LIMIT = 20
 
@@ -36,30 +34,32 @@ private const val TOP_PLACES_LIMIT = 20
  * Ile miejsc maksymalnie pokazujemy w sekcji "Blisko Ciebie".
  *
  * Symetrycznie do [TOP_PLACES_LIMIT] - obie sekcje wyglądają tak samo,
- * więc takie same liczby kart wzmacniają poczucie spójności. Filtrowanie
- * po promieniu [NEARBY_RADIUS_KM] dalej obowiązuje, więc w okolicy z
- * mniejszą bazą miejsc rząd po prostu będzie krótszy.
+ * więc takie same liczby kart wzmacniają poczucie spójności.
  */
 private const val NEARBY_LIMIT = 20
 
-/** Promień wyszukiwania pobliskich miejsc (km). */
-private const val NEARBY_RADIUS_KM = 10.0
+/** Promień lokalnego rankingu "Top miejsca" (km). */
+private const val TOP_PLACES_RADIUS_KM = 10.0
+
+/**
+ * Promień techniczny fetcha miejsc do sekcji startowych.
+ *
+ * Aktualne repo MVP i tak zwraca całą kolekcję, ale podajemy duży promień,
+ * żeby przyszła implementacja geo-query miała sensowny limit dla "Blisko Ciebie".
+ */
+private const val HOME_PLACES_FETCH_RADIUS_KM = 50.0
 
 /**
  * ViewModel ekranu Home (zakładka "Start" w bottom navigation).
  *
- * Trzyma niezależnie dwa zestawy danych:
- *  - **Top miejsca** – pobierane raz przez [PlaceRepository.getTopPlaces].
- *  - **Blisko Ciebie** – pobierane dopiero gdy user nadał uprawnienie do
- *    lokalizacji; wymaga fixu z FusedLocationProviderClient. Sortujemy
- *    haversine'em po stronie klienta i bierzemy pierwsze [NEARBY_LIMIT].
+ * Trzyma dwa zestawy danych zależne od aktualnej lokalizacji:
+ *  - **Top miejsca** – 20 najlepiej ocenianych miejsc w promieniu
+ *    [TOP_PLACES_RADIUS_KM] od użytkownika (lokalny ranking).
+ *  - **Blisko Ciebie** – 20 najbliższych miejsc, bez względu na ocenę i liczbę
+ *    opinii.
  *
- * Decyzja: nie subskrybujemy [PlaceRepository.observePlaces] – to byłby
- * snapshot listener na całej kolekcji tylko po to żeby wziąć top 5,
- * marnotrawstwo. Zwykły one-shot fetch + [refresh] gdy user wraca na
- * ekran wystarczy dla MVP. Można w przyszłości podpiąć listener na
- * znormalizowanej kolekcji `top_places` jeżeli zaczniemy ją utrzymywać
- * po stronie Cloud Functions.
+ * Obie sekcje korzystają z jednego pobrania lokalizacji i jednego fetcha miejsc,
+ * żeby nie dublować pracy FusedLocationProviderClient / Firestore.
  */
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -68,8 +68,8 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
 
     /**
-     * @property topPlaces lista najwyżej ocenianych miejsc
-     * @property nearbyPlaces lista miejsc w okolicy ([NEARBY_RADIUS_KM])
+     * @property topPlaces lokalny ranking najlepiej ocenianych miejsc w pobliżu
+     * @property nearbyPlaces lista najbliższych miejsc bez względu na ocenę
      * @property isTopLoading true do zakończenia pierwszego fetcha topu
      * @property isNearbyLoading true gdy lecimy fetchem "blisko Ciebie"
      * @property locationGranted true gdy user nadał ACCESS_*_LOCATION
@@ -78,7 +78,7 @@ class HomeViewModel @Inject constructor(
     data class UiState(
         val topPlaces: List<Place> = emptyList(),
         val nearbyPlaces: List<Place> = emptyList(),
-        val isTopLoading: Boolean = true,
+        val isTopLoading: Boolean = false,
         val isNearbyLoading: Boolean = false,
         val locationGranted: Boolean = false,
         val errorMessage: String? = null
@@ -89,10 +89,6 @@ class HomeViewModel @Inject constructor(
 
     init {
         refreshLocationGranted()
-        loadTopPlaces()
-        if (_uiState.value.locationGranted) {
-            loadNearbyPlaces()
-        }
     }
 
     /**
@@ -102,80 +98,101 @@ class HomeViewModel @Inject constructor(
      * informacją.
      */
     fun refreshLocationGranted() {
-        _uiState.update { it.copy(locationGranted = hasLocationPermission(appContext)) }
+        val granted = hasLocationPermission(appContext)
+        val shouldLoad = granted && !_uiState.value.locationGranted
+        _uiState.update {
+            it.copy(
+                locationGranted = granted,
+                isTopLoading = if (granted) it.isTopLoading else false,
+                isNearbyLoading = if (granted) it.isNearbyLoading else false
+            )
+        }
+        if (shouldLoad) loadLocationBasedPlaces()
     }
 
-    /** Wywoływać po pomyślnym requeście permissionsa – uruchamia load. */
+    /** Wywoływać po pomyślnym requeście permissionsa – uruchamia load obu sekcji. */
     fun onLocationPermissionGranted() {
         _uiState.update { it.copy(locationGranted = true) }
-        loadNearbyPlaces()
+        loadLocationBasedPlaces()
     }
 
-    private fun loadTopPlaces() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isTopLoading = true, errorMessage = null) }
-            when (val result = placeRepository.getTopPlaces(TOP_PLACES_LIMIT)) {
-                is OpResult.Success -> _uiState.update {
-                    it.copy(topPlaces = result.data, isTopLoading = false)
-                }
-                is OpResult.Failure -> _uiState.update {
-                    it.copy(
-                        isTopLoading = false,
-                        errorMessage = result.error.message
-                            ?: "Nie udało się wczytać top miejsc"
-                    )
-                }
-            }
-        }
-    }
-
-    private fun loadNearbyPlaces() {
+    private fun loadLocationBasedPlaces() {
         if (!hasLocationPermission(appContext)) {
-            _uiState.update { it.copy(locationGranted = false) }
+            _uiState.update {
+                it.copy(
+                    locationGranted = false,
+                    isTopLoading = false,
+                    isNearbyLoading = false
+                )
+            }
             return
         }
         viewModelScope.launch {
-            _uiState.update { it.copy(isNearbyLoading = true) }
+            _uiState.update {
+                it.copy(isTopLoading = true, isNearbyLoading = true, errorMessage = null)
+            }
 
             // fetchCurrentLocation może rzucić jeżeli FusedLocation explosion
             // (np. niezainicjalizowane Play Services), ale zwykle zwraca null
             // przy timeoucie / braku fixu (zob. LocationHelper.fetchCurrentLocation).
-            // Łapiemy żeby UI nie pełzł crashem; przy null/błędzie zachowujemy
-            // pustą listę "nearby" + ustawiamy delikatny komunikat zamiast
-            // wieczystego spinnera.
+            // Łapiemy żeby UI nie pełzł crashem; przy null/błędzie czyścimy obie
+            // sekcje zależne od lokalizacji i pokazujemy delikatny komunikat.
             val location = runCatching { fetchCurrentLocation(appContext) }.getOrNull()
             if (location == null) {
                 _uiState.update {
                     it.copy(
+                        isTopLoading = false,
                         isNearbyLoading = false,
+                        topPlaces = emptyList(),
                         nearbyPlaces = emptyList(),
                         errorMessage = LOCATION_TIMEOUT_USER_MESSAGE
                     )
                 }
                 return@launch
             }
+
             val (lat, lng) = location
-            when (val result = placeRepository.getPlacesNear(lat, lng, NEARBY_RADIUS_KM)) {
+            when (val result = placeRepository.getPlacesNear(lat, lng, HOME_PLACES_FETCH_RADIUS_KM)) {
                 is OpResult.Success -> {
-                    // Repo MVP zwraca wszystkie miejsca – sortujemy haversine'em
-                    // i bierzemy pierwsze NEARBY_LIMIT, plus filtrujemy ręcznie
-                    // po promieniu (bo getPlacesNear w aktualnej implementacji
-                    // jeszcze nie respektuje radiusa).
-                    val sorted = result.data
+                    // Repo MVP zwraca wszystkie miejsca – liczymy dystans na kliencie.
+                    // "Blisko Ciebie" to po prostu 20 najbliższych miejsc, bez
+                    // patrzenia na oceny. "Top miejsca" to ranking z miejsc
+                    // znajdujących się blisko usera.
+                    val placesWithDistance = result.data
                         .map { it to haversineKm(lat, lng, it.latitude, it.longitude) }
-                        .filter { it.second <= NEARBY_RADIUS_KM }
+
+                    val nearby = placesWithDistance
                         .sortedBy { it.second }
                         .take(NEARBY_LIMIT)
                         .map { it.first }
+
+                    val topNearby = placesWithDistance
+                        .filter { (place, distanceKm) ->
+                            place.reviewsCount > 0 && distanceKm <= TOP_PLACES_RADIUS_KM
+                        }
+                        .sortedWith(
+                            compareByDescending<Pair<Place, Double>> { it.first.averageRating }
+                                .thenByDescending { it.first.reviewsCount }
+                                .thenBy { it.second }
+                        )
+                        .take(TOP_PLACES_LIMIT)
+                        .map { it.first }
+
                     _uiState.update {
-                        it.copy(nearbyPlaces = sorted, isNearbyLoading = false)
+                        it.copy(
+                            topPlaces = topNearby,
+                            nearbyPlaces = nearby,
+                            isTopLoading = false,
+                            isNearbyLoading = false
+                        )
                     }
                 }
                 is OpResult.Failure -> _uiState.update {
                     it.copy(
+                        isTopLoading = false,
                         isNearbyLoading = false,
                         errorMessage = result.error.message
-                            ?: "Nie udało się wczytać pobliskich miejsc"
+                            ?: "Nie udało się wczytać miejsc w pobliżu"
                     )
                 }
             }
