@@ -53,6 +53,16 @@ class AddPlaceViewModel @Inject constructor(
      *           pozwalają wyświetlić mapę wycentrowaną na pinie po popBackStack
      * @property savedNewLongitude jak wyżej
      */
+    /**
+     * Miejsce znalezione w pobliżu aktualnej lokalizacji (potencjalny duplikat).
+     */
+    data class NearbyPlace(
+        val id: String,
+        val name: String,
+        val category: PlaceCategory,
+        val distanceMeters: Int
+    )
+
     data class UiState(
         val name: String = "",
         val description: String = "",
@@ -79,7 +89,13 @@ class AddPlaceViewModel @Inject constructor(
          * stanie pokazuje udogodnienia w kolejności z enuma (logiczne
          * grupowanie wg PlaceCategory) - to bezpieczny fallback.
          */
-        val amenityFrequency: Map<Amenity, Int> = emptyMap()
+        val amenityFrequency: Map<Amenity, Int> = emptyMap(),
+        /** Miejsca w promieniu 200m od pobranej lokalizacji GPS. */
+        val nearbyPlaces: List<NearbyPlace> = emptyList(),
+        /** True gdy wykryty potencjalny duplikat i czekamy na decyzję usera. */
+        val showDuplicateWarning: Boolean = false,
+        /** Potencjalny duplikat (ta sama kategoria w <100m) do wyświetlenia w dialogu. */
+        val duplicateCandidate: NearbyPlace? = null
     ) {
         /** Wszystkie wymagane pola wypełnione – można kliknąć "Zapisz". */
         val isFormValid: Boolean
@@ -218,6 +234,9 @@ class AddPlaceViewModel @Inject constructor(
      * Po udanym pobraniu GPS (i ewentualnym reverse geocodingu) zapisuje
      * współrzędne i nadpisuje pole adresu jeśli geocoder coś zwrócił. Jeśli
      * [address] jest null/puste, zachowujemy to, co użytkownik wpisał ręcznie.
+     *
+     * Dodatkowo uruchamia fetch miejsc w promieniu 200m, żeby user widział
+     * co już jest dodane w okolicy (ochrona przed duplikatami).
      */
     fun onLocationFetched(latitude: Double, longitude: Double, address: String? = null) {
         _uiState.update {
@@ -229,6 +248,48 @@ class AddPlaceViewModel @Inject constructor(
                 errorMessage = null
             )
         }
+        loadNearbyPlaces(latitude, longitude)
+    }
+
+    /**
+     * Ładuje miejsca w promieniu [NEARBY_RADIUS_KM] od podanych współrzędnych.
+     * Wynik zapisywany do [UiState.nearbyPlaces] — UI może pokazać mini-listę
+     * istniejących miejsc pod przyciskiem GPS, żeby user sam zauważył duplikaty.
+     */
+    private fun loadNearbyPlaces(latitude: Double, longitude: Double) {
+        viewModelScope.launch {
+            val nearby = runCatching {
+                when (val result = placeRepository.getPlacesNear(latitude, longitude, NEARBY_RADIUS_KM)) {
+                    is OpResult.Success -> result.data
+                        .filter { it.id != _uiState.value.editingPlaceId } // nie pokazuj edytowanego
+                        .map { place ->
+                            val distMeters = (haversineKm(
+                                latitude, longitude,
+                                place.latitude, place.longitude
+                            ) * 1000).toInt()
+                            NearbyPlace(
+                                id = place.id,
+                                name = place.name,
+                                category = place.category,
+                                distanceMeters = distMeters
+                            )
+                        }
+                        .filter { it.distanceMeters <= NEARBY_RADIUS_METERS }
+                        .sortedWith(
+                            // Priorytet: 1) podobna nazwa na górze, 2) bliskość
+                            compareByDescending<NearbyPlace> { nearby ->
+                                val input = _uiState.value.name.trim().lowercase()
+                                if (input.isNotEmpty() &&
+                                    (nearby.name.lowercase().contains(input) ||
+                                        input.contains(nearby.name.lowercase()))
+                                ) 1 else 0
+                            }.thenBy { it.distanceMeters }
+                        )
+                    is OpResult.Failure -> emptyList()
+                }
+            }.getOrElse { emptyList() }
+            _uiState.update { it.copy(nearbyPlaces = nearby) }
+        }
     }
 
     fun onLocationError(message: String) {
@@ -236,13 +297,9 @@ class AddPlaceViewModel @Inject constructor(
     }
 
     /**
-     * Buduje [Place] z aktualnego stanu UI i zapisuje przez repozytorium.
-     *
-     * - W trybie create: świeży [Place] z `id=""`, owner = aktualny user,
-     *   `createdAtMillis = now`. Repo nada id i wstawi do Firestore.
-     * - W trybie edit: kopia oryginału z UI-edytowalnymi polami nadpisanymi
-     *   nowymi wartościami. Niezmienne (ownerUserId, createdAtMillis,
-     *   averageRating, reviewsCount) zostają jak były.
+     * Próba zapisu. Jeśli wykryty potencjalny duplikat (ta sama kategoria
+     * w promieniu [DUPLICATE_RADIUS_METERS]) — zamiast od razu zapisywać,
+     * ustawiamy [UiState.showDuplicateWarning] = true. User musi potwierdzić.
      */
     fun save() {
         val state = _uiState.value
@@ -250,6 +307,46 @@ class AddPlaceViewModel @Inject constructor(
             _uiState.update { it.copy(errorMessage = "Wypełnij wymagane pola i pobierz lokalizację") }
             return
         }
+
+        // Sprawdź potencjalne duplikaty:
+        //  1. Ta sama kategoria w promieniu 100m
+        //  2. Podobna nazwa (case-insensitive contains) w promieniu 200m,
+        //     niezależnie od kategorii — ktoś mógł dodać to samo miejsce
+        //     pod inną kategorią.
+        if (!state.isEditMode && !state.showDuplicateWarning) {
+            val inputName = state.name.trim().lowercase()
+            val duplicate = state.nearbyPlaces.firstOrNull { nearby ->
+                val sameCategoryClose = nearby.category == state.category &&
+                    nearby.distanceMeters <= DUPLICATE_RADIUS_METERS
+                val similarName = inputName.isNotEmpty() &&
+                    (nearby.name.lowercase().contains(inputName) ||
+                        inputName.contains(nearby.name.lowercase()))
+                sameCategoryClose || similarName
+            }
+            if (duplicate != null) {
+                _uiState.update {
+                    it.copy(showDuplicateWarning = true, duplicateCandidate = duplicate)
+                }
+                return
+            }
+        }
+
+        performSave()
+    }
+
+    /** User potwierdził "Dodaj mimo to" w dialogu duplikatów. */
+    fun confirmSaveDespiteDuplicate() {
+        _uiState.update { it.copy(showDuplicateWarning = false, duplicateCandidate = null) }
+        performSave()
+    }
+
+    /** User anulował dialog duplikatów. */
+    fun dismissDuplicateWarning() {
+        _uiState.update { it.copy(showDuplicateWarning = false, duplicateCandidate = null) }
+    }
+
+    private fun performSave() {
+        val state = _uiState.value
 
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, errorMessage = null) }
@@ -275,8 +372,6 @@ class AddPlaceViewModel @Inject constructor(
                     latitude = state.latitude!!,
                     longitude = state.longitude!!,
                     amenities = state.amenities
-                    // ownerUserId, createdAtMillis, averageRating, reviewsCount,
-                    // photoUrls, id – zachowujemy z oryginału.
                 )
                 placeRepository.updatePlace(updated)
             } else {
@@ -298,9 +393,6 @@ class AddPlaceViewModel @Inject constructor(
             _uiState.update {
                 when (result) {
                     is OpResult.Success -> {
-                        // W trybie create publikujemy współrzędne nowego miejsca –
-                        // MainScreen użyje ich do wycentrowania mapy. W edit
-                        // zostawiamy null, bo tam nie chcemy zmieniać widoku mapy.
                         val isCreate = !state.isEditMode
                         it.copy(
                             isSaving = false,
@@ -319,4 +411,25 @@ class AddPlaceViewModel @Inject constructor(
             }
         }
     }
+}
+
+/** Promień (km) w jakim szukamy istniejących miejsc do wyświetlenia pod GPS. */
+private const val NEARBY_RADIUS_KM = 0.5
+
+/** Promień (metry) do wyświetlenia jako "w pobliżu". */
+private const val NEARBY_RADIUS_METERS = 200
+
+/** Promień (metry) dla wykrywania duplikatów (ta sama kategoria). */
+private const val DUPLICATE_RADIUS_METERS = 100
+
+/** Odległość w km między dwoma punktami (formuła haversine). */
+private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val r = 6371.0
+    val dLat = Math.toRadians(lat2 - lat1)
+    val dLon = Math.toRadians(lon2 - lon1)
+    val a = kotlin.math.sin(dLat / 2).let { it * it } +
+        kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
+        kotlin.math.sin(dLon / 2).let { it * it }
+    val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+    return r * c
 }
