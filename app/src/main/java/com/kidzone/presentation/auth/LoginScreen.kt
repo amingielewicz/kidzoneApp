@@ -335,10 +335,11 @@ fun LoginScreen(
                                         is GoogleSignInResult.Success ->
                                             viewModel.signInWithGoogle(result.idToken)
                                         GoogleSignInResult.Cancelled -> Unit // user anulował
-                                        GoogleSignInResult.NoGoogleAccountOnDevice ->
+                                        GoogleSignInResult.NoMatchingGoogleCredential ->
                                             viewModel.showInlineMessage(
-                                                "Brak konta Google na urządzeniu. " +
-                                                    "Dodaj konto w Ustawieniach Androida."
+                                                "Nie udało się znaleźć pasującego konta Google. " +
+                                                    "Sprawdź, czy Google Sign-In jest włączony w Firebase, " +
+                                                    "SHA-1 aplikacji jest dodany i masz aktualny google-services.json."
                                             )
                                         is GoogleSignInResult.Error ->
                                             viewModel.showInlineMessage(result.message)
