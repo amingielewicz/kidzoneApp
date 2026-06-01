@@ -25,7 +25,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,6 +35,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,9 +66,9 @@ private val PLACE_CARD_CONTENT_PADDING = 10.dp
  * Sekcje (w kolejności):
  *  1. Hero – kolorowe powitanie z taglinem.
  *  2. CTA do mapy – pełnoszerokościowa karta zachęcająca do otwarcia mapy.
- *  3. "Blisko Ciebie" – LazyRow z miejscami w okolicy; jeżeli brak permission,
- *     pokazujemy rationale + przycisk requesta.
- *  4. "Top miejsca" – LazyRow z najwyżej ocenianymi.
+ *  3. Systemowy dialog Androida o lokalizację, jeśli permission nie jest jeszcze nadany.
+ *  4. "Blisko Ciebie" – LazyRow z miejscami w okolicy.
+ *  5. "Top miejsca" – LazyRow z najwyżej ocenianymi miejscami w pobliżu.
  */
 @Composable
 fun HomeScreen(
@@ -89,6 +91,7 @@ fun HomeScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
     }
 
+    var hasAskedForLocationPermission by remember { mutableStateOf(false) }
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
@@ -98,13 +101,17 @@ fun HomeScreen(
             viewModel.onLocationPermissionGranted()
         }
     }
-    val requestLocationPermission = {
-        locationPermissionLauncher.launch(
-            arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
+
+    LaunchedEffect(state.locationGranted) {
+        if (!state.locationGranted && !hasAskedForLocationPermission) {
+            hasAskedForLocationPermission = true
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
             )
-        )
+        }
     }
 
     LazyColumn(
@@ -121,15 +128,6 @@ fun HomeScreen(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 onClick = onOpenMap
             )
-        }
-
-        if (!state.locationGranted) {
-            item {
-                EnableLocationCard(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    onClick = requestLocationPermission
-                )
-            }
         }
 
         item {
@@ -434,34 +432,3 @@ private fun PlaceCard(
         }
     }
 }
-
-/**
- * Karta z prośbą o włączenie lokalizacji. Pokazywana w sekcji "Blisko Ciebie"
- * gdy user nie nadał uprawnienia – tłumaczy po co nam to + button do requesta.
- */
-@Composable
-private fun EnableLocationCard(
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-        ),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = stringResource(R.string.home_location_rationale),
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Spacer(Modifier.height(12.dp))
-            Button(onClick = onClick) {
-                Text(stringResource(R.string.home_enable_location))
-            }
-        }
-    }
-}
-
