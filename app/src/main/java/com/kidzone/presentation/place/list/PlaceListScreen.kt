@@ -75,13 +75,12 @@ import com.kidzone.presentation.place.add.hasLocationPermission
 import kotlinx.coroutines.launch
 
 /**
- * 4 najczęściej szukane udogodnienia - pokazujemy je jako quick-chipy
- * bezpośrednio na ekranie (zawsze widoczne, multi-select). Pasują do każdej
- * kategorii i to po nich rodzice filtrują najczęściej.
- *
- * Kolejność wyświetlania jest sortowana alfabetycznie po polskim labelu
- * w runtime'ie (zob. [QuickAmenityBar]).
+ * Dawne 4 "quick" udogodnienia. Usunięte z UI listy – teraz wszystkie
+ * udogodnienia są dostępne wyłącznie z bottom sheeta filtrów.
+ * Stała zachowana, bo [PlaceListViewModel] nadal ich używa do logiki
+ * (zachowanie kompatybilności wstecznej – brak wpływu na UX).
  */
+@Suppress("unused")
 private val QUICK_AMENITIES = setOf(
     Amenity.CHANGING_TABLE,
     Amenity.TOILET,
@@ -166,9 +165,8 @@ fun PlaceListScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
     }
 
-    // Liczba aktywnych filtrów udogodnień siedzących w sheecie
-    // (wszystko poza QUICK_AMENITIES - te są na ekranie głównym i mają osobny stan wizualny).
-    val advancedAmenitiesCount = state.selectedAmenities.count { it !in QUICK_AMENITIES }
+    // Liczba aktywnych filtrów udogodnień w sheecie.
+    val advancedAmenitiesCount = state.selectedAmenities.size
 
     Column(modifier = Modifier.fillMaxSize()) {
         CategoryFilterBar(
@@ -176,12 +174,10 @@ fun PlaceListScreen(
             onCategorySelected = viewModel::onCategorySelected
         )
 
-        QuickAmenityBar(
-            selectedAmenities = state.selectedAmenities,
+        FilterAndSortBar(
             advancedFiltersCount = advancedAmenitiesCount,
             sortOrder = state.sortOrder,
             currentUserSignedIn = state.currentUserId != null,
-            onAmenityToggled = viewModel::onAmenityToggled,
             onOpenFilterSheet = { showFilterSheet = true },
             onSortOrderChange = viewModel::onSortOrderChange
         )
@@ -335,35 +331,21 @@ private fun CategoryFilterBar(
 }
 
 /**
- * Drugi rząd filtrów na ekranie listy.
+ * Rząd z przyciskiem filtrów (ikona Tune) + chipem sortowania.
  *
- * Po **lewej** - ikonowy `FilledTonalIconButton` (otwiera sheet z resztą
- * udogodnień). Z [BadgedBox] pokazującym liczbę aktywnych filtrów spoza
- * quick-set. Bez tekstu, sam ikona [Icons.Filled.Tune].
- *
- * W środku - chip "Sortuj: ..." z dropdownem. Świadomie chip a nie zwykły
- * dropdown, żeby wizualnie pasował do quick-amenity chipów obok i nie
- * wymagał osobnego rzędu.
- *
- * Po prawej - 4 uniwersalne quick-amenity chipy, sortowane alfabetycznie
- * po polskim labelu.
+ * Quick-amenity chipy usunięte – wszystkie udogodnienia dostępne wyłącznie
+ * z bottom sheeta (po kliknięciu ikony Tune). Dzięki temu ekran listy jest
+ * czystszy i mniej przytłaczający na mniejszych ekranach.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun QuickAmenityBar(
-    selectedAmenities: Set<Amenity>,
+private fun FilterAndSortBar(
     advancedFiltersCount: Int,
     sortOrder: PlaceListViewModel.SortOrder,
     currentUserSignedIn: Boolean,
-    onAmenityToggled: (Amenity) -> Unit,
     onOpenFilterSheet: () -> Unit,
     onSortOrderChange: (PlaceListViewModel.SortOrder) -> Unit
 ) {
-    val context = LocalContext.current
-    val orderedQuickAmenities = remember(context) {
-        QUICK_AMENITIES.sortedBy { context.getString(it.labelRes).lowercase() }
-    }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -372,7 +354,7 @@ private fun QuickAmenityBar(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 1. Button "Filtry" jako PIERWSZY z lewej, sam ikon.
+        // 1. Button "Filtry" (ikona Tune z badge liczbą aktywnych filtrów)
         BadgedBox(
             badge = {
                 if (advancedFiltersCount > 0) {
@@ -398,23 +380,12 @@ private fun QuickAmenityBar(
             }
         }
 
-        // 2. Sortowanie - chip-button z dropdownem. ADDED_BY_ME widoczny
-        //    w dropdownie, ale wybranie go gdy user wylogowany skutkuje
-        //    pustą listą + komunikatem (zob. emptyMessageFor).
+        // 2. Sortowanie
         SortChip(
             current = sortOrder,
             currentUserSignedIn = currentUserSignedIn,
             onChange = onSortOrderChange
         )
-
-        // 3. Quick amenities (alfabetycznie).
-        orderedQuickAmenities.forEach { amenity ->
-            FilterChip(
-                selected = amenity in selectedAmenities,
-                onClick = { onAmenityToggled(amenity) },
-                label = { Text(stringResource(amenity.labelRes)) }
-            )
-        }
     }
 }
 
