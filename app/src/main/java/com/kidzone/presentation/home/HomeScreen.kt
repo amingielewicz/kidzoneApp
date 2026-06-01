@@ -52,15 +52,21 @@ import com.kidzone.R
 import com.kidzone.domain.model.Place
 import com.kidzone.presentation.common.style
 
+private val PLACE_ROW_HEIGHT = 148.dp
+private val PLACE_CARD_WIDTH = 164.dp
+private val PLACE_CARD_HEADER_HEIGHT = 56.dp
+private val PLACE_CARD_ICON_SIZE = 28.dp
+private val PLACE_CARD_CONTENT_PADDING = 10.dp
+
 /**
  * Ekran "Start" – pierwsza zakładka po zalogowaniu.
  *
  * Sekcje (w kolejności):
  *  1. Hero – kolorowe powitanie z taglinem.
  *  2. CTA do mapy – pełnoszerokościowa karta zachęcająca do otwarcia mapy.
- *  3. "Top miejsca" – LazyRow z najwyżej ocenianymi.
- *  4. "Blisko Ciebie" – LazyRow z miejscami w okolicy; jeżeli brak permission,
+ *  3. "Blisko Ciebie" – LazyRow z miejscami w okolicy; jeżeli brak permission,
  *     pokazujemy rationale + przycisk requesta.
+ *  4. "Top miejsca" – LazyRow z najwyżej ocenianymi.
  */
 @Composable
 fun HomeScreen(
@@ -111,21 +117,6 @@ fun HomeScreen(
 
         item {
             SectionHeader(
-                title = stringResource(R.string.home_top_places),
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-        }
-        item {
-            HorizontalPlacesRow(
-                places = state.topPlaces,
-                isLoading = state.isTopLoading,
-                emptyMessage = stringResource(R.string.home_no_top_places),
-                onPlaceClick = onOpenPlaceDetails
-            )
-        }
-
-        item {
-            SectionHeader(
                 title = stringResource(R.string.home_nearby_places),
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
@@ -151,6 +142,21 @@ fun HomeScreen(
                     onPlaceClick = onOpenPlaceDetails
                 )
             }
+        }
+
+        item {
+            SectionHeader(
+                title = stringResource(R.string.home_top_places),
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
+        item {
+            HorizontalPlacesRow(
+                places = state.topPlaces,
+                isLoading = state.isTopLoading,
+                emptyMessage = stringResource(R.string.home_no_top_places),
+                onPlaceClick = onOpenPlaceDetails
+            )
         }
 
         state.errorMessage?.let { msg ->
@@ -182,9 +188,9 @@ private fun HeroSection() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(20.dp))
-            .height(160.dp)
+            .height(112.dp)
             .background(
                 brush = Brush.verticalGradient(
                     listOf(
@@ -193,7 +199,7 @@ private fun HeroSection() {
                     )
                 )
             )
-            .padding(horizontal = 24.dp, vertical = 24.dp),
+            .padding(horizontal = 20.dp, vertical = 16.dp),
         contentAlignment = Alignment.CenterStart
     ) {
         Column(
@@ -296,7 +302,7 @@ private fun HorizontalPlacesRow(
     emptyMessage: String,
     onPlaceClick: (placeId: String) -> Unit
 ) {
-    val rowHeight = 180.dp
+    val rowHeight = PLACE_ROW_HEIGHT
     when {
         isLoading -> {
             Box(
@@ -327,7 +333,7 @@ private fun HorizontalPlacesRow(
             LazyRow(
                 modifier = Modifier.height(rowHeight),
                 contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(places, key = { it.id }) { place ->
                     PlaceCard(place = place, onClick = { onPlaceClick(place.id) })
@@ -354,7 +360,8 @@ private fun PlaceCard(
     val style = place.category.style
     Card(
         modifier = Modifier
-            .width(220.dp)
+            .width(PLACE_CARD_WIDTH)
+            .height(PLACE_ROW_HEIGHT)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
@@ -367,7 +374,7 @@ private fun PlaceCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(72.dp)
+                    .height(PLACE_CARD_HEADER_HEIGHT)
                     .background(style.color),
                 contentAlignment = Alignment.Center
             ) {
@@ -375,13 +382,13 @@ private fun PlaceCard(
                     imageVector = style.icon,
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(PLACE_CARD_ICON_SIZE)
                 )
             }
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(12.dp),
+                    .padding(PLACE_CARD_CONTENT_PADDING),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {

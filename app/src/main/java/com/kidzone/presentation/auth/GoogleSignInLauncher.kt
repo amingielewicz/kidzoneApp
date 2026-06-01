@@ -7,7 +7,7 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 
@@ -22,16 +22,16 @@ sealed class GoogleSignInResult {
     /** Uzytkownik anulowal dialog wyboru konta. Nie pokazujemy bledu. */
     data object Cancelled : GoogleSignInResult()
 
-    /** Na urzadzeniu nie ma zadnego konta Google (lub nie zaakceptowane). */
-    data object NoGoogleAccountOnDevice : GoogleSignInResult()
+    /** Credential Manager nie znalazł pasującego konta / konfiguracji Google. */
+    data object NoMatchingGoogleCredential : GoogleSignInResult()
 
     /** Pozostale bledy - pokazujemy [message] w UI. */
     data class Error(val message: String) : GoogleSignInResult()
 }
 
 /**
- * Uruchamia natywny dialog Credential Manager z opcja "Zaloguj sie przez
- * Google". Zwraca idToken, ktory mozna podac do FirebaseAuth.signInWithCredential.
+ * Uruchamia natywny, jawny flow "Sign in with Google" z Credential Manager.
+ * Zwraca idToken, ktory mozna podac do FirebaseAuth.signInWithCredential.
  *
  * Wymaga:
  *  - skonfigurowanego Google Sign-In w Firebase Console (zob. [WEB_CLIENT_ID_RES_NAME]),
@@ -49,11 +49,7 @@ suspend fun launchGoogleSignIn(
 ): GoogleSignInResult {
     val credentialManager = CredentialManager.create(context)
 
-    val googleIdOption = GetGoogleIdOption.Builder()
-        // false -> pokaze wszystkie konta na urzadzeniu (przy pierwszym logowaniu).
-        .setFilterByAuthorizedAccounts(false)
-        .setServerClientId(webClientId)
-        .setAutoSelectEnabled(false)
+    val googleIdOption = GetSignInWithGoogleOption.Builder(webClientId)
         .build()
 
     val request = GetCredentialRequest.Builder()
@@ -75,7 +71,7 @@ suspend fun launchGoogleSignIn(
     } catch (e: GetCredentialCancellationException) {
         GoogleSignInResult.Cancelled
     } catch (e: NoCredentialException) {
-        GoogleSignInResult.NoGoogleAccountOnDevice
+        GoogleSignInResult.NoMatchingGoogleCredential
     } catch (e: GoogleIdTokenParsingException) {
         GoogleSignInResult.Error(e.message ?: "Blad parsowania tokena Google")
     } catch (e: GetCredentialException) {
