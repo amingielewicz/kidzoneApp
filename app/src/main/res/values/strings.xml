@@ -19,7 +19,7 @@
 
     <!-- Home (zakładka Start) -->
     <string name="home_welcome">Cześć!</string>
-    <string name="home_top_places">Top miejsca</string>
+    <string name="home_top_places">TOP blisko Ciebie</string>
     <string name="home_nearby_places">Blisko Ciebie</string>
     <string name="home_open_map">Otwórz mapę</string>
     <string name="home_open_map_subtitle">Zobacz wszystkie miejsca w okolicy</string>
