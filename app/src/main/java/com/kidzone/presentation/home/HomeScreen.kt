@@ -98,6 +98,14 @@ fun HomeScreen(
             viewModel.onLocationPermissionGranted()
         }
     }
+    val requestLocationPermission = {
+        locationPermissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -115,26 +123,23 @@ fun HomeScreen(
             )
         }
 
+        if (!state.locationGranted) {
+            item {
+                EnableLocationCard(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    onClick = requestLocationPermission
+                )
+            }
+        }
+
         item {
             SectionHeader(
                 title = stringResource(R.string.home_nearby_places),
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
-        item {
-            if (!state.locationGranted) {
-                EnableLocationCard(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    onClick = {
-                        locationPermissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION
-                            )
-                        )
-                    }
-                )
-            } else {
+        if (state.locationGranted) {
+            item {
                 HorizontalPlacesRow(
                     places = state.nearbyPlaces,
                     isLoading = state.isNearbyLoading,
@@ -150,13 +155,15 @@ fun HomeScreen(
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
-        item {
-            HorizontalPlacesRow(
-                places = state.topPlaces,
-                isLoading = state.isTopLoading,
-                emptyMessage = stringResource(R.string.home_no_top_places),
-                onPlaceClick = onOpenPlaceDetails
-            )
+        if (state.locationGranted) {
+            item {
+                HorizontalPlacesRow(
+                    places = state.topPlaces,
+                    isLoading = state.isTopLoading,
+                    emptyMessage = stringResource(R.string.home_no_top_places),
+                    onPlaceClick = onOpenPlaceDetails
+                )
+            }
         }
 
         state.errorMessage?.let { msg ->
