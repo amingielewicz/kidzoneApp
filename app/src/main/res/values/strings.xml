@@ -28,6 +28,9 @@
     <string name="home_enable_location">Włącz lokalizację</string>
     <string name="home_location_rationale">Pokażemy Ci miejsca przyjazne dzieciom w pobliżu, gdy zezwolisz na dostęp do lokalizacji.</string>
 
+    <!-- Map -->
+    <string name="map_my_location">Moja lokalizacja</string>
+
     <!-- Place -->
     <string name="add_place">Dodaj miejsce</string>
     <string name="place_details">Szczegóły miejsca</string>

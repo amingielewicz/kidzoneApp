@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -33,6 +34,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -75,6 +78,7 @@ import com.google.maps.android.compose.MapsComposeExperimentalApi
 import com.google.maps.android.compose.MarkerComposable
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
+import com.kidzone.R
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.presentation.common.style
@@ -222,10 +226,11 @@ fun MapScreen(
                 isMyLocationEnabled = locationPermissionGranted
             ),
             uiSettings = MapUiSettings(
-                // Natywny przycisk lokalizacji w prawym górnym rogu mapy –
-                // pojawia się dopiero gdy isMyLocationEnabled == true (czyli
-                // gdy permission jest granted, patrz LaunchedEffect powyżej).
-                myLocationButtonEnabled = true,
+                // Wyłączamy natywny przycisk lokalizacji – zamiast niego
+                // wyświetlamy własny Compose FAB (`MapMyLocationButton`) w
+                // prawym górnym rogu, co daje pełną kontrolę nad stylem i
+                // zachowaniem (np. wyzwalanie permission launchera).
+                myLocationButtonEnabled = false,
                 // Natywne +/- w prawym dolnym rogu mapy. contentPadding
                 // poniżej przesuwa je tak, by nie kolidowały z `+` FAB-em
                 // z MainScreena (też BottomEnd).
@@ -238,9 +243,10 @@ fun MapScreen(
             // "+" z MainScreena. Przesuwamy je o ok. wysokość FAB-a +
             // bottom navigation, żeby były dostępne palcem.
             //
-            // 96.dp ≈ 56 (FAB) + 16 (margin Scaffolda wokół FAB) + 24 (luz
-            // wizualny + bottom nav). Dobierane na oko, łatwo skorygować.
-            contentPadding = PaddingValues(bottom = 96.dp),
+            // 120.dp ≈ 56 (FAB) + 16 (margin Scaffolda wokół FAB) + 24 (luz
+            // wizualny) + 24 (dodatkowy buffer, żeby zoom buttons nie były
+            // zbyt blisko FAB-a). Dobierane na oko, łatwo skorygować.
+            contentPadding = PaddingValues(bottom = 120.dp),
             // Tap w pustą część mapy = zamykamy bottom sheet (jeśli otwarty).
             onMapClick = { viewModel.onPlaceSelected(null) }
         ) {
@@ -305,6 +311,25 @@ fun MapScreen(
                 modifier = Modifier.align(Alignment.Center)
             )
         }
+
+        // --- Custom "Moja lokalizacja" FAB ---
+        // Zastępuje natywny przycisk Maps SDK, żeby mieć pełną kontrolę
+        // nad wyglądem, pozycjonowaniem i zachowaniem (np. automatyczne
+        // wyzwalanie permission launchera gdy uprawnienie nie jest nadane).
+        MapMyLocationButton(
+            onClick = {
+                if (locationPermissionGranted) {
+                    scope.launch { recenterOnUser(context, cameraPositionState) }
+                } else {
+                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 8.dp, end = 8.dp)
+                // Offset w dół, żeby nie kolidować z filtrami overlay
+                .offset(y = 160.dp)
+        )
         state.errorMessage?.let { msg ->
             Surface(
                 modifier = Modifier
@@ -650,6 +675,44 @@ private fun PlacePreviewContent(
         ) {
             Text("Zobacz szczegóły")
         }
+    }
+}
+
+/**
+ * Custom "Moja lokalizacja" FAB – zamiennik natywnego przycisku Maps SDK.
+ *
+ * Zalety vs natywny:
+ *  - Pełna kontrola nad wyglądem (Material 3, brand colors).
+ *  - Możliwość wyzwolenia permission launchera z poziomu onClick (natywny
+ *    button wymaga `isMyLocationEnabled = true`, więc nie działa bez
+ *    uprawnienia).
+ *  - Swobodne pozycjonowanie w layoutcie Compose (bez walki z
+ *    `contentPadding` mapy).
+ *
+ * Wizualnie: mała okrągła powierzchnia z ikoną crosshair-a, lekko
+ * podniesiona (shadow), żeby odcinać się od tła mapy.
+ */
+@Composable
+private fun MapMyLocationButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FloatingActionButton(
+        onClick = onClick,
+        modifier = modifier.size(44.dp),
+        shape = CircleShape,
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.primary,
+        elevation = FloatingActionButtonDefaults.elevation(
+            defaultElevation = 4.dp,
+            pressedElevation = 8.dp
+        )
+    ) {
+        Icon(
+            imageVector = Icons.Filled.MyLocation,
+            contentDescription = stringResource(R.string.map_my_location),
+            modifier = Modifier.size(22.dp)
+        )
     }
 }
 
