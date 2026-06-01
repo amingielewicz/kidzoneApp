@@ -544,6 +544,33 @@ private fun PlaceMainCard(
                 }
             }
 
+            // Przycisk "Zobacz na Google Maps" – otwiera miejsce w Google Maps
+            // w trybie search (query=lat,lng), dzięki czemu user widzi oceny
+            // Google, godziny otwarcia, zdjęcia i inne szczegóły z ekosystemu
+            // Google Maps, których nie mamy w kidZone.
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = {
+                    val uri = Uri.parse(
+                        "https://www.google.com/maps/search/?api=1" +
+                            "&query=${place.latitude},${place.longitude}"
+                    )
+                    val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    runCatching { context.startActivity(intent) }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.LocationOn,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.view_on_google_maps))
+            }
+
             // --- 4. Dodano przez ---
             // Dla zalogowanego usera-właściciela pokazujemy "Dodano przez Ciebie"
             // (z datą), zamiast jego własnego nicka - taka konwencja jest

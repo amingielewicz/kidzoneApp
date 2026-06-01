@@ -39,6 +39,7 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -590,6 +591,7 @@ private fun PlacePreviewContent(
     onOpenDetails: () -> Unit
 ) {
     val style = place.category.style
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -674,6 +676,28 @@ private fun PlacePreviewContent(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Zobacz szczegóły")
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = {
+                val uri = Uri.parse(
+                    "https://www.google.com/maps/search/?api=1" +
+                        "&query=${place.latitude},${place.longitude}"
+                )
+                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                runCatching { context.startActivity(intent) }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Filled.LocationOn,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(stringResource(R.string.view_on_google_maps))
         }
     }
 }
