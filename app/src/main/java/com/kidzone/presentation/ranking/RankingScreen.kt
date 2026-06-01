@@ -20,19 +20,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -43,9 +43,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.User
@@ -59,11 +62,11 @@ import com.kidzone.presentation.common.style
  *
  * Dwie zakładki w [PrimaryTabRow]:
  *  - **Miejsca** – top miejsc wg [Place.averageRating] (do 100 pozycji),
- *  - **Użytkownicy** – top najbardziej aktywnych użytkowników (do 100 pozycji), z odznakami
- *    wyliczanymi klient-side z [User.placesAddedCount] i [User.reviewsCount].
+ *  - **Użytkownicy** – top najbardziej aktywnych użytkowników (do 100 pozycji).
  *
- * Stany ładowanie / błąd / pusta lista trzymamy spójnie z resztą aplikacji
- * (zob. [com.kidzone.presentation.place.list.PlaceListScreen]).
+ * Odświeżanie:
+ *  - Automatycznie przy każdym wejściu na zakładkę (ON_RESUME).
+ *  - Pull-to-refresh (swipe w dół).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,35 +77,32 @@ fun RankingScreen(
     val state by viewModel.uiState.collectAsState()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
 
+    // Auto-refresh przy każdym wejściu na zakładkę (ON_RESUME)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
-        // Pasek z zakładkami + przycisk refresh w prawym górnym rogu.
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            PrimaryTabRow(
-                selectedTabIndex = selectedTab,
-                modifier = Modifier.weight(1f)
-            ) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = { Text("Miejsca") },
-                    icon = { Icon(Icons.Filled.EmojiEvents, contentDescription = null) }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = { Text("Użytkownicy") },
-                    icon = { Icon(Icons.Filled.Person, contentDescription = null) }
-                )
-            }
-            IconButton(
-                onClick = viewModel::refresh,
-                enabled = !state.isLoading
-            ) {
-                Icon(Icons.Filled.Refresh, contentDescription = "Odśwież ranking")
-            }
+        PrimaryTabRow(selectedTabIndex = selectedTab) {
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 },
+                text = { Text("Miejsca") },
+                icon = { Icon(Icons.Filled.EmojiEvents, contentDescription = null) }
+            )
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                text = { Text("Użytkownicy") },
+                icon = { Icon(Icons.Filled.Person, contentDescription = null) }
+            )
         }
 
         when {
@@ -120,15 +120,23 @@ fun RankingScreen(
                 }
             }
 
-            else -> when (selectedTab) {
-                0 -> TopPlacesList(
-                    places = state.topPlaces,
-                    onOpenPlaceDetails = onOpenPlaceDetails
-                )
-                else -> TopUsersList(
-                    users = state.topUsers,
-                    badgesByUserId = state.userBadges
-                )
+            else -> {
+                PullToRefreshBox(
+                    isRefreshing = state.isLoading,
+                    onRefresh = viewModel::refresh,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    when (selectedTab) {
+                        0 -> TopPlacesList(
+                            places = state.topPlaces,
+                            onOpenPlaceDetails = onOpenPlaceDetails
+                        )
+                        else -> TopUsersList(
+                            users = state.topUsers,
+                            badgesByUserId = state.userBadges
+                        )
+                    }
+                }
             }
         }
     }
@@ -142,10 +150,7 @@ private fun TopPlacesList(
     if (places.isEmpty()) {
         FullScreenCentered {
             Text(
-                // Po wprowadzeniu filtra "tylko miejsca z >0 opinii" pusta
-                // lista znaczy, że jeszcze nikt nie wystawił żadnej opinii -
-                // komunikat sugeruje konkretną akcję.
-                text = "Żadne miejsce nie ma jeszcze opinii. Wystaw pierwszą!",
+                text = "\u017Badne miejsce nie ma jeszcze opinii. Wystaw pierwsz\u0105!",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -177,9 +182,7 @@ private fun TopUsersList(
     if (users.isEmpty()) {
         FullScreenCentered {
             Text(
-                // Po filtrze "min. 1 dodane miejsce LUB 1 opinia" pusta lista
-                // = jeszcze nikt nie zaczął żadnej aktywności w aplikacji.
-                text = "Brak aktywnych użytkowników. Bądź pierwszy - dodaj miejsce lub opinię!",
+                text = "Brak aktywnych u\u017Cytkownik\u00F3w. B\u0105d\u017A pierwszy - dodaj miejsce lub opini\u0119!",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -192,12 +195,17 @@ private fun TopUsersList(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        item {
+            Text(
+                text = "Przytrzymaj ikon\u0119 odznaki, aby zobaczy\u0107 jej nazw\u0119. " +
+                    "Wszystkie odznaki do zdobycia znajdziesz w Profilu \u2192 Odznaki \u2192 \u201E?\u201D",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+        }
         items(items = users, key = { it.id }) { user ->
             val position = users.indexOf(user) + 1
-            // Z mapy precomputed badges (z BadgeContext z VM) bierzemy
-            // pełny zestaw - count-based + ranking-based. Fallback na
-            // pustą listę, gdyby VM jeszcze nie zdążył zapełnić mapy
-            // (np. w trakcie pierwszego ładowania).
             val badges = badgesByUserId[user.id].orEmpty()
             TopUserCard(position = position, user = user, badges = badges)
         }
@@ -290,13 +298,13 @@ private fun TopUserCard(
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = user.name.ifBlank { "Użytkownik" },
+                        text = user.name.ifBlank { "U\u017Cytkownik" },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1
                     )
                     Text(
-                        text = "${user.placesAddedCount} miejsc · ${user.reviewsCount} opinii",
+                        text = "${user.placesAddedCount} miejsc \u00B7 ${user.reviewsCount} opinii",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -304,10 +312,6 @@ private fun TopUserCard(
             }
             if (badges.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                // Icon-only row, sortowane chronologicznie (od najwcześniej
-                // zdobytej do najnowszej). Bez tekstu - cała karta usera
-                // jest już ciasna (rank + nazwa + statystyki), opisy by się
-                // nie zmieściły. Pełna lista dostępna w profilu.
                 BadgesIconRow(
                     badges = chronologicalOrder(badges, user.badgeEarnedAt)
                 )
@@ -345,16 +349,12 @@ private fun UserAvatar(user: User) {
     }
 }
 
-/**
- * Mała "medal" – kółko z numerem pozycji. Pierwsze trzy miejsca dostają
- * specjalne kolory (złoto/srebro/brąz), reszta neutralny tonalny kolor.
- */
 @Composable
 private fun PositionMedal(position: Int) {
     val (background, contentColor) = when (position) {
-        1 -> Color(0xFFFFD54F) to Color(0xFF3E2723)         // złoto
-        2 -> Color(0xFFB0BEC5) to Color(0xFF263238)         // srebro
-        3 -> Color(0xFFD7A86E) to Color(0xFF3E2723)         // brąz
+        1 -> Color(0xFFFFD54F) to Color(0xFF3E2723)
+        2 -> Color(0xFFB0BEC5) to Color(0xFF263238)
+        3 -> Color(0xFFD7A86E) to Color(0xFF3E2723)
         else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
     }
     Box(
@@ -372,8 +372,6 @@ private fun PositionMedal(position: Int) {
         )
     }
 }
-
-// --- helpers ---------------------------------------------------------
 
 @Composable
 private fun FullScreenCentered(content: @Composable () -> Unit) {

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -205,11 +206,10 @@ fun ProfileScreen(
         )
     }
 
-    // Dialog gratulacyjny po zdobyciu nowej odznaki - jedna naraz, kolejne
-    // czekają w kolejce w VM (consumeNewlyEarnedBadge promuje następną).
-    ui.newlyEarnedBadge?.let { badge ->
+    // Dialog gratulacyjny po zdobyciu nowych odznak – zbiorczy, scrollowalny.
+    if (ui.newlyEarnedBadges.isNotEmpty()) {
         BadgeEarnedDialog(
-            badge = badge,
+            badges = ui.newlyEarnedBadges,
             onDismiss = viewModel::consumeNewlyEarnedBadge
         )
     }
@@ -645,7 +645,7 @@ private fun BadgesInfoDialog(
  */
 @Composable
 private fun BadgeEarnedDialog(
-    badge: UserBadge,
+    badges: List<UserBadge>,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -655,20 +655,20 @@ private fun BadgeEarnedDialog(
                 modifier = Modifier
                     .size(56.dp)
                     .clip(androidx.compose.foundation.shape.CircleShape)
-                    .background(badge.color.copy(alpha = 0.2f)),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = badge.icon,
+                    imageVector = Icons.Filled.EmojiEvents,
                     contentDescription = null,
-                    tint = badge.color,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp)
                 )
             }
         },
         title = {
             Text(
-                text = "Gratulacje!",
+                text = if (badges.size == 1) "Gratulacje!" else "Gratulacje! (${badges.size})",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
@@ -677,33 +677,58 @@ private fun BadgeEarnedDialog(
         },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 320.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Zdobyłaś/eś nową odznakę:",
+                    text = if (badges.size == 1) "Zdoby\u0142a\u015B/e\u015B now\u0105 odznak\u0119:"
+                    else "Zdoby\u0142a\u015B/e\u015B nowe odznaki:",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = badge.label,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = badge.color,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = badge.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Spacer(Modifier.height(12.dp))
+                badges.forEach { badge ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(badge.color.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = badge.icon,
+                                contentDescription = null,
+                                tint = badge.color,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = badge.label,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = badge.color
+                            )
+                            Text(
+                                text = badge.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
