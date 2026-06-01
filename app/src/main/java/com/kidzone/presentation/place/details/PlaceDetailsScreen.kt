@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -114,6 +115,7 @@ fun PlaceDetailsScreen(
     var showOverflow by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     // Po pomyślnym usunięciu – wracamy do listy.
     LaunchedEffect(state.isDeleted) {
@@ -157,34 +159,64 @@ fun PlaceDetailsScreen(
                     }
                 },
                 actions = {
-                    if (isOwner && state.place != null) {
+                    if (state.place != null) {
                         IconButton(onClick = { showOverflow = true }) {
-                            Icon(Icons.Filled.MoreVert, contentDescription = "Więcej akcji")
+                            Icon(Icons.Filled.MoreVert, contentDescription = "Wi\u0119cej akcji")
                         }
                         DropdownMenu(
                             expanded = showOverflow,
                             onDismissRequest = { showOverflow = false }
                         ) {
+                            // --- Opcje właściciela ---
+                            if (isOwner) {
+                                DropdownMenuItem(
+                                    text = { Text("Edytuj") },
+                                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                                    onClick = {
+                                        showOverflow = false
+                                        state.place?.let { onEditPlace(it.id) }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Usu\u0144") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Filled.Delete,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    onClick = {
+                                        showOverflow = false
+                                        showDeleteDialog = true
+                                    }
+                                )
+                            }
+                            // --- Udostępnij (dla wszystkich) ---
                             DropdownMenuItem(
-                                text = { Text("Edytuj") },
-                                leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                                text = { Text("Udost\u0119pnij") },
+                                leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
                                 onClick = {
                                     showOverflow = false
-                                    state.place?.let { onEditPlace(it.id) }
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Usuń") },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Filled.Delete,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
-                                },
-                                onClick = {
-                                    showOverflow = false
-                                    showDeleteDialog = true
+                                    state.place?.let { place ->
+                                        val shareText = buildString {
+                                            append(place.name)
+                                            if (place.address.isNotBlank()) {
+                                                append("\n")
+                                                append(place.address)
+                                            }
+                                            append("\n\nhttps://www.google.com/maps/search/?api=1")
+                                            append("&query=${place.latitude},${place.longitude}")
+                                        }
+                                        val intent = Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(Intent.EXTRA_SUBJECT, place.name)
+                                            putExtra(Intent.EXTRA_TEXT, shareText)
+                                        }
+                                        context.startActivity(
+                                            Intent.createChooser(intent, "Udost\u0119pnij miejsce")
+                                        )
+                                    }
                                 }
                             )
                         }
