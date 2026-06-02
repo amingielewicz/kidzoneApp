@@ -27,9 +27,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.kidzone.presentation.place.add.LOCATION_SERVICE_DISABLED_MESSAGE
 import com.kidzone.presentation.place.add.LOCATION_TIMEOUT_USER_MESSAGE
 import com.kidzone.presentation.place.add.fetchCurrentLocation
 import com.kidzone.presentation.place.add.hasLocationPermission
+import com.kidzone.presentation.place.add.isLocationServiceEnabled
 import com.kidzone.presentation.place.add.reverseGeocode
 import kotlinx.coroutines.launch
 
@@ -143,6 +145,10 @@ private suspend fun fetchLocationInternal(
     context: android.content.Context,
     onResult: (lat: Double?, lng: Double?, address: String?, error: String?) -> Unit
 ) {
+    if (!isLocationServiceEnabled(context)) {
+        onResult(null, null, null, LOCATION_SERVICE_DISABLED_MESSAGE)
+        return
+    }
     try {
         val coords = fetchCurrentLocation(context)
         if (coords == null) { onResult(null, null, null, LOCATION_TIMEOUT_USER_MESSAGE); return }
