@@ -2,6 +2,7 @@ package com.kidzone.presentation.place.details
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Navigation
@@ -58,6 +60,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
 import com.kidzone.domain.model.Amenity
+import kotlinx.coroutines.launch
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.model.User
@@ -114,7 +118,9 @@ fun PlaceDetailsScreen(
 
     var showOverflow by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showReportDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
     // Po pomyślnym usunięciu – wracamy do listy.
@@ -219,6 +225,23 @@ fun PlaceDetailsScreen(
                                     }
                                 }
                             )
+                            // --- Zg\u0142o\u015B (dla nie-w\u0142a\u015Bcicieli) ---
+                            if (!isOwner) {
+                                DropdownMenuItem(
+                                    text = { Text("Zg\u0142o\u015B") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Filled.Flag,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    onClick = {
+                                        showOverflow = false
+                                        showReportDialog = true
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -285,6 +308,19 @@ fun PlaceDetailsScreen(
                 showDeleteDialog = false
             },
             onDismiss = { if (!state.isDeleting) showDeleteDialog = false }
+        )
+    }
+
+    if (showReportDialog) {
+        ReportPlaceDialog(
+            onSubmit = { reason, comment ->
+                viewModel.reportPlace(reason, comment)
+                showReportDialog = false
+                scope.launch {
+                    snackbarHostState.showSnackbar("Dzi\u0119kujemy za zg\u0142oszenie!")
+                }
+            },
+            onDismiss = { showReportDialog = false }
         )
     }
 
@@ -1003,6 +1039,83 @@ private fun DeleteConfirmationDialog(
                 onClick = onDismiss,
                 enabled = !isDeleting
             ) {
+                Text("Anuluj")
+            }
+        }
+    )
+}
+
+
+
+@Composable
+private fun ReportPlaceDialog(
+    onSubmit: (reason: String, comment: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val reasons = listOf(
+        "NOT_EXISTS" to "Miejsce nie istnieje / zamkni\u0119te",
+        "INAPPROPRIATE" to "Nieodpowiednia tre\u015B\u0107",
+        "DUPLICATE" to "Duplikat innego miejsca",
+        "FALSE_DATA" to "Fa\u0142szywe dane (adres, udogodnienia)",
+        "OTHER" to "Inne"
+    )
+    var selectedReason by remember { mutableStateOf(reasons.first().first) }
+    var comment by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Filled.Flag,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+        },
+        title = { Text("Zg\u0142o\u015B miejsce") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Wybierz pow\u00F3d zg\u0142oszenia:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                reasons.forEach { (code, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedReason = code }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.material3.RadioButton(
+                            selected = selectedReason == code,
+                            onClick = { selectedReason = code }
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.material3.OutlinedTextField(
+                    value = comment,
+                    onValueChange = { comment = it },
+                    label = { Text("Komentarz (opcjonalny)") },
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSubmit(selectedReason, comment.trim()) }) {
+                Text("Wy\u015Blij zg\u0142oszenie")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
                 Text("Anuluj")
             }
         }
