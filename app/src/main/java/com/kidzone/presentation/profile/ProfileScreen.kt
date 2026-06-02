@@ -37,6 +37,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -46,6 +47,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -93,6 +95,7 @@ import java.util.Locale
  *   tak samo (ostatecznie i tak wraca na ekran logowania – współdzielimy
  *   callback, żeby nie wprowadzać drugiego)
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     onSignOut: () -> Unit,
@@ -113,26 +116,35 @@ fun ProfileScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (user == null) {
-            CircularProgressIndicator(
-                modifier = Modifier.align(Alignment.Center)
-            )
-        } else {
-            ProfileContent(
-                user = user!!,
-                signInProvider = ui.signInProvider,
-                obtainedBadges = ui.obtainedBadges,
-                userRank = ui.userRank,
-                onEdit = viewModel::openEditSheet,
-                onOpenMyPlaces = onOpenMyPlaces,
-                onOpenMyReviews = onOpenMyReviews,
-                onOpenBadgesInfo = viewModel::openBadgesInfo,
-                onChangePassword = viewModel::openChangePassword,
-                onChangeEmail = viewModel::openChangeEmail,
-                onDeleteAccount = viewModel::openDeleteAccount,
-                onPrivacyPolicy = viewModel::openPrivacyPolicy,
-                onSignOut = { viewModel.signOut(onSignOut) }
-            )
+        PullToRefreshBox(
+            isRefreshing = ui.isRefreshing,
+            onRefresh = { viewModel.refreshProfile() },
+            modifier = Modifier.fillMaxSize()
+        ) {
+            if (user == null) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                ProfileContent(
+                    user = user!!,
+                    signInProvider = ui.signInProvider,
+                    obtainedBadges = ui.obtainedBadges,
+                    userRank = ui.userRank,
+                    onEdit = viewModel::openEditSheet,
+                    onOpenMyPlaces = onOpenMyPlaces,
+                    onOpenMyReviews = onOpenMyReviews,
+                    onOpenBadgesInfo = viewModel::openBadgesInfo,
+                    onChangePassword = viewModel::openChangePassword,
+                    onChangeEmail = viewModel::openChangeEmail,
+                    onDeleteAccount = viewModel::openDeleteAccount,
+                    onPrivacyPolicy = viewModel::openPrivacyPolicy,
+                    onSignOut = { viewModel.signOut(onSignOut) }
+                )
+            }
         }
 
         SnackbarHost(
@@ -801,6 +813,14 @@ private fun SettingsCard(
             Spacer(Modifier.width(8.dp))
             Text("Wyloguj")
         }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = "Wersja: dev",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
+        )
     }
 }
 

@@ -47,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -70,6 +71,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.presentation.common.GpsDisabledBanner
+import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.hasLocationPermission
 import kotlinx.coroutines.launch
@@ -167,6 +170,7 @@ fun PlaceListScreen(
 
     // Liczba aktywnych filtrów udogodnień w sheecie.
     val advancedAmenitiesCount = state.selectedAmenities.size
+    val gpsEnabled = rememberLocationServiceEnabled()
 
     Column(modifier = Modifier.fillMaxSize()) {
         CategoryFilterBar(
@@ -197,6 +201,19 @@ fun PlaceListScreen(
             )
         }
 
+        // Banner GPS disabled - when permission granted, sort=NEAREST, but
+        // GPS service is turned off in system settings.
+        if (state.sortOrder == PlaceListViewModel.SortOrder.NEAREST &&
+            hasLocationPermission(context) && !gpsEnabled
+        ) {
+            GpsDisabledBanner(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+        }
+
+        PullToRefreshBox(
+            isRefreshing = state.isLoading,
+            onRefresh = { viewModel.refreshLocation() },
+            modifier = Modifier.fillMaxSize()
+        ) {
         when {
             state.isLoading && state.places.isEmpty() -> {
                 Box(
@@ -258,6 +275,7 @@ fun PlaceListScreen(
                     }
                 }
             }
+        }
         }
     }
 

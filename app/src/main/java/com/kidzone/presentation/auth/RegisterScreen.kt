@@ -64,6 +64,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
+import com.kidzone.presentation.common.NetworkStatus
+import com.kidzone.presentation.common.NoInternetBanner
+import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.utils.PasswordPolicy
 
 /**
@@ -88,6 +91,7 @@ fun RegisterScreen(
     val state by viewModel.uiState.collectAsState()
 
     var isPasswordVisible by remember { mutableStateOf(false) }
+    val networkStatus by rememberNetworkStatus()
 
     LaunchedEffect(state.isRegistered) {
         if (state.isRegistered) onRegisterSuccess()
@@ -129,6 +133,11 @@ fun RegisterScreen(
                     .padding(horizontal = 24.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                if (networkStatus == NetworkStatus.UNAVAILABLE) {
+                    NoInternetBanner()
+                    Spacer(Modifier.height(8.dp))
+                }
+
                 // Logo brandu - mniejsze niż na LoginScreen, bo ekran ma
                 // jeszcze TopAppBar i nagłówek karty pod spodem. fillMaxWidth(0.4f)
                 // daje proporcję ~120-180dp na typowych telefonach.

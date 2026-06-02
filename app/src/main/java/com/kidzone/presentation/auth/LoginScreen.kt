@@ -64,6 +64,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
+import com.kidzone.presentation.common.NetworkStatus
+import com.kidzone.presentation.common.NoInternetBanner
+import com.kidzone.presentation.common.rememberNetworkStatus
 import kotlinx.coroutines.launch
 
 /**
@@ -112,6 +115,8 @@ fun LoginScreen(
         )
     )
 
+    val networkStatus by rememberNetworkStatus()
+
     Scaffold(
         containerColor = Color.Transparent
     ) { padding ->
@@ -129,6 +134,11 @@ fun LoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
+                if (networkStatus == NetworkStatus.UNAVAILABLE) {
+                    NoInternetBanner()
+                    Spacer(Modifier.height(12.dp))
+                }
+
                 Spacer(Modifier.height(24.dp))
 
                 // Logo brandu - ten sam asset, którego używa SplashScreen.

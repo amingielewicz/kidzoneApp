@@ -28,9 +28,11 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -52,6 +54,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.kidzone.R
 import com.kidzone.domain.model.Place
+import com.kidzone.presentation.common.GpsDisabledBanner
+import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.style
 
 private val PLACE_ROW_HEIGHT = 148.dp
@@ -61,15 +65,16 @@ private val PLACE_CARD_ICON_SIZE = 28.dp
 private val PLACE_CARD_CONTENT_PADDING = 10.dp
 
 /**
- * Ekran "Start" – pierwsza zakładka po zalogowaniu.
+ * Ekran "Start" \u2013 pierwsza zak\u0142adka po zalogowaniu.
  *
- * Sekcje (w kolejności):
- *  1. Hero – kolorowe powitanie z taglinem.
- *  2. CTA do mapy – pełnoszerokościowa karta zachęcająca do otwarcia mapy.
- *  3. Systemowy dialog Androida o lokalizację, jeśli permission nie jest jeszcze nadany.
- *  4. "Blisko Ciebie" – LazyRow z miejscami w okolicy.
- *  5. "Top miejsca" – LazyRow z najwyżej ocenianymi miejscami w pobliżu.
+ * Sekcje (w kolejno\u015bci):
+ *  1. Hero \u2013 kolorowe powitanie z taglinem.
+ *  2. CTA do mapy \u2013 pe\u0142noszeroko\u015bciowa karta zach\u0119caj\u0105ca do otwarcia mapy.
+ *  3. Systemowy dialog Androida o lokalizacj\u0119, je\u015bli permission nie jest jeszcze nadany.
+ *  4. "Blisko Ciebie" \u2013 LazyRow z miejscami w okolicy.
+ *  5. "Top miejsca" \u2013 LazyRow z najwy\u017cej ocenianymi miejscami w pobli\u017cu.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onOpenPlaceDetails: (placeId: String) -> Unit,
@@ -77,9 +82,10 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val gpsEnabled = rememberLocationServiceEnabled()
 
-    // Refresh permission flag gdy ekran wraca na pierwszy plan – user mógł
-    // pójść do Settings i włączyć/wyłączyć lokalizację, a my chcemy mieć
+    // Refresh permission flag gdy ekran wraca na pierwszy plan \u2013 user m\u00f3g\u0142
+    // p\u00f3j\u015b\u0107 do Settings i w\u0142\u0105czy\u0107/wy\u0142\u0105czy\u0107 lokalizacj\u0119, a my chcemy mie\u0107
     // aktualny stan w UI bez restartu.
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner) {
@@ -95,8 +101,8 @@ fun HomeScreen(
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
-        // Wystarczy zgoda na coarse, żeby pokazać miejsca w pobliżu –
-        // dokładność z grubsza jest tu OK (radius 10km).
+        // Wystarczy zgoda na coarse, \u017ceby pokaza\u0107 miejsca w pobli\u017cu \u2013
+        // dok\u0142adno\u015b\u0107 z grubsza jest tu OK (radius 10km).
         if (result.values.any { it }) {
             viewModel.onLocationPermissionGranted()
         }
@@ -114,64 +120,75 @@ fun HomeScreen(
         }
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        contentPadding = PaddingValues(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    PullToRefreshBox(
+        isRefreshing = state.isNearbyLoading || state.isTopLoading,
+        onRefresh = { viewModel.refreshLocationGranted() },
+        modifier = Modifier.fillMaxSize()
     ) {
-        item { HeroSection() }
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            contentPadding = PaddingValues(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // GPS disabled banner \u2013 only when permission granted but service off
+            if (state.locationGranted && !gpsEnabled) {
+                item { GpsDisabledBanner() }
+            }
 
-        item {
-            OpenMapCta(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                onClick = onOpenMap
-            )
-        }
+            item { HeroSection() }
 
-        item {
-            SectionHeader(
-                title = stringResource(R.string.home_nearby_places),
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-        }
-        if (state.locationGranted) {
             item {
-                HorizontalPlacesRow(
-                    places = state.nearbyPlaces,
-                    isLoading = state.isNearbyLoading,
-                    emptyMessage = stringResource(R.string.home_no_nearby_places),
-                    onPlaceClick = onOpenPlaceDetails
+                OpenMapCta(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    onClick = onOpenMap
                 )
             }
-        }
 
-        item {
-            SectionHeader(
-                title = stringResource(R.string.home_top_places),
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-        }
-        if (state.locationGranted) {
             item {
-                HorizontalPlacesRow(
-                    places = state.topPlaces,
-                    isLoading = state.isTopLoading,
-                    emptyMessage = stringResource(R.string.home_no_top_places),
-                    onPlaceClick = onOpenPlaceDetails
-                )
-            }
-        }
-
-        state.errorMessage?.let { msg ->
-            item {
-                Text(
-                    text = msg,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
+                SectionHeader(
+                    title = stringResource(R.string.home_nearby_places),
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
+            }
+            if (state.locationGranted) {
+                item {
+                    HorizontalPlacesRow(
+                        places = state.nearbyPlaces,
+                        isLoading = state.isNearbyLoading,
+                        emptyMessage = stringResource(R.string.home_no_nearby_places),
+                        onPlaceClick = onOpenPlaceDetails
+                    )
+                }
+            }
+
+            item {
+                SectionHeader(
+                    title = stringResource(R.string.home_top_places),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
+            if (state.locationGranted) {
+                item {
+                    HorizontalPlacesRow(
+                        places = state.topPlaces,
+                        isLoading = state.isTopLoading,
+                        emptyMessage = stringResource(R.string.home_no_top_places),
+                        onPlaceClick = onOpenPlaceDetails
+                    )
+                }
+            }
+
+            state.errorMessage?.let { msg ->
+                item {
+                    Text(
+                        text = msg,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
             }
         }
     }
