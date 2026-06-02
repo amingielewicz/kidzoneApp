@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Address
 import android.location.Geocoder
+import android.location.LocationManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
@@ -56,6 +57,28 @@ fun hasLocationPermission(context: Context): Boolean {
 }
 
 /**
+ * Sprawdza, czy usługa lokalizacji (GPS / Network) jest włączona w systemie.
+ *
+ * Odróżnia to od [hasLocationPermission]:
+ *  - `hasLocationPermission` = czy apka ma uprawnienie do używania lokalizacji
+ *  - `isLocationServiceEnabled` = czy telefon w ogóle ma włączony GPS/lokalizację
+ *
+ * Użycie: przed próbą pobrania GPS sprawdź obie funkcje. Jeśli usługa
+ * wyłączona — pokaż dialog zachęcający do włączenia GPS.
+ */
+fun isLocationServiceEnabled(context: Context): Boolean {
+    val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+    return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+        locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+}
+
+/**
+ * Komunikat dla użytkownika, gdy usługa lokalizacji jest wyłączona w systemie.
+ */
+const val LOCATION_SERVICE_DISABLED_MESSAGE: String =
+    "Lokalizacja jest wy\u0142\u0105czona. W\u0142\u0105cz GPS w ustawieniach telefonu."
+
+/**
  * Pobiera aktualną lokalizację użytkownika przez FusedLocationProviderClient.
  *
  * Zakłada, że uprawnienie [Manifest.permission.ACCESS_FINE_LOCATION] zostało
@@ -67,8 +90,13 @@ fun hasLocationPermission(context: Context): Boolean {
  *    bywa wolny, a my nie chcemy zostawiać usera na bezterminowym spinnerze.
  */
 @SuppressLint("MissingPermission")
-suspend fun fetchCurrentLocation(context: Context): Pair<Double, Double>? =
-    withTimeoutOrNull(LOCATION_TIMEOUT_MS) {
+suspend fun fetchCurrentLocation(context: Context): Pair<Double, Double>? {
+    // Sprawdzenie czy usługa lokalizacji jest włączona — bez tego
+    // FusedLocationClient i tak zwróci timeout, ale komunikat będzie
+    // jaśniejszy ("Lokalizacja wyłączona" zamiast "Problem z ustaleniem").
+    if (!isLocationServiceEnabled(context)) return null
+
+    return withTimeoutOrNull(LOCATION_TIMEOUT_MS) {
         suspendCancellableCoroutine<Pair<Double, Double>?> { cont ->
             val client = LocationServices.getFusedLocationProviderClient(context)
             val cts = CancellationTokenSource()
@@ -78,7 +106,6 @@ suspend fun fetchCurrentLocation(context: Context): Pair<Double, Double>? =
                     if (location != null) {
                         cont.resume(location.latitude to location.longitude)
                     } else {
-                        // Jesli getCurrentLocation zwrocilo null, probujemy pobrac ostatnia znana lokalizacje
                         client.lastLocation.addOnSuccessListener { lastLoc ->
                             cont.resume(lastLoc?.let { it.latitude to it.longitude })
                         }.addOnFailureListener {
@@ -87,7 +114,6 @@ suspend fun fetchCurrentLocation(context: Context): Pair<Double, Double>? =
                     }
                 }
                 .addOnFailureListener { e ->
-                    // W razie bledu getCurrentLocation rowniez probujemy lastLocation jako fallback
                     client.lastLocation.addOnSuccessListener { lastLoc ->
                         cont.resume(lastLoc?.let { it.latitude to it.longitude })
                     }.addOnFailureListener {
@@ -98,6 +124,7 @@ suspend fun fetchCurrentLocation(context: Context): Pair<Double, Double>? =
             cont.invokeOnCancellation { cts.cancel() }
         }
     }
+}
 
 /**
  * Reverse geocoding – z pary (lat, lng) zwraca adres jako string.

@@ -194,7 +194,7 @@ app/src/main/java/com/kidzone
 │
 ├── data
 │   ├── remote
-│   │   ├── FirestoreCollections.kt    # users, places, reviews, photos
+│   │   ├── FirestoreCollections.kt    # users, places, reviews, photos, place_reports, place_change_requests
 │   │   └── dto/                        # PlaceDto, ReviewDto, UserDto
 │   └── repository
 │       ├── FirebaseAuthRepository.kt   # e-mail + Google + reset, mapowanie błędów,
@@ -463,8 +463,43 @@ przy pierwszym wejściu, `AddPlaceScreen` przy kliknięciu "Pobierz lokalizację
 | Chronologiczny sort odznak w rankingu (Firestore)    | ✅     |
 | Ranking miejsc (TOP 100) + użytkowników              | ✅     |
 | Upload avatara do Firebase Storage                   | ✅     |
+| Custom MapMyLocationButton na mapie                  | ✅     |
+| Deeplink "Zobacz na Google Maps" (oceny Google)      | ✅     |
+| Filtry listy category-aware (sheet filtrów)          | ✅     |
+| Banner GPS na ekranie Dodaj miejsce                  | ✅     |
+| Wykrywanie duplikatów przy dodawaniu (200m)          | ✅     |
+| Ranking: auto-refresh + pull-to-refresh              | ✅     |
+| Zbiorczy dialog nowych odznak (scrollowalny)         | ✅     |
+| Logo misia w TopAppBar obok "kidZone"                | ✅     |
+| Udostępnij miejsce (Share intent)                    | ✅     |
+| Zgłoś naruszenie (dialog + `place_reports`)          | ✅     |
+| Zaproponuj zmianę danych miejsca (`place_change_requests`) | ✅ |
+| Koryguj lokalizację GPS miejsca                      | ✅     |
+| Cloud Functions: email admin po zgłoszeniu/zmianie   | ✅     |
+| Sprawdzanie włączonej usługi GPS w systemie          | ✅     |
 | Zgłaszanie opinii jako spam                          | ⏳ — `reportReviewAsSpam` zwraca `NotImplementedError` |
 | Upload zdjęć miejsc / opinii do Storage              | ⏳ — Storage dep wpięte, brak UI |
+
+## Cloud Functions (backend)
+
+Folder `functions/` zawiera Cloud Functions (TypeScript, Firebase Functions v2)
+triggerowane przez zapis nowego dokumentu w Firestore:
+
+| Trigger | Kolekcja | Działanie |
+|---------|----------|-----------|
+| `onPlaceReport` | `place_reports` | Wysyła email do admina z powodu zgłoszenia naruszenia |
+| `onPlaceChangeRequest` | `place_change_requests` | Wysyła email z propozycją zmiany / korekty lokalizacji |
+
+Email zawiera: nazwę miejsca, dane zgłaszającego (imię, email, UID),
+powód / proponowane zmiany (zmapowane na czytelne polskie etykiety) +
+link do dokumentu w Firebase Console.
+
+Konfiguracja credentials przez Firebase Secrets (`defineSecret`):
+- `GMAIL_EMAIL` — adres z którego wychodzą powiadomienia
+- `GMAIL_PASSWORD` — App Password (Google 2FA)
+- `ADMIN_EMAIL` — adres docelowy powiadomień
+
+Deploy: `cd functions && npm run build && cd .. && firebase deploy --only functions`
 
 ## Kolejne kroki
 
@@ -473,24 +508,16 @@ przy pierwszym wejściu, `AddPlaceScreen` przy kliknięciu "Pobierz lokalizację
    plus modal w UI nad komentarzem.
 2. **Upload zdjęć miejsc i opinii** — analogicznie do `uploadAvatar`,
    w `AddPlaceScreen` i `AddReviewSheet`. Wykorzystać `READ_MEDIA_IMAGES`
-   i `CAMERA`, które już są w manifeście.
-3. **Cloud Functions / agregaty server-side** — przeniesienie utrzymywania
-   `averageRating` i `reviewsCount` na backend (trigger na write
-   w `reviews`), żeby klient nie polegał na transakcjach i nie miał
-   race condition przy równoczesnych ocenach.
-4. **Geo zapytania** — `getPlacesNear` w repo nadal pobiera wszystkie
+   i `CAMERA`, które już są w manifeście. User może dodać zdjęcie do
+   cudzego miejsca (zapamiętane do implementacji).
+3. **Geo zapytania** — `getPlacesNear` w repo nadal pobiera wszystkie
    miejsca i sortuje klient-side haversinem; przy rosnącej bazie
-   przepisać na geohash / GeoFirestore. Lista miejsc też skorzysta
-   (dziś bierze całą kolekcję, sortuje, cap-uje do 100 po stronie klienta).
-5. **Snapshot listener dla rankingu** — `RankingViewModel` używa one-shot;
-   po wdrożeniu Cloud Functions z denormalizowaną kolekcją `top_places`
-   można podmienić na listener bez zmiany API.
-6. **Themed icon (vector)** — obecny `ic_launcher_monochrome` jest PNG-iem;
-   docelowo lepiej mieć wersję wektorową single-path, by Android mógł
-   sensownie zastosować dynamic color overlay.
-7. **Replace placeholder Google glyph** — przycisk "Zaloguj się przez
-   Google" używa własnego mini-glyphu "G" (placeholder bez ryzyka
-   licencyjnego); docelowo wymienić na materiał z Google Identity po
-   uzyskaniu brand approvalu.
-8. Opcjonalnie: deep linking, push notifications, refinement dark mode,
+   przepisać na geohash / GeoFirestore.
+4. **Panel admina do akceptacji zmian** — propozycje zmian i korekty
+   lokalizacji trafiają do `place_change_requests`, ale akceptacja
+   wymaga ręcznej edycji w Firebase Console. Docelowo: prosty panel
+   webowy lub Cloud Function z auto-akceptacją po N zgodnych zgłoszeniach.
+5. **Themed icon (vector)** — obecny `ic_launcher_monochrome` jest PNG-iem;
+   docelowo lepiej mieć wersję wektorową single-path.
+6. Opcjonalnie: deep linking, push notifications, refinement dark mode,
    paginacja listy miejsc.

@@ -317,18 +317,19 @@ private suspend fun fetchAndSetLocation(
     viewModel: AddPlaceViewModel
 ) {
     viewModel.onFetchingLocationStart()
+
+    // Sprawdź najpierw czy usługa lokalizacji jest w ogóle włączona
+    if (!isLocationServiceEnabled(context)) {
+        viewModel.onLocationError(LOCATION_SERVICE_DISABLED_MESSAGE)
+        return
+    }
+
     try {
         val coords = fetchCurrentLocation(context)
         if (coords == null) {
-            // null = brak fixu albo timeout. Spójny komunikat dla obu
-            // przypadków (zob. LOCATION_TIMEOUT_USER_MESSAGE) - user nie
-            // potrzebuje wiedzieć, czy GPS się spóźnił, czy w ogóle nie
-            // ma sygnału, w obu sytuacjach robi się to samo (próbuje
-            // później albo wpisuje adres ręcznie).
             viewModel.onLocationError(LOCATION_TIMEOUT_USER_MESSAGE)
             return
         }
-        // Reverse geocoding jest best-effort – jego błędy nie blokują flow.
         val address = runCatching { reverseGeocode(context, coords.first, coords.second) }
             .getOrNull()
         viewModel.onLocationFetched(coords.first, coords.second, address)
