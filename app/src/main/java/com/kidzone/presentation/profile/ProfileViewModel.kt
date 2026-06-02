@@ -96,7 +96,8 @@ class ProfileViewModel @Inject constructor(
         val isBadgesInfoOpen: Boolean = false,
         val obtainedBadges: List<UserBadge> = emptyList(),
         val userRank: Int? = null,
-        val newlyEarnedBadges: List<UserBadge> = emptyList()
+        val newlyEarnedBadges: List<UserBadge> = emptyList(),
+        val isRefreshing: Boolean = false
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -201,6 +202,23 @@ class ProfileViewModel @Inject constructor(
     }
 
     // -------- Edycja profilu --------
+
+    /** Pull-to-refresh: re-compute badge context (ranks may have changed). */
+    fun refreshProfile() {
+        val u = user.value ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshing = true) }
+            val context = computeBadgeContext(u)
+            val obtained = u.computeBadges(context)
+            _uiState.update {
+                it.copy(
+                    obtainedBadges = obtained,
+                    userRank = context.userRank,
+                    isRefreshing = false
+                )
+            }
+        }
+    }
 
     fun openEditSheet() {
         _uiState.update { it.copy(isEditOpen = true, saveError = null) }

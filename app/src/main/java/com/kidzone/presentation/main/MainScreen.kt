@@ -2,9 +2,14 @@ package com.kidzone.presentation.main
 
 import android.widget.Toast
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -45,6 +50,9 @@ import androidx.navigation.compose.rememberNavController
 import com.google.android.gms.maps.model.LatLng
 import com.kidzone.R
 import com.kidzone.navigation.Route
+import com.kidzone.presentation.common.NetworkStatus
+import com.kidzone.presentation.common.NoInternetBanner
+import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.home.HomeScreen
 import com.kidzone.presentation.map.MapScreen
 import com.kidzone.presentation.place.list.PlaceListScreen
@@ -82,6 +90,7 @@ fun MainScreen(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val context = LocalContext.current
+    val networkStatus by rememberNetworkStatus()
 
     // Lokalny stan przekazywany dalej do MapScreen. Trzymamy go obok sygnału
     // z parent NavGraph, bo `onFocusConsumed()` od razu wyczyści savedStateHandle,
@@ -153,44 +162,53 @@ fun MainScreen(
             }
         }
     ) { padding ->
-        NavHost(
-            navController = navController,
-            startDestination = Route.Home.path,
-            modifier = Modifier.padding(padding)
-        ) {
-            composable(Route.Home.path) {
-                HomeScreen(
-                    onOpenPlaceDetails = onOpenPlaceDetails,
-                    onOpenMap = {
-                        navController.navigate(Route.Map.path) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            AnimatedVisibility(
+                visible = networkStatus == NetworkStatus.UNAVAILABLE,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                NoInternetBanner()
+            }
+            NavHost(
+                navController = navController,
+                startDestination = Route.Home.path,
+                modifier = Modifier.weight(1f)
+            ) {
+                composable(Route.Home.path) {
+                    HomeScreen(
+                        onOpenPlaceDetails = onOpenPlaceDetails,
+                        onOpenMap = {
+                            navController.navigate(Route.Map.path) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
                             }
-                            launchSingleTop = true
-                            restoreState = true
                         }
-                    }
-                )
-            }
-            composable(Route.Map.path) {
-                MapScreen(
-                    onOpenPlaceDetails = onOpenPlaceDetails,
-                    focusOn = pendingMapFocus,
-                    onFocusConsumed = { pendingMapFocus = null }
-                )
-            }
-            composable(Route.PlaceList.path) {
-                PlaceListScreen(onOpenPlaceDetails = onOpenPlaceDetails)
-            }
-            composable(Route.Ranking.path) {
-                RankingScreen(onOpenPlaceDetails = onOpenPlaceDetails)
-            }
-            composable(Route.Profile.path) {
-                ProfileScreen(
-                    onSignOut = onSignOut,
-                    onOpenMyPlaces = onOpenMyPlaces,
-                    onOpenMyReviews = onOpenMyReviews
-                )
+                    )
+                }
+                composable(Route.Map.path) {
+                    MapScreen(
+                        onOpenPlaceDetails = onOpenPlaceDetails,
+                        focusOn = pendingMapFocus,
+                        onFocusConsumed = { pendingMapFocus = null }
+                    )
+                }
+                composable(Route.PlaceList.path) {
+                    PlaceListScreen(onOpenPlaceDetails = onOpenPlaceDetails)
+                }
+                composable(Route.Ranking.path) {
+                    RankingScreen(onOpenPlaceDetails = onOpenPlaceDetails)
+                }
+                composable(Route.Profile.path) {
+                    ProfileScreen(
+                        onSignOut = onSignOut,
+                        onOpenMyPlaces = onOpenMyPlaces,
+                        onOpenMyReviews = onOpenMyReviews
+                    )
+                }
             }
         }
     }

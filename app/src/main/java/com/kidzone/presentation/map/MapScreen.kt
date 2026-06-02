@@ -82,6 +82,8 @@ import com.google.maps.android.compose.rememberCameraPositionState
 import com.kidzone.R
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.presentation.common.GpsDisabledBanner
+import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.fetchCurrentLocation
 import com.kidzone.presentation.place.add.hasLocationPermission
@@ -145,6 +147,7 @@ fun MapScreen(
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val gpsEnabled = rememberLocationServiceEnabled()
 
     // Trzymamy lokalnie, bo musimy reagować na nadanie uprawnienia bez
     // restartu ekranu. Wartość początkowa = stan systemowy w chwili pierwszej
@@ -303,6 +306,9 @@ fun MapScreen(
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
+            }
+            if (locationPermissionGranted && !gpsEnabled) {
+                GpsDisabledBanner(modifier = Modifier.fillMaxWidth())
             }
         }
 
