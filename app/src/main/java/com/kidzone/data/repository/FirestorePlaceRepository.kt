@@ -252,5 +252,38 @@ class FirestorePlaceRepository @Inject constructor(
         OpResult.failure(e)
     }
 
+    override suspend fun submitChangeRequest(
+        placeId: String,
+        requesterId: String,
+        changes: Map<String, Any>,
+        type: String
+    ): OpResult<Unit> = try {
+        val requestData = mapOf(
+            "placeId" to placeId,
+            "requesterId" to requesterId,
+            "changes" to changes,
+            "type" to type,
+            "createdAtMillis" to System.currentTimeMillis(),
+            "status" to "pending"
+        )
+        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+            firestore.collection(FirestoreCollections.PLACE_CHANGE_REQUESTS)
+                .add(requestData)
+                .await()
+            true
+        }
+        if (completed == null) {
+            OpResult.failure(
+                java.util.concurrent.TimeoutException(
+                    "Wys\u0142anie propozycji trwa zbyt d\u0142ugo. Spr\u00F3buj ponownie."
+                )
+            )
+        } else {
+            OpResult.success(Unit)
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
     private fun placesCollection() = firestore.collection(FirestoreCollections.PLACES)
 }

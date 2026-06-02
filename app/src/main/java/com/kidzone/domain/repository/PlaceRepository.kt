@@ -66,4 +66,14 @@ interface PlaceRepository {
         reason: String,
         comment: String = ""
     ): OpResult<Unit>
+
+    /**
+     * Wysyła propozycję zmiany danych miejsca (przez nie-właściciela).
+     */
+    suspend fun submitChangeRequest(
+        placeId: String,
+        requesterId: String,
+        changes: Map<String, Any>,
+        type: String = "EDIT"
+    ): OpResult<Unit>
 }
