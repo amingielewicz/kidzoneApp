@@ -1,61 +1,22 @@
 rules_version = '2';
 
-// Reguły bezpieczeństwa Firestore dla aplikacji KidZone.
-//
-// Deploy: `firebase deploy --only firestore:rules` (wymaga firebase.json
-// w root + Firebase CLI zalogowanego do projektu) ALBO ręczne wklejenie
-// całej zawartości tego pliku w konsoli:
-//   Firebase Console -> Firestore Database -> Rules -> Publish.
-//
-// Ogólne założenia:
-//  - aplikacja jest "post-login" – wszyscy klienci są zalogowani,
-//  - dane są w zasadzie publiczne do odczytu (mapa miejsc, opinie),
-//  - zapisy są dozwolone tylko dla właścicieli rekordów,
-//  - jeden mechanizm wyjątkowy: każdy zalogowany może aktualizować
-//    `places/{id}.averageRating` i `places/{id}.reviewsCount`, bo tak
-//    działa transakcja `addReview` w FirestoreReviewRepository.
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // ---------- helpery ----------
 
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Klucze, które dany write zmienia w istniejącym docu (delta).
     function changedKeys() {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
 
-    // ---------- /users/{userId} ----------
-    //
-    // Zapis tylko do "swojego" doca. Czytanie publiczne (zalogowanym),
-    // żeby ranking userów i karta autora miejsca działały.
-    //
-    // Uwaga: addPlace i addReview robią `set(merge=true)` na users/{me}
-    // z FieldValue.increment(1) na liczniku. Pierwsze takie wywołanie dla
-    // legacy usera może utworzyć minimalny doc – stąd `create` też
-    // ograniczone tylko do ścieżki ze swoim uid.
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create, update: if isSignedIn() && request.auth.uid == userId;
-      // Delete tylko dla siebie samego – używane przez `deleteAccount` w
-      // AuthRepository (RODO „prawo do bycia zapomnianym"). Klient kasuje
-      // swoje opinie i miejsca przed dotarciem do tej linii.
       allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // ---------- /places/{placeId} ----------
-    //
-    // Czytanie publiczne (anonimowi też mogą zobaczyć mapę – patrz `read: true`).
-    // Edytowanie i kasowanie zarezerwowane dla właściciela
-    // (`ownerUserId == auth.uid`).
-    //
-    // Wyjątek update'owy: każdy zalogowany użytkownik może zmieniać
-    // wyłącznie `averageRating` i `reviewsCount` (pełen zestaw zmian – oba
-    // jednocześnie albo każde z osobna). Dzięki temu transakcja addReview
-    // przechodzi bez przyznawania prawa do edycji nazwy / adresu.
     match /places/{placeId} {
       allow read: if true;
 
@@ -71,17 +32,6 @@ service cloud.firestore {
         && resource.data.ownerUserId == request.auth.uid;
     }
 
-    // ---------- /reviews/{reviewId} ----------
-    //
-    // Czytanie publiczne (lista opinii w detalach miejsca, ranking).
-    // Tworzenie tylko dla zalogowanego usera, który podpisuje się pod swoim
-    // uidem (`userId == auth.uid` w nowym dokumencie). Edytowanie / kasowanie
-    // tylko przez autora.
-    //
-    // Pole `reportedAsSpam` może być w przyszłości aktualizowane przez
-    // Cloud Function moderacyjną (admin SDK pomija reguły) – dziś nie
-    // robimy specjalnego przypadku, bo mechanizm spam-flag nie jest jeszcze
-    // wpięty po stronie klienta.
     match /reviews/{reviewId} {
       allow read: if true;
 
@@ -93,6 +43,20 @@ service cloud.firestore {
 
       allow delete: if isSignedIn()
         && resource.data.userId == request.auth.uid;
+    }
+
+    // Zgłoszenia naruszeń — każdy zalogowany może utworzyć
+    match /place_reports/{reportId} {
+      allow create: if isSignedIn()
+        && request.resource.data.reporterId == request.auth.uid;
+      allow read, update, delete: if false;
+    }
+
+    // Propozycje zmian — każdy zalogowany może utworzyć
+    match /place_change_requests/{requestId} {
+      allow create: if isSignedIn()
+        && request.resource.data.requesterId == request.auth.uid;
+      allow read, update, delete: if false;
     }
   }
 }
