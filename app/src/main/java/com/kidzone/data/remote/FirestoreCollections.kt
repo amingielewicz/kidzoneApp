@@ -9,4 +9,5 @@ object FirestoreCollections {
     const val REVIEWS = "reviews"
     const val PHOTOS = "photos"
     const val PLACE_REPORTS = "place_reports"
+    const val PLACE_CHANGE_REQUESTS = "place_change_requests"
 }

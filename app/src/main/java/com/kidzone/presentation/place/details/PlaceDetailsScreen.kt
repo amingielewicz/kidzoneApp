@@ -119,6 +119,8 @@ fun PlaceDetailsScreen(
     var showOverflow by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showReportDialog by remember { mutableStateOf(false) }
+    var showSuggestEditSheet by remember { mutableStateOf(false) }
+    var showLocationCorrectionDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -225,8 +227,24 @@ fun PlaceDetailsScreen(
                                     }
                                 }
                             )
-                            // --- Zg\u0142o\u015B (dla nie-w\u0142a\u015Bcicieli) ---
+                            // --- Opcje nie-w\u0142a\u015Bciciela ---
                             if (!isOwner) {
+                                DropdownMenuItem(
+                                    text = { Text("Zaproponuj zmian\u0119") },
+                                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                                    onClick = {
+                                        showOverflow = false
+                                        showSuggestEditSheet = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Koryguj lokalizacj\u0119") },
+                                    leadingIcon = { Icon(Icons.Filled.LocationOn, contentDescription = null) },
+                                    onClick = {
+                                        showOverflow = false
+                                        showLocationCorrectionDialog = true
+                                    }
+                                )
                                 DropdownMenuItem(
                                     text = { Text("Zg\u0142o\u015B") },
                                     leadingIcon = {
@@ -321,6 +339,39 @@ fun PlaceDetailsScreen(
                 }
             },
             onDismiss = { showReportDialog = false }
+        )
+    }
+
+    // --- Zaproponuj zmianę ---
+    if (showSuggestEditSheet && state.place != null) {
+        SuggestEditSheet(
+            place = state.place!!,
+            onSubmit = { name, description, category, amenities ->
+                viewModel.submitSuggestedEdit(name, description, category, amenities)
+                showSuggestEditSheet = false
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        "Dzi\u0119kujemy! Propozycja zmiany zosta\u0142a wys\u0142ana do weryfikacji."
+                    )
+                }
+            },
+            onDismiss = { showSuggestEditSheet = false }
+        )
+    }
+
+    // --- Koryguj lokalizację ---
+    if (showLocationCorrectionDialog && state.place != null) {
+        LocationCorrectionDialog(
+            onSubmit = { lat, lng, address ->
+                viewModel.submitLocationCorrection(lat, lng, address)
+                showLocationCorrectionDialog = false
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        "Dzi\u0119kujemy! Korekta lokalizacji zosta\u0142a wys\u0142ana do weryfikacji."
+                    )
+                }
+            },
+            onDismiss = { showLocationCorrectionDialog = false }
         )
     }
 

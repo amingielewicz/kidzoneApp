@@ -481,4 +481,50 @@ class PlaceDetailsViewModel @Inject constructor(
             )
         }
     }
+
+    // --- Propozycja zmiany / korekta lokalizacji ---
+
+    fun submitSuggestedEdit(
+        name: String,
+        description: String,
+        category: String,
+        amenities: Set<String>
+    ) {
+        val place = _uiState.value.place ?: return
+        val user = currentUser.value ?: return
+        val changes = mutableMapOf<String, Any>()
+        if (name.trim() != place.name) changes["name"] = name.trim()
+        if (description.trim() != place.description) changes["description"] = description.trim()
+        if (category != place.category.name) changes["category"] = category
+        if (amenities != place.amenities.map { it.name }.toSet()) {
+            changes["amenities"] = amenities.toList()
+        }
+        if (changes.isEmpty()) return
+        viewModelScope.launch {
+            placeRepository.submitChangeRequest(
+                placeId = place.id,
+                requesterId = user.id,
+                changes = changes,
+                type = "EDIT"
+            )
+        }
+    }
+
+    fun submitLocationCorrection(latitude: Double, longitude: Double, address: String?) {
+        val place = _uiState.value.place ?: return
+        val user = currentUser.value ?: return
+        val changes = mutableMapOf<String, Any>(
+            "latitude" to latitude,
+            "longitude" to longitude
+        )
+        if (!address.isNullOrBlank()) changes["address"] = address
+        viewModelScope.launch {
+            placeRepository.submitChangeRequest(
+                placeId = place.id,
+                requesterId = user.id,
+                changes = changes,
+                type = "LOCATION"
+            )
+        }
+    }
 }
