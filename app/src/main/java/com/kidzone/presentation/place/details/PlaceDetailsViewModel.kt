@@ -466,4 +466,19 @@ class PlaceDetailsViewModel @Inject constructor(
             }
         }
     }
+
+    // --- Zgłaszanie spamu ---
+
+    fun reportPlace(reason: String, comment: String = "") {
+        val place = _uiState.value.place ?: return
+        val user = currentUser.value ?: return
+        viewModelScope.launch {
+            placeRepository.reportPlace(
+                placeId = place.id,
+                reporterId = user.id,
+                reason = reason,
+                comment = comment
+            )
+        }
+    }
 }

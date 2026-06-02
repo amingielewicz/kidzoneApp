@@ -8,4 +8,5 @@ object FirestoreCollections {
     const val PLACES = "places"
     const val REVIEWS = "reviews"
     const val PHOTOS = "photos"
+    const val PLACE_REPORTS = "place_reports"
 }

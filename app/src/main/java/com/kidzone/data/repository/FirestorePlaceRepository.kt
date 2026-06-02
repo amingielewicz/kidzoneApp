@@ -219,5 +219,38 @@ class FirestorePlaceRepository @Inject constructor(
         OpResult.failure(e)
     }
 
+    override suspend fun reportPlace(
+        placeId: String,
+        reporterId: String,
+        reason: String,
+        comment: String
+    ): OpResult<Unit> = try {
+        val reportData = mapOf(
+            "placeId" to placeId,
+            "reporterId" to reporterId,
+            "reason" to reason,
+            "comment" to comment,
+            "createdAtMillis" to System.currentTimeMillis(),
+            "status" to "pending"
+        )
+        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+            firestore.collection(FirestoreCollections.PLACE_REPORTS)
+                .add(reportData)
+                .await()
+            true
+        }
+        if (completed == null) {
+            OpResult.failure(
+                java.util.concurrent.TimeoutException(
+                    "Wys\u0142anie zg\u0142oszenia trwa zbyt d\u0142ugo. Spr\u00F3buj ponownie."
+                )
+            )
+        } else {
+            OpResult.success(Unit)
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
     private fun placesCollection() = firestore.collection(FirestoreCollections.PLACES)
 }

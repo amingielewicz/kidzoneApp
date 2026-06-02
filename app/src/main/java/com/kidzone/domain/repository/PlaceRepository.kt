@@ -56,4 +56,14 @@ interface PlaceRepository {
 
     /** Usuwa miejsce. Patrz uwagi przy [updatePlace]. */
     suspend fun deletePlace(placeId: String): OpResult<Unit>
+
+    /**
+     * Zgłasza miejsce jako spam/naruszenie.
+     */
+    suspend fun reportPlace(
+        placeId: String,
+        reporterId: String,
+        reason: String,
+        comment: String = ""
+    ): OpResult<Unit>
 }
