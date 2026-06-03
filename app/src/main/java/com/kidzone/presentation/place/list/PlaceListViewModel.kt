@@ -32,17 +32,17 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Maks. liczba miejsc pokazywanych na liście.
+ * Rozmiar jednej strony (paginacja klient-side).
  *
- * 100 to świadoma decyzja - lista nie jest paginowana, ale Firestore zwraca
- * cały zbiór dla MVP. Sortujemy po stronie klienta i bierzemy "head" z
- * pierwszych 100 wyników. Dla obecnej skali apki to grubo z zapasem;
- * przy realnym wzroście bazy miejsc trzeba będzie dorobić paginację.
+ * LazyColumn ładuje kolejne porcje po [PAGE_SIZE] elementów. User scrolluje
+ * na dół → UI automatycznie doładowuje następną stronę z już-załadowanej
+ * kolekcji (dane z Firestore snapshot listenera / Room cache).
  *
- * Twardy limit ma też walor wydajnościowy: LazyColumn nie musi materializować
- * setek elementów + recompose pasków filtrów jest tańszy.
+ * Soft-limit całej listy to nadal ~500 miejsc w pamięci (Firestore snapshot) –
+ * wystarczające dla skali MVP. Ciężka server-side paginacja (limit+startAfter)
+ * do dorobienia gdy baza przekroczy 1000+ miejsc.
  */
-private const val LIST_LIMIT = 100
+private const val PAGE_SIZE = 20
 
 /**
  * ViewModel ekranu listy miejsc.
@@ -117,7 +117,11 @@ class PlaceListViewModel @Inject constructor(
         val nearestUnavailable: Boolean = false,
         val isLoading: Boolean = true,
         val isRefreshing: Boolean = false,
-        val errorMessage: String? = null
+        val errorMessage: String? = null,
+        /** Czy są jeszcze miejsca do załadowania (infinite scroll). */
+        val hasMore: Boolean = false,
+        /** Łączna liczba miejsc po filtrach (przed paginacją). */
+        val totalCount: Int = 0
     )
 
     private val selectedCategory = MutableStateFlow<PlaceCategory?>(null)
@@ -132,6 +136,9 @@ class PlaceListViewModel @Inject constructor(
 
     /** Flaga pull-to-refresh – osobna od isLoading (snapshot listenera). */
     private val _isRefreshing = MutableStateFlow(false)
+
+    /** Ile elementów jest aktualnie widocznych (infinite scroll). */
+    private val visibleCount = MutableStateFlow(PAGE_SIZE)
 
     /** Wewnętrzny model wyniku ze strumienia Firestore. */
     private sealed interface PlacesLoad {
@@ -170,13 +177,22 @@ class PlaceListViewModel @Inject constructor(
         currentUserIdFlow
     ) { sort, loc, uid -> SortContext(sort, loc, uid) }
 
+    @Suppress("UNCHECKED_CAST")
     val uiState: StateFlow<UiState> = combine(
         placesLoad,
         selectedCategory,
         selectedAmenities,
         sortContextFlow,
-        _isRefreshing
-    ) { load, category, amenities, sortCtx, refreshing ->
+        _isRefreshing,
+        visibleCount
+    ) { args ->
+        val load = args[0] as PlacesLoad
+        val category = args[1] as PlaceCategory?
+        val amenities = args[2] as Set<Amenity>
+        val sortCtx = args[3] as SortContext
+        val refreshing = args[4] as Boolean
+        val visible = args[5] as Int
+
         when (load) {
             PlacesLoad.Loading -> UiState(
                 selectedCategory = category,
@@ -193,9 +209,6 @@ class PlaceListViewModel @Inject constructor(
                 val filtered = load.list
                     .filter { place -> amenities.all { it in place.amenities } }
                     .let { list ->
-                        // ADDED_BY_ME działa równocześnie jako filtr i jako
-                        // sortowanie - filtrujemy do swoich miejsc, sort
-                        // dzieje się dalej w applySort.
                         if (sortCtx.sortOrder == SortOrder.ADDED_BY_ME) {
                             val uid = sortCtx.currentUserId
                             if (uid.isNullOrBlank()) emptyList()
@@ -209,8 +222,11 @@ class PlaceListViewModel @Inject constructor(
                     userLocation = sortCtx.userLocation
                 )
 
+                val totalCount = sorted.size
+                val paginated = sorted.take(visible)
+
                 UiState(
-                    places = sorted.take(LIST_LIMIT),
+                    places = paginated,
                     selectedCategory = category,
                     selectedAmenities = amenities,
                     sortOrder = sortCtx.sortOrder,
@@ -220,7 +236,9 @@ class PlaceListViewModel @Inject constructor(
                         sortCtx.userLocation == null,
                     isLoading = false,
                     isRefreshing = refreshing,
-                    errorMessage = null
+                    errorMessage = null,
+                    hasMore = paginated.size < totalCount,
+                    totalCount = totalCount
                 )
             }
             is PlacesLoad.Error -> UiState(
@@ -250,26 +268,32 @@ class PlaceListViewModel @Inject constructor(
 
     fun onCategorySelected(category: PlaceCategory?) {
         selectedCategory.value = category
+        visibleCount.value = PAGE_SIZE // Reset paginacji przy zmianie filtra
     }
 
     fun onAmenityToggled(amenity: Amenity) {
         selectedAmenities.update { current ->
             if (amenity in current) current - amenity else current + amenity
         }
+        visibleCount.value = PAGE_SIZE
     }
 
     fun onAmenitiesCleared() {
         selectedAmenities.value = emptySet()
+        visibleCount.value = PAGE_SIZE
     }
 
     fun onSortOrderChange(order: SortOrder) {
         sortOrder.value = order
-        // Jeśli user wybrał NEAREST a nie mamy jeszcze fixu, próbujemy go
-        // pobrać "w locie" - bez tego user musiałby ręcznie szarpnąć
-        // ekran by wymusić odświeżenie.
+        visibleCount.value = PAGE_SIZE
         if (order == SortOrder.NEAREST && userLocation.value == null) {
             refreshLocation()
         }
+    }
+
+    /** Infinite scroll – doładuj następną stronę. */
+    fun loadMore() {
+        visibleCount.update { it + PAGE_SIZE }
     }
 
     /**
