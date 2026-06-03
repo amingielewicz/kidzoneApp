@@ -364,7 +364,7 @@ class PlaceDetailsViewModel @Inject constructor(
         }
         if (user.id == place.ownerUserId) {
             _uiState.update {
-                it.copy(addReviewError = "Nie możesz oceniać własnego miejsca")
+                it.copy(addReviewError = "Nie możesz oceniać miejsca dodanego przez Ciebie")
             }
             return
         }
