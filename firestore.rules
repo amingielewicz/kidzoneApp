@@ -26,7 +26,7 @@ service cloud.firestore {
       allow update: if isSignedIn() && (
         resource.data.ownerUserId == request.auth.uid
         || changedKeys().hasOnly(['averageRating', 'reviewsCount'])
-        || changedKeys().hasOnly(['photoUrls'])
+        || changedKeys().hasOnly(['photoUrls', 'photoUploadedBy'])
       );
 
       allow delete: if isSignedIn()
