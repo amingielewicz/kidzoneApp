@@ -15,9 +15,9 @@ import com.kidzone.utils.OpResult
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
@@ -43,92 +43,83 @@ class FirestorePlaceRepository @Inject constructor(
     private val placeDao: PlaceDao
 ) : PlaceRepository {
 
-    override fun observePlaces(category: PlaceCategory?): Flow<List<Place>> = flow {
-        // 1. Natychmiast emituj dane z Room cache (offline-first).
+    override fun observePlaces(category: PlaceCategory?): Flow<List<Place>> = channelFlow {
+        // 1. Room jako local source – emitujemy z niego do kanału.
         val localFlow = if (category != null) {
             placeDao.observeByCategory(category.name)
         } else {
             placeDao.observeAll()
         }
 
-        // 2. Uruchom Firestore snapshot listener w tle – aktualizuje Room,
-        //    a Room Flow automatycznie re-emituje świeże dane do UI.
-        val firestoreFlow = callbackFlow {
-            val query = if (category != null) {
-                placesCollection().whereEqualTo("category", category.name)
-            } else {
-                placesCollection()
-            }
-
-            val registration = query.addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
+        // 2. Firestore snapshot listener – aktualizuje Room w tle.
+        val syncJob = launch {
+            val firestoreFlow = callbackFlow {
+                val query = if (category != null) {
+                    placesCollection().whereEqualTo("category", category.name)
+                } else {
+                    placesCollection()
                 }
-                val places = snapshot?.documents
-                    ?.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
-                    .orEmpty()
-                trySend(places)
-            }
-            awaitClose { registration.remove() }
-        }
 
-        // Podejście: zbieraj Firestore w osobnym flow, persystuj do Room.
-        // Emitujemy z Room, żeby offline zawsze działało.
-        // Kolektor zaczyna od Room, potem Firestore aktualizuje Room i Room
-        // re-emituje.
-        kotlinx.coroutines.coroutineScope {
-            // Uruchom synchronizację Firestore -> Room w tle.
-            val syncJob = kotlinx.coroutines.launch {
-                firestoreFlow.collect { places ->
-                    placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
-                }
-            }
-            try {
-                emitAll(localFlow.map { entities -> entities.map { it.toDomain() } })
-            } finally {
-                syncJob.cancel()
-            }
-        }
-    }
-
-    override fun observePlacesByOwner(ownerUserId: String): Flow<List<Place>> = flow {
-        if (ownerUserId.isBlank()) {
-            emit(emptyList())
-            return@flow
-        }
-
-        val localFlow = placeDao.observeByOwner(ownerUserId)
-
-        val firestoreFlow = callbackFlow {
-            val registration = placesCollection()
-                .whereEqualTo("ownerUserId", ownerUserId)
-                .addSnapshotListener { snapshot, error ->
+                val registration = query.addSnapshotListener { snapshot, error ->
                     if (error != null) {
                         close(error)
                         return@addSnapshotListener
                     }
                     val places = snapshot?.documents
                         ?.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
-                        ?.sortedByDescending { it.createdAtMillis }
                         .orEmpty()
                     trySend(places)
                 }
-            awaitClose { registration.remove() }
+                awaitClose { registration.remove() }
+            }
+            firestoreFlow.collect { places ->
+                placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
+            }
         }
 
-        kotlinx.coroutines.coroutineScope {
-            val syncJob = kotlinx.coroutines.launch {
-                firestoreFlow.collect { places ->
-                    placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
-                }
+        // 3. Emituj dane z Room (re-emituje automatycznie po upsert z synca).
+        localFlow.collectLatest { entities ->
+            send(entities.map { it.toDomain() })
+        }
+
+        syncJob.cancel()
+    }
+
+    override fun observePlacesByOwner(ownerUserId: String): Flow<List<Place>> = channelFlow {
+        if (ownerUserId.isBlank()) {
+            send(emptyList())
+            return@channelFlow
+        }
+
+        val localFlow = placeDao.observeByOwner(ownerUserId)
+
+        val syncJob = launch {
+            val firestoreFlow = callbackFlow {
+                val registration = placesCollection()
+                    .whereEqualTo("ownerUserId", ownerUserId)
+                    .addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            close(error)
+                            return@addSnapshotListener
+                        }
+                        val places = snapshot?.documents
+                            ?.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
+                            ?.sortedByDescending { it.createdAtMillis }
+                            .orEmpty()
+                        trySend(places)
+                    }
+                awaitClose { registration.remove() }
             }
-            try {
-                emitAll(localFlow.map { entities -> entities.map { it.toDomain() } })
-            } finally {
-                syncJob.cancel()
+            firestoreFlow.collect { places ->
+                placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
             }
         }
+
+        localFlow.collectLatest { entities ->
+            send(entities.map { it.toDomain() })
+        }
+
+        syncJob.cancel()
     }
 
     override suspend fun getPlace(placeId: String): OpResult<Place> = try {
