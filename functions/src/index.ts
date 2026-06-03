@@ -93,6 +93,34 @@ function mapReason(reason: string): string {
   return `${label} [${reason}]`;
 }
 
+function mapReviewReason(reason: string): string {
+  const reasons: Record<string, string> = {
+    "SPAM": "Spam / reklama",
+    "OFFENSIVE": "Obraźliwa treść",
+    "FALSE_INFO": "Fałszywe informacje",
+    "NOT_RELEVANT": "Nie dotyczy tego miejsca",
+    "OTHER": "Inne",
+  };
+  const label = reasons[reason] || reason;
+  return `${label} [${reason}]`;
+}
+
+async function getReviewInfo(reviewId: string): Promise<{comment: string; rating: number; authorName: string; placeId: string}> {
+  try {
+    const doc = await db.collection("reviews").doc(reviewId).get();
+    if (!doc.exists) return {comment: "", rating: 0, authorName: "Nieznany", placeId: ""};
+    const data = doc.data();
+    return {
+      comment: data?.comment || "",
+      rating: data?.rating || 0,
+      authorName: data?.authorName || "Anonim",
+      placeId: data?.placeId || "",
+    };
+  } catch {
+    return {comment: "", rating: 0, authorName: "Nieznany", placeId: ""};
+  }
+}
+
 function mapCategory(category: string): string {
   const categories: Record<string, string> = {
     "PLAYGROUND": "Plac zabaw",
@@ -335,6 +363,67 @@ export const onUserCreated = onDocumentCreated(
     });
 
     console.log(`Welcome email sent to ${userEmail}`);
+  }
+);
+
+// --- Trigger: zgłoszenie opinii jako spam ---
+export const onReviewReport = onDocumentCreated(
+  {
+    document: "review_reports/{reportId}",
+    secrets: [gmailEmail, gmailPassword, adminEmail],
+  },
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+
+    const reviewId = data.reviewId || "";
+    const reporterId = data.reporterId || "";
+    const reason = mapReviewReason(data.reason || "");
+    const comment = data.comment || "";
+
+    const [reviewInfo, reporterInfo] = await Promise.all([
+      getReviewInfo(reviewId),
+      getUserInfo(reporterId),
+    ]);
+
+    const placeInfo = reviewInfo.placeId ?
+      await getPlaceName(reviewInfo.placeId) : "Nieznane miejsce";
+
+    const projectId = process.env.GCLOUD_PROJECT || "playground-705e7162";
+    const firestoreUrl =
+      `https://console.firebase.google.com/project/${projectId}/firestore/data/review_reports/${event.params.reportId}`;
+
+    const stars = "★".repeat(reviewInfo.rating) + "☆".repeat(5 - reviewInfo.rating);
+
+    const html = wrapInTemplate("Zgłoszenie opinii", `
+      <table>
+        <tr><td>Miejsce:</td><td>${placeInfo}</td></tr>
+        <tr><td>Autor opinii:</td><td>${reviewInfo.authorName}</td></tr>
+        <tr><td>Ocena:</td><td>${stars} (${reviewInfo.rating}/5)</td></tr>
+        <tr><td>Treść opinii:</td><td>${reviewInfo.comment || "(brak)"}</td></tr>
+      </table>
+      <h3 style="color:#D32F2F; margin-top:16px;">Zgłoszenie:</h3>
+      <table>
+        <tr><td>Powód:</td><td>${reason}</td></tr>
+        <tr><td>Komentarz:</td><td>${comment || "(brak)"}</td></tr>
+        <tr><td>Zgłaszający:</td><td>${reporterInfo}</td></tr>
+      </table>
+      <p><a class="btn" href="${firestoreUrl}">Otwórz w Firebase Console</a></p>
+    `);
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
+    });
+
+    await transporter.sendMail({
+      from: `kidZone <${gmailEmail.value()}>`,
+      to: adminEmail.value(),
+      subject: `[kidZone] Zgłoszenie opinii: ${reviewInfo.authorName} @ ${placeInfo}`,
+      html,
+    });
+
+    console.log(`Email sent for review report ${event.params.reportId}`);
   }
 );
 
