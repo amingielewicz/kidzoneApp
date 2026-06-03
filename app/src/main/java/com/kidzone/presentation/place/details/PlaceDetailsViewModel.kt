@@ -482,6 +482,18 @@ class PlaceDetailsViewModel @Inject constructor(
         }
     }
 
+    fun reportReview(reviewId: String, reason: String, comment: String = "") {
+        val user = currentUser.value ?: return
+        viewModelScope.launch {
+            reviewRepository.reportReviewAsSpam(
+                reviewId = reviewId,
+                reporterId = user.id,
+                reason = reason,
+                comment = comment
+            )
+        }
+    }
+
     // --- Propozycja zmiany / korekta lokalizacji ---
 
     fun submitSuggestedEdit(

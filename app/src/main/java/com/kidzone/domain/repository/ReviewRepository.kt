@@ -54,5 +54,16 @@ interface ReviewRepository {
      */
     suspend fun deleteReview(reviewId: String): OpResult<Unit>
 
-    suspend fun reportReviewAsSpam(reviewId: String): OpResult<Unit>
+    /**
+     * Zgłasza opinię jako spam/naruszenie.
+     *
+     * Analogicznie do [PlaceRepository.reportPlace]: zapis do kolekcji
+     * `review_reports` z danymi zgłaszającego, powodem i komentarzem.
+     */
+    suspend fun reportReviewAsSpam(
+        reviewId: String,
+        reporterId: String,
+        reason: String,
+        comment: String = ""
+    ): OpResult<Unit>
 }
