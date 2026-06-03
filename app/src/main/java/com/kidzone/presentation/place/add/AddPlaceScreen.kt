@@ -112,6 +112,15 @@ fun AddPlaceScreen(
         if (state.isSaved) onSaved(state.savedNewLatitude, state.savedNewLongitude)
     }
 
+    // Komunikat o duplikatach zdjęć
+    LaunchedEffect(state.photoDuplicateMessage) {
+        val msg = state.photoDuplicateMessage
+        if (msg != null) {
+            snackbarHostState.showSnackbar(msg)
+            viewModel.consumePhotoDuplicateMessage()
+        }
+    }
+
     // Launcher prośby o uprawnienie lokalizacji.
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()

@@ -487,19 +487,36 @@ class PlaceDetailsViewModel @Inject constructor(
 
         // Upload new photos (if any) – z dedup check
         val newUploadedUrls = mutableListOf<String>()
+        var reviewDuplicatesSkipped = 0
         for (uri in photoUris) {
             val bytes = ImageCompressor.compressToWebp(appContext, uri)
             if (bytes != null) {
                 val hash = java.security.MessageDigest.getInstance("MD5")
                     .digest(bytes)
                     .joinToString("") { "%02x".format(it) }
-                if (hash in existingHashes) continue // duplikat – skip
+                if (hash in existingHashes) {
+                    reviewDuplicatesSkipped++
+                    continue
+                }
                 existingHashes.add(hash)
                 try {
                     val url = photoUploader.uploadReviewPhoto(existing.id, bytes)
                     newUploadedUrls.add(url)
                 } catch (_: Exception) { /* best-effort */ }
             }
+        }
+
+        // Jeśli WSZYSTKIE nowe zdjęcia to duplikaty – pokaż błąd i nie zapisuj
+        if (reviewDuplicatesSkipped > 0 && newUploadedUrls.isEmpty() && photoUris.isNotEmpty()
+            && rating == existing.rating && comment.trim() == existing.comment) {
+            // Nic się nie zmieniło (ani tekst, ani zdjęcia) – pokaż komunikat
+            _uiState.update {
+                it.copy(
+                    isAddingReview = false,
+                    addReviewError = "To zdjęcie zostało już dodane. Nie można dodać duplikatu."
+                )
+            }
+            return
         }
 
         // Final photo list = retained existing URLs + newly uploaded ones

@@ -108,7 +108,9 @@ class AddPlaceViewModel @Inject constructor(
         /** Istniejące URL-e zdjęć (tryb edycji – zdjęcia już uploadowane). */
         val existingPhotoUrls: List<String> = emptyList(),
         /** True podczas uploadu zdjęć. */
-        val isUploadingPhotos: Boolean = false
+        val isUploadingPhotos: Boolean = false,
+        /** Komunikat o duplikatach (event jednorazowy, konsumowany przez UI). */
+        val photoDuplicateMessage: String? = null
     ) {
         /** Max 5 zdjęć łącznie (nowe + istniejące). */
         val canAddMorePhotos: Boolean
@@ -364,6 +366,10 @@ class AddPlaceViewModel @Inject constructor(
         _uiState.update { it.copy(showDuplicateWarning = false, duplicateCandidate = null) }
     }
 
+    fun consumePhotoDuplicateMessage() {
+        _uiState.update { it.copy(photoDuplicateMessage = null) }
+    }
+
     // --- Zarządzanie zdjęciami ---
 
     /** Zbiór hashów (MD5 skompresowanych bajtów) istniejących zdjęć. */
@@ -472,6 +478,25 @@ class AddPlaceViewModel @Inject constructor(
                     }
                 }
                 _uiState.update { it.copy(isUploadingPhotos = false) }
+            }
+
+            // Komunikat o duplikatach
+            if (duplicatesSkipped > 0 && uploadedUrls.isEmpty() && state.existingPhotoUrls.isNotEmpty()) {
+                // Wszystkie nowe zdjęcia to duplikaty – nie zapisujemy, pokazujemy błąd
+                _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        photoDuplicateMessage = "To zdjęcie zostało już dodane. Nie można dodać duplikatu."
+                    )
+                }
+                return@launch
+            } else if (duplicatesSkipped > 0) {
+                // Część zdjęć pominięta – kontynuujemy zapis z resztą
+                _uiState.update {
+                    it.copy(
+                        photoDuplicateMessage = "To zdjęcie zostało już dodane. Nie można dodać duplikatu."
+                    )
+                }
             }
 
             // Łączymy istniejące URL-e (edycja) + nowo uploadowane
