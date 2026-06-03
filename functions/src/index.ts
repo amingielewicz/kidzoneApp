@@ -105,6 +105,18 @@ function mapReviewReason(reason: string): string {
   return `${label} [${reason}]`;
 }
 
+function mapPhotoReason(reason: string): string {
+  const reasons: Record<string, string> = {
+    "INAPPROPRIATE": "Nieodpowiednia treść",
+    "NOT_RELEVANT": "Niezwiązane z miejscem",
+    "COPYRIGHT": "Narusza prawa autorskie",
+    "OFFENSIVE": "Obraźliwe / wulgarne",
+    "OTHER": "Inne",
+  };
+  const label = reasons[reason] || reason;
+  return `${label} [${reason}]`;
+}
+
 async function getReviewInfo(reviewId: string): Promise<{comment: string; rating: number; authorName: string; placeId: string}> {
   try {
     const doc = await db.collection("reviews").doc(reviewId).get();
@@ -424,6 +436,53 @@ export const onReviewReport = onDocumentCreated(
     });
 
     console.log(`Email sent for review report ${event.params.reportId}`);
+  }
+);
+
+// --- Trigger: zgłoszenie zdjęcia ---
+export const onPhotoReport = onDocumentCreated(
+  {
+    document: "photo_reports/{reportId}",
+    secrets: [gmailEmail, gmailPassword, adminEmail],
+  },
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+
+    const photoUrl = data.photoUrl || "";
+    const reporterId = data.reporterId || "";
+    const reason = mapPhotoReason(data.reason || "");
+    const comment = data.comment || "";
+
+    const reporterInfo = await getUserInfo(reporterId);
+
+    const projectId = process.env.GCLOUD_PROJECT || "playground-705e7162";
+    const firestoreUrl =
+      `https://console.firebase.google.com/project/${projectId}/firestore/data/photo_reports/${event.params.reportId}`;
+
+    const html = wrapInTemplate("Zgłoszenie zdjęcia", `
+      <table>
+        <tr><td>URL zdjęcia:</td><td><a href="${photoUrl}">Otwórz zdjęcie</a></td></tr>
+        <tr><td>Powód:</td><td>${reason}</td></tr>
+        <tr><td>Komentarz:</td><td>${comment || "(brak)"}</td></tr>
+        <tr><td>Zgłaszający:</td><td>${reporterInfo}</td></tr>
+      </table>
+      <p><a class="btn" href="${firestoreUrl}">Otwórz w Firebase Console</a></p>
+    `);
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
+    });
+
+    await transporter.sendMail({
+      from: `kidZone <${gmailEmail.value()}>`,
+      to: adminEmail.value(),
+      subject: "[kidZone] Zgłoszenie zdjęcia",
+      html,
+    });
+
+    console.log(`Email sent for photo report ${event.params.reportId}`);
   }
 );
 

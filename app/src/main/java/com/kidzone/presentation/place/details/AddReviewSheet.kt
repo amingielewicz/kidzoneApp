@@ -1,12 +1,17 @@
 package com.kidzone.presentation.place.details
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import java.io.File
+import java.security.MessageDigest
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -58,6 +63,26 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+
+/**
+ * Oblicza MD5 hash pierwszych 64KB zawartości URI (wystarczające do
+ * wykrycia duplikatów zdjęć, nawet jeśli URI się różnią między wywołaniami
+ * photo pickera). Zwraca null gdy nie udało się odczytać contentu.
+ */
+private fun computeContentHash(context: Context, uri: Uri): String? {
+    return try {
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+        val md = MessageDigest.getInstance("MD5")
+        val buffer = ByteArray(65536)
+        val bytesRead = inputStream.read(buffer)
+        inputStream.close()
+        if (bytesRead <= 0) return null
+        md.update(buffer, 0, bytesRead)
+        md.digest().joinToString("") { "%02x".format(it) }
+    } catch (_: Exception) {
+        null
+    }
+}
 
 /**
  * Maksymalna długość komentarza opinii. Świadomy kompromis między swobodą
@@ -113,9 +138,13 @@ fun AddReviewSheet(
     var existingPhotoUrls by rememberSaveable(initialPhotoUrls) {
         mutableStateOf(initialPhotoUrls)
     }
+    // Content hashes (MD5) of already-added photos for duplicate detection
+    var photoHashes by remember { mutableStateOf(setOf<String>()) }
 
     // Total photos = existing URLs + new URIs; constrained to MAX_REVIEW_PHOTOS
     val totalPhotoCount = existingPhotoUrls.size + photoUris.size
+
+    val context = LocalContext.current
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(MAX_REVIEW_PHOTOS)
@@ -123,10 +152,20 @@ fun AddReviewSheet(
         if (uris.isNotEmpty()) {
             val currentTotal = existingPhotoUrls.size + photoUris.size
             val available = MAX_REVIEW_PHOTOS - currentTotal
-            // Deduplikacja: odrzucamy URI już obecne w liście (blokada duplikatów)
-            val existingSet = photoUris.map { it.toString() }.toSet()
-            val newUris = uris.filter { it.toString() !in existingSet }
-            photoUris = photoUris + newUris.take(available)
+            // Deduplikacja na bazie content hash (MD5 pierwszych 64KB).
+            // URI comparison nie działa bo ten sam plik dostaje inny URI
+            // przy każdym wywołaniu photo pickera.
+            val newUris = mutableListOf<Uri>()
+            val newHashes = photoHashes.toMutableSet()
+            for (uri in uris) {
+                if (newUris.size >= available) break
+                val hash = computeContentHash(context, uri)
+                if (hash != null && hash in newHashes) continue // duplikat
+                if (hash != null) newHashes.add(hash)
+                newUris.add(uri)
+            }
+            photoHashes = newHashes
+            photoUris = photoUris + newUris
         }
     }
 
@@ -137,15 +176,41 @@ fun AddReviewSheet(
         if (success) {
             cameraUri.value?.let { uri ->
                 val currentTotal = existingPhotoUrls.size + photoUris.size
-                val existingSet = photoUris.map { it.toString() }.toSet()
-                if (uri.toString() !in existingSet && currentTotal < MAX_REVIEW_PHOTOS) {
-                    photoUris = photoUris + uri
+                if (currentTotal < MAX_REVIEW_PHOTOS) {
+                    val hash = computeContentHash(context, uri)
+                    if (hash == null || hash !in photoHashes) {
+                        photoUris = photoUris + uri
+                        if (hash != null) photoHashes = photoHashes + hash
+                    }
                 }
             }
         }
     }
 
-    val context = LocalContext.current
+    // Runtime permission request for camera
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasCameraPermission = granted
+        if (granted) {
+            // Permission just granted – launch camera
+            val photoFile = File(context.cacheDir, "review_photo_${System.currentTimeMillis()}.jpg")
+            photoFile.createNewFile()
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                photoFile
+            )
+            cameraUri.value = uri
+            cameraLauncher.launch(uri)
+        }
+    }
 
     val title = when {
         isEditing -> "Edytuj swoją opinię"
@@ -321,17 +386,22 @@ fun AddReviewSheet(
                     }
                     OutlinedButton(
                         onClick = {
-                            val photoFile = File(
-                                context.cacheDir,
-                                "review_photo_${System.currentTimeMillis()}.jpg"
-                            )
-                            val uri = FileProvider.getUriForFile(
-                                context,
-                                "${context.packageName}.fileprovider",
-                                photoFile
-                            )
-                            cameraUri.value = uri
-                            cameraLauncher.launch(uri)
+                            if (hasCameraPermission) {
+                                val photoFile = File(
+                                    context.cacheDir,
+                                    "review_photo_${System.currentTimeMillis()}.jpg"
+                                )
+                                photoFile.createNewFile()
+                                val uri = FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.fileprovider",
+                                    photoFile
+                                )
+                                cameraUri.value = uri
+                                cameraLauncher.launch(uri)
+                            } else {
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
                         },
                         enabled = !isSubmitting,
                         modifier = Modifier.weight(1f)
