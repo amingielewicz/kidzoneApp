@@ -147,4 +147,8 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.play.services)
+
+    // In-App Update
+    implementation(libs.play.app.update)
+    implementation(libs.play.app.update.ktx)
 }
