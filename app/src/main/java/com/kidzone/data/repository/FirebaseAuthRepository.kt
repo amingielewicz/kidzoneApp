@@ -86,7 +86,8 @@ class FirebaseAuthRepository @Inject constructor(
 
             // Blokada logowania bez potwierdzonego emaila.
             // Google Sign-In jest zwolniony (email zweryfikowany z natury).
-            if (!firebaseUser.isEmailVerified) {
+            // W debug buildach pomijamy weryfikację (ułatwia testowanie).
+            if (!com.kidzone.BuildConfig.DEBUG && !firebaseUser.isEmailVerified) {
                 // Wyślij ponownie link weryfikacyjny (na wypadek gdyby stary wygasł)
                 runCatching { firebaseUser.sendEmailVerification().await() }
                 // Wyloguj – nie pozwól na dostęp do apki
