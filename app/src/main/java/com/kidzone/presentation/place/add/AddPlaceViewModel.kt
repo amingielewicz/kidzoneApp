@@ -381,9 +381,14 @@ class AddPlaceViewModel @Inject constructor(
         }
     }
 
+    /** URL-e zdjęć usuniętych przez usera (do skasowania z Storage przy save). */
+    private val removedPhotoUrls = mutableListOf<String>()
+
     /** Usuwa istniejące (już uploadowane) zdjęcie po indeksie. */
     fun removeExistingPhoto(index: Int) {
         _uiState.update { state ->
+            val removed = state.existingPhotoUrls[index]
+            removedPhotoUrls.add(removed)
             state.copy(
                 existingPhotoUrls = state.existingPhotoUrls.toMutableList().apply { removeAt(index) }
             )
@@ -472,6 +477,12 @@ class AddPlaceViewModel @Inject constructor(
             _uiState.update {
                 when (result) {
                     is OpResult.Success -> {
+                        // Usuń z Storage zdjęcia oznaczone do usunięcia (best-effort)
+                        for (url in removedPhotoUrls) {
+                            photoUploader.deletePhoto(url)
+                        }
+                        removedPhotoUrls.clear()
+
                         val isCreate = !state.isEditMode
                         it.copy(
                             isSaving = false,
