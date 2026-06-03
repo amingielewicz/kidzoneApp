@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 
 /**
  * Schemat kolorów kidZone – odwzorowuje paletę marki.
@@ -36,19 +37,41 @@ private val LightColors = lightColorScheme(
 )
 
 private val DarkColors = darkColorScheme(
-    primary = BrandBlue,
-    onPrimary = BrandWhite,
+    primary = BrandBlueLighter,
+    onPrimary = BrandDark,
+    primaryContainer = BrandBlueDark,
+    onPrimaryContainer = BrandBlueLighter,
 
-    secondary = BrandGreen,
-    onSecondary = BrandWhite,
+    secondary = BrandGreenLighter,
+    onSecondary = BrandDark,
+    secondaryContainer = BrandGreenDark,
+    onSecondaryContainer = BrandGreenLighter,
 
-    tertiary = BrandYellow,
+    tertiary = BrandYellowLighter,
     onTertiary = BrandDark,
+    tertiaryContainer = BrandYellowDark,
+    onTertiaryContainer = BrandYellowLighter,
 
     background = SurfaceDarkBg,
     onBackground = OnSurfaceDark,
     surface = SurfaceDarkBg,
-    onSurface = OnSurfaceDark
+    onSurface = OnSurfaceDark,
+    surfaceVariant = SurfaceDarkVariant,
+    onSurfaceVariant = OnSurfaceDarkVariant,
+    outline = OutlineDark,
+    outlineVariant = Color(0xFF383838),
+
+    // Podwyższone surfaces (karty, dialogi, sheety)
+    surfaceContainerLowest = Color(0xFF0E0E0E),
+    surfaceContainerLow = Color(0xFF1A1A1A),
+    surfaceContainer = SurfaceDarkElevated,
+    surfaceContainerHigh = Color(0xFF252525),
+    surfaceContainerHighest = SurfaceDarkVariant,
+
+    error = Color(0xFFEF5350),
+    onError = BrandWhite,
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6)
 )
 
 @Composable
