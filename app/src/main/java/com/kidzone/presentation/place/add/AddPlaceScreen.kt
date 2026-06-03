@@ -51,6 +51,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -101,6 +103,7 @@ fun AddPlaceScreen(
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     // Po pomyślnym zapisie – wracamy poziom wyżej. W trybie create
     // dodatkowo przekazujemy współrzędne nowego pinu, żeby Main mógł
@@ -130,15 +133,27 @@ fun AddPlaceScreen(
             // Deduplikacja na bazie content hash
             val accepted = mutableListOf<Uri>()
             val hashes = photoHashSet.toMutableSet()
+            var duplicatesFound = 0
             for (uri in uris) {
                 val hash = computePlacePhotoHash(context, uri)
-                if (hash != null && hash in hashes) continue
+                if (hash != null && hash in hashes) {
+                    duplicatesFound++
+                    continue
+                }
                 if (hash != null) hashes.add(hash)
                 accepted.add(uri)
             }
             photoHashSet = hashes
             if (accepted.isNotEmpty()) {
                 viewModel.addPhotos(accepted)
+            }
+            if (duplicatesFound > 0) {
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar(
+                        if (duplicatesFound == 1) "To zdjęcie jest już dodane"
+                        else "Pominięto $duplicatesFound zduplikowanych zdjęć"
+                    )
+                }
             }
         }
     }
@@ -154,6 +169,10 @@ fun AddPlaceScreen(
             if (hash == null || hash !in photoHashSet) {
                 if (hash != null) photoHashSet = photoHashSet + hash
                 viewModel.addPhotos(listOf(uri))
+            } else {
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("To zdjęcie jest już dodane")
+                }
             }
         }
     }
@@ -169,6 +188,10 @@ fun AddPlaceScreen(
     ) { granted ->
         if (granted) {
             launchPlaceCamera()
+        } else {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Brak dostępu do aparatu")
+            }
         }
     }
 
@@ -187,7 +210,8 @@ fun AddPlaceScreen(
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
             modifier = Modifier

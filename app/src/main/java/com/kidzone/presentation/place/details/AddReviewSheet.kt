@@ -41,6 +41,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -244,13 +246,14 @@ fun AddReviewSheet(
         sheetState = sheetState,
         contentWindowInsets = { WindowInsets(0) }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-                .imePadding()
-                .navigationBarsPadding()
-        ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .imePadding()
+                    .navigationBarsPadding()
+            ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge
@@ -391,6 +394,11 @@ fun AddReviewSheet(
                 }
             }
             Spacer(Modifier.height(8.dp))
+            }
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
     }
 }
