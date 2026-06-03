@@ -349,7 +349,7 @@ class PlaceDetailsViewModel @Inject constructor(
      * @param rating 1..5
      * @param comment treść opinii (opcjonalna; trim-ujemy whitespace).
      */
-    fun submitReview(rating: Int, comment: String, photoUris: List<android.net.Uri> = emptyList()) {
+    fun submitReview(rating: Int, comment: String, photoUris: List<android.net.Uri> = emptyList(), retainedPhotoUrls: List<String> = emptyList()) {
         val place = _uiState.value.place ?: return
         val user = currentUser.value
         if (user == null) {
@@ -372,7 +372,7 @@ class PlaceDetailsViewModel @Inject constructor(
             if (editing == null) {
                 submitNewReview(place, user, rating, comment, photoUris)
             } else {
-                submitEditedReview(place, editing, rating, comment)
+                submitEditedReview(place, editing, rating, comment, photoUris, retainedPhotoUrls)
             }
         }
     }
@@ -446,13 +446,37 @@ class PlaceDetailsViewModel @Inject constructor(
         place: Place,
         existing: Review,
         rating: Int,
-        comment: String
+        comment: String,
+        photoUris: List<android.net.Uri>,
+        retainedPhotoUrls: List<String>
     ) {
+        // Upload new photos (if any)
+        val newUploadedUrls = mutableListOf<String>()
+        for (uri in photoUris) {
+            val bytes = ImageCompressor.compressToWebp(appContext, uri)
+            if (bytes != null) {
+                try {
+                    val url = photoUploader.uploadReviewPhoto(existing.id, bytes)
+                    newUploadedUrls.add(url)
+                } catch (_: Exception) { /* best-effort */ }
+            }
+        }
+
+        // Final photo list = retained existing URLs + newly uploaded ones
+        val finalPhotoUrls = retainedPhotoUrls + newUploadedUrls
+
+        // Delete removed photos from Storage (best-effort)
+        val removedUrls = existing.photoUrls.filter { it !in retainedPhotoUrls }
+        for (url in removedUrls) {
+            try { photoUploader.deletePhoto(url) } catch (_: Exception) { }
+        }
+
         // Update – zachowujemy id / userId / authorName / placeId / createdAt
         // z istniejącej opinii, nadpisując tylko user-edytowalne pola.
         val updated = existing.copy(
             rating = rating,
-            comment = comment.trim()
+            comment = comment.trim(),
+            photoUrls = finalPhotoUrls
         )
 
         when (val result = reviewRepository.updateReview(updated)) {
@@ -507,6 +531,18 @@ class PlaceDetailsViewModel @Inject constructor(
         viewModelScope.launch {
             reviewRepository.reportReviewAsSpam(
                 reviewId = reviewId,
+                reporterId = user.id,
+                reason = reason,
+                comment = comment
+            )
+        }
+    }
+
+    fun reportPhoto(photoUrl: String, reason: String, comment: String = "") {
+        val user = currentUser.value ?: return
+        viewModelScope.launch {
+            placeRepository.reportPhoto(
+                photoUrl = photoUrl,
                 reporterId = user.id,
                 reason = reason,
                 comment = comment

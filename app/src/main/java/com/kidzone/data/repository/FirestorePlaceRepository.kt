@@ -378,4 +378,40 @@ class FirestorePlaceRepository @Inject constructor(
     }
 
     private fun placesCollection() = firestore.collection(FirestoreCollections.PLACES)
+
+    override suspend fun reportPhoto(
+        photoUrl: String,
+        reporterId: String,
+        reason: String,
+        comment: String
+    ): OpResult<Unit> = try {
+        require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
+        require(reporterId.isNotBlank()) { "reporterId nie może być puste" }
+
+        val reportData = mapOf(
+            "photoUrl" to photoUrl,
+            "reporterId" to reporterId,
+            "reason" to reason,
+            "comment" to comment,
+            "createdAtMillis" to System.currentTimeMillis(),
+            "status" to "pending"
+        )
+        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+            firestore.collection(FirestoreCollections.PHOTO_REPORTS)
+                .add(reportData)
+                .await()
+            true
+        }
+        if (completed == null) {
+            OpResult.failure(
+                java.util.concurrent.TimeoutException(
+                    "Wysłanie zgłoszenia trwa zbyt długo. Spróbuj ponownie."
+                )
+            )
+        } else {
+            OpResult.success(Unit)
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
 }

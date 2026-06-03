@@ -123,6 +123,11 @@ fun PlaceDetailsScreen(
     var reviewToReport by remember { mutableStateOf<Review?>(null) }
     var showSuggestEditSheet by remember { mutableStateOf(false) }
     var showLocationCorrectionDialog by remember { mutableStateOf(false) }
+    // Fullscreen photo viewer state
+    var fullscreenPhotos by remember { mutableStateOf<List<String>>(emptyList()) }
+    var fullscreenPhotoIndex by remember { mutableStateOf(0) }
+    var showReportPhotoDialog by remember { mutableStateOf(false) }
+    var photoUrlToReport by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -316,6 +321,10 @@ fun PlaceDetailsScreen(
                         onReportReview = { review ->
                             reviewToReport = review
                             showReportReviewDialog = true
+                        },
+                        onOpenPhotoViewer = { photos, index ->
+                            fullscreenPhotos = photos
+                            fullscreenPhotoIndex = index
                         }
                     )
                 }
@@ -391,9 +400,12 @@ fun PlaceDetailsScreen(
             isSubmitting = state.isAddingReview,
             errorMessage = state.addReviewError,
             onDismiss = viewModel::dismissAddReviewSheet,
-            onSubmit = viewModel::submitReview,
+            onSubmit = { rating, comment, photoUris, retainedUrls ->
+                viewModel.submitReview(rating, comment, photoUris, retainedUrls)
+            },
             initialRating = editing?.rating ?: 0,
             initialComment = editing?.comment.orEmpty(),
+            initialPhotoUrls = editing?.photoUrls.orEmpty(),
             isEditing = editing != null
         )
     }
@@ -416,6 +428,37 @@ fun PlaceDetailsScreen(
             }
         )
     }
+
+    // Fullscreen photo viewer
+    if (fullscreenPhotos.isNotEmpty()) {
+        com.kidzone.presentation.common.FullscreenPhotoViewer(
+            photoUrls = fullscreenPhotos,
+            initialIndex = fullscreenPhotoIndex,
+            onDismiss = { fullscreenPhotos = emptyList() },
+            onReportPhoto = { url ->
+                photoUrlToReport = url
+                showReportPhotoDialog = true
+            }
+        )
+    }
+
+    // Report photo dialog
+    if (showReportPhotoDialog && photoUrlToReport != null) {
+        ReportPhotoDialog(
+            onSubmit = { reason, comment ->
+                viewModel.reportPhoto(photoUrlToReport!!, reason, comment)
+                showReportPhotoDialog = false
+                photoUrlToReport = null
+                scope.launch {
+                    snackbarHostState.showSnackbar("Dziękujemy za zgłoszenie zdjęcia!")
+                }
+            },
+            onDismiss = {
+                showReportPhotoDialog = false
+                photoUrlToReport = null
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -430,7 +473,8 @@ private fun PlaceDetailsContent(
     onSortOrderChange: (PlaceDetailsViewModel.ReviewSortOrder) -> Unit,
     onAddReview: () -> Unit,
     onEditReview: (Review) -> Unit,
-    onReportReview: (Review) -> Unit
+    onReportReview: (Review) -> Unit,
+    onOpenPhotoViewer: (photos: List<String>, startIndex: Int) -> Unit = { _, _ -> }
 ) {
     // Jedna opinia per user per miejsce (MVP). Przycisk "Dodaj opinię" znika,
     // gdy zalogowany user już wystawił ocenę – w jego miejsce daje
@@ -463,7 +507,10 @@ private fun PlaceDetailsContent(
         // Sekcja 1b: Zdjęcia miejsca
         if (place.photoUrls.isNotEmpty()) {
             item {
-                PlacePhotoGallery(photoUrls = place.photoUrls)
+                PlacePhotoGallery(
+                    photoUrls = place.photoUrls,
+                    onPhotoClick = { index -> onOpenPhotoViewer(place.photoUrls, index) }
+                )
             }
         }
 
@@ -543,6 +590,9 @@ private fun PlaceDetailsContent(
                 } else null,
                 onReport = if (!isMine && currentUserId != null) {
                     { onReportReview(review) }
+                } else null,
+                onPhotoClick = if (review.photoUrls.isNotEmpty()) {
+                    { index -> onOpenPhotoViewer(review.photoUrls, index) }
                 } else null
             )
         }
@@ -813,7 +863,8 @@ private fun ReviewCard(
     review: Review,
     isMine: Boolean = false,
     onEdit: (() -> Unit)? = null,
-    onReport: (() -> Unit)? = null
+    onReport: (() -> Unit)? = null,
+    onPhotoClick: ((index: Int) -> Unit)? = null
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -900,7 +951,10 @@ private fun ReviewCard(
             // Zdjęcia opinii
             if (review.photoUrls.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                ReviewPhotoRow(photoUrls = review.photoUrls)
+                ReviewPhotoRow(
+                    photoUrls = review.photoUrls,
+                    onPhotoClick = { index -> onPhotoClick?.invoke(index) }
+                )
             }
         }
     }
@@ -1321,10 +1375,13 @@ private fun ReportReviewDialog(
 
 /**
  * Galeria zdjęć miejsca – pełnoszerokościowy LazyRow z miniaturami.
- * Klik na miniaturę otwiera powiększony podgląd (TODO: fullscreen viewer).
+ * Klik na miniaturę otwiera powiększony podgląd fullscreen.
  */
 @Composable
-private fun PlacePhotoGallery(photoUrls: List<String>) {
+private fun PlacePhotoGallery(
+    photoUrls: List<String>,
+    onPhotoClick: (index: Int) -> Unit = {}
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
@@ -1345,7 +1402,8 @@ private fun PlacePhotoGallery(photoUrls: List<String>) {
                         contentDescription = "Zdjęcie ${index + 1}",
                         modifier = Modifier
                             .size(120.dp)
-                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                            .clickable { onPhotoClick(index) },
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop
                     )
                 }
@@ -1358,7 +1416,10 @@ private fun PlacePhotoGallery(photoUrls: List<String>) {
  * Wiersz miniaturek zdjęć w opinii – mniejsze niż w galerii miejsca.
  */
 @Composable
-private fun ReviewPhotoRow(photoUrls: List<String>) {
+private fun ReviewPhotoRow(
+    photoUrls: List<String>,
+    onPhotoClick: (index: Int) -> Unit = {}
+) {
     androidx.compose.foundation.lazy.LazyRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -1368,9 +1429,90 @@ private fun ReviewPhotoRow(photoUrls: List<String>) {
                 contentDescription = "Zdjęcie opinii ${index + 1}",
                 modifier = Modifier
                     .size(72.dp)
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)),
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                    .clickable { onPhotoClick(index) },
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop
             )
         }
     }
+}
+
+
+/**
+ * Dialog zgłaszania zdjęcia – powody dostosowane do zdjęć
+ * (nieodpowiednia treść, niezwiązane z miejscem, narusza prawa autorskie itp.).
+ */
+@Composable
+private fun ReportPhotoDialog(
+    onSubmit: (reason: String, comment: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val reasons = listOf(
+        "INAPPROPRIATE" to "Nieodpowiednia treść",
+        "NOT_RELEVANT" to "Niezwiązane z miejscem",
+        "COPYRIGHT" to "Narusza prawa autorskie",
+        "OFFENSIVE" to "Obraźliwe / wulgarne",
+        "OTHER" to "Inne"
+    )
+    var selectedReason by remember { mutableStateOf(reasons.first().first) }
+    var comment by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Filled.Flag,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+        },
+        title = { Text("Zgłoś zdjęcie") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Wybierz powód zgłoszenia:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                reasons.forEach { (code, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedReason = code }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.material3.RadioButton(
+                            selected = selectedReason == code,
+                            onClick = { selectedReason = code }
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.material3.OutlinedTextField(
+                    value = comment,
+                    onValueChange = { comment = it },
+                    label = { Text("Komentarz (opcjonalny)") },
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSubmit(selectedReason, comment.trim()) }) {
+                Text("Wyślij zgłoszenie")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Anuluj")
+            }
+        }
+    )
 }

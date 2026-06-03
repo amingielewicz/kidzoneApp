@@ -76,4 +76,17 @@ interface PlaceRepository {
         changes: Map<String, Any>,
         type: String = "EDIT"
     ): OpResult<Unit>
+
+    /**
+     * Zgłasza zdjęcie jako nieodpowiednie.
+     *
+     * Zapis do kolekcji `photo_reports` z danymi zgłaszającego,
+     * URL-em zdjęcia, powodem i komentarzem.
+     */
+    suspend fun reportPhoto(
+        photoUrl: String,
+        reporterId: String,
+        reason: String,
+        comment: String = ""
+    ): OpResult<Unit>
 }

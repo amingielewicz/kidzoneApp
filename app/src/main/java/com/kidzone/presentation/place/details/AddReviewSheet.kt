@@ -4,6 +4,9 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import java.io.File
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
@@ -43,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -90,9 +95,10 @@ fun AddReviewSheet(
     isSubmitting: Boolean,
     errorMessage: String?,
     onDismiss: () -> Unit,
-    onSubmit: (rating: Int, comment: String, photoUris: List<Uri>) -> Unit,
+    onSubmit: (rating: Int, comment: String, photoUris: List<Uri>, retainedPhotoUrls: List<String>) -> Unit,
     initialRating: Int = 0,
     initialComment: String = "",
+    initialPhotoUrls: List<String> = emptyList(),
     isEditing: Boolean = false
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -103,15 +109,43 @@ fun AddReviewSheet(
     var rating by rememberSaveable(initialRating) { mutableIntStateOf(initialRating) }
     var comment by rememberSaveable(initialComment) { mutableStateOf(initialComment) }
     var photoUris by rememberSaveable { mutableStateOf(listOf<Uri>()) }
+    // Existing photo URLs from a previously saved review (edit mode)
+    var existingPhotoUrls by rememberSaveable(initialPhotoUrls) {
+        mutableStateOf(initialPhotoUrls)
+    }
+
+    // Total photos = existing URLs + new URIs; constrained to MAX_REVIEW_PHOTOS
+    val totalPhotoCount = existingPhotoUrls.size + photoUris.size
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(MAX_REVIEW_PHOTOS)
     ) { uris ->
         if (uris.isNotEmpty()) {
-            val available = MAX_REVIEW_PHOTOS - photoUris.size
-            photoUris = photoUris + uris.take(available)
+            val currentTotal = existingPhotoUrls.size + photoUris.size
+            val available = MAX_REVIEW_PHOTOS - currentTotal
+            // Deduplikacja: odrzucamy URI już obecne w liście (blokada duplikatów)
+            val existingSet = photoUris.map { it.toString() }.toSet()
+            val newUris = uris.filter { it.toString() !in existingSet }
+            photoUris = photoUris + newUris.take(available)
         }
     }
+
+    val cameraUri = remember { mutableStateOf<Uri?>(null) }
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            cameraUri.value?.let { uri ->
+                val currentTotal = existingPhotoUrls.size + photoUris.size
+                val existingSet = photoUris.map { it.toString() }.toSet()
+                if (uri.toString() !in existingSet && currentTotal < MAX_REVIEW_PHOTOS) {
+                    photoUris = photoUris + uri
+                }
+            }
+        }
+    }
+
+    val context = LocalContext.current
 
     val title = when {
         isEditing -> "Edytuj swoją opinię"
@@ -194,11 +228,45 @@ fun AddReviewSheet(
 
             // --- Zdjęcia opinii ---
             Spacer(Modifier.height(12.dp))
-            if (photoUris.isNotEmpty()) {
+            // Existing photo URLs (from edit mode) + new local URIs
+            if (existingPhotoUrls.isNotEmpty() || photoUris.isNotEmpty()) {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
+                    // Existing remote URLs
+                    itemsIndexed(existingPhotoUrls) { index, url ->
+                        Box(modifier = Modifier.size(64.dp)) {
+                            AsyncImage(
+                                model = url,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .clip(RoundedCornerShape(6.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                            IconButton(
+                                onClick = {
+                                    existingPhotoUrls = existingPhotoUrls.toMutableList().apply { removeAt(index) }
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .size(18.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                        shape = CircleShape
+                                    )
+                            ) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "Usuń",
+                                    tint = MaterialTheme.colorScheme.onError,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
+                    }
+                    // New local URIs
                     itemsIndexed(photoUris) { index, uri ->
                         Box(modifier = Modifier.size(64.dp)) {
                             AsyncImage(
@@ -233,26 +301,52 @@ fun AddReviewSheet(
                 }
                 Spacer(Modifier.height(8.dp))
             }
-            if (photoUris.size < MAX_REVIEW_PHOTOS) {
-                OutlinedButton(
-                    onClick = {
-                        photoPickerLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
-                    },
-                    enabled = !isSubmitting,
-                    modifier = Modifier.fillMaxWidth()
+            if (totalPhotoCount < MAX_REVIEW_PHOTOS) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Filled.AddAPhoto, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Dodaj zdjęcia (${photoUris.size}/$MAX_REVIEW_PHOTOS)")
+                    OutlinedButton(
+                        onClick = {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        enabled = !isSubmitting,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.AddAPhoto, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Galeria (${totalPhotoCount}/$MAX_REVIEW_PHOTOS)")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            val photoFile = File(
+                                context.cacheDir,
+                                "review_photo_${System.currentTimeMillis()}.jpg"
+                            )
+                            val uri = FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                photoFile
+                            )
+                            cameraUri.value = uri
+                            cameraLauncher.launch(uri)
+                        },
+                        enabled = !isSubmitting,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.CameraAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Aparat")
+                    }
                 }
             }
 
             Spacer(Modifier.height(20.dp))
 
             Button(
-                onClick = { onSubmit(rating, comment, photoUris) },
+                onClick = { onSubmit(rating, comment, photoUris, existingPhotoUrls) },
                 enabled = rating in 1..5 && !isSubmitting,
                 modifier = Modifier
                     .fillMaxWidth()
