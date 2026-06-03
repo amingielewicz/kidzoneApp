@@ -99,6 +99,31 @@ private fun computeContentHash(context: Context, uri: Uri): String? {
 }
 
 /**
+ * Pobiera zdjęcie z remote URL (Firebase Storage) i oblicza MD5 hash.
+ * Używane do seedowania hashów istniejących zdjęć przy edycji opinii/miejsca,
+ * żeby user nie mógł dodać duplikatu z galerii.
+ * Wywołuj na Dispatchers.IO.
+ */
+private fun computeRemoteContentHash(url: String): String? {
+    return try {
+        val connection = java.net.URL(url).openConnection()
+        connection.connectTimeout = 10_000
+        connection.readTimeout = 10_000
+        val inputStream = connection.getInputStream()
+        val md = MessageDigest.getInstance("MD5")
+        val buffer = ByteArray(8192)
+        var bytesRead: Int
+        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+            md.update(buffer, 0, bytesRead)
+        }
+        inputStream.close()
+        md.digest().joinToString("") { "%02x".format(it) }
+    } catch (_: Exception) {
+        null
+    }
+}
+
+/**
  * Tworzy tymczasowy plik w cache i zwraca content URI przez FileProvider.
  * Plik jest tworzony na dysku (createNewFile), więc FileProvider nie rzuci.
  */
@@ -145,6 +170,23 @@ fun AddReviewSheet(
     // Hash set przechowywany jako List<String> żeby był Parcelable-friendly
     // (rememberSaveable wymaga serializowalności).
     var photoHashList by rememberSaveable { mutableStateOf(listOf<String>()) }
+
+    // Seeduj hashe z istniejących remote URLs przy edycji, żeby nie dało się
+    // dodać duplikatu (to samo zdjęcie z galerii co już jest w opinii).
+    androidx.compose.runtime.LaunchedEffect(initialPhotoUrls) {
+        if (initialPhotoUrls.isNotEmpty() && photoHashList.isEmpty()) {
+            val hashes = mutableListOf<String>()
+            for (url in initialPhotoUrls) {
+                val hash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    computeRemoteContentHash(url)
+                }
+                if (hash != null) hashes.add(hash)
+            }
+            if (hashes.isNotEmpty()) {
+                photoHashList = photoHashList + hashes
+            }
+        }
+    }
 
     val totalPhotoCount = existingPhotoUrls.size + photoUris.size
 

@@ -126,6 +126,22 @@ fun AddPlaceScreen(
     // Photo picker – max 5 zdjęć jednocześnie.
     var photoHashSet by remember { mutableStateOf(setOf<String>()) }
 
+    // Seeduj hashe z istniejących remote URLs przy edycji miejsca
+    androidx.compose.runtime.LaunchedEffect(state.existingPhotoUrls) {
+        if (state.existingPhotoUrls.isNotEmpty() && photoHashSet.isEmpty()) {
+            val hashes = mutableSetOf<String>()
+            for (url in state.existingPhotoUrls) {
+                val hash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    computeRemotePlacePhotoHash(url)
+                }
+                if (hash != null) hashes.add(hash)
+            }
+            if (hashes.isNotEmpty()) {
+                photoHashSet = photoHashSet + hashes
+            }
+        }
+    }
+
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(MAX_PLACE_PHOTOS)
     ) { uris ->
@@ -847,4 +863,29 @@ private fun createPlaceCameraUri(context: android.content.Context): Uri {
         "${context.packageName}.fileprovider",
         photoFile
     )
+}
+
+
+/**
+ * Pobiera zdjęcie z remote URL i oblicza MD5 hash.
+ * Używane do seedowania hashów istniejących zdjęć przy edycji miejsca.
+ * Wywołuj na Dispatchers.IO.
+ */
+private fun computeRemotePlacePhotoHash(url: String): String? {
+    return try {
+        val connection = java.net.URL(url).openConnection()
+        connection.connectTimeout = 10_000
+        connection.readTimeout = 10_000
+        val inputStream = connection.getInputStream()
+        val md = MessageDigest.getInstance("MD5")
+        val buffer = ByteArray(8192)
+        var bytesRead: Int
+        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+            md.update(buffer, 0, bytesRead)
+        }
+        inputStream.close()
+        md.digest().joinToString("") { "%02x".format(it) }
+    } catch (_: Exception) {
+        null
+    }
 }
