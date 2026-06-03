@@ -1,7 +1,13 @@
 package com.kidzone.presentation.place.details
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,15 +19,23 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -33,9 +47,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 
 /**
  * Maksymalna długość komentarza opinii. Świadomy kompromis między swobodą
@@ -47,6 +64,9 @@ import androidx.compose.ui.unit.dp
  *  - w `FirestoreReviewRepository.addReview` – `require(...)`.
  */
 private const val COMMENT_MAX_LENGTH = 1000
+
+/** Maksymalna liczba zdjęć na opinię. */
+private const val MAX_REVIEW_PHOTOS = 3
 
 /**
  * Bottom sheet z formularzem dodawania LUB edycji opinii o miejscu.
@@ -70,7 +90,7 @@ fun AddReviewSheet(
     isSubmitting: Boolean,
     errorMessage: String?,
     onDismiss: () -> Unit,
-    onSubmit: (rating: Int, comment: String) -> Unit,
+    onSubmit: (rating: Int, comment: String, photoUris: List<Uri>) -> Unit,
     initialRating: Int = 0,
     initialComment: String = "",
     isEditing: Boolean = false
@@ -82,6 +102,16 @@ fun AddReviewSheet(
     // do nowych wartości startowych.
     var rating by rememberSaveable(initialRating) { mutableIntStateOf(initialRating) }
     var comment by rememberSaveable(initialComment) { mutableStateOf(initialComment) }
+    var photoUris by rememberSaveable { mutableStateOf(listOf<Uri>()) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(MAX_REVIEW_PHOTOS)
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            val available = MAX_REVIEW_PHOTOS - photoUris.size
+            photoUris = photoUris + uris.take(available)
+        }
+    }
 
     val title = when {
         isEditing -> "Edytuj swoją opinię"
@@ -162,10 +192,67 @@ fun AddReviewSheet(
                 )
             }
 
+            // --- Zdjęcia opinii ---
+            Spacer(Modifier.height(12.dp))
+            if (photoUris.isNotEmpty()) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    itemsIndexed(photoUris) { index, uri ->
+                        Box(modifier = Modifier.size(64.dp)) {
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .clip(RoundedCornerShape(6.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                            IconButton(
+                                onClick = {
+                                    photoUris = photoUris.toMutableList().apply { removeAt(index) }
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .size(18.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                        shape = CircleShape
+                                    )
+                            ) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "Usuń",
+                                    tint = MaterialTheme.colorScheme.onError,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+            if (photoUris.size < MAX_REVIEW_PHOTOS) {
+                OutlinedButton(
+                    onClick = {
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    enabled = !isSubmitting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Filled.AddAPhoto, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Dodaj zdjęcia (${photoUris.size}/$MAX_REVIEW_PHOTOS)")
+                }
+            }
+
             Spacer(Modifier.height(20.dp))
 
             Button(
-                onClick = { onSubmit(rating, comment) },
+                onClick = { onSubmit(rating, comment, photoUris) },
                 enabled = rating in 1..5 && !isSubmitting,
                 modifier = Modifier
                     .fillMaxWidth()

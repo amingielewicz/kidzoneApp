@@ -63,7 +63,9 @@ class PlaceDetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val placeRepository: PlaceRepository,
     private val authRepository: AuthRepository,
-    private val reviewRepository: ReviewRepository
+    private val reviewRepository: ReviewRepository,
+    private val photoUploader: com.kidzone.utils.PhotoUploader,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context
 ) : ViewModel() {
 
     /**
@@ -343,7 +345,7 @@ class PlaceDetailsViewModel @Inject constructor(
      * @param rating 1..5
      * @param comment treść opinii (opcjonalna; trim-ujemy whitespace).
      */
-    fun submitReview(rating: Int, comment: String) {
+    fun submitReview(rating: Int, comment: String, photoUris: List<android.net.Uri> = emptyList()) {
         val place = _uiState.value.place ?: return
         val user = currentUser.value
         if (user == null) {
@@ -364,7 +366,7 @@ class PlaceDetailsViewModel @Inject constructor(
             _uiState.update { it.copy(isAddingReview = true, addReviewError = null) }
 
             if (editing == null) {
-                submitNewReview(place, user, rating, comment)
+                submitNewReview(place, user, rating, comment, photoUris)
             } else {
                 submitEditedReview(place, editing, rating, comment)
             }
@@ -375,8 +377,21 @@ class PlaceDetailsViewModel @Inject constructor(
         place: Place,
         user: User,
         rating: Int,
-        comment: String
+        comment: String,
+        photoUris: List<android.net.Uri>
     ) {
+        // Upload zdjęć opinii (jeśli są)
+        val uploadedPhotoUrls = mutableListOf<String>()
+        for (uri in photoUris) {
+            val bytes = com.kidzone.utils.ImageCompressor.compressToWebp(appContext, uri)
+            if (bytes != null) {
+                try {
+                    val url = photoUploader.uploadReviewPhoto("pending_${System.currentTimeMillis()}", bytes)
+                    uploadedPhotoUrls.add(url)
+                } catch (_: Exception) { /* best-effort – pomijamy nieudane */ }
+            }
+        }
+
         val review = Review(
             id = "",
             placeId = place.id,
@@ -384,6 +399,7 @@ class PlaceDetailsViewModel @Inject constructor(
             authorName = user.name,
             rating = rating,
             comment = comment.trim(),
+            photoUrls = uploadedPhotoUrls,
             createdAtMillis = System.currentTimeMillis()
         )
 
