@@ -33,6 +33,27 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Deep linking: https://kidzone.app/place/{placeId} -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="kidzone.app"
+                    android:pathPrefix="/place/" />
+            </intent-filter>
+
+            <!-- Custom scheme fallback: kidzone://place/{placeId} -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="kidzone"
+                    android:host="place" />
+            </intent-filter>
         </activity>
 
         <meta-data

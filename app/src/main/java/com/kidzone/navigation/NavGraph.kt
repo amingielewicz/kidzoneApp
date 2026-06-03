@@ -9,6 +9,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.navigation.navDeepLink
 import com.kidzone.presentation.auth.LoginScreen
 import com.kidzone.presentation.auth.RegisterScreen
 import com.kidzone.presentation.main.MainScreen
@@ -154,6 +155,10 @@ fun KidZoneNavGraph(
             route = Route.PlaceDetails.path,
             arguments = listOf(
                 navArgument(Route.PlaceDetails.ARG_PLACE_ID) { type = NavType.StringType }
+            ),
+            deepLinks = listOf(
+                navDeepLink { uriPattern = "https://kidzone.app/place/{placeId}" },
+                navDeepLink { uriPattern = "kidzone://place/{placeId}" }
             )
         ) {
             PlaceDetailsScreen(
