@@ -26,6 +26,7 @@ service cloud.firestore {
       allow update: if isSignedIn() && (
         resource.data.ownerUserId == request.auth.uid
         || changedKeys().hasOnly(['averageRating', 'reviewsCount'])
+        || changedKeys().hasOnly(['photoUrls'])
       );
 
       allow delete: if isSignedIn()
@@ -61,6 +62,13 @@ service cloud.firestore {
 
     // Zgłoszenia opinii jako spam — każdy zalogowany może utworzyć
     match /review_reports/{reportId} {
+      allow create: if isSignedIn()
+        && request.resource.data.reporterId == request.auth.uid;
+      allow read, update, delete: if false;
+    }
+
+    // Zgłoszenia zdjęć — każdy zalogowany może utworzyć
+    match /photo_reports/{reportId} {
       allow create: if isSignedIn()
         && request.resource.data.reporterId == request.auth.uid;
       allow read, update, delete: if false;

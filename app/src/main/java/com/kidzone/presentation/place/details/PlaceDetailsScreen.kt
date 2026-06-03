@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Flag
@@ -132,6 +133,15 @@ fun PlaceDetailsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    // Photo picker for adding photos to place (any logged-in user)
+    val placePhotoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.addPhotoToPlace(uri)
+        }
+    }
 
     // Po pomyślnym usunięciu – wracamy do listy.
     LaunchedEffect(state.isDeleted) {
@@ -327,7 +337,17 @@ fun PlaceDetailsScreen(
                             fullscreenPhotos = photos
                             fullscreenPhotoIndex = index
                             fullscreenPhotosAreMine = areMine
-                        }
+                        },
+                        onAddPlacePhoto = if (currentUser != null) {
+                            {
+                                placePhotoPickerLauncher.launch(
+                                    androidx.activity.result.PickVisualMediaRequest(
+                                        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+                                    )
+                                )
+                            }
+                        } else null,
+                        isUploadingPlacePhoto = state.isUploadingPlacePhoto
                     )
                 }
             }
@@ -476,7 +496,9 @@ private fun PlaceDetailsContent(
     onAddReview: () -> Unit,
     onEditReview: (Review) -> Unit,
     onReportReview: (Review) -> Unit,
-    onOpenPhotoViewer: (photos: List<String>, startIndex: Int, areMine: Boolean) -> Unit = { _, _, _ -> }
+    onOpenPhotoViewer: (photos: List<String>, startIndex: Int, areMine: Boolean) -> Unit = { _, _, _ -> },
+    onAddPlacePhoto: (() -> Unit)? = null,
+    isUploadingPlacePhoto: Boolean = false
 ) {
     // Przycisk "Dodaj opinię" widoczny tylko gdy:
     //  - user jest zalogowany,
@@ -513,8 +535,45 @@ private fun PlaceDetailsContent(
             item {
                 PlacePhotoGallery(
                     photoUrls = place.photoUrls,
-                    onPhotoClick = { index -> onOpenPhotoViewer(place.photoUrls, index, isOwner) }
+                    onPhotoClick = { index ->
+                        // Zdjęcia miejsca – właściciel MOŻE zgłaszać (bo inni usery
+                        // mogą dodawać zdjęcia do jego miejsca). Nie-właściciel też może.
+                        // Jedyny case "areMine" to zdjęcia opinii autora.
+                        onOpenPhotoViewer(place.photoUrls, index, false)
+                    }
                 )
+            }
+        }
+
+        // Przycisk "Dodaj zdjęcie" – widoczny gdy < 5 zdjęć i user zalogowany
+        if (onAddPlacePhoto != null && place.photoUrls.size < 5) {
+            item {
+                if (isUploadingPlacePhoto) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "Przesyłanie zdjęcia...",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = onAddPlacePhoto,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.AddAPhoto,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Dodaj zdjęcie (${place.photoUrls.size}/5)")
+                    }
+                }
             }
         }
 

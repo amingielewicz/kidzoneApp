@@ -89,4 +89,11 @@ interface PlaceRepository {
         reason: String,
         comment: String = ""
     ): OpResult<Unit>
+
+    /**
+     * Dodaje URL zdjęcia do listy `photoUrls` na dokumencie miejsca.
+     * Używane gdy dowolny zalogowany user dodaje zdjęcie do miejsca
+     * (nie tylko właściciel).
+     */
+    suspend fun addPhotoUrl(placeId: String, photoUrl: String): OpResult<Unit>
 }

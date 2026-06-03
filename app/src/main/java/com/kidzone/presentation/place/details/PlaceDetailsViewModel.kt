@@ -37,6 +37,9 @@ import javax.inject.Inject
  */
 private const val TOP_RANKING_POOL = 100
 
+/** Maksymalna liczba zdjęć na miejsce (widoczna z poziomu ekranu szczegółów). */
+private const val MAX_PLACE_PHOTOS_ON_DETAILS = 5
+
 /**
  * Górna granica pozycji, dla której pokazujemy plakietkę "TOP 100" z numerem.
  *
@@ -113,7 +116,8 @@ class PlaceDetailsViewModel @Inject constructor(
         val editingReview: Review? = null,
         val sortOrder: ReviewSortOrder = ReviewSortOrder.NEWEST,
         val reviewActionEvent: ReviewActionEvent? = null,
-        val topRank: Int? = null
+        val topRank: Int? = null,
+        val isUploadingPlacePhoto: Boolean = false
     )
 
     /**
@@ -553,6 +557,38 @@ class PlaceDetailsViewModel @Inject constructor(
                 reason = reason,
                 comment = comment
             )
+        }
+    }
+
+    // --- Dodawanie zdjęcia do miejsca (przez dowolnego zalogowanego usera) ---
+
+    fun addPhotoToPlace(photoUri: android.net.Uri) {
+        val place = _uiState.value.place ?: return
+        val user = currentUser.value ?: return
+        if (place.photoUrls.size >= MAX_PLACE_PHOTOS_ON_DETAILS) {
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isUploadingPlacePhoto = true) }
+            val bytes = ImageCompressor.compressToWebp(appContext, photoUri)
+            if (bytes != null) {
+                try {
+                    val url = photoUploader.uploadPlacePhoto(place.id, bytes)
+                    // Dodaj URL do photoUrls miejsca w Firestore
+                    placeRepository.addPhotoUrl(place.id, url)
+                    // Optymistyczny update UI
+                    _uiState.update {
+                        it.copy(
+                            place = place.copy(photoUrls = place.photoUrls + url),
+                            isUploadingPlacePhoto = false
+                        )
+                    }
+                } catch (_: Exception) {
+                    _uiState.update { it.copy(isUploadingPlacePhoto = false) }
+                }
+            } else {
+                _uiState.update { it.copy(isUploadingPlacePhoto = false) }
+            }
         }
     }
 
