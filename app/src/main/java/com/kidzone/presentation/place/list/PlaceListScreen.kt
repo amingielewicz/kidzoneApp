@@ -52,6 +52,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -272,6 +273,36 @@ fun PlaceListScreen(
                                 state.userLocation != null,
                             onClick = { onOpenPlaceDetails(place.id) }
                         )
+                    }
+                    if (state.hasMore) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Infinite scroll: doładuj następną stronę gdy user dojdzie
+                // blisko końca listy (ostatnie 3 elementy).
+                val shouldLoadMore = remember {
+                    derivedStateOf {
+                        val lastVisible = lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                        val totalItems = lazyListState.layoutInfo.totalItemsCount
+                        lastVisible >= totalItems - 3 && state.hasMore
+                    }
+                }
+                LaunchedEffect(shouldLoadMore.value) {
+                    if (shouldLoadMore.value) {
+                        viewModel.loadMore()
                     }
                 }
             }
