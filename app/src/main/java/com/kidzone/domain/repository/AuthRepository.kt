@@ -58,6 +58,9 @@ interface AuthRepository {
 
     suspend fun sendPasswordResetEmail(email: String): OpResult<Unit>
 
+    /** Wysyła ponownie email weryfikacyjny do aktualnie zalogowanego usera. */
+    suspend fun resendVerificationEmail(email: String, password: String): OpResult<Unit>
+
     suspend fun signOut()
 
     /**

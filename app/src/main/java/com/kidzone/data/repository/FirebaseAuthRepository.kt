@@ -175,6 +175,16 @@ class FirebaseAuthRepository @Inject constructor(
         firebaseAuth.sendPasswordResetEmail(email).await()
     }
 
+    override suspend fun resendVerificationEmail(email: String, password: String): OpResult<Unit> = runFirebase {
+        // Logujemy tymczasowo żeby mieć dostęp do FirebaseUser (sendEmailVerification wymaga zalogowania)
+        val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
+        val user = result.user
+            ?: throw IllegalStateException("Nie udało się zalogować w celu wysłania weryfikacji")
+        user.sendEmailVerification().await()
+        // Wyloguj z powrotem – user nie powinien mieć sesji bez weryfikacji
+        firebaseAuth.signOut()
+    }
+
     override suspend fun signOut() {
         firebaseAuth.signOut()
     }
