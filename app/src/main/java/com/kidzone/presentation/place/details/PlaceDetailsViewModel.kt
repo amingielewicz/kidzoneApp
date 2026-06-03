@@ -10,8 +10,12 @@ import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.repository.ReviewRepository
 import com.kidzone.navigation.Route
+import com.kidzone.utils.ImageCompressor
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.PhotoUploader
+import android.content.Context
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -64,8 +68,8 @@ class PlaceDetailsViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
     private val authRepository: AuthRepository,
     private val reviewRepository: ReviewRepository,
-    private val photoUploader: com.kidzone.utils.PhotoUploader,
-    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context
+    private val photoUploader: PhotoUploader,
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     /**
@@ -383,7 +387,7 @@ class PlaceDetailsViewModel @Inject constructor(
         // Upload zdjęć opinii (jeśli są)
         val uploadedPhotoUrls = mutableListOf<String>()
         for (uri in photoUris) {
-            val bytes = com.kidzone.utils.ImageCompressor.compressToWebp(appContext, uri)
+            val bytes = ImageCompressor.compressToWebp(appContext, uri)
             if (bytes != null) {
                 try {
                     val url = photoUploader.uploadReviewPhoto("pending_${System.currentTimeMillis()}", bytes)
