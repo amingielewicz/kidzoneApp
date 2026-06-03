@@ -104,6 +104,7 @@ class PlaceListViewModel @Inject constructor(
      *   lokalizacji - wtedy lista jest sortowana RECENTLY_ADDED jako fallback,
      *   a UI może pokazać banner "Włącz lokalizację, by sortować po odległości".
      * @property isLoading true do pierwszego emita z Firestore (po rebindzie też)
+     * @property isRefreshing true podczas pull-to-refresh (kręci spinner)
      * @property errorMessage komunikat błędu z snapshot listenera
      */
     data class UiState(
@@ -115,6 +116,7 @@ class PlaceListViewModel @Inject constructor(
         val currentUserId: String? = null,
         val nearestUnavailable: Boolean = false,
         val isLoading: Boolean = true,
+        val isRefreshing: Boolean = false,
         val errorMessage: String? = null
     )
 
@@ -127,6 +129,9 @@ class PlaceListViewModel @Inject constructor(
      * MutableStateFlow, bo wartość zmienia się w czasie (init -> fetch -> success).
      */
     private val userLocation = MutableStateFlow<Pair<Double, Double>?>(null)
+
+    /** Flaga pull-to-refresh – osobna od isLoading (snapshot listenera). */
+    private val _isRefreshing = MutableStateFlow(false)
 
     /** Wewnętrzny model wyniku ze strumienia Firestore. */
     private sealed interface PlacesLoad {
@@ -169,8 +174,9 @@ class PlaceListViewModel @Inject constructor(
         placesLoad,
         selectedCategory,
         selectedAmenities,
-        sortContextFlow
-    ) { load, category, amenities, sortCtx ->
+        sortContextFlow,
+        _isRefreshing
+    ) { load, category, amenities, sortCtx, refreshing ->
         when (load) {
             PlacesLoad.Loading -> UiState(
                 selectedCategory = category,
@@ -179,6 +185,7 @@ class PlaceListViewModel @Inject constructor(
                 userLocation = sortCtx.userLocation,
                 currentUserId = sortCtx.currentUserId,
                 isLoading = true,
+                isRefreshing = refreshing,
                 errorMessage = null,
                 places = emptyList()
             )
@@ -212,6 +219,7 @@ class PlaceListViewModel @Inject constructor(
                     nearestUnavailable = sortCtx.sortOrder == SortOrder.NEAREST &&
                         sortCtx.userLocation == null,
                     isLoading = false,
+                    isRefreshing = refreshing,
                     errorMessage = null
                 )
             }
@@ -222,6 +230,7 @@ class PlaceListViewModel @Inject constructor(
                 userLocation = sortCtx.userLocation,
                 currentUserId = sortCtx.currentUserId,
                 isLoading = false,
+                isRefreshing = refreshing,
                 errorMessage = load.message,
                 places = emptyList()
             )
@@ -275,6 +284,28 @@ class PlaceListViewModel @Inject constructor(
         viewModelScope.launch {
             val coords = runCatching { fetchCurrentLocation(appContext) }.getOrNull()
             if (coords != null) userLocation.value = coords
+        }
+    }
+
+    /** Pull-to-refresh: odświeża lokalizację i ustawia flagę isRefreshing. */
+    fun refresh() {
+        _isRefreshing.value = true
+        if (!hasLocationPermission(appContext)) {
+            // Bez lokalizacji – dane i tak się odświeżą z Firestore listenera,
+            // więc po krótkim opóźnieniu zdejmujemy spinner.
+            viewModelScope.launch {
+                kotlinx.coroutines.delay(500)
+                _isRefreshing.value = false
+            }
+            return
+        }
+        viewModelScope.launch {
+            val coords = runCatching { fetchCurrentLocation(appContext) }.getOrNull()
+            if (coords != null) userLocation.value = coords
+            // Poczekaj chwilę żeby nowy emit z observePlaces + sort miał czas
+            // dotrzeć do uiState, a spinner był widoczny dla usera.
+            kotlinx.coroutines.delay(300)
+            _isRefreshing.value = false
         }
     }
 

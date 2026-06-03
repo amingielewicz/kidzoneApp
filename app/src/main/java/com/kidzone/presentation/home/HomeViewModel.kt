@@ -72,6 +72,7 @@ class HomeViewModel @Inject constructor(
      * @property nearbyPlaces lista najbliższych miejsc bez względu na ocenę
      * @property isTopLoading true do zakończenia pierwszego fetcha topu
      * @property isNearbyLoading true gdy lecimy fetchem "blisko Ciebie"
+     * @property isRefreshing true podczas pull-to-refresh (kręci spinner)
      * @property locationGranted true gdy user nadał ACCESS_*_LOCATION
      * @property errorMessage błąd ostatniego fetcha (top lub nearby)
      */
@@ -80,6 +81,7 @@ class HomeViewModel @Inject constructor(
         val nearbyPlaces: List<Place> = emptyList(),
         val isTopLoading: Boolean = false,
         val isNearbyLoading: Boolean = false,
+        val isRefreshing: Boolean = false,
         val locationGranted: Boolean = false,
         val errorMessage: String? = null
     )
@@ -114,6 +116,68 @@ class HomeViewModel @Inject constructor(
     fun onLocationPermissionGranted() {
         _uiState.update { it.copy(locationGranted = true) }
         loadLocationBasedPlaces()
+    }
+
+    /** Pull-to-refresh – zawsze przeładowuje dane niezależnie od stanu permission. */
+    fun refresh() {
+        if (!hasLocationPermission(appContext)) {
+            _uiState.update { it.copy(isRefreshing = false) }
+            return
+        }
+        _uiState.update { it.copy(isRefreshing = true) }
+        viewModelScope.launch {
+            val location = runCatching { fetchCurrentLocation(appContext) }.getOrNull()
+            if (location == null) {
+                _uiState.update {
+                    it.copy(
+                        isRefreshing = false,
+                        errorMessage = LOCATION_TIMEOUT_USER_MESSAGE
+                    )
+                }
+                return@launch
+            }
+
+            val (lat, lng) = location
+            when (val result = placeRepository.getPlacesNear(lat, lng, HOME_PLACES_FETCH_RADIUS_KM)) {
+                is OpResult.Success -> {
+                    val placesWithDistance = result.data
+                        .map { it to haversineKm(lat, lng, it.latitude, it.longitude) }
+
+                    val nearby = placesWithDistance
+                        .sortedBy { it.second }
+                        .take(NEARBY_LIMIT)
+                        .map { it.first }
+
+                    val topNearby = placesWithDistance
+                        .filter { (place, distanceKm) ->
+                            place.reviewsCount > 0 && distanceKm <= TOP_PLACES_RADIUS_KM
+                        }
+                        .sortedWith(
+                            compareByDescending<Pair<Place, Double>> { it.first.averageRating }
+                                .thenByDescending { it.first.reviewsCount }
+                                .thenBy { it.second }
+                        )
+                        .take(TOP_PLACES_LIMIT)
+                        .map { it.first }
+
+                    _uiState.update {
+                        it.copy(
+                            topPlaces = topNearby,
+                            nearbyPlaces = nearby,
+                            isRefreshing = false,
+                            errorMessage = null
+                        )
+                    }
+                }
+                is OpResult.Failure -> _uiState.update {
+                    it.copy(
+                        isRefreshing = false,
+                        errorMessage = result.error.message
+                            ?: "Nie udało się wczytać miejsc w pobliżu"
+                    )
+                }
+            }
+        }
     }
 
     private fun loadLocationBasedPlaces() {

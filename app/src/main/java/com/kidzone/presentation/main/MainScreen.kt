@@ -123,10 +123,13 @@ fun MainScreen(
                     Image(
                         painter = painterResource(R.drawable.ic_launcher_foreground),
                         contentDescription = null,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(37.dp)
                     )
                     Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.app_name))
+                    Text(
+                        text = stringResource(R.string.app_name),
+                        style = MaterialTheme.typography.titleLarge
+                    )
                 }
             })
         },
