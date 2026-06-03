@@ -460,6 +460,13 @@ private fun PlaceDetailsContent(
             )
         }
 
+        // Sekcja 1b: Zdjęcia miejsca
+        if (place.photoUrls.isNotEmpty()) {
+            item {
+                PlacePhotoGallery(photoUrls = place.photoUrls)
+            }
+        }
+
         // Sekcja 2: Udogodnienia
         if (place.amenities.isNotEmpty()) {
             item {
@@ -890,6 +897,11 @@ private fun ReviewCard(
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
+            // Zdjęcia opinii
+            if (review.photoUrls.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                ReviewPhotoRow(photoUrls = review.photoUrls)
+            }
         }
     }
 }
@@ -1304,4 +1316,61 @@ private fun ReportReviewDialog(
             }
         }
     )
+}
+
+
+/**
+ * Galeria zdjęć miejsca – pełnoszerokościowy LazyRow z miniaturami.
+ * Klik na miniaturę otwiera powiększony podgląd (TODO: fullscreen viewer).
+ */
+@Composable
+private fun PlacePhotoGallery(photoUrls: List<String>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Zdjęcia (${photoUrls.size})",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(8.dp))
+            androidx.compose.foundation.lazy.LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(photoUrls.size) { index ->
+                    coil.compose.AsyncImage(
+                        model = photoUrls[index],
+                        contentDescription = "Zdjęcie ${index + 1}",
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Wiersz miniaturek zdjęć w opinii – mniejsze niż w galerii miejsca.
+ */
+@Composable
+private fun ReviewPhotoRow(photoUrls: List<String>) {
+    androidx.compose.foundation.lazy.LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        items(photoUrls.size) { index ->
+            coil.compose.AsyncImage(
+                model = photoUrls[index],
+                contentDescription = "Zdjęcie opinii ${index + 1}",
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)),
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+            )
+        }
+    }
 }

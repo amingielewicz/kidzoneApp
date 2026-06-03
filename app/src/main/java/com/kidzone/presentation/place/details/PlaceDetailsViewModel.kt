@@ -10,8 +10,12 @@ import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.repository.ReviewRepository
 import com.kidzone.navigation.Route
+import com.kidzone.utils.ImageCompressor
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.PhotoUploader
+import android.content.Context
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -63,7 +67,9 @@ class PlaceDetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val placeRepository: PlaceRepository,
     private val authRepository: AuthRepository,
-    private val reviewRepository: ReviewRepository
+    private val reviewRepository: ReviewRepository,
+    private val photoUploader: PhotoUploader,
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     /**
@@ -343,7 +349,7 @@ class PlaceDetailsViewModel @Inject constructor(
      * @param rating 1..5
      * @param comment treść opinii (opcjonalna; trim-ujemy whitespace).
      */
-    fun submitReview(rating: Int, comment: String) {
+    fun submitReview(rating: Int, comment: String, photoUris: List<android.net.Uri> = emptyList()) {
         val place = _uiState.value.place ?: return
         val user = currentUser.value
         if (user == null) {
@@ -364,7 +370,7 @@ class PlaceDetailsViewModel @Inject constructor(
             _uiState.update { it.copy(isAddingReview = true, addReviewError = null) }
 
             if (editing == null) {
-                submitNewReview(place, user, rating, comment)
+                submitNewReview(place, user, rating, comment, photoUris)
             } else {
                 submitEditedReview(place, editing, rating, comment)
             }
@@ -375,8 +381,21 @@ class PlaceDetailsViewModel @Inject constructor(
         place: Place,
         user: User,
         rating: Int,
-        comment: String
+        comment: String,
+        photoUris: List<android.net.Uri>
     ) {
+        // Upload zdjęć opinii (jeśli są)
+        val uploadedPhotoUrls = mutableListOf<String>()
+        for (uri in photoUris) {
+            val bytes = ImageCompressor.compressToWebp(appContext, uri)
+            if (bytes != null) {
+                try {
+                    val url = photoUploader.uploadReviewPhoto("pending_${System.currentTimeMillis()}", bytes)
+                    uploadedPhotoUrls.add(url)
+                } catch (_: Exception) { /* best-effort – pomijamy nieudane */ }
+            }
+        }
+
         val review = Review(
             id = "",
             placeId = place.id,
@@ -384,6 +403,7 @@ class PlaceDetailsViewModel @Inject constructor(
             authorName = user.name,
             rating = rating,
             comment = comment.trim(),
+            photoUrls = uploadedPhotoUrls,
             createdAtMillis = System.currentTimeMillis()
         )
 

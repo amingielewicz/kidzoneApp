@@ -80,7 +80,7 @@ class FirestorePlaceRepository @Inject constructor(
 
         // 3. Emituj dane z Room (re-emituje automatycznie po upsert z synca).
         localFlow.collectLatest { entities ->
-            send(entities.map { it.toDomain() })
+            trySend(entities.map { it.toDomain() })
         }
 
         syncJob.cancel()
@@ -88,7 +88,7 @@ class FirestorePlaceRepository @Inject constructor(
 
     override fun observePlacesByOwner(ownerUserId: String): Flow<List<Place>> = channelFlow {
         if (ownerUserId.isBlank()) {
-            send(emptyList())
+            trySend(emptyList())
             return@channelFlow
         }
 
@@ -117,7 +117,7 @@ class FirestorePlaceRepository @Inject constructor(
         }
 
         localFlow.collectLatest { entities ->
-            send(entities.map { it.toDomain() })
+            trySend(entities.map { it.toDomain() })
         }
 
         syncJob.cancel()
