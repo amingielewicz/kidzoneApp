@@ -121,13 +121,21 @@ class HomeViewModel @Inject constructor(
     /** Pull-to-refresh – zawsze przeładowuje dane niezależnie od stanu permission. */
     fun refresh() {
         if (!hasLocationPermission(appContext)) {
-            _uiState.update { it.copy(isRefreshing = false) }
+            viewModelScope.launch {
+                _uiState.update { it.copy(isRefreshing = true) }
+                kotlinx.coroutines.delay(300)
+                _uiState.update { it.copy(isRefreshing = false) }
+            }
             return
         }
         _uiState.update { it.copy(isRefreshing = true) }
         viewModelScope.launch {
             val location = runCatching { fetchCurrentLocation(appContext) }.getOrNull()
             if (location == null) {
+                // Minimalny delay żeby PullToRefreshBox zdążył zarejestrować
+                // przejście true→false (bez tego spinner może „zawisnąć" gdy
+                // fetchCurrentLocation zwróci null natychmiast – np. GPS off).
+                kotlinx.coroutines.delay(300)
                 _uiState.update {
                     it.copy(
                         isRefreshing = false,
