@@ -131,6 +131,10 @@ class FirebaseAuthRepository @Inject constructor(
                 .set(userDto)
                 .await()
 
+            // Wyślij email weryfikacyjny – link do potwierdzenia konta.
+            // Nie blokujemy rejestracji jeśli się nie uda (best-effort).
+            runCatching { firebaseUser.sendEmailVerification().await() }
+
             userDto.toDomain()
         } catch (e: Throwable) {
             // Awaria po createUser - sprzątamy konto Auth, by user mógł

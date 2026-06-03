@@ -148,30 +148,6 @@ fun AddPlaceScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.Top
         ) {
-            // --- Info o konieczności użycia GPS ---
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.MyLocation,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    text = "Możesz dodać tylko miejsce, w którym aktualnie się znajdujesz. " +
-                        "Kliknij \u201EPobierz moją lokalizację\u201D, aby pobrać współrzędne GPS.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(Modifier.height(12.dp))
-
             // --- Nazwa (wymagana) ---
             // Title Case (KeyboardCapitalization.Words) - "Plac Zabaw Kasztanowa"
             // wygląda lepiej niż "plac zabaw kasztanowa". Klawiatura sama
@@ -238,6 +214,15 @@ fun AddPlaceScreen(
                 enabled = !state.isSaving
             )
 
+            // Info pod przyciskiem GPS
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Możesz dodać miejsce, w którym aktualnie się znajdujesz.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+
             // --- Miejsca w pobliżu (ochrona przed duplikatami) ---
             if (state.nearbyPlaces.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
@@ -246,20 +231,15 @@ fun AddPlaceScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // --- Adres (wymagany) – po GPS, żeby reverse geocoding mógł go
-            // wypełnić, ale nadal w pełni edytowalny przez użytkownika.
-            // Words = duża litera na początku każdego słowa ("Aleje
-            // Ujazdowskie 4, Warszawa") - zgodnie z polską konwencją
-            // adresową. ---
+            // --- Adres (read-only, wypełniany przez reverse geocoding po
+            // pobraniu lokalizacji GPS). Użytkownik nie może edytować ręcznie. ---
             OutlinedTextField(
                 value = state.address,
-                onValueChange = viewModel::onAddressChange,
-                label = { RequiredFieldLabel("Adres") },
+                onValueChange = { /* read-only */ },
+                label = { Text("Adres") },
                 singleLine = true,
-                enabled = !state.isSaving,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Words
-                ),
+                readOnly = true,
+                enabled = false,
                 modifier = Modifier.fillMaxWidth()
             )
 
