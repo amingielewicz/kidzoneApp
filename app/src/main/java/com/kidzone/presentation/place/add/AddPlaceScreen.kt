@@ -2,8 +2,11 @@ package com.kidzone.presentation.place.add
 
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -14,11 +17,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,6 +39,8 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -53,7 +65,11 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.kidzone.R
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.PlaceCategory
@@ -95,6 +111,15 @@ fun AddPlaceScreen(
             coroutineScope.launch { fetchAndSetLocation(context, viewModel) }
         } else {
             viewModel.onLocationError("Brak uprawnienia do lokalizacji")
+        }
+    }
+
+    // Photo picker – max 5 zdjęć jednocześnie.
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(MAX_PLACE_PHOTOS)
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            viewModel.addPhotos(uris)
         }
     }
 
@@ -261,6 +286,67 @@ fun AddPlaceScreen(
                     text = msg,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error
+                )
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            // --- Zdjęcia ---
+            Text(
+                text = "Zdjęcia (${state.photoUris.size + state.existingPhotoUrls.size}/$MAX_PLACE_PHOTOS)",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(8.dp))
+
+            // Miniaturki istniejących zdjęć (edycja)
+            if (state.existingPhotoUrls.isNotEmpty() || state.photoUris.isNotEmpty()) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    // Istniejące (już uploadowane)
+                    itemsIndexed(state.existingPhotoUrls) { index, url ->
+                        PhotoThumbnail(
+                            model = url,
+                            onRemove = { viewModel.removeExistingPhoto(index) },
+                            enabled = !state.isSaving
+                        )
+                    }
+                    // Nowe (lokalne URI)
+                    itemsIndexed(state.photoUris) { index, uri ->
+                        PhotoThumbnail(
+                            model = uri,
+                            onRemove = { viewModel.removeNewPhoto(index) },
+                            enabled = !state.isSaving
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+
+            // Przycisk dodawania zdjęć
+            if (state.canAddMorePhotos) {
+                OutlinedButton(
+                    onClick = { photoPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    ) },
+                    enabled = !state.isSaving,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Filled.AddAPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Dodaj zdjęcia")
+                }
+            }
+
+            if (state.isUploadingPhotos) {
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                Text(
+                    text = "Przesyłanie zdjęć...",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -585,4 +671,46 @@ private fun DuplicateWarningDialog(
             }
         }
     )
+}
+
+
+/**
+ * Miniaturka zdjęcia z przyciskiem "X" do usunięcia.
+ * Akceptuje zarówno [android.net.Uri] (nowe) jak i [String] URL (istniejące).
+ */
+@Composable
+private fun PhotoThumbnail(
+    model: Any, // Uri lub String URL
+    onRemove: () -> Unit,
+    enabled: Boolean = true
+) {
+    Box(modifier = Modifier.size(80.dp)) {
+        AsyncImage(
+            model = model,
+            contentDescription = null,
+            modifier = Modifier
+                .size(80.dp)
+                .clip(RoundedCornerShape(8.dp)),
+            contentScale = ContentScale.Crop
+        )
+        if (enabled) {
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(22.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                        shape = CircleShape
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "Usuń zdjęcie",
+                    tint = MaterialTheme.colorScheme.onError,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
+    }
 }

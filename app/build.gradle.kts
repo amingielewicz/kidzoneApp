@@ -139,6 +139,9 @@ dependencies {
     // Image loading
     implementation(libs.coil.compose)
 
+    // ExifInterface (auto-rotate photos before upload)
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
+
     // Room
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
