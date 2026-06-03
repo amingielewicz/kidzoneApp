@@ -117,7 +117,8 @@ class PlaceDetailsViewModel @Inject constructor(
         val sortOrder: ReviewSortOrder = ReviewSortOrder.NEWEST,
         val reviewActionEvent: ReviewActionEvent? = null,
         val topRank: Int? = null,
-        val isUploadingPlacePhoto: Boolean = false
+        val isUploadingPlacePhoto: Boolean = false,
+        val placePhotoDuplicateEvent: Boolean = false
     )
 
     /**
@@ -212,6 +213,7 @@ class PlaceDetailsViewModel @Inject constructor(
                     }
                     loadAuthor(result.data.ownerUserId)
                     loadTopRank()
+                    seedPlacePhotoHashes(result.data.photoUrls)
                 }
                 is OpResult.Failure -> _uiState.update {
                     it.copy(
@@ -562,6 +564,13 @@ class PlaceDetailsViewModel @Inject constructor(
 
     // --- Dodawanie zdjęcia do miejsca (przez dowolnego zalogowanego usera) ---
 
+    /** Zbiór MD5 hashów skompresowanych zdjęć miejsca (seedowany przy ładowaniu). */
+    private val placePhotoHashes = mutableSetOf<String>()
+
+    fun consumePlacePhotoDuplicateEvent() {
+        _uiState.update { it.copy(placePhotoDuplicateEvent = false) }
+    }
+
     fun addPhotoToPlace(photoUri: android.net.Uri) {
         val place = _uiState.value.place ?: return
         val user = currentUser.value ?: return
@@ -570,24 +579,56 @@ class PlaceDetailsViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _uiState.update { it.copy(isUploadingPlacePhoto = true) }
-            val bytes = ImageCompressor.compressToWebp(appContext, photoUri)
-            if (bytes != null) {
-                try {
-                    val url = photoUploader.uploadPlacePhoto(place.id, bytes)
-                    // Dodaj URL do photoUrls miejsca w Firestore
-                    placeRepository.addPhotoUrl(place.id, url)
-                    // Optymistyczny update UI
-                    _uiState.update {
-                        it.copy(
-                            place = place.copy(photoUrls = place.photoUrls + url),
-                            isUploadingPlacePhoto = false
-                        )
-                    }
-                } catch (_: Exception) {
-                    _uiState.update { it.copy(isUploadingPlacePhoto = false) }
-                }
-            } else {
+
+            val newBytes = ImageCompressor.compressToWebp(appContext, photoUri)
+            if (newBytes == null) {
                 _uiState.update { it.copy(isUploadingPlacePhoto = false) }
+                return@launch
+            }
+
+            // Duplicate check: hash skompresowanego zdjęcia
+            val newHash = java.security.MessageDigest.getInstance("MD5")
+                .digest(newBytes)
+                .joinToString("") { "%02x".format(it) }
+
+            if (newHash in placePhotoHashes) {
+                _uiState.update { it.copy(isUploadingPlacePhoto = false, placePhotoDuplicateEvent = true) }
+                return@launch
+            }
+
+            try {
+                val url = photoUploader.uploadPlacePhoto(place.id, newBytes)
+                placeRepository.addPhotoUrl(place.id, url)
+                placePhotoHashes.add(newHash)
+                _uiState.update {
+                    it.copy(
+                        place = place.copy(photoUrls = place.photoUrls + url),
+                        isUploadingPlacePhoto = false
+                    )
+                }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(isUploadingPlacePhoto = false) }
+            }
+        }
+    }
+
+    /** Seeduje hash set istniejących zdjęć miejsca (wołane z init po załadowaniu place). */
+    private fun seedPlacePhotoHashes(photoUrls: List<String>) {
+        if (photoUrls.isEmpty()) return
+        viewModelScope.launch {
+            for (url in photoUrls) {
+                try {
+                    val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        val conn = java.net.URL(url).openConnection()
+                        conn.connectTimeout = 10_000
+                        conn.readTimeout = 10_000
+                        conn.getInputStream().readBytes()
+                    }
+                    val hash = java.security.MessageDigest.getInstance("MD5")
+                        .digest(bytes)
+                        .joinToString("") { "%02x".format(it) }
+                    placePhotoHashes.add(hash)
+                } catch (_: Exception) { /* best-effort */ }
             }
         }
     }

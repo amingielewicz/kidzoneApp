@@ -165,10 +165,7 @@ fun AddPlaceScreen(
             }
             if (duplicatesFound > 0) {
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar(
-                        if (duplicatesFound == 1) "To zdjęcie jest już dodane"
-                        else "Pominięto $duplicatesFound zduplikowanych zdjęć"
-                    )
+                    snackbarHostState.showSnackbar("Dodano już to zdjęcie")
                 }
             }
         }
@@ -187,7 +184,7 @@ fun AddPlaceScreen(
                 viewModel.addPhotos(listOf(uri))
             } else {
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar("To zdjęcie jest już dodane")
+                    snackbarHostState.showSnackbar("Dodano już to zdjęcie")
                 }
             }
         }

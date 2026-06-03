@@ -227,9 +227,7 @@ fun AddReviewSheet(
             }
             if (duplicatesFound > 0) {
                 scope.launch {
-                    snackbarHostState.showSnackbar(
-                        "Pominięto $duplicatesFound zduplikowanych zdjęć"
-                    )
+                    snackbarHostState.showSnackbar("Dodano już to zdjęcie")
                 }
             }
         }
@@ -250,7 +248,7 @@ fun AddReviewSheet(
                     photoUris = photoUris + uri
                 } else {
                     scope.launch {
-                        snackbarHostState.showSnackbar("To zdjęcie jest już dodane")
+                        snackbarHostState.showSnackbar("Dodano już to zdjęcie")
                     }
                 }
             }

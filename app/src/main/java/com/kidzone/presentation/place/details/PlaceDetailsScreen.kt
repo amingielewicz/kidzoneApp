@@ -170,6 +170,14 @@ fun PlaceDetailsScreen(
         viewModel.consumeReviewActionEvent()
     }
 
+    // Snackbar: duplikat zdjęcia na ekranie szczegółów miejsca
+    LaunchedEffect(state.placePhotoDuplicateEvent) {
+        if (state.placePhotoDuplicateEvent) {
+            snackbarHostState.showSnackbar("Dodano już to zdjęcie")
+            viewModel.consumePlacePhotoDuplicateEvent()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
