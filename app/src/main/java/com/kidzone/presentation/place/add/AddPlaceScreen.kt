@@ -125,6 +125,7 @@ fun AddPlaceScreen(
 
     // Photo picker – max 5 zdjęć jednocześnie.
     var photoHashSet by remember { mutableStateOf(setOf<String>()) }
+    var placeHashesReady by remember { mutableStateOf(!state.isEditMode) }
 
     // Seeduj hashe z istniejących remote URLs przy edycji miejsca
     androidx.compose.runtime.LaunchedEffect(state.existingPhotoUrls) {
@@ -140,6 +141,7 @@ fun AddPlaceScreen(
                 photoHashSet = photoHashSet + hashes
             }
         }
+        placeHashesReady = true
     }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -165,7 +167,7 @@ fun AddPlaceScreen(
             }
             if (duplicatesFound > 0) {
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar("Dodano już to zdjęcie")
+                    snackbarHostState.showSnackbar("To zdjęcie zostało już dodane. Nie można dodać duplikatu.")
                 }
             }
         }
@@ -184,7 +186,7 @@ fun AddPlaceScreen(
                 viewModel.addPhotos(listOf(uri))
             } else {
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar("Dodano już to zdjęcie")
+                    snackbarHostState.showSnackbar("To zdjęcie zostało już dodane. Nie można dodać duplikatu.")
                 }
             }
         }
@@ -423,7 +425,7 @@ fun AddPlaceScreen(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                             )
                         },
-                        enabled = !state.isSaving,
+                        enabled = !state.isSaving && placeHashesReady,
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.Filled.AddAPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -441,7 +443,7 @@ fun AddPlaceScreen(
                                 placeCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                             }
                         },
-                        enabled = !state.isSaving,
+                        enabled = !state.isSaving && placeHashesReady,
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.Filled.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))

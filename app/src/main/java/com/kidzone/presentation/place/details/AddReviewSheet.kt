@@ -170,6 +170,7 @@ fun AddReviewSheet(
     // Hash set przechowywany jako List<String> żeby był Parcelable-friendly
     // (rememberSaveable wymaga serializowalności).
     var photoHashList by rememberSaveable { mutableStateOf(listOf<String>()) }
+    var hashesReady by remember { mutableStateOf(initialPhotoUrls.isEmpty()) }
 
     // Seeduj hashe z istniejących remote URLs przy edycji, żeby nie dało się
     // dodać duplikatu (to samo zdjęcie z galerii co już jest w opinii).
@@ -186,6 +187,7 @@ fun AddReviewSheet(
                 photoHashList = photoHashList + hashes
             }
         }
+        hashesReady = true
     }
 
     val totalPhotoCount = existingPhotoUrls.size + photoUris.size
@@ -227,7 +229,7 @@ fun AddReviewSheet(
             }
             if (duplicatesFound > 0) {
                 scope.launch {
-                    snackbarHostState.showSnackbar("Dodano już to zdjęcie")
+                    snackbarHostState.showSnackbar("To zdjęcie zostało już dodane. Nie można dodać duplikatu.")
                 }
             }
         }
@@ -248,7 +250,7 @@ fun AddReviewSheet(
                     photoUris = photoUris + uri
                 } else {
                     scope.launch {
-                        snackbarHostState.showSnackbar("Dodano już to zdjęcie")
+                        snackbarHostState.showSnackbar("To zdjęcie zostało już dodane. Nie można dodać duplikatu.")
                     }
                 }
             }
@@ -386,7 +388,7 @@ fun AddReviewSheet(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                             )
                         },
-                        enabled = !isSubmitting,
+                        enabled = !isSubmitting && hashesReady,
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.Filled.AddAPhoto, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -404,7 +406,7 @@ fun AddReviewSheet(
                                 cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                             }
                         },
-                        enabled = !isSubmitting,
+                        enabled = !isSubmitting && hashesReady,
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.Filled.CameraAlt, contentDescription = null, modifier = Modifier.size(16.dp))

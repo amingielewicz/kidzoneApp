@@ -174,7 +174,7 @@ fun PlaceDetailsScreen(
     // Snackbar: duplikat zdjęcia na ekranie szczegółów miejsca
     LaunchedEffect(state.placePhotoDuplicateEvent) {
         if (state.placePhotoDuplicateEvent) {
-            snackbarHostState.showSnackbar("Dodano już to zdjęcie")
+            snackbarHostState.showSnackbar("To zdjęcie zostało już dodane. Nie można dodać duplikatu.")
             viewModel.consumePlacePhotoDuplicateEvent()
         }
     }
