@@ -210,8 +210,8 @@ fun PlaceListScreen(
         }
 
         PullToRefreshBox(
-            isRefreshing = state.isLoading,
-            onRefresh = { viewModel.refreshLocation() },
+            isRefreshing = state.isRefreshing,
+            onRefresh = { viewModel.refresh() },
             modifier = Modifier.fillMaxSize()
         ) {
         when {

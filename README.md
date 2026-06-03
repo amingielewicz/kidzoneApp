@@ -29,7 +29,7 @@ Pozostałe TODO są w sekcji [Status MVP](#status-mvp).
 - **Credential Manager** 1.3.0 + `googleid` 1.1.1 (nowoczesne Google Sign-In)
 - **androidx.core:core-splashscreen** 1.0.1 (Splash Screen API Android 12+, backportowane)
 - **Poppins** jako brand font (Google Font, OFL, bundlowany w `res/font/`, 3 weights: 400/600/700)
-- **Coil 2.7.0** (obrazy + avatar), **Retrofit 2.11.0 + OkHttp** (na przyszłość), **Room 2.6.1** (cache offline, na przyszłość)
+- **Coil 2.7.0** (obrazy + avatar), **Retrofit 2.11.0 + OkHttp** (na przyszłość), **Room 2.6.1** (offline cache miejsc — `PlaceEntity` + `PlaceDao` + `KidZoneDatabase`)
 - **Navigation Compose** 2.8.2, **Coroutines** 1.9.0
 - Architektura: **MVVM + Clean Architecture** (warstwy `data` / `domain` / `presentation`)
 - Build tooling: **AGP 8.13.2**, **Gradle 8.13** (przez `mise.toml`), Java 17
@@ -194,17 +194,24 @@ app/src/main/java/com/kidzone
 │
 ├── data
 │   ├── remote
-│   │   ├── FirestoreCollections.kt    # users, places, reviews, photos, place_reports, place_change_requests
+│   │   ├── FirestoreCollections.kt    # users, places, reviews, photos, place_reports, review_reports, place_change_requests
 │   │   └── dto/                        # PlaceDto, ReviewDto, UserDto
+│   ├── local
+│   │   ├── KidZoneDatabase.kt         # Room DB v1 (fallbackToDestructiveMigration)
+│   │   ├── PlaceDao.kt                # observe / query / upsert / delete
+│   │   └── PlaceEntity.kt             # Room entity, mapowanie 1:1 z Place
 │   └── repository
 │       ├── FirebaseAuthRepository.kt   # e-mail + Google + reset, mapowanie błędów,
 │       │                               # zmiana hasła / e-maila, deleteAccount,
 │       │                               # uploadAvatar (Storage)
-│       ├── FirestorePlaceRepository.kt # observe (snapshot), top, near, add/update/delete
-│       │                               # (z timeoutem + atomic increment user.placesAddedCount)
+│       ├── FirestorePlaceRepository.kt # observe (snapshot) + Room offline cache (channelFlow),
+│       │                               # top, near, add/update/delete (z timeoutem +
+│       │                               # atomic increment user.placesAddedCount +
+│       │                               # cache persist/fallback)
 │       └── FirestoreReviewRepository.kt# observeReviewsForPlace + observeReviewsByUser,
 │                                       # addReview / updateReview / deleteReview
-│                                       # (transakcje agregujące averageRating + reviewsCount)
+│                                       # (transakcje agregujące averageRating + reviewsCount),
+│                                       # reportReviewAsSpam (zapis do review_reports)
 │
 ├── domain
 │   ├── model/               # User, Place, Review, Photo, PlaceCategory, Amenity
@@ -274,6 +281,9 @@ app/src/main/java/com/kidzone
 │   │                            # precomputed userBadges per uid (z BadgeContext)
 │   └── common
 │       ├── CategoryStyle.kt     # ikona + kolor per PlaceCategory
+│       ├── NetworkObserver.kt   # Flow<NetworkStatus> via ConnectivityManager
+│       ├── StatusBanners.kt     # NoInternetBanner, GpsDisabledBanner,
+│       │                        # rememberNetworkStatus(), rememberLocationServiceEnabled()
 │       └── UserBadges.kt        # 15 odznak (6 kategorii) + BadgeContext
 │                                # + BadgesRow / BadgesIconRow / chronologicalOrder
 │
@@ -287,6 +297,7 @@ app/src/main/java/com/kidzone
 │   └── NavGraph.kt          # KidZoneNavGraph + przejścia pre/post-auth
 │
 ├── di
+│   ├── DatabaseModule.kt    # @Provides Room DB + PlaceDao
 │   ├── FirebaseModule.kt    # @Provides FirebaseAuth/Firestore/Storage
 │   └── RepositoryModule.kt  # @Binds dla 3 repo
 │
@@ -477,18 +488,27 @@ przy pierwszym wejściu, `AddPlaceScreen` przy kliknięciu "Pobierz lokalizację
 | Koryguj lokalizację GPS miejsca                      | ✅     |
 | Cloud Functions: email admin po zgłoszeniu/zmianie   | ✅     |
 | Sprawdzanie włączonej usługi GPS w systemie          | ✅     |
-| Zgłaszanie opinii jako spam                          | ⏳ — `reportReviewAsSpam` zwraca `NotImplementedError` |
+| Zgłaszanie opinii jako spam                          | ✅     |
+| Room offline cache (miejsca — offline-first reads)   | ✅     |
+| Banner "Brak internetu" na wszystkich zakładkach     | ✅     |
+| Banner "GPS wyłączony" na Home/Map/List              | ✅     |
+| Pull-to-refresh na Home/List/Profile/Ranking         | ✅     |
+| Cloud Functions: email admin po zgłoszeniu opinii    | ✅     |
+| Cloud Functions: email powitalny + email przy usunięciu konta | ✅ |
 | Upload zdjęć miejsc / opinii do Storage              | ⏳ — Storage dep wpięte, brak UI |
 
 ## Cloud Functions (backend)
 
 Folder `functions/` zawiera Cloud Functions (TypeScript, Firebase Functions v2)
-triggerowane przez zapis nowego dokumentu w Firestore:
+triggerowane przez zapis/usunięcie dokumentu w Firestore:
 
 | Trigger | Kolekcja | Działanie |
 |---------|----------|-----------|
-| `onPlaceReport` | `place_reports` | Wysyła email do admina z powodu zgłoszenia naruszenia |
-| `onPlaceChangeRequest` | `place_change_requests` | Wysyła email z propozycją zmiany / korekty lokalizacji |
+| `onPlaceReport` | `place_reports` | Email do admina: zgłoszenie naruszenia miejsca |
+| `onReviewReport` | `review_reports` | Email do admina: zgłoszenie opinii jako spam (z treścią opinii, autorem, gwiazdkami) |
+| `onPlaceChangeRequest` | `place_change_requests` | Email do admina: propozycja zmiany / korekty lokalizacji |
+| `onUserCreated` | `users` (onCreate) | Email powitalny do usera + powiadomienie admina |
+| `onUserDeleted` | `users` (onDelete) | Email pożegnalny do usera + powiadomienie admina |
 
 Email zawiera: nazwę miejsca, dane zgłaszającego (imię, email, UID),
 powód / proponowane zmiany (zmapowane na czytelne polskie etykiety) +
@@ -503,21 +523,21 @@ Deploy: `cd functions && npm run build && cd .. && firebase deploy --only functi
 
 ## Kolejne kroki
 
-1. **Zgłaszanie opinii jako spam** — wpiąć `reportReviewAsSpam`
-   (Firestore: zwiększyć `reportCount` + ustawić `reportedAsSpam`),
-   plus modal w UI nad komentarzem.
-2. **Upload zdjęć miejsc i opinii** — analogicznie do `uploadAvatar`,
+1. **Upload zdjęć miejsc i opinii** — analogicznie do `uploadAvatar`,
    w `AddPlaceScreen` i `AddReviewSheet`. Wykorzystać `READ_MEDIA_IMAGES`
    i `CAMERA`, które już są w manifeście. User może dodać zdjęcie do
    cudzego miejsca (zapamiętane do implementacji).
-3. **Geo zapytania** — `getPlacesNear` w repo nadal pobiera wszystkie
+2. **Geo zapytania** — `getPlacesNear` w repo nadal pobiera wszystkie
    miejsca i sortuje klient-side haversinem; przy rosnącej bazie
    przepisać na geohash / GeoFirestore.
-4. **Panel admina do akceptacji zmian** — propozycje zmian i korekty
+3. **Panel admina do akceptacji zmian** — propozycje zmian i korekty
    lokalizacji trafiają do `place_change_requests`, ale akceptacja
    wymaga ręcznej edycji w Firebase Console. Docelowo: prosty panel
    webowy lub Cloud Function z auto-akceptacją po N zgodnych zgłoszeniach.
-5. **Themed icon (vector)** — obecny `ic_launcher_monochrome` jest PNG-iem;
+4. **Themed icon (vector)** — obecny `ic_launcher_monochrome` jest PNG-iem;
    docelowo lepiej mieć wersję wektorową single-path.
+5. **Usuwanie starych wpisów z Room cache** — brak TTL / polityki
+   wygaszania; stale entries czyszczą się przy najbliższym sync
+   z Firestore, ale przy dużej bazie warto dodać periodyczny gc.
 6. Opcjonalnie: deep linking, push notifications, refinement dark mode,
    paginacja listy miejsc.

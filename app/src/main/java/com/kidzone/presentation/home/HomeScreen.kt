@@ -121,8 +121,8 @@ fun HomeScreen(
     }
 
     PullToRefreshBox(
-        isRefreshing = state.isNearbyLoading || state.isTopLoading,
-        onRefresh = { viewModel.refreshLocationGranted() },
+        isRefreshing = state.isRefreshing,
+        onRefresh = { viewModel.refresh() },
         modifier = Modifier.fillMaxSize()
     ) {
         LazyColumn(
