@@ -11,6 +11,7 @@ import com.kidzone.data.remote.dto.PlaceDto
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.repository.PlaceRepository
+import com.kidzone.utils.GeoHash
 import com.kidzone.utils.OpResult
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -148,14 +149,34 @@ class FirestorePlaceRepository @Inject constructor(
         longitude: Double,
         radiusKm: Double
     ): OpResult<List<Place>> {
-        // TODO: filtrowanie po geohashu (np. biblioteka GeoFirestore) lub bounding box.
-        // Na razie zwracamy wszystkie - klient wyfiltruje, MVP bez geo-zapytania.
         return try {
-            val snapshot = placesCollection().get().await()
+            val prefixLen = GeoHash.prefixLengthForRadius(radiusKm)
+            val centerHash = GeoHash.encode(latitude, longitude, prefixLen)
+            // Firestore range query na prefixie geohash: >= prefix, < prefix~
+            // (~ = ostatni znak inkrementowany). Zwraca wszystkie miejsca w
+            // „buckecie" geohash, klient doprecyzowuje haversinem.
+            val hashEnd = centerHash.substring(0, centerHash.length - 1) +
+                (centerHash.last() + 1)
+
+            val snapshot = placesCollection()
+                .whereGreaterThanOrEqualTo("geohash", centerHash)
+                .whereLessThan("geohash", hashEnd)
+                .get()
+                .await()
             val places = snapshot.documents.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
+
+            // Fallback: jeśli geohash query zwrócił 0 wyników (np. stare
+            // miejsca bez geohash), pobierz wszystko (legacy behavior).
+            val result = if (places.isEmpty()) {
+                val allSnapshot = placesCollection().get().await()
+                allSnapshot.documents.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
+            } else {
+                places
+            }
+
             // Persystuj do cache.
-            placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
-            OpResult.success(places)
+            placeDao.upsertAll(result.map(PlaceEntity::fromDomain))
+            OpResult.success(result)
         } catch (e: Exception) {
             // Fallback: zwróć wszystko z cache (klient filtruje po odległości).
             val cached = placeDao.getTopPlaces(Int.MAX_VALUE)

@@ -3,9 +3,14 @@ package com.kidzone.data.remote.dto
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.utils.GeoHash
 
 /**
  * Reprezentacja [Place] w kolekcji `places` w Firestore.
+ *
+ * Pole [geohash] jest obliczane z (latitude, longitude) przy zapisie
+ * i używane do geo-zapytań (`whereGreaterThanOrEqualTo` / `whereLessThan`
+ * na prefixie geohashu). Precision 7 ≈ 150m.
  */
 data class PlaceDto(
     val id: String = "",
@@ -20,7 +25,8 @@ data class PlaceDto(
     val reviewsCount: Int = 0,
     val amenities: List<String> = emptyList(),
     val photoUrls: List<String> = emptyList(),
-    val createdAtMillis: Long = 0L
+    val createdAtMillis: Long = 0L,
+    val geohash: String = ""
 ) {
     fun toDomain(): Place = Place(
         id = id,
@@ -52,7 +58,8 @@ data class PlaceDto(
             reviewsCount = place.reviewsCount,
             amenities = place.amenities.map { it.name },
             photoUrls = place.photoUrls,
-            createdAtMillis = place.createdAtMillis
+            createdAtMillis = place.createdAtMillis,
+            geohash = GeoHash.encode(place.latitude, place.longitude)
         )
     }
 }
