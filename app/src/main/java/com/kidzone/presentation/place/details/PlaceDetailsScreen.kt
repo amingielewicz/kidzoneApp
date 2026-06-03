@@ -126,6 +126,7 @@ fun PlaceDetailsScreen(
     // Fullscreen photo viewer state
     var fullscreenPhotos by remember { mutableStateOf<List<String>>(emptyList()) }
     var fullscreenPhotoIndex by remember { mutableStateOf(0) }
+    var fullscreenPhotosAreMine by remember { mutableStateOf(false) }
     var showReportPhotoDialog by remember { mutableStateOf(false) }
     var photoUrlToReport by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -322,9 +323,10 @@ fun PlaceDetailsScreen(
                             reviewToReport = review
                             showReportReviewDialog = true
                         },
-                        onOpenPhotoViewer = { photos, index ->
+                        onOpenPhotoViewer = { photos, index, areMine ->
                             fullscreenPhotos = photos
                             fullscreenPhotoIndex = index
+                            fullscreenPhotosAreMine = areMine
                         }
                     )
                 }
@@ -435,7 +437,7 @@ fun PlaceDetailsScreen(
             photoUrls = fullscreenPhotos,
             initialIndex = fullscreenPhotoIndex,
             onDismiss = { fullscreenPhotos = emptyList() },
-            onReportPhoto = { url ->
+            onReportPhoto = if (fullscreenPhotosAreMine) null else { url ->
                 photoUrlToReport = url
                 showReportPhotoDialog = true
             }
@@ -474,13 +476,15 @@ private fun PlaceDetailsContent(
     onAddReview: () -> Unit,
     onEditReview: (Review) -> Unit,
     onReportReview: (Review) -> Unit,
-    onOpenPhotoViewer: (photos: List<String>, startIndex: Int) -> Unit = { _, _ -> }
+    onOpenPhotoViewer: (photos: List<String>, startIndex: Int, areMine: Boolean) -> Unit = { _, _, _ -> }
 ) {
-    // Jedna opinia per user per miejsce (MVP). Przycisk "Dodaj opinię" znika,
-    // gdy zalogowany user już wystawił ocenę – w jego miejsce daje
-    // ikona ołówka na karcie własnej opinii (patrz ReviewCard).
+    // Przycisk "Dodaj opinię" widoczny tylko gdy:
+    //  - user jest zalogowany,
+    //  - NIE jest właścicielem miejsca (nie oceniamy swoich miejsc),
+    //  - jeszcze nie wystawił opinii (1 opinia per user per miejsce).
+    val isOwner = currentUserId != null && place.ownerUserId == currentUserId
     val alreadyReviewed = currentUserId != null && reviews.any { it.userId == currentUserId }
-    val canAddReview = currentUserId != null && !alreadyReviewed
+    val canAddReview = currentUserId != null && !isOwner && !alreadyReviewed
 
     // Klient-side sort. `remember` z kluczami chroni przed niepotrzebnym
     // re-sortowaniem – wykonuje się tylko gdy zmieni się lista albo sortOrder.
@@ -509,7 +513,7 @@ private fun PlaceDetailsContent(
             item {
                 PlacePhotoGallery(
                     photoUrls = place.photoUrls,
-                    onPhotoClick = { index -> onOpenPhotoViewer(place.photoUrls, index) }
+                    onPhotoClick = { index -> onOpenPhotoViewer(place.photoUrls, index, isOwner) }
                 )
             }
         }
@@ -592,7 +596,10 @@ private fun PlaceDetailsContent(
                     { onReportReview(review) }
                 } else null,
                 onPhotoClick = if (review.photoUrls.isNotEmpty()) {
-                    { index -> onOpenPhotoViewer(review.photoUrls, index) }
+                    { index ->
+                        val isMyReview = currentUserId != null && review.userId == currentUserId
+                        onOpenPhotoViewer(review.photoUrls, index, isMyReview)
+                    }
                 } else null
             )
         }

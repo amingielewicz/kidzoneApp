@@ -358,6 +358,12 @@ class PlaceDetailsViewModel @Inject constructor(
             }
             return
         }
+        if (user.id == place.ownerUserId) {
+            _uiState.update {
+                it.copy(addReviewError = "Nie możesz oceniać własnego miejsca")
+            }
+            return
+        }
         if (rating !in 1..5) {
             _uiState.update {
                 it.copy(addReviewError = "Wybierz ocenę 1–5 gwiazdek")
