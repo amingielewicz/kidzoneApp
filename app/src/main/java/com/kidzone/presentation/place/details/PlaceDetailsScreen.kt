@@ -119,6 +119,8 @@ fun PlaceDetailsScreen(
     var showOverflow by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showReportDialog by remember { mutableStateOf(false) }
+    var showReportReviewDialog by remember { mutableStateOf(false) }
+    var reviewToReport by remember { mutableStateOf<Review?>(null) }
     var showSuggestEditSheet by remember { mutableStateOf(false) }
     var showLocationCorrectionDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -310,7 +312,11 @@ fun PlaceDetailsScreen(
                         sortOrder = state.sortOrder,
                         onSortOrderChange = viewModel::setSortOrder,
                         onAddReview = viewModel::openAddReviewSheet,
-                        onEditReview = viewModel::openEditReviewSheet
+                        onEditReview = viewModel::openEditReviewSheet,
+                        onReportReview = { review ->
+                            reviewToReport = review
+                            showReportReviewDialog = true
+                        }
                     )
                 }
             }
@@ -391,6 +397,25 @@ fun PlaceDetailsScreen(
             isEditing = editing != null
         )
     }
+
+    // Dialog zgłaszania opinii jako spam – analogiczny do ReportPlaceDialog.
+    if (showReportReviewDialog && reviewToReport != null) {
+        ReportReviewDialog(
+            authorName = reviewToReport!!.authorName,
+            onSubmit = { reason, comment ->
+                viewModel.reportReview(reviewToReport!!.id, reason, comment)
+                showReportReviewDialog = false
+                reviewToReport = null
+                scope.launch {
+                    snackbarHostState.showSnackbar("Dziękujemy za zgłoszenie opinii!")
+                }
+            },
+            onDismiss = {
+                showReportReviewDialog = false
+                reviewToReport = null
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -404,7 +429,8 @@ private fun PlaceDetailsContent(
     sortOrder: PlaceDetailsViewModel.ReviewSortOrder,
     onSortOrderChange: (PlaceDetailsViewModel.ReviewSortOrder) -> Unit,
     onAddReview: () -> Unit,
-    onEditReview: (Review) -> Unit
+    onEditReview: (Review) -> Unit,
+    onReportReview: (Review) -> Unit
 ) {
     // Jedna opinia per user per miejsce (MVP). Przycisk "Dodaj opinię" znika,
     // gdy zalogowany user już wystawił ocenę – w jego miejsce daje
@@ -507,6 +533,9 @@ private fun PlaceDetailsContent(
                 isMine = isMine,
                 onEdit = if (isMine) {
                     { onEditReview(review) }
+                } else null,
+                onReport = if (!isMine && currentUserId != null) {
+                    { onReportReview(review) }
                 } else null
             )
         }
@@ -776,7 +805,8 @@ private fun SectionCard(
 private fun ReviewCard(
     review: Review,
     isMine: Boolean = false,
-    onEdit: (() -> Unit)? = null
+    onEdit: (() -> Unit)? = null,
+    onReport: (() -> Unit)? = null
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -828,6 +858,21 @@ private fun ReviewCard(
                                 imageVector = Icons.Filled.Edit,
                                 contentDescription = "Edytuj swoją opinię",
                                 tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    // Flaga zgłoszenia – tylko dla cudzych opinii.
+                    if (onReport != null) {
+                        Spacer(Modifier.width(4.dp))
+                        IconButton(
+                            onClick = onReport,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Flag,
+                                contentDescription = "Zgłoś opinię",
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -1163,6 +1208,94 @@ private fun ReportPlaceDialog(
         confirmButton = {
             Button(onClick = { onSubmit(selectedReason, comment.trim()) }) {
                 Text("Wy\u015Blij zg\u0142oszenie")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Anuluj")
+            }
+        }
+    )
+}
+
+
+
+/**
+ * Dialog zgłaszania opinii – analogiczny do [ReportPlaceDialog], ale
+ * z powodami dostosowanymi do opinii (spam, obraźliwa treść itp.).
+ */
+@Composable
+private fun ReportReviewDialog(
+    authorName: String,
+    onSubmit: (reason: String, comment: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val reasons = listOf(
+        "SPAM" to "Spam / reklama",
+        "OFFENSIVE" to "Obraźliwa treść",
+        "FALSE_INFO" to "Fałszywe informacje",
+        "NOT_RELEVANT" to "Nie dotyczy tego miejsca",
+        "OTHER" to "Inne"
+    )
+    var selectedReason by remember { mutableStateOf(reasons.first().first) }
+    var comment by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Filled.Flag,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+        },
+        title = { Text("Zgłoś opinię") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Zgłaszasz opinię użytkownika ${authorName.ifBlank { "Anonim" }}.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "Wybierz powód zgłoszenia:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                reasons.forEach { (code, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedReason = code }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.material3.RadioButton(
+                            selected = selectedReason == code,
+                            onClick = { selectedReason = code }
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.material3.OutlinedTextField(
+                    value = comment,
+                    onValueChange = { comment = it },
+                    label = { Text("Komentarz (opcjonalny)") },
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSubmit(selectedReason, comment.trim()) }) {
+                Text("Wyślij zgłoszenie")
             }
         },
         dismissButton = {

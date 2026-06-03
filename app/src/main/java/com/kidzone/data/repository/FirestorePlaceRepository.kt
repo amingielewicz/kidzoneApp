@@ -4,6 +4,8 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.toObject
+import com.kidzone.data.local.PlaceDao
+import com.kidzone.data.local.PlaceEntity
 import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.PlaceDto
 import com.kidzone.domain.model.Place
@@ -13,6 +15,9 @@ import com.kidzone.utils.OpResult
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
@@ -34,64 +39,108 @@ private const val WRITE_TIMEOUT_MS = 30_000L
  */
 @Singleton
 class FirestorePlaceRepository @Inject constructor(
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val placeDao: PlaceDao
 ) : PlaceRepository {
 
-    override fun observePlaces(category: PlaceCategory?): Flow<List<Place>> = callbackFlow {
-        // Bazowe zapytanie - opcjonalnie filtrowane po kategorii.
-        val query = if (category != null) {
-            placesCollection().whereEqualTo("category", category.name)
+    override fun observePlaces(category: PlaceCategory?): Flow<List<Place>> = channelFlow {
+        // 1. Room jako local source – emitujemy z niego do kanału.
+        val localFlow = if (category != null) {
+            placeDao.observeByCategory(category.name)
         } else {
-            placesCollection()
+            placeDao.observeAll()
         }
 
-        val registration = query.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                close(error)
-                return@addSnapshotListener
+        // 2. Firestore snapshot listener – aktualizuje Room w tle.
+        val syncJob = launch {
+            val firestoreFlow = callbackFlow {
+                val query = if (category != null) {
+                    placesCollection().whereEqualTo("category", category.name)
+                } else {
+                    placesCollection()
+                }
+
+                val registration = query.addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        close(error)
+                        return@addSnapshotListener
+                    }
+                    val places = snapshot?.documents
+                        ?.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
+                        .orEmpty()
+                    trySend(places)
+                }
+                awaitClose { registration.remove() }
             }
-            val places = snapshot?.documents
-                ?.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
-                .orEmpty()
-            trySend(places)
+            firestoreFlow.collect { places ->
+                placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
+            }
         }
-        awaitClose { registration.remove() }
+
+        // 3. Emituj dane z Room (re-emituje automatycznie po upsert z synca).
+        localFlow.collectLatest { entities ->
+            send(entities.map { it.toDomain() })
+        }
+
+        syncJob.cancel()
     }
 
-    override fun observePlacesByOwner(ownerUserId: String): Flow<List<Place>> = callbackFlow {
+    override fun observePlacesByOwner(ownerUserId: String): Flow<List<Place>> = channelFlow {
         if (ownerUserId.isBlank()) {
-            trySend(emptyList())
-            close()
-            return@callbackFlow
+            send(emptyList())
+            return@channelFlow
         }
-        val registration = placesCollection()
-            .whereEqualTo("ownerUserId", ownerUserId)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                // Sortowanie po stronie klienta – patrz komentarz w
-                // [PlaceRepository.observePlacesByOwner].
-                val places = snapshot?.documents
-                    ?.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
-                    ?.sortedByDescending { it.createdAtMillis }
-                    .orEmpty()
-                trySend(places)
+
+        val localFlow = placeDao.observeByOwner(ownerUserId)
+
+        val syncJob = launch {
+            val firestoreFlow = callbackFlow {
+                val registration = placesCollection()
+                    .whereEqualTo("ownerUserId", ownerUserId)
+                    .addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            close(error)
+                            return@addSnapshotListener
+                        }
+                        val places = snapshot?.documents
+                            ?.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
+                            ?.sortedByDescending { it.createdAtMillis }
+                            .orEmpty()
+                        trySend(places)
+                    }
+                awaitClose { registration.remove() }
             }
-        awaitClose { registration.remove() }
+            firestoreFlow.collect { places ->
+                placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
+            }
+        }
+
+        localFlow.collectLatest { entities ->
+            send(entities.map { it.toDomain() })
+        }
+
+        syncJob.cancel()
     }
 
     override suspend fun getPlace(placeId: String): OpResult<Place> = try {
         val snapshot = placesCollection().document(placeId).get().await()
         val dto = snapshot.toObject<PlaceDto>()
         if (dto != null) {
-            OpResult.success(dto.toDomain())
+            val place = dto.toDomain()
+            // Zaktualizuj cache po udanym pobraniu z sieci.
+            placeDao.upsert(PlaceEntity.fromDomain(place))
+            OpResult.success(place)
         } else {
             OpResult.failure(NoSuchElementException("Brak miejsca o id=$placeId"))
         }
     } catch (e: Exception) {
-        OpResult.failure(e)
+        // Fallback do cache offline przy błędzie sieci.
+        val cached = placeDao.getById(placeId)
+        if (cached != null) {
+            OpResult.success(cached.toDomain())
+        } else {
+            OpResult.failure(e)
+        }
     }
 
     override suspend fun getPlacesNear(
@@ -104,9 +153,17 @@ class FirestorePlaceRepository @Inject constructor(
         return try {
             val snapshot = placesCollection().get().await()
             val places = snapshot.documents.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
+            // Persystuj do cache.
+            placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
             OpResult.success(places)
         } catch (e: Exception) {
-            OpResult.failure(e)
+            // Fallback: zwróć wszystko z cache (klient filtruje po odległości).
+            val cached = placeDao.getTopPlaces(Int.MAX_VALUE)
+            if (cached.isNotEmpty()) {
+                OpResult.success(cached.map { it.toDomain() })
+            } else {
+                OpResult.failure(e)
+            }
         }
     }
 
@@ -117,9 +174,17 @@ class FirestorePlaceRepository @Inject constructor(
             .get()
             .await()
         val places = snapshot.documents.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
+        // Persystuj do cache.
+        placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
         OpResult.success(places)
     } catch (e: Exception) {
-        OpResult.failure(e)
+        // Fallback: top z cache.
+        val cached = placeDao.getTopPlaces(limit)
+        if (cached.isNotEmpty()) {
+            OpResult.success(cached.map { it.toDomain() })
+        } else {
+            OpResult.failure(e)
+        }
     }
 
     override suspend fun addPlace(place: Place): OpResult<Place> = try {
@@ -167,6 +232,8 @@ class FirestorePlaceRepository @Inject constructor(
                 )
             )
         } else {
+            // Persystuj do lokalnego cache.
+            placeDao.upsert(PlaceEntity.fromDomain(placeWithId))
             OpResult.success(placeWithId)
         }
     } catch (e: Exception) {
@@ -194,6 +261,8 @@ class FirestorePlaceRepository @Inject constructor(
                 )
             )
         } else {
+            // Zaktualizuj cache.
+            placeDao.upsert(PlaceEntity.fromDomain(place))
             OpResult.success(place)
         }
     } catch (e: Exception) {
@@ -213,6 +282,8 @@ class FirestorePlaceRepository @Inject constructor(
                 )
             )
         } else {
+            // Usuń z cache.
+            placeDao.deleteById(placeId)
             OpResult.success(Unit)
         }
     } catch (e: Exception) {

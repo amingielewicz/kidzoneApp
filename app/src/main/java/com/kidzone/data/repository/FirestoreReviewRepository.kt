@@ -253,10 +253,40 @@ class FirestoreReviewRepository @Inject constructor(
         OpResult.failure(e)
     }
 
-    override suspend fun reportReviewAsSpam(reviewId: String): OpResult<Unit> {
-        // TODO: reviewsCollection().document(reviewId).update("reportedAsSpam", true)
-        //  + ewentualne przeliczenie averageRating na Place w transakcji.
-        return OpResult.failure(NotImplementedError("reportReviewAsSpam – do uzupełnienia"))
+    override suspend fun reportReviewAsSpam(
+        reviewId: String,
+        reporterId: String,
+        reason: String,
+        comment: String
+    ): OpResult<Unit> = try {
+        require(reviewId.isNotBlank()) { "reviewId nie może być puste" }
+        require(reporterId.isNotBlank()) { "reporterId nie może być puste" }
+
+        val reportData = mapOf(
+            "reviewId" to reviewId,
+            "reporterId" to reporterId,
+            "reason" to reason,
+            "comment" to comment,
+            "createdAtMillis" to System.currentTimeMillis(),
+            "status" to "pending"
+        )
+        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+            firestore.collection(FirestoreCollections.REVIEW_REPORTS)
+                .add(reportData)
+                .await()
+            true
+        }
+        if (completed == null) {
+            OpResult.failure(
+                java.util.concurrent.TimeoutException(
+                    "Wysłanie zgłoszenia trwa zbyt długo. Spróbuj ponownie."
+                )
+            )
+        } else {
+            OpResult.success(Unit)
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
     }
 
     override suspend fun deleteReview(reviewId: String): OpResult<Unit> = try {
