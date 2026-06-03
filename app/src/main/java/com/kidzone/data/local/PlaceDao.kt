@@ -48,6 +48,10 @@ interface PlaceDao {
     @Query("DELETE FROM places WHERE id = :placeId")
     suspend fun deleteById(placeId: String)
 
+    /** Usunięcie wpisów starszych niż podany timestamp (TTL gc). */
+    @Query("DELETE FROM places WHERE cachedAtMillis < :olderThan")
+    suspend fun deleteStale(olderThan: Long)
+
     /** Czyszczenie całego cache (np. po wylogowaniu lub force-refresh). */
     @Query("DELETE FROM places")
     suspend fun clearAll()
