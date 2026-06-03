@@ -415,13 +415,18 @@ class FirestorePlaceRepository @Inject constructor(
         OpResult.failure(e)
     }
 
-    override suspend fun addPhotoUrl(placeId: String, photoUrl: String): OpResult<Unit> = try {
+    override suspend fun addPhotoUrl(placeId: String, photoUrl: String, uploadedByUserId: String): OpResult<Unit> = try {
         require(placeId.isNotBlank()) { "placeId nie może być puste" }
         require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
 
         val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
             placesCollection().document(placeId)
-                .update("photoUrls", com.google.firebase.firestore.FieldValue.arrayUnion(photoUrl))
+                .update(
+                    mapOf(
+                        "photoUrls" to com.google.firebase.firestore.FieldValue.arrayUnion(photoUrl),
+                        "photoUploadedBy.$photoUrl" to uploadedByUserId
+                    )
+                )
                 .await()
             true
         }

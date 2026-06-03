@@ -396,11 +396,17 @@ class PlaceDetailsViewModel @Inject constructor(
         comment: String,
         photoUris: List<android.net.Uri>
     ) {
-        // Upload zdjęć opinii (jeśli są)
+        // Upload zdjęć opinii (jeśli są) – z dedup wśród nowych
         val uploadedPhotoUrls = mutableListOf<String>()
+        val newHashes = mutableSetOf<String>()
         for (uri in photoUris) {
             val bytes = ImageCompressor.compressToWebp(appContext, uri)
             if (bytes != null) {
+                val hash = java.security.MessageDigest.getInstance("MD5")
+                    .digest(bytes)
+                    .joinToString("") { "%02x".format(it) }
+                if (hash in newHashes) continue // duplikat wśród nowych
+                newHashes.add(hash)
                 try {
                     val url = photoUploader.uploadReviewPhoto("pending_${System.currentTimeMillis()}", bytes)
                     uploadedPhotoUrls.add(url)
@@ -462,11 +468,33 @@ class PlaceDetailsViewModel @Inject constructor(
         photoUris: List<android.net.Uri>,
         retainedPhotoUrls: List<String>
     ) {
-        // Upload new photos (if any)
+        // Seed hashów z istniejących retained zdjęć (do dedup)
+        val existingHashes = mutableSetOf<String>()
+        for (url in retainedPhotoUrls) {
+            try {
+                val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val conn = java.net.URL(url).openConnection()
+                    conn.connectTimeout = 10_000
+                    conn.readTimeout = 10_000
+                    conn.getInputStream().readBytes()
+                }
+                val hash = java.security.MessageDigest.getInstance("MD5")
+                    .digest(bytes)
+                    .joinToString("") { "%02x".format(it) }
+                existingHashes.add(hash)
+            } catch (_: Exception) { /* best-effort */ }
+        }
+
+        // Upload new photos (if any) – z dedup check
         val newUploadedUrls = mutableListOf<String>()
         for (uri in photoUris) {
             val bytes = ImageCompressor.compressToWebp(appContext, uri)
             if (bytes != null) {
+                val hash = java.security.MessageDigest.getInstance("MD5")
+                    .digest(bytes)
+                    .joinToString("") { "%02x".format(it) }
+                if (hash in existingHashes) continue // duplikat – skip
+                existingHashes.add(hash)
                 try {
                     val url = photoUploader.uploadReviewPhoto(existing.id, bytes)
                     newUploadedUrls.add(url)
@@ -598,11 +626,14 @@ class PlaceDetailsViewModel @Inject constructor(
 
             try {
                 val url = photoUploader.uploadPlacePhoto(place.id, newBytes)
-                placeRepository.addPhotoUrl(place.id, url)
+                placeRepository.addPhotoUrl(place.id, url, user.id)
                 placePhotoHashes.add(newHash)
                 _uiState.update {
                     it.copy(
-                        place = place.copy(photoUrls = place.photoUrls + url),
+                        place = place.copy(
+                            photoUrls = place.photoUrls + url,
+                            photoUploadedBy = place.photoUploadedBy + (url to user.id)
+                        ),
                         isUploadingPlacePhoto = false
                     )
                 }

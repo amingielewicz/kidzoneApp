@@ -197,6 +197,8 @@ class AddPlaceViewModel @Inject constructor(
                             errorMessage = null
                         )
                     }
+                    // Seed hash set z istniejących zdjęć dla dedup detection
+                    seedPhotoHashes(result.data.photoUrls)
                 }
                 is OpResult.Failure -> {
                     _uiState.update {
@@ -364,6 +366,29 @@ class AddPlaceViewModel @Inject constructor(
 
     // --- Zarządzanie zdjęciami ---
 
+    /** Zbiór hashów (MD5 skompresowanych bajtów) istniejących zdjęć. */
+    private val photoContentHashes = mutableSetOf<String>()
+
+    /** Seeduje hash set z remote URLs (background IO). */
+    private fun seedPhotoHashes(urls: List<String>) {
+        viewModelScope.launch {
+            for (url in urls) {
+                try {
+                    val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        val conn = java.net.URL(url).openConnection()
+                        conn.connectTimeout = 10_000
+                        conn.readTimeout = 10_000
+                        conn.getInputStream().readBytes()
+                    }
+                    val hash = java.security.MessageDigest.getInstance("MD5")
+                        .digest(bytes)
+                        .joinToString("") { "%02x".format(it) }
+                    photoContentHashes.add(hash)
+                } catch (_: Exception) { /* best-effort */ }
+            }
+        }
+    }
+
     /** Dodaje zdjęcia z photo pickera (respektuje limit MAX_PLACE_PHOTOS). */
     fun addPhotos(uris: List<Uri>) {
         _uiState.update { state ->
@@ -412,17 +437,25 @@ class AddPlaceViewModel @Inject constructor(
                 return@launch
             }
 
-            // Upload nowych zdjęć (kompresja + Firebase Storage)
+            // Upload nowych zdjęć (kompresja + Firebase Storage + dedup)
             val uploadedUrls = mutableListOf<String>()
+            var duplicatesSkipped = 0
             if (state.photoUris.isNotEmpty()) {
                 _uiState.update { it.copy(isUploadingPhotos = true) }
                 for (uri in state.photoUris) {
                     val bytes = ImageCompressor.compressToWebp(appContext, uri)
                     if (bytes != null) {
+                        // Dedup check na bazie hash skompresowanych bajtów
+                        val hash = java.security.MessageDigest.getInstance("MD5")
+                            .digest(bytes)
+                            .joinToString("") { "%02x".format(it) }
+                        if (hash in photoContentHashes) {
+                            duplicatesSkipped++
+                            continue
+                        }
+                        photoContentHashes.add(hash)
+
                         try {
-                            // Używamy tymczasowego ID "pending" dla nowych miejsc;
-                            // po uzyskaniu prawdziwego ID z Firestore pliki już są
-                            // uploadowane – URL jest stały niezależnie od folder path.
                             val tempId = state.editingPlaceId ?: "pending_${System.currentTimeMillis()}"
                             val url = photoUploader.uploadPlacePhoto(tempId, bytes)
                             uploadedUrls.add(url)

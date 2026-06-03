@@ -92,8 +92,7 @@ interface PlaceRepository {
 
     /**
      * Dodaje URL zdjęcia do listy `photoUrls` na dokumencie miejsca.
-     * Używane gdy dowolny zalogowany user dodaje zdjęcie do miejsca
-     * (nie tylko właściciel).
+     * Zapisuje też kto dodał zdjęcie w `photoUploadedBy`.
      */
-    suspend fun addPhotoUrl(placeId: String, photoUrl: String): OpResult<Unit>
+    suspend fun addPhotoUrl(placeId: String, photoUrl: String, uploadedByUserId: String): OpResult<Unit>
 }

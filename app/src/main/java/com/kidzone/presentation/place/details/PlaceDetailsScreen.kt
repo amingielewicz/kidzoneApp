@@ -128,6 +128,7 @@ fun PlaceDetailsScreen(
     var fullscreenPhotos by remember { mutableStateOf<List<String>>(emptyList()) }
     var fullscreenPhotoIndex by remember { mutableStateOf(0) }
     var fullscreenPhotosAreMine by remember { mutableStateOf(false) }
+    var fullscreenPhotoUploadedBy by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var showReportPhotoDialog by remember { mutableStateOf(false) }
     var photoUrlToReport by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -345,6 +346,7 @@ fun PlaceDetailsScreen(
                             fullscreenPhotos = photos
                             fullscreenPhotoIndex = index
                             fullscreenPhotosAreMine = areMine
+                            fullscreenPhotoUploadedBy = state.place?.photoUploadedBy.orEmpty()
                         },
                         onAddPlacePhoto = if (currentUser != null) {
                             {
@@ -461,13 +463,23 @@ fun PlaceDetailsScreen(
 
     // Fullscreen photo viewer
     if (fullscreenPhotos.isNotEmpty()) {
+        val myUserId = currentUser?.id
         com.kidzone.presentation.common.FullscreenPhotoViewer(
             photoUrls = fullscreenPhotos,
             initialIndex = fullscreenPhotoIndex,
             onDismiss = { fullscreenPhotos = emptyList() },
             onReportPhoto = if (fullscreenPhotosAreMine) null else { url ->
-                photoUrlToReport = url
-                showReportPhotoDialog = true
+                // Blokuj zgłoszenie własnego zdjęcia (sprawdź po photoUploadedBy)
+                val uploaderId = fullscreenPhotoUploadedBy[url]
+                if (uploaderId != null && uploaderId == myUserId) {
+                    // Nie otwieraj dialogu – to moje zdjęcie
+                    scope.launch {
+                        snackbarHostState.showSnackbar("Nie możesz zgłosić zdjęcia dodanego przez Ciebie")
+                    }
+                } else {
+                    photoUrlToReport = url
+                    showReportPhotoDialog = true
+                }
             }
         )
     }
