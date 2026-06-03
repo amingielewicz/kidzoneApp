@@ -83,9 +83,17 @@ class FirebaseAuthRepository @Inject constructor(
             val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
             val firebaseUser = result.user
                 ?: throw IllegalStateException("Logowanie się powiodło, ale Firebase nie zwrócił użytkownika")
-            // Self-heal: jeśli ten user nie ma jeszcze doca w `users` (np. konto
-            // utworzone zanim ten kod istniał, albo rejestracja zakończyła się
-            // częściowym błędem), dotworzymy go teraz na podstawie FirebaseUser.
+
+            // Blokada logowania bez potwierdzonego emaila.
+            // Google Sign-In jest zwolniony (email zweryfikowany z natury).
+            if (!firebaseUser.isEmailVerified) {
+                // Wyślij ponownie link weryfikacyjny (na wypadek gdyby stary wygasł)
+                runCatching { firebaseUser.sendEmailVerification().await() }
+                // Wyloguj – nie pozwól na dostęp do apki
+                firebaseAuth.signOut()
+                throw AuthException.EmailNotVerified
+            }
+
             ensureUserDoc(firebaseUser)
             firebaseUser.toDomain()
         }
