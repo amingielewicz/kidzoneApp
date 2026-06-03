@@ -38,14 +38,17 @@ import coil.compose.AsyncImage
  * @param photoUrls lista URL-i zdjęć do pokazania
  * @param initialIndex indeks zdjęcia od którego zaczynamy
  * @param onDismiss callback zamknięcia viewera
- * @param onReportPhoto opcjonalny callback zgłoszenia zdjęcia (index -> URL)
+ * @param onReportPhoto opcjonalny callback zgłoszenia zdjęcia (URL)
+ * @param canReportPhoto per-URL check czy flaga zgłoszenia jest widoczna
+ *   (np. ukryta dla zdjęć dodanych przez bieżącego usera)
  */
 @Composable
 fun FullscreenPhotoViewer(
     photoUrls: List<String>,
     initialIndex: Int = 0,
     onDismiss: () -> Unit,
-    onReportPhoto: ((photoUrl: String) -> Unit)? = null
+    onReportPhoto: ((photoUrl: String) -> Unit)? = null,
+    canReportPhoto: (photoUrl: String) -> Boolean = { true }
 ) {
     if (photoUrls.isEmpty()) {
         onDismiss()
@@ -96,8 +99,8 @@ fun FullscreenPhotoViewer(
                 )
             }
 
-            // Report button (top-right) - only if callback provided
-            if (onReportPhoto != null) {
+            // Report button (top-right) - only if callback provided AND photo is reportable
+            if (onReportPhoto != null && canReportPhoto(photoUrls[pagerState.currentPage])) {
                 FilledTonalIconButton(
                     onClick = {
                         val currentUrl = photoUrls[pagerState.currentPage]

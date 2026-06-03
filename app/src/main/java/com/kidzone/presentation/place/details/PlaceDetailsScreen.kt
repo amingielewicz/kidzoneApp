@@ -469,17 +469,13 @@ fun PlaceDetailsScreen(
             initialIndex = fullscreenPhotoIndex,
             onDismiss = { fullscreenPhotos = emptyList() },
             onReportPhoto = if (fullscreenPhotosAreMine) null else { url ->
-                // Blokuj zgłoszenie własnego zdjęcia (sprawdź po photoUploadedBy)
+                photoUrlToReport = url
+                showReportPhotoDialog = true
+            },
+            canReportPhoto = { url ->
+                // Ukryj flagę na zdjęciach dodanych przez bieżącego usera
                 val uploaderId = fullscreenPhotoUploadedBy[url]
-                if (uploaderId != null && uploaderId == myUserId) {
-                    // Nie otwieraj dialogu – to moje zdjęcie
-                    scope.launch {
-                        snackbarHostState.showSnackbar("Nie możesz zgłosić zdjęcia dodanego przez Ciebie")
-                    }
-                } else {
-                    photoUrlToReport = url
-                    showReportPhotoDialog = true
-                }
+                uploaderId == null || uploaderId != myUserId
             }
         )
     }
