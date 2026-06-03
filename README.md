@@ -495,6 +495,13 @@ przy pierwszym wejściu, `AddPlaceScreen` przy kliknięciu "Pobierz lokalizację
 | Pull-to-refresh na Home/List/Profile/Ranking         | ✅     |
 | Cloud Functions: email admin po zgłoszeniu opinii    | ✅     |
 | Cloud Functions: email powitalny + email przy usunięciu konta | ✅ |
+| Google Play In-App Update (auto-aktualizacja)        | ✅     |
+| Themed icon jako VectorDrawable (Android 13+)        | ✅     |
+| Room cache TTL (7 dni, auto-cleanup)                 | ✅     |
+| Dark mode refinement (pełna paleta Material3)        | ✅     |
+| Infinite scroll / paginacja listy miejsc (20/stronę) | ✅     |
+| Geohash-based geo queries (`getPlacesNear`)          | ✅     |
+| Deep linking (`kidzone://place/{id}`, `https://kidzone.app/place/{id}`) | ✅ |
 | Upload zdjęć miejsc / opinii do Storage              | ⏳ — Storage dep wpięte, brak UI |
 
 ## Cloud Functions (backend)
@@ -527,17 +534,25 @@ Deploy: `cd functions && npm run build && cd .. && firebase deploy --only functi
    w `AddPlaceScreen` i `AddReviewSheet`. Wykorzystać `READ_MEDIA_IMAGES`
    i `CAMERA`, które już są w manifeście. User może dodać zdjęcie do
    cudzego miejsca (zapamiętane do implementacji).
-2. **Geo zapytania** — `getPlacesNear` w repo nadal pobiera wszystkie
-   miejsca i sortuje klient-side haversinem; przy rosnącej bazie
-   przepisać na geohash / GeoFirestore.
+2. **Landing page dla deep linków** — postawić stronę na Firebase Hosting
+   (lub GitHub Pages) pod adresem `kidzone.app/place/{id}`:
+   - User z apką → otwiera w kidZone
+   - User bez apki → widzi przycisk "Pobierz z Google Play"
+   - Hostowanie `assetlinks.json` do App Links (HTTPS bez dialogu "Otwórz za pomocą...")
 3. **Panel admina do akceptacji zmian** — propozycje zmian i korekty
    lokalizacji trafiają do `place_change_requests`, ale akceptacja
    wymaga ręcznej edycji w Firebase Console. Docelowo: prosty panel
    webowy lub Cloud Function z auto-akceptacją po N zgodnych zgłoszeniach.
-4. **Themed icon (vector)** — obecny `ic_launcher_monochrome` jest PNG-iem;
-   docelowo lepiej mieć wersję wektorową single-path.
-5. **Usuwanie starych wpisów z Room cache** — brak TTL / polityki
-   wygaszania; stale entries czyszczą się przy najbliższym sync
-   z Firestore, ale przy dużej bazie warto dodać periodyczny gc.
-6. Opcjonalnie: deep linking, push notifications, refinement dark mode,
-   paginacja listy miejsc.
+4. **Backfill geohash na istniejących miejscach** — nowe miejsca dostają
+   `geohash` automatycznie, ale stare (sprzed PR #46) nie mają tego pola.
+   Jednorazowy skrypt / Cloud Function który przechodzi po kolekcji `places`
+   i ustawia `geohash = GeoHash.encode(lat, lng)`.
+5. **Push notifications (FCM)** — "Ktoś dodał opinię do Twojego miejsca",
+   "Twoje miejsce weszło do TOP 10" itp. Wymaga: firebase-messaging dep,
+   token registration, Cloud Function trigger.
+6. **Subskrypcja (Google Play Billing)** — 14-day free trial + miesięczna
+   opłata. Google Play Billing Library, paywall screen, weryfikacja statusu.
+7. **Zmiana "Udostępnij" na link kidZone** — zamiast Google Maps URL dawać
+   `https://kidzone.app/place/{id}` (wymaga punktu 2. landing page).
+8. Opcjonalnie: server-side paginacja (gdy baza >1000 miejsc),
+   zdjęcia miejsc/opinii, paginacja rankingu.
