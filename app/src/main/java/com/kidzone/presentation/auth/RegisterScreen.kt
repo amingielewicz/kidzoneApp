@@ -57,6 +57,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -94,7 +95,8 @@ fun RegisterScreen(
     val networkStatus by rememberNetworkStatus()
 
     LaunchedEffect(state.isRegistered) {
-        if (state.isRegistered) onRegisterSuccess()
+        // Nie nawigujemy od razu – pokazujemy komunikat o weryfikacji emaila.
+        // User musi sam kliknąć "Przejdź do logowania" po przeczytaniu.
     }
 
     val backgroundBrush = Brush.verticalGradient(
@@ -292,6 +294,51 @@ fun RegisterScreen(
                             ErrorMessageBanner(text = msg)
                         }
 
+                        // Po rejestracji: komunikat o weryfikacji emaila
+                        if (state.isRegistered) {
+                            Spacer(Modifier.height(16.dp))
+                            androidx.compose.material3.Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Email,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                    Spacer(Modifier.height(12.dp))
+                                    Text(
+                                        text = "Konto utworzone!",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        text = "Wysłaliśmy link weryfikacyjny na podany adres e-mail. " +
+                                            "Kliknij link w wiadomości, aby potwierdzić konto i móc się zalogować.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        textAlign = TextAlign.Center,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    Spacer(Modifier.height(16.dp))
+                                    Button(
+                                        onClick = onRegisterSuccess,
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Przejdź do logowania")
+                                    }
+                                }
+                            }
+                        }
+
+                        if (!state.isRegistered) {
                         Spacer(Modifier.height(20.dp))
                         Button(
                             onClick = viewModel::register,
@@ -313,6 +360,7 @@ fun RegisterScreen(
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
+                        }
                         }
                     }
                 }

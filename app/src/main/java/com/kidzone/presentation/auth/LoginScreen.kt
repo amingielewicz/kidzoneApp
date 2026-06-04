@@ -281,6 +281,18 @@ fun LoginScreen(
                             )
                         }
 
+                        // Przycisk "Wyślij ponownie" link weryfikacyjny
+                        if (state.showResendVerification) {
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = viewModel::resendVerificationEmail,
+                                enabled = !state.isLoading,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Wyślij ponownie link weryfikacyjny")
+                            }
+                        }
+
                         Spacer(Modifier.height(16.dp))
 
                         Button(

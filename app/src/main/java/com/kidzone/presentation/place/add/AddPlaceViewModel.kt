@@ -118,7 +118,6 @@ class AddPlaceViewModel @Inject constructor(
         /** Wszystkie wymagane pola wypełnione – można kliknąć "Zapisz". */
         val isFormValid: Boolean
             get() = name.trim().isNotBlank() &&
-                address.trim().isNotBlank() &&
                 latitude != null && longitude != null
     }
 

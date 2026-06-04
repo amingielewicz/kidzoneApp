@@ -36,6 +36,10 @@ sealed class AuthException(message: String) : Exception(message) {
     /** Niepoprawny format adresu e-mail. */
     data object InvalidEmail : AuthException("Niepoprawny format adresu e-mail")
 
+    /** Adres e-mail nie został potwierdzony (link weryfikacyjny nie kliknięty). */
+    data object EmailNotVerified :
+        AuthException("Potwierdź swój adres e-mail. Sprawdź skrzynkę pocztową.")
+
     /** Brak Internetu, timeout, błąd po stronie Firebase. */
     data class Network(val networkCause: Throwable) :
         AuthException(networkCause.message ?: "Błąd połączenia z serwerem")
