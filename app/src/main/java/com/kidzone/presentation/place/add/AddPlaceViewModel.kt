@@ -502,6 +502,12 @@ class AddPlaceViewModel @Inject constructor(
             // Łączymy istniejące URL-e (edycja) + nowo uploadowane
             val allPhotoUrls = state.existingPhotoUrls + uploadedUrls
 
+            // Budujemy mapę photoUploadedBy: zachowujemy istniejącą (edycja)
+            // + dodajemy nowo-uploadowane URL-e z bieżącym userId
+            val existingUploadedBy = editingOriginal?.photoUploadedBy.orEmpty()
+            val newUploadedBy = uploadedUrls.associateWith { currentUser.id }
+            val allPhotoUploadedBy = existingUploadedBy + newUploadedBy
+
             val result = if (state.isEditMode && editingOriginal != null) {
                 val original = editingOriginal!!
                 val updated = original.copy(
@@ -512,7 +518,8 @@ class AddPlaceViewModel @Inject constructor(
                     latitude = state.latitude!!,
                     longitude = state.longitude!!,
                     amenities = state.amenities,
-                    photoUrls = allPhotoUrls
+                    photoUrls = allPhotoUrls,
+                    photoUploadedBy = allPhotoUploadedBy
                 )
                 placeRepository.updatePlace(updated)
             } else {
@@ -527,6 +534,7 @@ class AddPlaceViewModel @Inject constructor(
                     address = TextNormalization.toTitleCase(state.address),
                     amenities = state.amenities,
                     photoUrls = allPhotoUrls,
+                    photoUploadedBy = allPhotoUploadedBy,
                     createdAtMillis = System.currentTimeMillis()
                 )
                 placeRepository.addPlace(newPlace)
