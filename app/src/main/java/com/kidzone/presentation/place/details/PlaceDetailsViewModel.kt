@@ -118,7 +118,8 @@ class PlaceDetailsViewModel @Inject constructor(
         val reviewActionEvent: ReviewActionEvent? = null,
         val topRank: Int? = null,
         val isUploadingPlacePhoto: Boolean = false,
-        val placePhotoDuplicateEvent: Boolean = false
+        val placePhotoDuplicateEvent: Boolean = false,
+        val reviewPhotoDuplicateEvent: Boolean = false
     )
 
     /**
@@ -509,11 +510,13 @@ class PlaceDetailsViewModel @Inject constructor(
         // Jeśli WSZYSTKIE nowe zdjęcia to duplikaty – pokaż błąd i nie zapisuj
         if (reviewDuplicatesSkipped > 0 && newUploadedUrls.isEmpty() && photoUris.isNotEmpty()
             && rating == existing.rating && comment.trim() == existing.comment) {
-            // Nic się nie zmieniło (ani tekst, ani zdjęcia) – pokaż komunikat
+            // Nic się nie zmieniło (ani tekst, ani zdjęcia) – pokaż snackbar
             _uiState.update {
                 it.copy(
                     isAddingReview = false,
-                    addReviewError = "To zdjęcie zostało już dodane. Nie można dodać duplikatu."
+                    showAddReviewSheet = false,
+                    editingReview = null,
+                    reviewPhotoDuplicateEvent = true
                 )
             }
             return
@@ -614,6 +617,10 @@ class PlaceDetailsViewModel @Inject constructor(
 
     fun consumePlacePhotoDuplicateEvent() {
         _uiState.update { it.copy(placePhotoDuplicateEvent = false) }
+    }
+
+    fun consumeReviewPhotoDuplicateEvent() {
+        _uiState.update { it.copy(reviewPhotoDuplicateEvent = false) }
     }
 
     fun addPhotoToPlace(photoUri: android.net.Uri) {

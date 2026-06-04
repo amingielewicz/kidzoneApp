@@ -179,6 +179,14 @@ fun PlaceDetailsScreen(
         }
     }
 
+    // Snackbar: duplikat zdjęcia w edycji opinii
+    LaunchedEffect(state.reviewPhotoDuplicateEvent) {
+        if (state.reviewPhotoDuplicateEvent) {
+            snackbarHostState.showSnackbar("To zdjęcie zostało już dodane. Nie można dodać duplikatu.")
+            viewModel.consumeReviewPhotoDuplicateEvent()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
