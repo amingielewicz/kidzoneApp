@@ -378,4 +378,68 @@ class FirestorePlaceRepository @Inject constructor(
     }
 
     private fun placesCollection() = firestore.collection(FirestoreCollections.PLACES)
+
+    override suspend fun reportPhoto(
+        photoUrl: String,
+        reporterId: String,
+        reason: String,
+        comment: String
+    ): OpResult<Unit> = try {
+        require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
+        require(reporterId.isNotBlank()) { "reporterId nie może być puste" }
+
+        val reportData = mapOf(
+            "photoUrl" to photoUrl,
+            "reporterId" to reporterId,
+            "reason" to reason,
+            "comment" to comment,
+            "createdAtMillis" to System.currentTimeMillis(),
+            "status" to "pending"
+        )
+        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+            firestore.collection(FirestoreCollections.PHOTO_REPORTS)
+                .add(reportData)
+                .await()
+            true
+        }
+        if (completed == null) {
+            OpResult.failure(
+                java.util.concurrent.TimeoutException(
+                    "Wysłanie zgłoszenia trwa zbyt długo. Spróbuj ponownie."
+                )
+            )
+        } else {
+            OpResult.success(Unit)
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
+    override suspend fun addPhotoUrl(placeId: String, photoUrl: String, uploadedByUserId: String): OpResult<Unit> = try {
+        require(placeId.isNotBlank()) { "placeId nie może być puste" }
+        require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
+
+        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+            placesCollection().document(placeId)
+                .update(
+                    mapOf(
+                        "photoUrls" to com.google.firebase.firestore.FieldValue.arrayUnion(photoUrl),
+                        "photoUploadedBy.$photoUrl" to uploadedByUserId
+                    )
+                )
+                .await()
+            true
+        }
+        if (completed == null) {
+            OpResult.failure(
+                java.util.concurrent.TimeoutException(
+                    "Dodawanie zdjęcia trwa zbyt długo. Spróbuj ponownie."
+                )
+            )
+        } else {
+            OpResult.success(Unit)
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
 }

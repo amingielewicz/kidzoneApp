@@ -1,9 +1,15 @@
 package com.kidzone.presentation.place.add
 
 import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import java.io.File
+import java.security.MessageDigest
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +34,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
@@ -42,9 +49,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -95,12 +103,22 @@ fun AddPlaceScreen(
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     // Po pomyślnym zapisie – wracamy poziom wyżej. W trybie create
     // dodatkowo przekazujemy współrzędne nowego pinu, żeby Main mógł
     // wycentrować na nim mapę.
     LaunchedEffect(state.isSaved) {
         if (state.isSaved) onSaved(state.savedNewLatitude, state.savedNewLongitude)
+    }
+
+    // Komunikat o duplikatach zdjęć
+    LaunchedEffect(state.photoDuplicateMessage) {
+        val msg = state.photoDuplicateMessage
+        if (msg != null) {
+            snackbarHostState.showSnackbar(msg)
+            viewModel.consumePhotoDuplicateMessage()
+        }
     }
 
     // Launcher prośby o uprawnienie lokalizacji.
@@ -115,11 +133,89 @@ fun AddPlaceScreen(
     }
 
     // Photo picker – max 5 zdjęć jednocześnie.
+    var photoHashSet by remember { mutableStateOf(setOf<String>()) }
+    var placeHashesReady by remember { mutableStateOf(!state.isEditMode) }
+
+    // Seeduj hashe z istniejących remote URLs przy edycji miejsca
+    androidx.compose.runtime.LaunchedEffect(state.existingPhotoUrls) {
+        if (state.existingPhotoUrls.isNotEmpty() && photoHashSet.isEmpty()) {
+            val hashes = mutableSetOf<String>()
+            for (url in state.existingPhotoUrls) {
+                val hash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    computeRemotePlacePhotoHash(url)
+                }
+                if (hash != null) hashes.add(hash)
+            }
+            if (hashes.isNotEmpty()) {
+                photoHashSet = photoHashSet + hashes
+            }
+        }
+        placeHashesReady = true
+    }
+
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(MAX_PLACE_PHOTOS)
     ) { uris ->
         if (uris.isNotEmpty()) {
-            viewModel.addPhotos(uris)
+            // Deduplikacja na bazie content hash
+            val accepted = mutableListOf<Uri>()
+            val hashes = photoHashSet.toMutableSet()
+            var duplicatesFound = 0
+            for (uri in uris) {
+                val hash = computePlacePhotoHash(context, uri)
+                if (hash != null && hash in hashes) {
+                    duplicatesFound++
+                    continue
+                }
+                if (hash != null) hashes.add(hash)
+                accepted.add(uri)
+            }
+            photoHashSet = hashes
+            if (accepted.isNotEmpty()) {
+                viewModel.addPhotos(accepted)
+            }
+            if (duplicatesFound > 0) {
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("To zdjęcie zostało już dodane. Nie można dodać duplikatu.")
+                }
+            }
+        }
+    }
+
+    // Camera launcher
+    val placeCameraUri = remember { mutableStateOf<Uri?>(null) }
+    val placeCameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && placeCameraUri.value != null) {
+            val uri = placeCameraUri.value!!
+            val hash = computePlacePhotoHash(context, uri)
+            if (hash == null || hash !in photoHashSet) {
+                if (hash != null) photoHashSet = photoHashSet + hash
+                viewModel.addPhotos(listOf(uri))
+            } else {
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("To zdjęcie zostało już dodane. Nie można dodać duplikatu.")
+                }
+            }
+        }
+    }
+
+    fun launchPlaceCamera() {
+        val uri = createPlaceCameraUri(context)
+        placeCameraUri.value = uri
+        placeCameraLauncher.launch(uri)
+    }
+
+    val placeCameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            launchPlaceCamera()
+        } else {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Brak dostępu do aparatu")
+            }
         }
     }
 
@@ -138,7 +234,8 @@ fun AddPlaceScreen(
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -325,18 +422,43 @@ fun AddPlaceScreen(
                 Spacer(Modifier.height(8.dp))
             }
 
-            // Przycisk dodawania zdjęć
+            // Przyciski Galeria + Aparat
             if (state.canAddMorePhotos) {
-                OutlinedButton(
-                    onClick = { photoPickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    ) },
-                    enabled = !state.isSaving,
-                    modifier = Modifier.fillMaxWidth()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Filled.AddAPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Dodaj zdjęcia")
+                    OutlinedButton(
+                        onClick = {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        enabled = !state.isSaving && placeHashesReady,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.AddAPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Galeria")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            val hasPerm = ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.CAMERA
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (hasPerm) {
+                                launchPlaceCamera()
+                            } else {
+                                placeCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
+                        },
+                        enabled = !state.isSaving && placeHashesReady,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Aparat")
+                    }
                 }
             }
 
@@ -712,5 +834,66 @@ private fun PhotoThumbnail(
                 )
             }
         }
+    }
+}
+
+
+/**
+ * Oblicza MD5 hash zawartości URI do detekcji duplikatów zdjęć.
+ */
+private fun computePlacePhotoHash(context: android.content.Context, uri: Uri): String? {
+    return try {
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+        val md = MessageDigest.getInstance("MD5")
+        val buffer = ByteArray(8192)
+        var bytesRead: Int
+        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+            md.update(buffer, 0, bytesRead)
+        }
+        inputStream.close()
+        md.digest().joinToString("") { "%02x".format(it) }
+    } catch (_: Exception) {
+        null
+    }
+}
+
+/**
+ * Tworzy tymczasowy plik dla zdjęcia z aparatu i zwraca content URI.
+ */
+private fun createPlaceCameraUri(context: android.content.Context): Uri {
+    val photoFile = File.createTempFile(
+        "place_camera_",
+        ".jpg",
+        context.cacheDir
+    )
+    return FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        photoFile
+    )
+}
+
+
+/**
+ * Pobiera zdjęcie z remote URL i oblicza MD5 hash.
+ * Używane do seedowania hashów istniejących zdjęć przy edycji miejsca.
+ * Wywołuj na Dispatchers.IO.
+ */
+private fun computeRemotePlacePhotoHash(url: String): String? {
+    return try {
+        val connection = java.net.URL(url).openConnection()
+        connection.connectTimeout = 10_000
+        connection.readTimeout = 10_000
+        val inputStream = connection.getInputStream()
+        val md = MessageDigest.getInstance("MD5")
+        val buffer = ByteArray(8192)
+        var bytesRead: Int
+        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+            md.update(buffer, 0, bytesRead)
+        }
+        inputStream.close()
+        md.digest().joinToString("") { "%02x".format(it) }
+    } catch (_: Exception) {
+        null
     }
 }
