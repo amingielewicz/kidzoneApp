@@ -83,7 +83,9 @@ class HomeViewModel @Inject constructor(
         val isNearbyLoading: Boolean = false,
         val isRefreshing: Boolean = false,
         val locationGranted: Boolean = false,
-        val errorMessage: String? = null
+        val errorMessage: String? = null,
+        /** true gdy GPS jest włączony ale lokalizacja jeszcze nie ustalona (trwa retry). */
+        val isAcquiringLocation: Boolean = false
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -194,7 +196,8 @@ class HomeViewModel @Inject constructor(
                 it.copy(
                     locationGranted = false,
                     isTopLoading = false,
-                    isNearbyLoading = false
+                    isNearbyLoading = false,
+                    isAcquiringLocation = false
                 )
             }
             return
@@ -204,12 +207,20 @@ class HomeViewModel @Inject constructor(
                 it.copy(isTopLoading = true, isNearbyLoading = true, errorMessage = null)
             }
 
-            // fetchCurrentLocation może rzucić jeżeli FusedLocation explosion
-            // (np. niezainicjalizowane Play Services), ale zwykle zwraca null
-            // przy timeoucie / braku fixu (zob. LocationHelper.fetchCurrentLocation).
-            // Łapiemy żeby UI nie pełzł crashem; przy null/błędzie czyścimy obie
-            // sekcje zależne od lokalizacji i pokazujemy delikatny komunikat.
-            val location = runCatching { fetchCurrentLocation(appContext) }.getOrNull()
+            // Retry up to 3 times when GPS fix fails (weak signal, cold start).
+            // Between retries, show "Ustalanie lokalizacji…" banner.
+            var location: Pair<Double, Double>? = null
+            val maxRetries = 3
+            for (attempt in 1..maxRetries) {
+                location = runCatching { fetchCurrentLocation(appContext) }.getOrNull()
+                if (location != null) break
+                if (attempt < maxRetries) {
+                    _uiState.update { it.copy(isAcquiringLocation = true) }
+                    kotlinx.coroutines.delay(3_000L)
+                }
+            }
+            _uiState.update { it.copy(isAcquiringLocation = false) }
+
             if (location == null) {
                 _uiState.update {
                     it.copy(

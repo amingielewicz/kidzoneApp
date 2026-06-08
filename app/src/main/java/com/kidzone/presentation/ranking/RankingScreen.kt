@@ -75,6 +75,19 @@ fun RankingScreen(
     viewModel: RankingViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+
+    // Auto-refresh po przywróceniu internetu
+    val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
+    var previousNetworkStatus by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(networkStatus) }
+    androidx.compose.runtime.LaunchedEffect(networkStatus) {
+        if (previousNetworkStatus == com.kidzone.presentation.common.NetworkStatus.UNAVAILABLE
+            && networkStatus == com.kidzone.presentation.common.NetworkStatus.AVAILABLE
+        ) {
+            viewModel.refresh()
+        }
+        previousNetworkStatus = networkStatus
+    }
+
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
 
     // Auto-refresh przy każdym wejściu na zakładkę (ON_RESUME)
