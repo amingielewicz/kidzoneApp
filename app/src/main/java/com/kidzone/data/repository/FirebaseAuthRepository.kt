@@ -186,6 +186,8 @@ class FirebaseAuthRepository @Inject constructor(
     }
 
     override suspend fun signOut() {
+        // Usuń FCM token z Firestore przed wylogowaniem
+        com.kidzone.messaging.KidZoneMessagingService.unregisterToken()
         firebaseAuth.signOut()
     }
 

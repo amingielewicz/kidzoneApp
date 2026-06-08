@@ -120,6 +120,7 @@ dependencies {
     implementation(libs.firebase.auth.ktx)
     implementation(libs.firebase.firestore.ktx)
     implementation(libs.firebase.storage.ktx)
+    implementation(libs.firebase.messaging)
 
     // Credential Manager (Google Sign-In przez nowoczesne API)
     implementation(libs.androidx.credentials)

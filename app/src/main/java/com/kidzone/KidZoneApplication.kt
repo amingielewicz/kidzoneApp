@@ -36,6 +36,8 @@ class KidZoneApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         cleanStaleCache()
+        // Zarejestruj FCM token jeśli user jest zalogowany
+        com.kidzone.messaging.KidZoneMessagingService.registerCurrentToken(this)
     }
 
     private fun cleanStaleCache() {
