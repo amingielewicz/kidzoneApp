@@ -833,7 +833,7 @@ private fun SettingsCard(
         }
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "Wersja: dev",
+            text = "Wersja: ${com.kidzone.BuildConfig.VERSION_NAME}",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             modifier = Modifier.fillMaxWidth(),
