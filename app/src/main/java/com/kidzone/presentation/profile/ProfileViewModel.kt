@@ -434,6 +434,35 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Trwałe usunięcie konta Google (reauth przez Google idToken).
+     * Wywoływane po pomyślnym Google Sign-In w UI.
+     */
+    fun deleteAccountGoogle(idToken: String, onDeleted: () -> Unit) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(isAccountActionInProgress = true, accountActionError = null)
+            }
+            when (val r = authRepository.deleteAccountWithGoogle(idToken)) {
+                is OpResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isAccountActionInProgress = false,
+                            isDeleteAccountOpen = false
+                        )
+                    }
+                    onDeleted()
+                }
+                is OpResult.Failure -> _uiState.update {
+                    it.copy(
+                        isAccountActionInProgress = false,
+                        accountActionError = r.error.message ?: "Nie udało się usunąć konta"
+                    )
+                }
+            }
+        }
+    }
+
     fun signOut(onComplete: () -> Unit) {
         viewModelScope.launch {
             authRepository.signOut()

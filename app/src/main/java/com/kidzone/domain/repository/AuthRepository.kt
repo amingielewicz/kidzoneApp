@@ -213,6 +213,17 @@ interface AuthRepository {
     suspend fun deleteAccount(currentPassword: String): OpResult<Unit>
 
     /**
+     * Trwałe usunięcie konta użytkownika zalogowanego przez Google.
+     *
+     * Reauth odbywa się przez Google credential (idToken uzyskany z Google
+     * Sign-In w UI). Po reauth wykonuje tę samą kaskadę co [deleteAccount]:
+     * opinie → miejsca → doc usera → avatar → firebaseUser.delete().
+     *
+     * @param idToken Google ID token uzyskany przez Credential Manager / Google Sign-In
+     */
+    suspend fun deleteAccountWithGoogle(idToken: String): OpResult<Unit>
+
+    /**
      * Zapisuje na dokumencie `users/{uid}` znaczniki czasu zdobycia podanych
      * odznak.
      *
