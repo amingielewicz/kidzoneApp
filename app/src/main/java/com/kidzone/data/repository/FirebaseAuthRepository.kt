@@ -12,7 +12,6 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
-import com.google.firebase.firestore.ktx.toObject
 import com.google.firebase.storage.FirebaseStorage
 import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.UserDto
@@ -72,7 +71,7 @@ class FirebaseAuthRepository @Inject constructor(
                 close(error)
                 return@addSnapshotListener
             }
-            val user = snapshot?.toObject<UserDto>()?.toDomain()
+            val user = snapshot?.toObject(UserDto::class.java)?.toDomain()
             trySend(user)
         }
         awaitClose { registration.remove() }
@@ -195,7 +194,7 @@ class FirebaseAuthRepository @Inject constructor(
             .document(userId)
             .get()
             .await()
-        val dto = snapshot.toObject<UserDto>()
+        val dto = snapshot.toObject(UserDto::class.java)
         if (dto != null) {
             OpResult.success(dto.toDomain())
         } else {
@@ -216,7 +215,7 @@ class FirebaseAuthRepository @Inject constructor(
             .get()
             .await()
         val users = snapshot.documents
-            .mapNotNull { it.toObject<UserDto>()?.toDomain() }
+            .mapNotNull { it.toObject(UserDto::class.java)?.toDomain() }
             .sortedWith(
                 compareByDescending<User> { it.placesAddedCount }
                     .thenByDescending { it.reviewsCount }

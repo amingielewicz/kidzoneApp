@@ -669,6 +669,9 @@ class PlaceDetailsViewModel @Inject constructor(
 
     /** Seeduje hash set istniejących zdjęć miejsca (wołane z init po załadowaniu place). */
     private fun seedPlacePhotoHashes(photoUrls: List<String>) {
+        // Reset the set to match current state – this fixes the bug where
+        // a deleted photo's hash would remain and block re-adding it.
+        placePhotoHashes.clear()
         if (photoUrls.isEmpty()) return
         viewModelScope.launch {
             for (url in photoUrls) {

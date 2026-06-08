@@ -3,7 +3,6 @@ package com.kidzone.data.repository
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
-import com.google.firebase.firestore.ktx.toObject
 import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.ReviewDto
 import com.kidzone.domain.model.Review
@@ -53,7 +52,7 @@ class FirestoreReviewRepository @Inject constructor(
                     return@addSnapshotListener
                 }
                 val reviews = snapshot?.documents
-                    ?.mapNotNull { it.toObject<ReviewDto>() }
+                    ?.mapNotNull { it.toObject(ReviewDto::class.java) }
                     ?.filterNot { it.reportedAsSpam }
                     ?.map { it.toDomain() }
                     .orEmpty()
@@ -78,7 +77,7 @@ class FirestoreReviewRepository @Inject constructor(
                 // Świadomie NIE filtrujemy `reportedAsSpam` – patrz komentarz
                 // w [ReviewRepository.observeReviewsByUser].
                 val reviews = snapshot?.documents
-                    ?.mapNotNull { it.toObject<ReviewDto>()?.toDomain() }
+                    ?.mapNotNull { it.toObject(ReviewDto::class.java)?.toDomain() }
                     ?.sortedByDescending { it.createdAtMillis }
                     .orEmpty()
                 trySend(reviews)
@@ -191,7 +190,7 @@ class FirestoreReviewRepository @Inject constructor(
                 if (!reviewSnap.exists()) {
                     throw NoSuchElementException("Brak opinii o id=${review.id}")
                 }
-                val existing = reviewSnap.toObject<ReviewDto>()
+                val existing = reviewSnap.toObject(ReviewDto::class.java)
                     ?: throw IllegalStateException("Nieczytelny dokument opinii ${review.id}")
                 if (existing.userId != review.userId) {
                     // Defensywnie – właściwie zatrzymają to security rules,
@@ -317,7 +316,7 @@ class FirestoreReviewRepository @Inject constructor(
                     // Już skasowana – traktujemy jako sukces (idempotentność).
                     return@runTransaction
                 }
-                val existing = reviewSnap.toObject<ReviewDto>()
+                val existing = reviewSnap.toObject(ReviewDto::class.java)
                     ?: throw IllegalStateException("Nieczytelny dokument opinii $reviewId")
 
                 val placeRef = firestore

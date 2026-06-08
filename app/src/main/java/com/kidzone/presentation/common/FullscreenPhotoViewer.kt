@@ -143,6 +143,10 @@ fun FullscreenPhotoViewer(
 
 /**
  * Zdjęcie z obsługą pinch-to-zoom i pan (przesuwanie po powiększeniu).
+ *
+ * Gdy `scale == 1f` (brak zoomu), gesty pan nie są konsumowane –
+ * HorizontalPager może swobodnie przechwytywać swipe lewo/prawo.
+ * Pan włącza się dopiero po powiększeniu (scale > 1f).
  */
 @Composable
 private fun ZoomableImage(
@@ -156,18 +160,27 @@ private fun ZoomableImage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    val newScale = (scale * zoom).coerceIn(1f, 5f)
-                    scale = newScale
-                    if (newScale > 1f) {
-                        val maxX = (size.width * (newScale - 1)) / 2
-                        val maxY = (size.height * (newScale - 1)) / 2
-                        offsetX = (offsetX + pan.x).coerceIn(-maxX, maxX)
-                        offsetY = (offsetY + pan.y).coerceIn(-maxY, maxY)
-                    } else {
-                        offsetX = 0f
-                        offsetY = 0f
+            .pointerInput(scale) {
+                if (scale > 1f) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        val newScale = (scale * zoom).coerceIn(1f, 5f)
+                        scale = newScale
+                        if (newScale > 1f) {
+                            val maxX = (size.width * (newScale - 1)) / 2
+                            val maxY = (size.height * (newScale - 1)) / 2
+                            offsetX = (offsetX + pan.x).coerceIn(-maxX, maxX)
+                            offsetY = (offsetY + pan.y).coerceIn(-maxY, maxY)
+                        } else {
+                            offsetX = 0f
+                            offsetY = 0f
+                        }
+                    }
+                } else {
+                    detectTransformGestures { _, _, zoom, _ ->
+                        // Only handle pinch (multi-finger zoom), ignore pan
+                        // so HorizontalPager can handle single-finger swipe.
+                        val newScale = (scale * zoom).coerceIn(1f, 5f)
+                        scale = newScale
                     }
                 }
             }
