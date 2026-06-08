@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PrivacyTip
@@ -156,6 +157,7 @@ fun ProfileScreen(
                     onChangeEmail = viewModel::openChangeEmail,
                     onDeleteAccount = viewModel::openDeleteAccount,
                     onPrivacyPolicy = viewModel::openPrivacyPolicy,
+                    onNotificationPrefs = viewModel::openNotificationPrefs,
                     onSignOut = { viewModel.signOut(onSignOut) }
                 )
             }
@@ -186,6 +188,14 @@ fun ProfileScreen(
 
     if (ui.isPrivacyPolicyOpen) {
         PrivacyPolicyDialog(onDismiss = viewModel::dismissPrivacyPolicy)
+    }
+
+    if (ui.isNotificationPrefsOpen) {
+        NotificationPreferencesDialog(
+            currentPrefs = ui.notificationPrefs,
+            onSave = viewModel::saveNotificationPrefs,
+            onDismiss = viewModel::dismissNotificationPrefs
+        )
     }
 
     if (ui.isChangePasswordOpen) {
@@ -259,6 +269,7 @@ private fun ProfileContent(
     onChangeEmail: () -> Unit,
     onDeleteAccount: () -> Unit,
     onPrivacyPolicy: () -> Unit,
+    onNotificationPrefs: () -> Unit,
     onSignOut: () -> Unit
 ) {
     LazyColumn(
@@ -302,6 +313,7 @@ private fun ProfileContent(
         item {
             SettingsCard(
                 onPrivacyPolicy = onPrivacyPolicy,
+                onNotificationPrefs = onNotificationPrefs,
                 onSignOut = onSignOut
             )
         }
@@ -808,9 +820,16 @@ private fun AccountSecurityCard(
 @Composable
 private fun SettingsCard(
     onPrivacyPolicy: () -> Unit,
+    onNotificationPrefs: () -> Unit,
     onSignOut: () -> Unit
 ) {
     SectionCard(title = "Ustawienia") {
+        NavRow(
+            icon = Icons.Filled.Notifications,
+            label = "Powiadomienia push",
+            onClick = onNotificationPrefs
+        )
+        Spacer(Modifier.height(4.dp))
         NavRow(
             icon = Icons.Filled.PrivacyTip,
             label = "Polityka prywatności",

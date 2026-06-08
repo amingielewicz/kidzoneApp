@@ -769,6 +769,10 @@ export const onReviewCreatedPush = onDocumentCreated(
 
     if (fcmTokens.length === 0) return;
 
+    // Sprawdź preferencje powiadomień — domyślnie włączone
+    const notifPrefs = ownerData?.notificationPreferences || {};
+    if (notifPrefs.newReviewOnMyPlace === false) return;
+
     const stars = "★".repeat(rating) + "☆".repeat(5 - rating);
     const body = comment
       ? `${stars} — "${comment}"`
