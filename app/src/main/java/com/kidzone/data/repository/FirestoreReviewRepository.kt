@@ -3,7 +3,8 @@ package com.kidzone.data.repository
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
-import com.google.firebase.firestore.ktx.toObject
+import com.kidzone.data.local.ReviewDao
+import com.kidzone.data.local.ReviewEntity
 import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.ReviewDto
 import com.kidzone.domain.model.Review
@@ -12,6 +13,9 @@ import com.kidzone.utils.OpResult
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
@@ -30,68 +34,110 @@ private const val WRITE_TIMEOUT_MS = 30_000L
 private const val REVIEW_COMMENT_MAX_LENGTH = 1000
 
 /**
- * Implementacja [ReviewRepository] oparta o Firestore.
+ * Implementacja [ReviewRepository] oparta o Firestore + Room cache.
  *
- * `reportReviewAsSpam` jest jeszcze placeholderem – do uzupełnienia w
- * osobnym PR-ze (powinien analogicznie zaktualizować `averageRating`
- * miejsca, jeśli traktujemy spam jako "wycofanie" oceny).
+ * Wzorzec offline-first (analogiczny do FirestorePlaceRepository):
+ *  - Room jest lokalnym source, UI obserwuje Flow z Room.
+ *  - Firestore snapshot listener w tle synchronizuje dane do Room.
+ *  - Przy błędzie sieci UI nadal widzi ostatnio zcache'owane opinie.
  */
 @Singleton
 class FirestoreReviewRepository @Inject constructor(
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val reviewDao: ReviewDao
 ) : ReviewRepository {
 
-    override fun observeReviewsForPlace(placeId: String): Flow<List<Review>> = callbackFlow {
-        // Filtr `reportedAsSpam=false` celowo robimy klient-side – inaczej
-        // Firestore wymagałby composite indexu (placeId + reportedAsSpam),
-        // którego użytkownik musiałby ręcznie utworzyć w konsoli.
-        val registration = reviewsCollection()
-            .whereEqualTo("placeId", placeId)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                val reviews = snapshot?.documents
-                    ?.mapNotNull { it.toObject<ReviewDto>() }
-                    ?.filterNot { it.reportedAsSpam }
-                    ?.map { it.toDomain() }
-                    .orEmpty()
-                trySend(reviews)
+    override fun observeReviewsForPlace(placeId: String): Flow<List<Review>> = channelFlow {
+        if (placeId.isBlank()) {
+            trySend(emptyList())
+            return@channelFlow
+        }
+
+        // 1. Room jako local source – emitujemy z niego do kanału.
+        val localFlow = reviewDao.observeByPlace(placeId)
+
+        // 2. Firestore snapshot listener – aktualizuje Room w tle.
+        val syncJob = launch {
+            val firestoreFlow = callbackFlow {
+                val registration = reviewsCollection()
+                    .whereEqualTo("placeId", placeId)
+                    .addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            close(error)
+                            return@addSnapshotListener
+                        }
+                        val reviews = snapshot?.documents
+                            ?.mapNotNull { it.toObject(ReviewDto::class.java) }
+                            ?.filterNot { it.reportedAsSpam }
+                            ?.map { it.toDomain() }
+                            .orEmpty()
+                        trySend(reviews)
+                    }
+                awaitClose { registration.remove() }
             }
-        awaitClose { registration.remove() }
+            firestoreFlow.collect { reviews ->
+                // Sync do Room: nadpisz cache dla tego placeId
+                reviewDao.deleteByPlace(placeId)
+                reviewDao.upsertAll(reviews.map(ReviewEntity::fromDomain))
+            }
+        }
+
+        // 3. Emituj dane z Room (re-emituje automatycznie po upsert z synca).
+        //    Filtrujemy reportedAsSpam klient-side – Room nie ma tego pola
+        //    (nie cache'ujemy spamu, bo deleteByPlace + upsertAll z przefiltrowaną
+        //    listą już to załatwia).
+        localFlow.collectLatest { entities ->
+            trySend(entities.map { it.toDomain() })
+        }
+
+        syncJob.cancel()
     }
 
-    override fun observeReviewsByUser(userId: String): Flow<List<Review>> = callbackFlow {
+    override fun observeReviewsByUser(userId: String): Flow<List<Review>> = channelFlow {
         if (userId.isBlank()) {
             trySend(emptyList())
-            close()
-            return@callbackFlow
+            return@channelFlow
         }
-        val registration = reviewsCollection()
-            .whereEqualTo("userId", userId)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                // Świadomie NIE filtrujemy `reportedAsSpam` – patrz komentarz
-                // w [ReviewRepository.observeReviewsByUser].
-                val reviews = snapshot?.documents
-                    ?.mapNotNull { it.toObject<ReviewDto>()?.toDomain() }
-                    ?.sortedByDescending { it.createdAtMillis }
-                    .orEmpty()
-                trySend(reviews)
+
+        // 1. Room jako local source.
+        val localFlow = reviewDao.observeByUser(userId)
+
+        // 2. Firestore snapshot listener – sync do Room.
+        val syncJob = launch {
+            val firestoreFlow = callbackFlow {
+                val registration = reviewsCollection()
+                    .whereEqualTo("userId", userId)
+                    .addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            close(error)
+                            return@addSnapshotListener
+                        }
+                        val reviews = snapshot?.documents
+                            ?.mapNotNull { it.toObject(ReviewDto::class.java)?.toDomain() }
+                            ?.sortedByDescending { it.createdAtMillis }
+                            .orEmpty()
+                        trySend(reviews)
+                    }
+                awaitClose { registration.remove() }
             }
-        awaitClose { registration.remove() }
+            firestoreFlow.collect { reviews ->
+                // Upsert all – nie czyścimy tu bo user może mieć opinie
+                // w różnych miejscach, a observeByUser zwraca wszystkie.
+                reviewDao.upsertAll(reviews.map(ReviewEntity::fromDomain))
+            }
+        }
+
+        // 3. Emituj dane z Room.
+        localFlow.collectLatest { entities ->
+            trySend(entities.map { it.toDomain() })
+        }
+
+        syncJob.cancel()
     }
 
     override suspend fun addReview(review: Review): OpResult<Review> = try {
         require(review.placeId.isNotBlank()) { "Review.placeId nie może być puste" }
         require(review.rating in 1..5) { "Review.rating musi być w zakresie 1..5" }
-        // Defense-in-depth: UI też cappuje na 1000 (AddReviewSheet),
-        // ale walidujemy tu na wypadek gdyby ktoś zawołał repo z innego
-        // miejsca lub spreparował dane z poziomu testu.
         require(review.comment.length <= REVIEW_COMMENT_MAX_LENGTH) {
             "Review.comment przekracza limit $REVIEW_COMMENT_MAX_LENGTH znaków"
         }
@@ -104,13 +150,6 @@ class FirestoreReviewRepository @Inject constructor(
 
         val reviewWithId = review.copy(id = reviewRef.id)
 
-        // Transakcja zapewnia ATOMOWOŚĆ całej operacji "dodaj opinię":
-        //  1) zapis dokumentu Review,
-        //  2) przeliczenie i zapis nowego averageRating + reviewsCount na Place,
-        //  3) inkrementacja reviewsCount na User (do rankingu).
-        //
-        // Reguła Firestore: wszystkie READ-y muszą być przed WRITE-ami.
-        // Dlatego najpierw pobieramy aktualny stan miejsca.
         val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
             firestore.runTransaction<Unit> { tx ->
                 val placeSnap = tx.get(placeRef)
@@ -120,9 +159,6 @@ class FirestoreReviewRepository @Inject constructor(
                 val oldCount = placeSnap.getLong("reviewsCount")?.toInt() ?: 0
                 val oldAvg = placeSnap.getDouble("averageRating") ?: 0.0
                 val newCount = oldCount + 1
-                // Średnia krocząca: nie trzymamy historii pojedynczych ocen,
-                // tylko aktualizujemy agregat. Dla setek ocen precyzja Double
-                // jest w pełni wystarczająca.
                 val newAvg = (oldAvg * oldCount + reviewWithId.rating) / newCount
 
                 tx.set(reviewRef, ReviewDto.fromDomain(reviewWithId))
@@ -133,14 +169,6 @@ class FirestoreReviewRepository @Inject constructor(
                         "averageRating" to newAvg
                     )
                 )
-                // FieldValue.increment jest atomowy po stronie serwera.
-                // Pomijamy gdy userRef = null (anonimowy / brak uid), żeby
-                // nie wywalać całej transakcji.
-                //
-                // set + merge zamiast update: nie wywali się jeśli doc usera
-                // nie istnieje – po prostu utworzy minimalny doc z samym
-                // licznikiem. Brakujące pola dopełni ensureUserDoc() przy
-                // najbliższym logowaniu.
                 if (userRef != null) {
                     tx.set(
                         userRef,
@@ -158,6 +186,8 @@ class FirestoreReviewRepository @Inject constructor(
                 )
             )
         } else {
+            // Persystuj do cache.
+            reviewDao.upsert(ReviewEntity.fromDomain(reviewWithId))
             OpResult.success(reviewWithId)
         }
     } catch (e: Exception) {
@@ -172,30 +202,17 @@ class FirestoreReviewRepository @Inject constructor(
         }
 
         val reviewRef = reviewsCollection().document(review.id)
-
-        // Transakcja:
-        //  1) READ aktualna opinia (po `oldRating`) – jest też walidacją,
-        //     że doc istnieje i należy do `userId` z payload-u (rules to
-        //     egzekwują, ale lepiej rzucić jasny błąd zamiast czekać na
-        //     PERMISSION_DENIED).
-        //  2) READ miejsce – musimy znać aktualne `averageRating` i
-        //     `reviewsCount`, żeby przeliczyć średnią po edycji.
-        //  3) WRITE opinia z nowymi polami + `updatedAtMillis = now`.
-        //  4) WRITE place z nowym `averageRating` (count bez zmian).
-        //
-        // `users.reviewsCount` zostaje – edycja to nadal jedna opinia.
         val updatedReview = review.copy(updatedAtMillis = System.currentTimeMillis())
+
         val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
             firestore.runTransaction<Unit> { tx ->
                 val reviewSnap = tx.get(reviewRef)
                 if (!reviewSnap.exists()) {
                     throw NoSuchElementException("Brak opinii o id=${review.id}")
                 }
-                val existing = reviewSnap.toObject<ReviewDto>()
+                val existing = reviewSnap.toObject(ReviewDto::class.java)
                     ?: throw IllegalStateException("Nieczytelny dokument opinii ${review.id}")
                 if (existing.userId != review.userId) {
-                    // Defensywnie – właściwie zatrzymają to security rules,
-                    // ale eksplicytny komunikat jest dla nas czytelniejszy.
                     throw SecurityException("Można edytować tylko własne opinie")
                 }
                 val placeId = existing.placeId.ifBlank { review.placeId }
@@ -211,19 +228,12 @@ class FirestoreReviewRepository @Inject constructor(
                 val oldRating = existing.rating
                 val newRating = updatedReview.rating
 
-                // Średnia krocząca – delta z różnicy ratingów.
-                // Gdyby z jakiegoś powodu count == 0 (sytuacja niespójna –
-                // doc opinii istnieje, ale licznik miejsca = 0), traktujemy
-                // edycję jak pierwszą ocenę: average = newRating.
                 val newAvg = if (count > 0) {
                     (oldAvg * count - oldRating + newRating) / count
                 } else {
                     newRating.toDouble()
                 }
 
-                // Składamy DTO zachowując pola immutowalne z istniejącego
-                // dokumentu (placeId, userId, authorName, createdAtMillis),
-                // nadpisując tylko to, co user mógł zmienić (w tym zdjęcia).
                 val merged = existing.copy(
                     rating = newRating,
                     comment = updatedReview.comment,
@@ -232,11 +242,6 @@ class FirestoreReviewRepository @Inject constructor(
                 )
                 tx.set(reviewRef, merged)
                 tx.update(placeRef, mapOf("averageRating" to newAvg))
-                // tx.update zwraca Transaction; lambda runTransaction<Unit>
-                // wymaga ostatniego wyrażenia typu Unit, więc jawnie kończymy
-                // blok Unitem. (Analogiczny problem w addReview rozwiązany
-                // tam przez `if (userRef != null) { ... }` jako ostatni
-                // statement – tu nie ma naturalnego warunku.)
                 Unit
             }.await()
             true
@@ -248,6 +253,8 @@ class FirestoreReviewRepository @Inject constructor(
                 )
             )
         } else {
+            // Zaktualizuj cache.
+            reviewDao.upsert(ReviewEntity.fromDomain(updatedReview))
             OpResult.success(updatedReview)
         }
     } catch (e: Exception) {
@@ -294,30 +301,13 @@ class FirestoreReviewRepository @Inject constructor(
         require(reviewId.isNotBlank()) { "reviewId nie może być puste" }
         val reviewRef = reviewsCollection().document(reviewId)
 
-        // Transakcja:
-        //  1) READ opinia – żeby znać `placeId`, `userId` i `rating` przed
-        //     skasowaniem.
-        //  2) READ miejsce – żeby znać aktualne `averageRating`/`reviewsCount`
-        //     do przeliczenia po stracie tej oceny.
-        //  3) DELETE opinia.
-        //  4) WRITE place: dekrement `reviewsCount` o 1, recompute
-        //     `averageRating` (gdy count == 1 -> 0.0; gdy 0 - nie powinno
-        //     się zdarzyć, defensywnie też 0.0).
-        //  5) WRITE user: dekrement `users/{authorId}.reviewsCount`.
-        //
-        // Błędy potencjalne:
-        //  - SecurityException z Firestore gdy `userId != auth.uid` (rules);
-        //    propagujemy na zewnątrz, VM pokaże komunikat.
-        //  - Nieistniejące miejsce (np. zostało już usunięte) – wtedy
-        //    pomijamy krok 4, opinia była orphaned i tak.
         val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
             firestore.runTransaction<Unit> { tx ->
                 val reviewSnap = tx.get(reviewRef)
                 if (!reviewSnap.exists()) {
-                    // Już skasowana – traktujemy jako sukces (idempotentność).
                     return@runTransaction
                 }
-                val existing = reviewSnap.toObject<ReviewDto>()
+                val existing = reviewSnap.toObject(ReviewDto::class.java)
                     ?: throw IllegalStateException("Nieczytelny dokument opinii $reviewId")
 
                 val placeRef = firestore
@@ -337,7 +327,6 @@ class FirestoreReviewRepository @Inject constructor(
                     val oldAvg = placeSnap.getDouble("averageRating") ?: 0.0
                     val newCount = (oldCount - 1).coerceAtLeast(0)
                     val newAvg = if (newCount > 0) {
-                        // Średnia krocząca: usuwamy wkład tej oceny.
                         ((oldAvg * oldCount) - existing.rating) / newCount
                     } else {
                         0.0
@@ -352,11 +341,6 @@ class FirestoreReviewRepository @Inject constructor(
                 }
 
                 if (authorRef != null) {
-                    // FieldValue.increment(-1) jest atomowy. Nie trzymamy
-                    // licznika poniżej 0 (Firestore by pozwoliło, ale
-                    // ranking by się posypał) – server-side tu nie
-                    // wymusimy, więc liczy się dyscyplina po stronie
-                    // klienta. Założenie: każdy delete ma swojego addReview.
                     tx.set(
                         authorRef,
                         mapOf("reviewsCount" to FieldValue.increment(-1)),
@@ -373,6 +357,8 @@ class FirestoreReviewRepository @Inject constructor(
                 )
             )
         } else {
+            // Usuń z cache.
+            reviewDao.deleteById(reviewId)
             OpResult.success(Unit)
         }
     } catch (e: Exception) {
