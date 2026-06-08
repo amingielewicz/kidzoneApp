@@ -131,6 +131,9 @@ dependencies {
     implementation(libs.play.services.maps)
     implementation(libs.play.services.location)
 
+    // Legacy Google Sign-In (fallback for devices where Credential Manager fails)
+    implementation("com.google.android.gms:play-services-auth:21.3.0")
+
     // Networking
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
