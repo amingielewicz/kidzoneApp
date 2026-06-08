@@ -36,6 +36,7 @@ class KidZoneApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         cleanStaleCache()
+        com.kidzone.messaging.KidZoneMessagingService.registerCurrentToken(this)
     }
 
     private fun cleanStaleCache() {

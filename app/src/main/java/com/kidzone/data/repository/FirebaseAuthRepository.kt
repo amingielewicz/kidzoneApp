@@ -185,6 +185,7 @@ class FirebaseAuthRepository @Inject constructor(
     }
 
     override suspend fun signOut() {
+        com.kidzone.messaging.KidZoneMessagingService.unregisterToken()
         firebaseAuth.signOut()
     }
 
