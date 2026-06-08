@@ -528,6 +528,18 @@ fun PlaceDetailsScreen(
                 // Ukryj flagę na zdjęciach dodanych przez bieżącego usera
                 val uploaderId = fullscreenPhotoUploadedBy[url]
                 uploaderId == null || uploaderId != myUserId
+            },
+            onDeletePhoto = { url ->
+                viewModel.deletePhotoFromPlace(url)
+                fullscreenPhotos = fullscreenPhotos - url
+                if (fullscreenPhotos.isEmpty()) {
+                    // zamknij viewer jeśli nie ma więcej zdjęć
+                }
+            },
+            canDeletePhoto = { url ->
+                // Pokaż kosz tylko na zdjęciach dodanych przez bieżącego usera
+                val uploaderId = fullscreenPhotoUploadedBy[url]
+                myUserId != null && uploaderId == myUserId
             }
         )
     }

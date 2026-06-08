@@ -13,6 +13,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -45,6 +46,9 @@ import coil.compose.AsyncImage
  * @param onReportPhoto opcjonalny callback zgłoszenia zdjęcia (URL)
  * @param canReportPhoto per-URL check czy flaga zgłoszenia jest widoczna
  *   (np. ukryta dla zdjęć dodanych przez bieżącego usera)
+ * @param onDeletePhoto opcjonalny callback usunięcia zdjęcia (URL)
+ * @param canDeletePhoto per-URL check czy przycisk usunięcia jest widoczny
+ *   (true gdy `photoUploadedBy[url] == currentUserId`)
  */
 @Composable
 fun FullscreenPhotoViewer(
@@ -52,7 +56,9 @@ fun FullscreenPhotoViewer(
     initialIndex: Int = 0,
     onDismiss: () -> Unit,
     onReportPhoto: ((photoUrl: String) -> Unit)? = null,
-    canReportPhoto: (photoUrl: String) -> Boolean = { true }
+    canReportPhoto: (photoUrl: String) -> Boolean = { true },
+    onDeletePhoto: ((photoUrl: String) -> Unit)? = null,
+    canDeletePhoto: (photoUrl: String) -> Boolean = { false }
 ) {
     if (photoUrls.isEmpty()) {
         onDismiss()
@@ -126,6 +132,30 @@ fun FullscreenPhotoViewer(
                     Icon(
                         imageVector = Icons.Filled.Flag,
                         contentDescription = "Zgłoś zdjęcie"
+                    )
+                }
+            }
+
+            // Delete button (top-right, below report) - only for user's own photos
+            if (onDeletePhoto != null && canDeletePhoto(photoUrls[pagerState.currentPage])) {
+                FilledTonalIconButton(
+                    onClick = {
+                        val currentUrl = photoUrls[pagerState.currentPage]
+                        onDeletePhoto(currentUrl)
+                        // Dismiss viewer after deletion if no photos remain
+                        if (photoUrls.size <= 1) onDismiss()
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 72.dp, end = 16.dp),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = Color.Red.copy(alpha = 0.7f),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = "Usuń zdjęcie"
                     )
                 }
             }

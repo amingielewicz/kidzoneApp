@@ -95,4 +95,15 @@ interface PlaceRepository {
      * Zapisuje też kto dodał zdjęcie w `photoUploadedBy`.
      */
     suspend fun addPhotoUrl(placeId: String, photoUrl: String, uploadedByUserId: String): OpResult<Unit>
+
+    /**
+     * Usuwa URL zdjęcia z listy `photoUrls` na dokumencie miejsca.
+     * Usuwa też wpis z `photoUploadedBy`.
+     *
+     * Autoryzacja po stronie klienta: wywołujący powinien upewnić się,
+     * że `photoUploadedBy[photoUrl] == currentUserId` przed wywołaniem.
+     * Reguły Firestore pozwalają na update `photoUrls` + `photoUploadedBy`
+     * przez każdego zalogowanego usera.
+     */
+    suspend fun removePhotoUrl(placeId: String, photoUrl: String): OpResult<Unit>
 }
