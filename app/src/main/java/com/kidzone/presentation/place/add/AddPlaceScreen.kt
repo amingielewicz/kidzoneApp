@@ -388,7 +388,19 @@ fun AddPlaceScreen(
                     itemsIndexed(state.existingPhotoUrls) { index, url ->
                         PhotoThumbnail(
                             model = url,
-                            onRemove = { viewModel.removeExistingPhoto(index) },
+                            onRemove = {
+                                // Usuwamy hash żeby ponowne dodanie tego samego zdjęcia nie było blokowane
+                                val removedUrl = state.existingPhotoUrls[index]
+                                viewModel.removeExistingPhoto(index)
+                                coroutineScope.launch {
+                                    val hash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        computeRemotePlacePhotoHash(removedUrl)
+                                    }
+                                    if (hash != null) {
+                                        photoHashSet = photoHashSet - hash
+                                    }
+                                }
+                            },
                             enabled = !state.isSaving
                         )
                     }
@@ -396,7 +408,15 @@ fun AddPlaceScreen(
                     itemsIndexed(state.photoUris) { index, uri ->
                         PhotoThumbnail(
                             model = uri,
-                            onRemove = { viewModel.removeNewPhoto(index) },
+                            onRemove = {
+                                // Usuwamy hash żeby ponowne dodanie tego samego zdjęcia nie było blokowane
+                                val removedUri = state.photoUris[index]
+                                val hash = computePlacePhotoHash(context, removedUri)
+                                viewModel.removeNewPhoto(index)
+                                if (hash != null) {
+                                    photoHashSet = photoHashSet - hash
+                                }
+                            },
                             enabled = !state.isSaving
                         )
                     }
