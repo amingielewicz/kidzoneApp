@@ -469,6 +469,51 @@ class FirebaseAuthRepository @Inject constructor(
         OpResult.failure(e)
     }
 
+    override suspend fun deleteAccountWithGoogle(idToken: String): OpResult<Unit> = try {
+        val user = firebaseAuth.currentUser
+            ?: throw IllegalStateException("Brak zalogowanego użytkownika")
+
+        // Reauth przez Google credential
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+        user.reauthenticate(credential).await()
+
+        val uid = user.uid
+
+        // Kaskada: opinie → miejsca → doc usera → avatar → Auth (identycznie
+        // jak w deleteAccount dla email/password).
+        val reviewsSnap = firestore.collection(FirestoreCollections.REVIEWS)
+            .whereEqualTo("userId", uid)
+            .get()
+            .await()
+        reviewsSnap.documents.forEach { it.reference.delete().await() }
+
+        val placesSnap = firestore.collection(FirestoreCollections.PLACES)
+            .whereEqualTo("ownerUserId", uid)
+            .get()
+            .await()
+        placesSnap.documents.forEach { it.reference.delete().await() }
+
+        firestore.collection(FirestoreCollections.USERS)
+            .document(uid)
+            .delete()
+            .await()
+
+        runCatching {
+            firebaseStorage.reference
+                .child("avatars/$uid/avatar.jpg")
+                .delete()
+                .await()
+        }
+
+        user.delete().await()
+
+        OpResult.success(Unit)
+    } catch (e: FirebaseAuthInvalidCredentialsException) {
+        OpResult.failure(AuthException.InvalidCredentials)
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
     // --- helpers ---
 
     override suspend fun recordBadgesEarned(

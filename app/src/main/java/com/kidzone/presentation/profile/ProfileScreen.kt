@@ -199,9 +199,13 @@ fun ProfileScreen(
             reviewsCount = user!!.reviewsCount,
             isInProgress = ui.isAccountActionInProgress,
             errorMessage = ui.accountActionError,
+            isGoogleUser = ui.signInProvider == com.kidzone.domain.repository.SignInProvider.GOOGLE,
             onDismiss = viewModel::dismissDeleteAccount,
             onConfirm = { password ->
                 viewModel.deleteAccount(password, onDeleted = onSignOut)
+            },
+            onConfirmGoogle = { idToken ->
+                viewModel.deleteAccountGoogle(idToken, onDeleted = onSignOut)
             }
         )
     }

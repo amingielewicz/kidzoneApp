@@ -34,21 +34,13 @@ import androidx.compose.ui.unit.dp
 /**
  * Dialog potwierdzenia usunięcia konta.
  *
- * Pokazuje:
- *  - ikonę ostrzeżenia + tytuł "Usuń konto?",
- *  - listę tego co zostanie skasowane (X miejsc, Y opinii, avatar, dane konta),
- *  - explicit "operacja nieodwracalna",
- *  - pole hasła dla reauth.
+ * Obsługuje dwa typy kont:
+ *  - **Email/password:** pole hasła dla reauth
+ *  - **Google:** przycisk "Zaloguj się przez Google" (Credential Manager)
  *
- * CTA jest typu `error` (czerwone), żeby na ostatniej milicze user widział,
- * że robi coś poważnego.
- *
- * Świadomie nie wymagamy dodatkowego "wpisz USUŃ żeby potwierdzić" – sam
- * fakt że trzeba wstawić aktualne hasło jest wystarczająco silnym
- * potwierdzeniem (analogiczne UX jak w GitHub / Google).
- *
- * @param placesCount liczba miejsc usera (pokazana w ostrzeżeniu)
- * @param reviewsCount liczba opinii usera
+ * @param isGoogleUser true gdy `signInProvider == GOOGLE`
+ * @param onConfirm callback dla email/password (z hasłem)
+ * @param onConfirmGoogle callback dla Google (z idToken)
  */
 @Composable
 fun DeleteAccountDialog(
@@ -56,12 +48,23 @@ fun DeleteAccountDialog(
     reviewsCount: Int,
     isInProgress: Boolean,
     errorMessage: String?,
+    isGoogleUser: Boolean = false,
     onDismiss: () -> Unit,
-    onConfirm: (currentPassword: String) -> Unit
+    onConfirm: (currentPassword: String) -> Unit = {},
+    onConfirmGoogle: (idToken: String) -> Unit = {}
 ) {
     var password by rememberSaveable { mutableStateOf("") }
     var showPassword by rememberSaveable { mutableStateOf(false) }
-    val isFormValid = password.isNotBlank()
+    val isFormValid = if (isGoogleUser) true else password.isNotBlank()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Google Sign-In launcher for reauth
+    val googleSignInLauncher = if (isGoogleUser) {
+        com.kidzone.presentation.auth.rememberGoogleSignInLauncher(
+            onTokenReceived = { idToken -> onConfirmGoogle(idToken) },
+            onError = { /* Handled by errorMessage from VM */ }
+        )
+    } else null
 
     AlertDialog(
         onDismissRequest = { if (!isInProgress) onDismiss() },
@@ -94,33 +97,43 @@ fun DeleteAccountDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(12.dp))
-                Text(
-                    text = "Wpisz aktualne hasło, aby potwierdzić:",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(Modifier.height(4.dp))
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("Aktualne hasło") },
-                    singleLine = true,
-                    enabled = !isInProgress,
-                    visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    trailingIcon = {
-                        IconButton(
-                            onClick = { showPassword = !showPassword },
-                            enabled = !isInProgress
-                        ) {
-                            Icon(
-                                imageVector = if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                contentDescription = if (showPassword) "Ukryj hasło" else "Pokaż hasło"
-                            )
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
+
+                if (isGoogleUser) {
+                    Text(
+                        text = "Zaloguj się ponownie przez Google, aby potwierdzić usunięcie konta:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                } else {
+                    Text(
+                        text = "Wpisz aktualne hasło, aby potwierdzić:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("Aktualne hasło") },
+                        singleLine = true,
+                        enabled = !isInProgress,
+                        visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { showPassword = !showPassword },
+                                enabled = !isInProgress
+                            ) {
+                                Icon(
+                                    imageVector = if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                    contentDescription = if (showPassword) "Ukryj hasło" else "Pokaż hasło"
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
                 if (errorMessage != null) {
                     Spacer(Modifier.height(8.dp))
                     Text(
@@ -133,7 +146,13 @@ fun DeleteAccountDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(password) },
+                onClick = {
+                    if (isGoogleUser) {
+                        googleSignInLauncher?.invoke()
+                    } else {
+                        onConfirm(password)
+                    }
+                },
                 enabled = isFormValid && !isInProgress,
                 colors = ButtonDefaults.textButtonColors(
                     contentColor = MaterialTheme.colorScheme.error
@@ -146,7 +165,7 @@ fun DeleteAccountDialog(
                         color = MaterialTheme.colorScheme.error
                     )
                 } else {
-                    Text("Usuń konto")
+                    Text(if (isGoogleUser) "Potwierdź przez Google" else "Usuń konto")
                 }
             }
         },
