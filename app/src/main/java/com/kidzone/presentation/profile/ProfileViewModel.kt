@@ -15,6 +15,7 @@ import com.kidzone.utils.OpResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -97,7 +98,9 @@ class ProfileViewModel @Inject constructor(
         val obtainedBadges: List<UserBadge> = emptyList(),
         val userRank: Int? = null,
         val newlyEarnedBadges: List<UserBadge> = emptyList(),
-        val isRefreshing: Boolean = false
+        val isRefreshing: Boolean = false,
+        val isNotificationPrefsOpen: Boolean = false,
+        val notificationPrefs: com.kidzone.presentation.profile.NotificationPrefs = com.kidzone.presentation.profile.NotificationPrefs()
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -233,6 +236,66 @@ class ProfileViewModel @Inject constructor(
 
     fun openPrivacyPolicy() {
         _uiState.update { it.copy(isPrivacyPolicyOpen = true) }
+    }
+
+    // -------- Preferencje powiadomień push --------
+
+    fun openNotificationPrefs() {
+        _uiState.update { it.copy(isNotificationPrefsOpen = true) }
+        loadNotificationPrefs()
+    }
+
+    fun dismissNotificationPrefs() {
+        _uiState.update { it.copy(isNotificationPrefsOpen = false) }
+    }
+
+    fun saveNotificationPrefs(prefs: NotificationPrefs) {
+        val uid = authRepository.currentUser.value?.id ?: return
+        viewModelScope.launch {
+            val data = mapOf(
+                "notificationPreferences" to mapOf(
+                    "newReviewOnMyPlace" to prefs.newReviewOnMyPlace,
+                    "newPlaceNearby" to prefs.newPlaceNearby,
+                    "weeklyDigest" to prefs.weeklyDigest
+                )
+            )
+            try {
+                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("users")
+                    .document(uid)
+                    .set(data, com.google.firebase.firestore.SetOptions.merge())
+                    .await()
+            } catch (_: Exception) { /* best-effort */ }
+            _uiState.update {
+                it.copy(isNotificationPrefsOpen = false, notificationPrefs = prefs)
+            }
+        }
+    }
+
+    private fun loadNotificationPrefs() {
+        val uid = authRepository.currentUser.value?.id ?: return
+        viewModelScope.launch {
+            try {
+                val snap = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("users")
+                    .document(uid)
+                    .get()
+                    .await()
+                @Suppress("UNCHECKED_CAST")
+                val prefsMap = snap.get("notificationPreferences") as? Map<String, Boolean>
+                if (prefsMap != null) {
+                    _uiState.update {
+                        it.copy(
+                            notificationPrefs = NotificationPrefs(
+                                newReviewOnMyPlace = prefsMap["newReviewOnMyPlace"] ?: true,
+                                newPlaceNearby = prefsMap["newPlaceNearby"] ?: true,
+                                weeklyDigest = prefsMap["weeklyDigest"] ?: true
+                            )
+                        )
+                    }
+                }
+            } catch (_: Exception) { /* use defaults */ }
+        }
     }
 
     fun dismissPrivacyPolicy() {

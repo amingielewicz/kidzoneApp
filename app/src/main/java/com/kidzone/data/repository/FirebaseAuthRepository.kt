@@ -185,6 +185,21 @@ class FirebaseAuthRepository @Inject constructor(
     }
 
     override suspend fun signOut() {
+        // Usuń FCM token z Firestore PRZED wylogowaniem (po signOut uid = null)
+        val uid = firebaseAuth.currentUser?.uid
+        if (uid != null) {
+            try {
+                val token = kotlinx.coroutines.tasks.await(
+                    com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                )
+                firestore.collection(FirestoreCollections.USERS)
+                    .document(uid)
+                    .update("fcmTokens", com.google.firebase.firestore.FieldValue.arrayRemove(token))
+                    .await()
+            } catch (_: Exception) {
+                // Best-effort — nie blokujemy wylogowania
+            }
+        }
         firebaseAuth.signOut()
     }
 

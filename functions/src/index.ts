@@ -734,3 +734,98 @@ function renderAdminResponse(title: string, message: string): string {
 </body>
 </html>`;
 }
+
+
+
+// --- Trigger: nowa opinia → push do właściciela miejsca ---
+export const onReviewCreatedPush = onDocumentCreated(
+  {
+    document: "reviews/{reviewId}",
+  },
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+
+    const placeId = data.placeId || "";
+    const reviewAuthorName = data.authorName || "Ktoś";
+    const rating = data.rating || 0;
+    const comment = (data.comment || "").substring(0, 100);
+
+    if (!placeId) return;
+
+    const placeDoc = await db.collection("places").doc(placeId).get();
+    if (!placeDoc.exists) return;
+    const placeData = placeDoc.data();
+    const ownerUserId = placeData?.ownerUserId || "";
+    const placeName = placeData?.name || "Twoje miejsce";
+
+    if (!ownerUserId) return;
+    if (data.userId === ownerUserId) return;
+
+    const ownerDoc = await db.collection("users").doc(ownerUserId).get();
+    if (!ownerDoc.exists) return;
+    const ownerData = ownerDoc.data();
+    const fcmTokens: string[] = ownerData?.fcmTokens || [];
+
+    if (fcmTokens.length === 0) return;
+
+    // Sprawdź preferencje powiadomień — domyślnie włączone
+    const notifPrefs = ownerData?.notificationPreferences || {};
+    if (notifPrefs.newReviewOnMyPlace === false) return;
+
+    const stars = "★".repeat(rating) + "☆".repeat(5 - rating);
+    const body = comment
+      ? `${stars} — "${comment}"`
+      : `${stars}`;
+
+    const message: admin.messaging.MulticastMessage = {
+      tokens: fcmTokens,
+      notification: {
+        title: `${reviewAuthorName} ocenił/a „${placeName}"`,
+        body: body,
+      },
+      data: {
+        type: "new_review",
+        placeId: placeId,
+        reviewId: event.params.reviewId,
+      },
+      android: {
+        priority: "high",
+        notification: {
+          channelId: "kidzone_general",
+        },
+      },
+    };
+
+    try {
+      const response = await admin.messaging().sendEachForMulticast(message);
+      console.log(
+        `Push sent for review ${event.params.reviewId}: ` +
+        `${response.successCount} success, ${response.failureCount} failure`
+      );
+
+      // Wyczyść nieaktualne tokeny
+      const tokensToRemove: string[] = [];
+      response.responses.forEach((resp, idx) => {
+        if (resp.error) {
+          const errorCode = resp.error.code;
+          if (
+            errorCode === "messaging/invalid-registration-token" ||
+            errorCode === "messaging/registration-token-not-registered"
+          ) {
+            tokensToRemove.push(fcmTokens[idx]);
+          }
+        }
+      });
+
+      if (tokensToRemove.length > 0) {
+        await db.collection("users").doc(ownerUserId).update({
+          fcmTokens: admin.firestore.FieldValue.arrayRemove(...tokensToRemove),
+        });
+        console.log(`Removed ${tokensToRemove.length} stale tokens for user ${ownerUserId}`);
+      }
+    } catch (err) {
+      console.error("Push notification error:", err);
+    }
+  }
+);
