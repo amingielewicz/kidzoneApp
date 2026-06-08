@@ -40,7 +40,24 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = run {
+            val baseVersion = "0.1.0"
+            // Na branchach dev/feature dodajemy suffix dev#<numerPR>.
+            // Np. branch po merge jako PR #63 → "0.1.0-dev#63".
+            // Na main (release) zostaje czyste "0.1.0".
+            val branch = providers.exec {
+                commandLine("git", "rev-parse", "--abbrev-ref", "HEAD")
+            }.standardOutput.asText.get().trim()
+            if (branch == "main" || branch == "master" || branch == "HEAD") {
+                baseVersion
+            } else {
+                val prNumber = System.getenv("PR_NUMBER")
+                    ?: branch.replace(Regex(".*?(\\d+).*"), "$1")
+                        .takeIf { it.all(Char::isDigit) }
+                    ?: "local"
+                "$baseVersion-dev#$prNumber"
+            }
+        }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
