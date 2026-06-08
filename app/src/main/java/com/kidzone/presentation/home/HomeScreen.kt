@@ -54,6 +54,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.kidzone.R
 import com.kidzone.domain.model.Place
+import com.kidzone.presentation.common.GpsAcquiringBanner
 import com.kidzone.presentation.common.GpsDisabledBanner
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.style
@@ -83,6 +84,18 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val gpsEnabled = rememberLocationServiceEnabled()
+    val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
+
+    // Auto-refresh po przywróceniu internetu
+    var previousNetworkStatus by remember { mutableStateOf(networkStatus) }
+    LaunchedEffect(networkStatus) {
+        if (previousNetworkStatus == com.kidzone.presentation.common.NetworkStatus.UNAVAILABLE
+            && networkStatus == com.kidzone.presentation.common.NetworkStatus.AVAILABLE
+        ) {
+            viewModel.refresh()
+        }
+        previousNetworkStatus = networkStatus
+    }
 
     // Refresh permission flag gdy ekran wraca na pierwszy plan \u2013 user m\u00f3g\u0142
     // p\u00f3j\u015b\u0107 do Settings i w\u0142\u0105czy\u0107/wy\u0142\u0105czy\u0107 lokalizacj\u0119, a my chcemy mie\u0107
@@ -135,6 +148,11 @@ fun HomeScreen(
             // GPS disabled banner \u2013 only when permission granted but service off
             if (state.locationGranted && !gpsEnabled) {
                 item { GpsDisabledBanner() }
+            }
+
+            // GPS acquiring banner \u2013 GPS on, permission granted, but no fix yet (retrying)
+            if (state.isAcquiringLocation) {
+                item { GpsAcquiringBanner() }
             }
 
             item { HeroSection() }

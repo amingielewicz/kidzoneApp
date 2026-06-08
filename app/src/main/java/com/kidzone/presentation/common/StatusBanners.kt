@@ -123,3 +123,36 @@ fun GpsDisabledBanner(modifier: Modifier = Modifier) {
         }
     }
 }
+
+/**
+ * Banner "Ustalanie lokalizacji…" – wyświetlany gdy GPS jest włączony i
+ * uprawnienie nadane, ale lokalizacja nie została jeszcze ustalona (np.
+ * zimny start GPS, słaby sygnał w budynku). Informuje usera, że apka
+ * aktywnie próbuje uzyskać fix.
+ */
+@Composable
+fun GpsAcquiringBanner(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        tonalElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            androidx.compose.material3.CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "Ustalanie lokalizacji\u2026",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}

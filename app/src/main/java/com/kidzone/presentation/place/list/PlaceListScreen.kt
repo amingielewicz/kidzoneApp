@@ -118,6 +118,18 @@ fun PlaceListScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
+    // Auto-refresh po przywróceniu internetu
+    val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
+    var previousNetworkStatus by remember { mutableStateOf(networkStatus) }
+    LaunchedEffect(networkStatus) {
+        if (previousNetworkStatus == com.kidzone.presentation.common.NetworkStatus.UNAVAILABLE
+            && networkStatus == com.kidzone.presentation.common.NetworkStatus.AVAILABLE
+        ) {
+            viewModel.refresh()
+        }
+        previousNetworkStatus = networkStatus
+    }
+
     var showFilterSheet by rememberSaveable { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()

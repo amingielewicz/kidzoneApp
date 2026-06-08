@@ -52,7 +52,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -105,6 +107,18 @@ fun ProfileScreen(
 ) {
     val user by viewModel.user.collectAsState()
     val ui by viewModel.uiState.collectAsState()
+
+    // Auto-refresh po przywróceniu internetu
+    val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
+    var previousNetworkStatus by remember { mutableStateOf(networkStatus) }
+    LaunchedEffect(networkStatus) {
+        if (previousNetworkStatus == com.kidzone.presentation.common.NetworkStatus.UNAVAILABLE
+            && networkStatus == com.kidzone.presentation.common.NetworkStatus.AVAILABLE
+        ) {
+            viewModel.refreshProfile()
+        }
+        previousNetworkStatus = networkStatus
+    }
 
     // Snackbar pokazujemy dla informacji typu "Hasło zmienione" /
     // "Wysłaliśmy link na nowy adres". Po pokazaniu czyścimy stan.
