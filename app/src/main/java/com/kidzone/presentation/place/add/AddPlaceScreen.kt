@@ -1,9 +1,15 @@
 package com.kidzone.presentation.place.add
 
 import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import java.io.File
+import java.security.MessageDigest
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +34,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
@@ -120,6 +127,31 @@ fun AddPlaceScreen(
     ) { uris ->
         if (uris.isNotEmpty()) {
             viewModel.addPhotos(uris)
+        }
+    }
+
+    // Camera
+    val placeCameraUri = remember { mutableStateOf<Uri?>(null) }
+    val placeCameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && placeCameraUri.value != null) {
+            viewModel.addPhotos(listOf(placeCameraUri.value!!))
+        }
+    }
+
+    fun launchPlaceCamera() {
+        val photoFile = File.createTempFile("place_camera_", ".jpg", context.cacheDir)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+        placeCameraUri.value = uri
+        placeCameraLauncher.launch(uri)
+    }
+
+    val placeCameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            launchPlaceCamera()
         }
     }
 
@@ -325,18 +357,43 @@ fun AddPlaceScreen(
                 Spacer(Modifier.height(8.dp))
             }
 
-            // Przycisk dodawania zdjęć
+            // Przyciski Galeria + Aparat
             if (state.canAddMorePhotos) {
-                OutlinedButton(
-                    onClick = { photoPickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    ) },
-                    enabled = !state.isSaving,
-                    modifier = Modifier.fillMaxWidth()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Filled.AddAPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Dodaj zdjęcia")
+                    OutlinedButton(
+                        onClick = {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        enabled = !state.isSaving,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.AddAPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Galeria")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            val hasPerm = ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.CAMERA
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (hasPerm) {
+                                launchPlaceCamera()
+                            } else {
+                                placeCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
+                        },
+                        enabled = !state.isSaving,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Aparat")
+                    }
                 }
             }
 
