@@ -360,7 +360,18 @@ fun AddReviewSheet(
                         PhotoThumbnail(
                             model = url,
                             onRemove = {
+                                // Usuwamy hash remote URL żeby ponowne dodanie tego samego zdjęcia
+                                // z galerii nie było blokowane jako duplikat.
+                                val removedUrl = existingPhotoUrls[index]
                                 existingPhotoUrls = existingPhotoUrls.toMutableList().apply { removeAt(index) }
+                                scope.launch {
+                                    val hash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        computeRemoteContentHash(removedUrl)
+                                    }
+                                    if (hash != null) {
+                                        photoHashList = photoHashList.filter { it != hash }
+                                    }
+                                }
                             }
                         )
                     }
@@ -368,7 +379,14 @@ fun AddReviewSheet(
                         PhotoThumbnail(
                             model = uri,
                             onRemove = {
+                                // Usuwamy hash lokalnego URI żeby ponowne dodanie tego samego
+                                // zdjęcia nie pokazywało "już dodane".
+                                val removedUri = photoUris[index]
+                                val hash = computeContentHash(context, removedUri)
                                 photoUris = photoUris.toMutableList().apply { removeAt(index) }
+                                if (hash != null) {
+                                    photoHashList = photoHashList.filter { it != hash }
+                                }
                             }
                         )
                     }

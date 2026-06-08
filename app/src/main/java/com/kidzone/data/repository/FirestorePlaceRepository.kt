@@ -3,7 +3,6 @@ package com.kidzone.data.repository
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
-import com.google.firebase.firestore.ktx.toObject
 import com.kidzone.data.local.PlaceDao
 import com.kidzone.data.local.PlaceEntity
 import com.kidzone.data.remote.FirestoreCollections
@@ -67,7 +66,7 @@ class FirestorePlaceRepository @Inject constructor(
                         return@addSnapshotListener
                     }
                     val places = snapshot?.documents
-                        ?.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
+                        ?.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
                         .orEmpty()
                     trySend(places)
                 }
@@ -104,7 +103,7 @@ class FirestorePlaceRepository @Inject constructor(
                             return@addSnapshotListener
                         }
                         val places = snapshot?.documents
-                            ?.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
+                            ?.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
                             ?.sortedByDescending { it.createdAtMillis }
                             .orEmpty()
                         trySend(places)
@@ -125,7 +124,7 @@ class FirestorePlaceRepository @Inject constructor(
 
     override suspend fun getPlace(placeId: String): OpResult<Place> = try {
         val snapshot = placesCollection().document(placeId).get().await()
-        val dto = snapshot.toObject<PlaceDto>()
+        val dto = snapshot.toObject(PlaceDto::class.java)
         if (dto != null) {
             val place = dto.toDomain()
             // Zaktualizuj cache po udanym pobraniu z sieci.
@@ -163,13 +162,13 @@ class FirestorePlaceRepository @Inject constructor(
                 .whereLessThan("geohash", hashEnd)
                 .get()
                 .await()
-            val places = snapshot.documents.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
+            val places = snapshot.documents.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
 
             // Fallback: jeśli geohash query zwrócił 0 wyników (np. stare
             // miejsca bez geohash), pobierz wszystko (legacy behavior).
             val result = if (places.isEmpty()) {
                 val allSnapshot = placesCollection().get().await()
-                allSnapshot.documents.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
+                allSnapshot.documents.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
             } else {
                 places
             }
@@ -194,7 +193,7 @@ class FirestorePlaceRepository @Inject constructor(
             .limit(limit.toLong())
             .get()
             .await()
-        val places = snapshot.documents.mapNotNull { it.toObject<PlaceDto>()?.toDomain() }
+        val places = snapshot.documents.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
         // Persystuj do cache.
         placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
         OpResult.success(places)
@@ -420,20 +419,65 @@ class FirestorePlaceRepository @Inject constructor(
         require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
 
         val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
-            placesCollection().document(placeId)
-                .update(
-                    mapOf(
-                        "photoUrls" to com.google.firebase.firestore.FieldValue.arrayUnion(photoUrl),
-                        "photoUploadedBy.$photoUrl" to uploadedByUserId
-                    )
+            // Nie używamy dot-notation ("photoUploadedBy.$photoUrl") bo URL-e
+            // zawierają kropki, które Firestore interpretuje jako separatory
+            // zagnieżdżonych pól. Zamiast tego robimy dwa osobne update'y:
+            // 1) arrayUnion na photoUrls
+            // 2) merge set na photoUploadedBy jako całej mapie
+            val docRef = placesCollection().document(placeId)
+
+            // Pobierz aktualną mapę photoUploadedBy i dodaj nowy wpis
+            val snap = docRef.get().await()
+            @Suppress("UNCHECKED_CAST")
+            val currentMap = (snap.get("photoUploadedBy") as? Map<String, String>).orEmpty()
+            val updatedMap = currentMap + (photoUrl to uploadedByUserId)
+
+            docRef.update(
+                mapOf(
+                    "photoUrls" to FieldValue.arrayUnion(photoUrl),
+                    "photoUploadedBy" to updatedMap
                 )
-                .await()
+            ).await()
             true
         }
         if (completed == null) {
             OpResult.failure(
                 java.util.concurrent.TimeoutException(
                     "Dodawanie zdjęcia trwa zbyt długo. Spróbuj ponownie."
+                )
+            )
+        } else {
+            OpResult.success(Unit)
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
+    override suspend fun removePhotoUrl(placeId: String, photoUrl: String): OpResult<Unit> = try {
+        require(placeId.isNotBlank()) { "placeId nie może być puste" }
+        require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
+
+        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+            val docRef = placesCollection().document(placeId)
+
+            // Pobierz aktualną mapę i usuń wpis
+            val snap = docRef.get().await()
+            @Suppress("UNCHECKED_CAST")
+            val currentMap = (snap.get("photoUploadedBy") as? Map<String, String>).orEmpty()
+            val updatedMap = currentMap - photoUrl
+
+            docRef.update(
+                mapOf(
+                    "photoUrls" to FieldValue.arrayRemove(photoUrl),
+                    "photoUploadedBy" to updatedMap
+                )
+            ).await()
+            true
+        }
+        if (completed == null) {
+            OpResult.failure(
+                java.util.concurrent.TimeoutException(
+                    "Usuwanie zdjęcia trwa zbyt długo. Spróbuj ponownie."
                 )
             )
         } else {

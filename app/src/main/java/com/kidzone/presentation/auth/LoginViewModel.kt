@@ -132,7 +132,8 @@ class LoginViewModel @Inject constructor(
                 when (result) {
                     is OpResult.Success -> it.copy(
                         isLoading = false,
-                        message = "Wysłaliśmy link do zresetowania hasła na $email",
+                        message = "Wysłaliśmy link do zresetowania hasła na $email. " +
+                            "Jeśli logowałeś/aś się przez Google, użyj przycisku \"Zaloguj się przez Google\" poniżej.",
                         isMessageError = false
                     )
                     is OpResult.Failure -> it.copy(

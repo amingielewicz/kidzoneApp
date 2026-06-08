@@ -650,16 +650,22 @@ class PlaceDetailsViewModel @Inject constructor(
 
             try {
                 val url = photoUploader.uploadPlacePhoto(place.id, newBytes)
-                placeRepository.addPhotoUrl(place.id, url, user.id)
-                placePhotoHashes.add(newHash)
-                _uiState.update {
-                    it.copy(
-                        place = place.copy(
-                            photoUrls = place.photoUrls + url,
-                            photoUploadedBy = place.photoUploadedBy + (url to user.id)
-                        ),
-                        isUploadingPlacePhoto = false
-                    )
+                when (placeRepository.addPhotoUrl(place.id, url, user.id)) {
+                    is OpResult.Success -> {
+                        placePhotoHashes.add(newHash)
+                        _uiState.update {
+                            it.copy(
+                                place = place.copy(
+                                    photoUrls = place.photoUrls + url,
+                                    photoUploadedBy = place.photoUploadedBy + (url to user.id)
+                                ),
+                                isUploadingPlacePhoto = false
+                            )
+                        }
+                    }
+                    is OpResult.Failure -> {
+                        _uiState.update { it.copy(isUploadingPlacePhoto = false) }
+                    }
                 }
             } catch (_: Exception) {
                 _uiState.update { it.copy(isUploadingPlacePhoto = false) }
@@ -667,8 +673,51 @@ class PlaceDetailsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Usuwa zdjęcie z galerii miejsca. Tylko zdjęcia dodane przez bieżącego
+     * usera mogą być usunięte (sprawdzane przez `photoUploadedBy`).
+     */
+    fun deletePhotoFromPlace(photoUrl: String) {
+        val place = _uiState.value.place ?: return
+        val user = currentUser.value ?: return
+
+        // Autoryzacja klient-side: tylko własne zdjęcia
+        val uploaderId = place.photoUploadedBy[photoUrl]
+        if (uploaderId != user.id) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isUploadingPlacePhoto = true) }
+
+            when (placeRepository.removePhotoUrl(place.id, photoUrl)) {
+                is OpResult.Success -> {
+                    // Usuń z Storage (best-effort)
+                    try { photoUploader.deletePhoto(photoUrl) } catch (_: Exception) {}
+
+                    // Aktualizuj stan optymistycznie
+                    _uiState.update {
+                        it.copy(
+                            place = place.copy(
+                                photoUrls = place.photoUrls - photoUrl,
+                                photoUploadedBy = place.photoUploadedBy - photoUrl
+                            ),
+                            isUploadingPlacePhoto = false
+                        )
+                    }
+                    // Re-seed hashów po usunięciu
+                    seedPlacePhotoHashes((_uiState.value.place?.photoUrls).orEmpty())
+                }
+                is OpResult.Failure -> {
+                    _uiState.update { it.copy(isUploadingPlacePhoto = false) }
+                }
+            }
+        }
+    }
+
     /** Seeduje hash set istniejących zdjęć miejsca (wołane z init po załadowaniu place). */
     private fun seedPlacePhotoHashes(photoUrls: List<String>) {
+        // Reset the set to match current state – this fixes the bug where
+        // a deleted photo's hash would remain and block re-adding it.
+        placePhotoHashes.clear()
         if (photoUrls.isEmpty()) return
         viewModelScope.launch {
             for (url in photoUrls) {

@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Flag
@@ -141,6 +142,37 @@ fun PlaceDetailsScreen(
     ) { uri ->
         if (uri != null) {
             viewModel.addPhotoToPlace(uri)
+        }
+    }
+
+    // Camera for adding photos to place
+    val placeCameraUri = remember { androidx.compose.runtime.mutableStateOf<android.net.Uri?>(null) }
+    val placeCameraLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && placeCameraUri.value != null) {
+            viewModel.addPhotoToPlace(placeCameraUri.value!!)
+        }
+    }
+    fun launchPlaceCamera() {
+        val photoFile = java.io.File.createTempFile(
+            "place_camera_",
+            ".jpg",
+            context.cacheDir
+        )
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            photoFile
+        )
+        placeCameraUri.value = uri
+        placeCameraLauncher.launch(uri)
+    }
+    val placeCameraPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            launchPlaceCamera()
         }
     }
 
@@ -365,6 +397,18 @@ fun PlaceDetailsScreen(
                                 )
                             }
                         } else null,
+                        onAddPlaceCamera = if (currentUser != null) {
+                            {
+                                val hasPerm = androidx.core.content.ContextCompat.checkSelfPermission(
+                                    context, android.Manifest.permission.CAMERA
+                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                if (hasPerm) {
+                                    launchPlaceCamera()
+                                } else {
+                                    placeCameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                                }
+                            }
+                        } else null,
                         isUploadingPlacePhoto = state.isUploadingPlacePhoto
                     )
                 }
@@ -484,6 +528,15 @@ fun PlaceDetailsScreen(
                 // Ukryj flagę na zdjęciach dodanych przez bieżącego usera
                 val uploaderId = fullscreenPhotoUploadedBy[url]
                 uploaderId == null || uploaderId != myUserId
+            },
+            onDeletePhoto = { url ->
+                viewModel.deletePhotoFromPlace(url)
+                // Viewer dismisses itself after deletion (onDismiss called inside)
+            },
+            canDeletePhoto = { url ->
+                // Pokaż kosz tylko na zdjęciach dodanych przez bieżącego usera
+                val uploaderId = fullscreenPhotoUploadedBy[url]
+                myUserId != null && uploaderId == myUserId
             }
         )
     }
@@ -522,6 +575,7 @@ private fun PlaceDetailsContent(
     onReportReview: (Review) -> Unit,
     onOpenPhotoViewer: (photos: List<String>, startIndex: Int, areMine: Boolean) -> Unit = { _, _, _ -> },
     onAddPlacePhoto: (() -> Unit)? = null,
+    onAddPlaceCamera: (() -> Unit)? = null,
     isUploadingPlacePhoto: Boolean = false
 ) {
     // Przycisk "Dodaj opinię" widoczny tylko gdy:
@@ -585,17 +639,36 @@ private fun PlaceDetailsContent(
                         )
                     }
                 } else {
-                    OutlinedButton(
-                        onClick = onAddPlacePhoto,
-                        modifier = Modifier.fillMaxWidth()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.AddAPhoto,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("Dodaj zdjęcie (${place.photoUrls.size}/5)")
+                        OutlinedButton(
+                            onClick = onAddPlacePhoto,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.AddAPhoto,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text("Galeria (${place.photoUrls.size}/5)")
+                        }
+                        if (onAddPlaceCamera != null) {
+                            OutlinedButton(
+                                onClick = onAddPlaceCamera,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.CameraAlt,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text("Aparat")
+                            }
+                        }
                     }
                 }
             }
