@@ -219,6 +219,31 @@ fun AddPlaceScreen(
         }
     }
 
+    // Camera
+    val placeCameraUri = remember { mutableStateOf<Uri?>(null) }
+    val placeCameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && placeCameraUri.value != null) {
+            viewModel.addPhotos(listOf(placeCameraUri.value!!))
+        }
+    }
+
+    fun launchPlaceCamera() {
+        val photoFile = File.createTempFile("place_camera_", ".jpg", context.cacheDir)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+        placeCameraUri.value = uri
+        placeCameraLauncher.launch(uri)
+    }
+
+    val placeCameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            launchPlaceCamera()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
