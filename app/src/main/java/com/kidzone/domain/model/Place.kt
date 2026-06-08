@@ -18,5 +18,7 @@ data class Place(
     val reviewsCount: Int = 0,
     val amenities: Set<Amenity> = emptySet(),
     val photoUrls: List<String> = emptyList(),
+    /** Mapowanie URL zdjęcia → userId autora. Do blokowania zgłoszenia własnych zdjęć. */
+    val photoUploadedBy: Map<String, String> = emptyMap(),
     val createdAtMillis: Long = 0L
 )

@@ -43,7 +43,8 @@ class LoginViewModel @Inject constructor(
         val isLoading: Boolean = false,
         val message: String? = null,
         val isMessageError: Boolean = true,
-        val isSignedIn: Boolean = false
+        val isSignedIn: Boolean = false,
+        val showResendVerification: Boolean = false
     ) {
         /** Oba pola wypełnione – tylko wtedy można kliknąć "Zaloguj się". */
         val isFormValid: Boolean
@@ -73,11 +74,15 @@ class LoginViewModel @Inject constructor(
             _uiState.update {
                 when (result) {
                     is OpResult.Success -> it.copy(isLoading = false, isSignedIn = true)
-                    is OpResult.Failure -> it.copy(
-                        isLoading = false,
-                        message = mapError(result.error),
-                        isMessageError = true
-                    )
+                    is OpResult.Failure -> {
+                        val isEmailNotVerified = result.error is AuthException.EmailNotVerified
+                        it.copy(
+                            isLoading = false,
+                            message = mapError(result.error),
+                            isMessageError = true,
+                            showResendVerification = isEmailNotVerified
+                        )
+                    }
                 }
             }
         }
@@ -143,5 +148,29 @@ class LoginViewModel @Inject constructor(
     private fun mapError(throwable: Throwable): String = when (throwable) {
         is AuthException -> throwable.message ?: "Nieznany błąd"
         else -> throwable.message ?: "Nieznany błąd"
+    }
+
+    fun resendVerificationEmail() {
+        val state = _uiState.value
+        if (state.email.isBlank() || state.password.isBlank()) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val result = authRepository.resendVerificationEmail(state.email.trim(), state.password)
+            _uiState.update {
+                when (result) {
+                    is OpResult.Success -> it.copy(
+                        isLoading = false,
+                        message = "Link weryfikacyjny wysłany ponownie. Sprawdź skrzynkę.",
+                        isMessageError = false,
+                        showResendVerification = false
+                    )
+                    is OpResult.Failure -> it.copy(
+                        isLoading = false,
+                        message = "Nie udało się wysłać linku: ${result.error.message}",
+                        isMessageError = true
+                    )
+                }
+            }
+        }
     }
 }

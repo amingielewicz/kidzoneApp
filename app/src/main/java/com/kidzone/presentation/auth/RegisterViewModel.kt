@@ -28,6 +28,7 @@ class RegisterViewModel @Inject constructor(
         val password: String = "",
         val isLoading: Boolean = false,
         val errorMessage: String? = null,
+        val successMessage: String? = null,
         val isRegistered: Boolean = false
     ) {
         val isNameValid: Boolean
@@ -92,9 +93,17 @@ class RegisterViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             val result = authRepository.registerWithEmail(name, email, password)
+            // Po rejestracji wyloguj – user musi potwierdzić email zanim się zaloguje.
+            if (result is OpResult.Success) {
+                authRepository.signOut()
+            }
             _uiState.update {
                 when (result) {
-                    is OpResult.Success -> it.copy(isLoading = false, isRegistered = true)
+                    is OpResult.Success -> it.copy(
+                        isLoading = false,
+                        isRegistered = true,
+                        successMessage = "Konto utworzone! Sprawdź skrzynkę e-mail i kliknij link weryfikacyjny, aby się zalogować."
+                    )
                     is OpResult.Failure -> it.copy(
                         isLoading = false,
                         errorMessage = mapError(result.error)

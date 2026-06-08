@@ -222,11 +222,12 @@ class FirestoreReviewRepository @Inject constructor(
                 }
 
                 // Składamy DTO zachowując pola immutowalne z istniejącego
-                // dokumentu (placeId, userId, authorName, createdAtMillis,
-                // photoUrls), nadpisując tylko to, co user mógł zmienić.
+                // dokumentu (placeId, userId, authorName, createdAtMillis),
+                // nadpisując tylko to, co user mógł zmienić (w tym zdjęcia).
                 val merged = existing.copy(
                     rating = newRating,
                     comment = updatedReview.comment,
+                    photoUrls = updatedReview.photoUrls,
                     updatedAtMillis = updatedReview.updatedAtMillis
                 )
                 tx.set(reviewRef, merged)

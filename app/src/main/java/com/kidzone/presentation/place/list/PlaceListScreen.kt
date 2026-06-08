@@ -187,19 +187,10 @@ fun PlaceListScreen(
             onSortOrderChange = viewModel::onSortOrderChange
         )
 
-        // Banner zachęcający do włączenia lokalizacji - tylko gdy user
-        // wybrał "Najbliższe", a lokalizacji nie mamy.
+        // Banner informujący o wyłączonej lokalizacji - standardowy GpsDisabledBanner
+        // (wystarczy "Lokalizacja wyłączona, Włącz GPS")
         if (state.nearestUnavailable) {
-            EnableLocationForSortingBanner(
-                onAllowClick = {
-                    locationPermissionLauncher.launch(
-                        arrayOf(
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
-                        )
-                    )
-                }
-            )
+            com.kidzone.presentation.common.GpsDisabledBanner()
         }
 
         // Banner GPS disabled - when permission granted, sort=NEAREST, but

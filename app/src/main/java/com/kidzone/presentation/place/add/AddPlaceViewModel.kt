@@ -108,7 +108,9 @@ class AddPlaceViewModel @Inject constructor(
         /** Istniejące URL-e zdjęć (tryb edycji – zdjęcia już uploadowane). */
         val existingPhotoUrls: List<String> = emptyList(),
         /** True podczas uploadu zdjęć. */
-        val isUploadingPhotos: Boolean = false
+        val isUploadingPhotos: Boolean = false,
+        /** Komunikat o duplikatach (event jednorazowy, konsumowany przez UI). */
+        val photoDuplicateMessage: String? = null
     ) {
         /** Max 5 zdjęć łącznie (nowe + istniejące). */
         val canAddMorePhotos: Boolean
@@ -116,7 +118,6 @@ class AddPlaceViewModel @Inject constructor(
         /** Wszystkie wymagane pola wypełnione – można kliknąć "Zapisz". */
         val isFormValid: Boolean
             get() = name.trim().isNotBlank() &&
-                address.trim().isNotBlank() &&
                 latitude != null && longitude != null
     }
 
@@ -197,6 +198,8 @@ class AddPlaceViewModel @Inject constructor(
                             errorMessage = null
                         )
                     }
+                    // Seed hash set z istniejących zdjęć dla dedup detection
+                    seedPhotoHashes(result.data.photoUrls)
                 }
                 is OpResult.Failure -> {
                     _uiState.update {
@@ -362,7 +365,34 @@ class AddPlaceViewModel @Inject constructor(
         _uiState.update { it.copy(showDuplicateWarning = false, duplicateCandidate = null) }
     }
 
+    fun consumePhotoDuplicateMessage() {
+        _uiState.update { it.copy(photoDuplicateMessage = null) }
+    }
+
     // --- Zarządzanie zdjęciami ---
+
+    /** Zbiór hashów (MD5 skompresowanych bajtów) istniejących zdjęć. */
+    private val photoContentHashes = mutableSetOf<String>()
+
+    /** Seeduje hash set z remote URLs (background IO). */
+    private fun seedPhotoHashes(urls: List<String>) {
+        viewModelScope.launch {
+            for (url in urls) {
+                try {
+                    val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        val conn = java.net.URL(url).openConnection()
+                        conn.connectTimeout = 10_000
+                        conn.readTimeout = 10_000
+                        conn.getInputStream().readBytes()
+                    }
+                    val hash = java.security.MessageDigest.getInstance("MD5")
+                        .digest(bytes)
+                        .joinToString("") { "%02x".format(it) }
+                    photoContentHashes.add(hash)
+                } catch (_: Exception) { /* best-effort */ }
+            }
+        }
+    }
 
     /** Dodaje zdjęcia z photo pickera (respektuje limit MAX_PLACE_PHOTOS). */
     fun addPhotos(uris: List<Uri>) {
@@ -412,17 +442,25 @@ class AddPlaceViewModel @Inject constructor(
                 return@launch
             }
 
-            // Upload nowych zdjęć (kompresja + Firebase Storage)
+            // Upload nowych zdjęć (kompresja + Firebase Storage + dedup)
             val uploadedUrls = mutableListOf<String>()
+            var duplicatesSkipped = 0
             if (state.photoUris.isNotEmpty()) {
                 _uiState.update { it.copy(isUploadingPhotos = true) }
                 for (uri in state.photoUris) {
                     val bytes = ImageCompressor.compressToWebp(appContext, uri)
                     if (bytes != null) {
+                        // Dedup check na bazie hash skompresowanych bajtów
+                        val hash = java.security.MessageDigest.getInstance("MD5")
+                            .digest(bytes)
+                            .joinToString("") { "%02x".format(it) }
+                        if (hash in photoContentHashes) {
+                            duplicatesSkipped++
+                            continue
+                        }
+                        photoContentHashes.add(hash)
+
                         try {
-                            // Używamy tymczasowego ID "pending" dla nowych miejsc;
-                            // po uzyskaniu prawdziwego ID z Firestore pliki już są
-                            // uploadowane – URL jest stały niezależnie od folder path.
                             val tempId = state.editingPlaceId ?: "pending_${System.currentTimeMillis()}"
                             val url = photoUploader.uploadPlacePhoto(tempId, bytes)
                             uploadedUrls.add(url)
@@ -441,8 +479,33 @@ class AddPlaceViewModel @Inject constructor(
                 _uiState.update { it.copy(isUploadingPhotos = false) }
             }
 
+            // Komunikat o duplikatach
+            if (duplicatesSkipped > 0 && uploadedUrls.isEmpty() && state.existingPhotoUrls.isNotEmpty()) {
+                // Wszystkie nowe zdjęcia to duplikaty – nie zapisujemy, pokazujemy błąd
+                _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        photoDuplicateMessage = "To zdjęcie zostało już dodane. Nie można dodać duplikatu."
+                    )
+                }
+                return@launch
+            } else if (duplicatesSkipped > 0) {
+                // Część zdjęć pominięta – kontynuujemy zapis z resztą
+                _uiState.update {
+                    it.copy(
+                        photoDuplicateMessage = "To zdjęcie zostało już dodane. Nie można dodać duplikatu."
+                    )
+                }
+            }
+
             // Łączymy istniejące URL-e (edycja) + nowo uploadowane
             val allPhotoUrls = state.existingPhotoUrls + uploadedUrls
+
+            // Budujemy mapę photoUploadedBy: zachowujemy istniejącą (edycja)
+            // + dodajemy nowo-uploadowane URL-e z bieżącym userId
+            val existingUploadedBy = editingOriginal?.photoUploadedBy.orEmpty()
+            val newUploadedBy = uploadedUrls.associateWith { currentUser.id }
+            val allPhotoUploadedBy = existingUploadedBy + newUploadedBy
 
             val result = if (state.isEditMode && editingOriginal != null) {
                 val original = editingOriginal!!
@@ -454,7 +517,8 @@ class AddPlaceViewModel @Inject constructor(
                     latitude = state.latitude!!,
                     longitude = state.longitude!!,
                     amenities = state.amenities,
-                    photoUrls = allPhotoUrls
+                    photoUrls = allPhotoUrls,
+                    photoUploadedBy = allPhotoUploadedBy
                 )
                 placeRepository.updatePlace(updated)
             } else {
@@ -469,6 +533,7 @@ class AddPlaceViewModel @Inject constructor(
                     address = TextNormalization.toTitleCase(state.address),
                     amenities = state.amenities,
                     photoUrls = allPhotoUrls,
+                    photoUploadedBy = allPhotoUploadedBy,
                     createdAtMillis = System.currentTimeMillis()
                 )
                 placeRepository.addPlace(newPlace)

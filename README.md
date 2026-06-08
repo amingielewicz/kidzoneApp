@@ -502,7 +502,14 @@ przy pierwszym wejściu, `AddPlaceScreen` przy kliknięciu "Pobierz lokalizację
 | Infinite scroll / paginacja listy miejsc (20/stronę) | ✅     |
 | Geohash-based geo queries (`getPlacesNear`)          | ✅     |
 | Deep linking (`kidzone://place/{id}`, `https://kidzone.app/place/{id}`) | ✅ |
-| Upload zdjęć miejsc / opinii do Storage              | ⏳ — Storage dep wpięte, brak UI |
+| Upload zdjęć miejsc (galeria + aparat)               | ✅     |
+| Upload zdjęć opinii (galeria + aparat)               | ✅     |
+| Blokada duplikatów zdjęć (MD5 content hash)          | ✅     |
+| Fullscreen viewer zdjęć (swipe + pinch-to-zoom)      | ✅     |
+| Edycja zdjęć w opiniach (dodawanie/usuwanie)         | ✅     |
+| Zgłaszanie zdjęcia (dialog + `photo_reports`)        | ✅     |
+| Cloud Function: email admin po zgłoszeniu zdjęcia    | ✅     |
+| Admin: Usuń zdjęcie / Odrzuć zgłoszenie (HTTP endpoints) | ✅ |
 
 ## Cloud Functions (backend)
 
@@ -513,9 +520,12 @@ triggerowane przez zapis/usunięcie dokumentu w Firestore:
 |---------|----------|-----------|
 | `onPlaceReport` | `place_reports` | Email do admina: zgłoszenie naruszenia miejsca |
 | `onReviewReport` | `review_reports` | Email do admina: zgłoszenie opinii jako spam (z treścią opinii, autorem, gwiazdkami) |
+| `onPhotoReport` | `photo_reports` | Email do admina: zgłoszenie zdjęcia (z miniaturką inline + przyciski "Usuń zdjęcie" / "Odrzuć zgłoszenie") |
 | `onPlaceChangeRequest` | `place_change_requests` | Email do admina: propozycja zmiany / korekty lokalizacji |
 | `onUserCreated` | `users` (onCreate) | Email powitalny do usera + powiadomienie admina |
 | `onUserDeleted` | `users` (onDelete) | Email pożegnalny do usera + powiadomienie admina |
+| `adminDeletePhoto` | HTTP endpoint | Usuwa zdjęcie z Storage + czyści URL z reviews/places + oznacza report jako resolved |
+| `adminDismissPhotoReport` | HTTP endpoint | Oznacza zgłoszenie zdjęcia jako dismissed (zdjęcie zostaje) |
 
 Email zawiera: nazwę miejsca, dane zgłaszającego (imię, email, UID),
 powód / proponowane zmiany (zmapowane na czytelne polskie etykiety) +
@@ -528,31 +538,77 @@ Konfiguracja credentials przez Firebase Secrets (`defineSecret`):
 
 Deploy: `cd functions && npm run build && cd .. && firebase deploy --only functions`
 
-## Kolejne kroki
+## Kolejne kroki (Roadmap + Wycena)
 
-1. **Upload zdjęć miejsc i opinii** — analogicznie do `uploadAvatar`,
-   w `AddPlaceScreen` i `AddReviewSheet`. Wykorzystać `READ_MEDIA_IMAGES`
-   i `CAMERA`, które już są w manifeście. User może dodać zdjęcie do
-   cudzego miejsca (zapamiętane do implementacji).
-2. **Landing page dla deep linków** — postawić stronę na Firebase Hosting
-   (lub GitHub Pages) pod adresem `kidzone.app/place/{id}`:
-   - User z apką → otwiera w kidZone
-   - User bez apki → widzi przycisk "Pobierz z Google Play"
-   - Hostowanie `assetlinks.json` do App Links (HTTPS bez dialogu "Otwórz za pomocą...")
-3. **Panel admina do akceptacji zmian** — propozycje zmian i korekty
-   lokalizacji trafiają do `place_change_requests`, ale akceptacja
-   wymaga ręcznej edycji w Firebase Console. Docelowo: prosty panel
-   webowy lub Cloud Function z auto-akceptacją po N zgodnych zgłoszeniach.
-4. **Backfill geohash na istniejących miejscach** — nowe miejsca dostają
-   `geohash` automatycznie, ale stare (sprzed PR #46) nie mają tego pola.
-   Jednorazowy skrypt / Cloud Function który przechodzi po kolekcji `places`
-   i ustawia `geohash = GeoHash.encode(lat, lng)`.
-5. **Push notifications (FCM)** — "Ktoś dodał opinię do Twojego miejsca",
-   "Twoje miejsce weszło do TOP 10" itp. Wymaga: firebase-messaging dep,
-   token registration, Cloud Function trigger.
-6. **Subskrypcja (Google Play Billing)** — 14-day free trial + miesięczna
-   opłata. Google Play Billing Library, paywall screen, weryfikacja statusu.
-7. **Zmiana "Udostępnij" na link kidZone** — zamiast Google Maps URL dawać
-   `https://kidzone.app/place/{id}` (wymaga punktu 2. landing page).
-8. Opcjonalnie: server-side paginacja (gdy baza >1000 miejsc),
-   zdjęcia miejsc/opinii, paginacja rankingu.
+Poniższa tabela zbiera wszystkie zaplanowane zadania, pogrupowane
+tematycznie. Wycena w **roboczogodzinach (h)** zakłada jednego
+developera znającego projekt; w zespole 2-osobowym czas kalendarzowy
+≈ 60% podanego.
+
+### 🔴 Priorytet 1 — UX krytyczny (przed release na Google Play)
+
+| # | Zadanie | Opis | Wycena |
+|---|---------|------|--------|
+| 1.1 | **Landing page dla deep linków** | Firebase Hosting pod `kidzone.app/place/{id}`: user z apką → otwiera w kidZone; bez apki → "Pobierz z Google Play". Hostowanie `assetlinks.json` (App Links bez dialogu "Otwórz za pomocą..."). | 8h |
+| 1.2 | **Push notifications (FCM)** | "Ktoś dodał opinię do Twojego miejsca", "Twoje miejsce w TOP 10", "Nowa odznaka". Token registration + Cloud Function triggers + `firebase-messaging` dep. | 16h |
+| 1.3 | **Subskrypcja (Google Play Billing)** | 14-day free trial + miesięczna opłata. Paywall screen, BillingClient, weryfikacja receipts server-side (Cloud Function), gating premium features. | 24h |
+| 1.4 | **Panel admina do akceptacji zmian** | Webowy panel (React/Next.js na Firebase Hosting) do akceptacji/odrzucania `place_change_requests` + moderacji zgłoszeń miejsc/opinii/zdjęć. CRUD na kolekcjach reports. | 20h |
+
+**Suma priorytetu 1: ~68h (≈ 8.5 dnia roboczego)**
+
+---
+
+### 🟡 Priorytet 2 — Ulepszenia UX + jakość
+
+| # | Zadanie | Opis | Wycena |
+|---|---------|------|--------|
+| 2.1 | **Wymuszenie GPS (SettingsClient)** | Na Home/Map/List — dialog z `SettingsClient.checkLocationSettings()` wymuszający włączenie GPS w ustawieniach telefonu + retry aż do uzyskania sygnału. | 6h |
+| 2.2 | **Banner słabego sygnału GPS** | Na Home/Map/List — banner "Słaby sygnał GPS" z animacją ładowania gdy accuracy >100m + auto-hide gdy sygnał się ustabilizuje. | 4h |
+| 2.3 | **Udostępnij link kidZone** | Zamiana URL Google Maps w Share intent na `https://kidzone.app/place/{id}` (zależy od 1.1 landing page). | 2h |
+| 2.4 | **Backfill geohash** | Jednorazowa Cloud Function/skrypt przechodzący po kolekcji `places` i ustawiający `geohash` na starych dokumentach (sprzed PR #46). | 3h |
+| 2.5 | **Dodawanie zdjęcia do cudzego miejsca** | User może zaproponować zdjęcie do miejsca, którego nie jest właścicielem. Zapis do `photo_proposals` + email do admina + akceptacja. | 10h |
+| 2.6 | **Animacje i micro-interactions** | Shared element transitions (Compose animation), skeleton loaders zamiast CircularProgressIndicator, animacja dodawania odznaki. | 8h |
+
+**Suma priorytetu 2: ~33h (≈ 4 dni robocze)**
+
+---
+
+### 🟢 Priorytet 3 — Skalowanie + offline
+
+| # | Zadanie | Opis | Wycena |
+|---|---------|------|--------|
+| 3.1 | **Pełny offline mode (Room sync)** | Room jako single source of truth. Firestore sync w background. Offline writes z queue + retry. Status sync indicator w UI. | 20h |
+| 3.2 | **Server-side paginacja** | Cursor-based pagination na Firestore (startAfter) dla >1000 miejsc. Infinite scroll + `PagingSource` (Paging 3). | 12h |
+| 3.3 | **Moderacja AI (Cloud Function)** | Auto-flagowanie obraźliwych opinii/zdjęć przez Cloud Natural Language API / Vision API. Auto-hide + email do admina. | 16h |
+| 3.4 | **Analytics + Crashlytics** | Firebase Analytics (eventy: dodanie miejsca, opinii, zdjęcia, share, report) + Crashlytics (crash reporting). | 6h |
+| 3.5 | **Widget Android** | Glance widget "Blisko Ciebie" — 3 najbliższe miejsca z mini-info (nazwa + rating + dystans). | 10h |
+| 3.6 | **Wersja iOS (KMP)** | Kotlin Multiplatform — shared domain + data layer, natywny UI (SwiftUI). | 120h+ |
+
+**Suma priorytetu 3: ~184h (≈ 23 dni robocze)**
+
+---
+
+### Podsumowanie wyceny
+
+| Priorytet | Zakres | Godziny | Dni robocze |
+|-----------|--------|---------|-------------|
+| 🔴 P1 | Release-critical | 68h | ~8.5 |
+| 🟡 P2 | UX improvements | 33h | ~4 |
+| 🟢 P3 | Scale + platform | 184h | ~23 |
+| **RAZEM** | | **285h** | **~36 dni** |
+
+> **Uwaga:** Wycena nie obejmuje: testów (unit + UI + integration),
+> code review, QA manualnego, procesu publikacji na Google Play
+> (assets, opisy, screenshots, privacy policy link), ani utrzymania
+> (bug fixes po release). Dodaj ~30% buforu na te aktywności.
+
+---
+
+### Zadania ukończone w bieżącej sesji (PR #53)
+
+- [x] Blokada duplikatów zdjęć (MD5 content hash, działa przy dodawaniu i edycji)
+- [x] Fullscreen viewer z nawigacją swipe + pinch-to-zoom + double-tap
+- [x] Zdjęcie z aparatu (AddReviewSheet + AddPlaceScreen)
+- [x] Edycja zdjęć w opiniach (dodawanie nowych + usuwanie istniejących)
+- [x] Zgłoszenie zdjęcia (dialog + Firestore `photo_reports` + Cloud Function email z miniaturką + przyciski admin: Usuń/Odrzuć)
+

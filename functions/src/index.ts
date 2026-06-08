@@ -1,4 +1,5 @@
 import {onDocumentCreated, onDocumentDeleted} from "firebase-functions/v2/firestore";
+import {onRequest} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import * as nodemailer from "nodemailer";
@@ -99,6 +100,18 @@ function mapReviewReason(reason: string): string {
     "OFFENSIVE": "Obraźliwa treść",
     "FALSE_INFO": "Fałszywe informacje",
     "NOT_RELEVANT": "Nie dotyczy tego miejsca",
+    "OTHER": "Inne",
+  };
+  const label = reasons[reason] || reason;
+  return `${label} [${reason}]`;
+}
+
+function mapPhotoReason(reason: string): string {
+  const reasons: Record<string, string> = {
+    "INAPPROPRIATE": "Nieodpowiednia treść",
+    "NOT_RELEVANT": "Niezwiązane z miejscem",
+    "COPYRIGHT": "Narusza prawa autorskie",
+    "OFFENSIVE": "Obraźliwe / wulgarne",
     "OTHER": "Inne",
   };
   const label = reasons[reason] || reason;
@@ -427,6 +440,71 @@ export const onReviewReport = onDocumentCreated(
   }
 );
 
+// --- Trigger: zgłoszenie zdjęcia ---
+export const onPhotoReport = onDocumentCreated(
+  {
+    document: "photo_reports/{reportId}",
+    secrets: [gmailEmail, gmailPassword, adminEmail],
+  },
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+
+    const photoUrl = data.photoUrl || "";
+    const reporterId = data.reporterId || "";
+    const reason = mapPhotoReason(data.reason || "");
+    const comment = data.comment || "";
+    const reportId = event.params.reportId;
+
+    const reporterInfo = await getUserInfo(reporterId);
+
+    const projectId = process.env.GCLOUD_PROJECT || "playground-705e7162";
+    const firestoreUrl =
+      `https://console.firebase.google.com/project/${projectId}/firestore/data/photo_reports/${reportId}`;
+
+    // Deep link do Cloud Function HTTP endpoints dla akcji admina
+    const baseUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
+    const deletePhotoUrl = `${baseUrl}/adminDeletePhoto?reportId=${reportId}`;
+    const dismissReportUrl = `${baseUrl}/adminDismissPhotoReport?reportId=${reportId}`;
+
+    const html = wrapInTemplate("Zgłoszenie zdjęcia", `
+      <div style="text-align:center; margin-bottom:16px;">
+        <a href="${photoUrl}" target="_blank">
+          <img src="${photoUrl}" alt="Zgłoszone zdjęcie"
+               style="max-width:100%; max-height:300px; border-radius:8px; border:1px solid #e0e0e0; object-fit:contain;" />
+        </a>
+        <p style="font-size:12px; color:#999; margin-top:4px;">Kliknij miniaturkę, aby otworzyć w pełnym rozmiarze</p>
+      </div>
+      <table>
+        <tr><td>Powód:</td><td>${reason}</td></tr>
+        <tr><td>Komentarz:</td><td>${comment || "(brak)"}</td></tr>
+        <tr><td>Zgłaszający:</td><td>${reporterInfo}</td></tr>
+      </table>
+      <div style="margin-top:20px; text-align:center;">
+        <a href="${deletePhotoUrl}" class="btn" style="background:#D32F2F; margin-right:8px;">Usuń zdjęcie</a>
+        <a href="${dismissReportUrl}" class="btn" style="background:#757575;">Odrzuć zgłoszenie</a>
+      </div>
+      <p style="margin-top:12px; text-align:center;">
+        <a href="${firestoreUrl}" style="font-size:12px; color:#1976D2;">Otwórz w Firebase Console</a>
+      </p>
+    `);
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
+    });
+
+    await transporter.sendMail({
+      from: `kidZone <${gmailEmail.value()}>`,
+      to: adminEmail.value(),
+      subject: "[kidZone] Zgłoszenie zdjęcia",
+      html,
+    });
+
+    console.log(`Email sent for photo report ${reportId}`);
+  }
+);
+
 // --- Trigger: użytkownik usunął konto ---
 export const onUserDeleted = onDocumentDeleted(
   {
@@ -485,3 +563,174 @@ export const onUserDeleted = onDocumentDeleted(
     console.log(`Account deletion email sent for ${event.params.userId}`);
   }
 );
+
+
+
+// --- HTTP Endpoint: Admin usuwa zgłoszone zdjęcie ---
+export const adminDeletePhoto = onRequest(
+  {secrets: [gmailEmail, gmailPassword, adminEmail]},
+  async (req, res) => {
+    const reportId = req.query.reportId as string;
+    if (!reportId) {
+      res.status(400).send(renderAdminResponse("Błąd", "Brak reportId w żądaniu."));
+      return;
+    }
+
+    try {
+      const reportDoc = await db.collection("photo_reports").doc(reportId).get();
+      if (!reportDoc.exists) {
+        res.status(404).send(renderAdminResponse("Nie znaleziono", "Zgłoszenie nie istnieje lub zostało już obsłużone."));
+        return;
+      }
+
+      const reportData = reportDoc.data();
+      const photoUrl = reportData?.photoUrl || "";
+      const status = reportData?.status || "";
+
+      if (status === "resolved" || status === "dismissed") {
+        res.status(200).send(renderAdminResponse("Już obsłużone", `To zgłoszenie ma status: ${status}.`));
+        return;
+      }
+
+      // 1. Usuń zdjęcie z Firebase Storage
+      if (photoUrl) {
+        try {
+          const filePath = decodeStoragePath(photoUrl);
+          if (filePath) {
+            const bucket = admin.storage().bucket();
+            await bucket.file(filePath).delete();
+          }
+        } catch (storageErr) {
+          console.warn(`Could not delete photo from storage: ${storageErr}`);
+          // Kontynuuj – może zdjęcie zostało już usunięte ręcznie
+        }
+      }
+
+      // 2. Usuń URL z dokumentów reviews/places które go zawierają
+      if (photoUrl) {
+        // Szukaj w reviews
+        const reviewsSnap = await db.collection("reviews")
+          .where("photoUrls", "array-contains", photoUrl)
+          .get();
+        const batch = db.batch();
+        reviewsSnap.docs.forEach((doc) => {
+          const urls: string[] = doc.data().photoUrls || [];
+          batch.update(doc.ref, {
+            photoUrls: urls.filter((u: string) => u !== photoUrl),
+          });
+        });
+
+        // Szukaj w places
+        const placesSnap = await db.collection("places")
+          .where("photoUrls", "array-contains", photoUrl)
+          .get();
+        placesSnap.docs.forEach((doc) => {
+          const urls: string[] = doc.data().photoUrls || [];
+          batch.update(doc.ref, {
+            photoUrls: urls.filter((u: string) => u !== photoUrl),
+          });
+        });
+
+        await batch.commit();
+      }
+
+      // 3. Oznacz zgłoszenie jako resolved
+      await db.collection("photo_reports").doc(reportId).update({
+        status: "resolved",
+        resolvedAtMillis: Date.now(),
+        action: "deleted",
+      });
+
+      res.status(200).send(renderAdminResponse(
+        "Zdjęcie usunięte",
+        "Zdjęcie zostało usunięte z Storage oraz ze wszystkich opinii i miejsc, które je zawierały."
+      ));
+    } catch (err) {
+      console.error("adminDeletePhoto error:", err);
+      res.status(500).send(renderAdminResponse("Błąd serwera", `Wystąpił błąd: ${err}`));
+    }
+  }
+);
+
+// --- HTTP Endpoint: Admin odrzuca zgłoszenie zdjęcia ---
+export const adminDismissPhotoReport = onRequest(
+  {secrets: [gmailEmail, gmailPassword, adminEmail]},
+  async (req, res) => {
+    const reportId = req.query.reportId as string;
+    if (!reportId) {
+      res.status(400).send(renderAdminResponse("Błąd", "Brak reportId w żądaniu."));
+      return;
+    }
+
+    try {
+      const reportDoc = await db.collection("photo_reports").doc(reportId).get();
+      if (!reportDoc.exists) {
+        res.status(404).send(renderAdminResponse("Nie znaleziono", "Zgłoszenie nie istnieje."));
+        return;
+      }
+
+      const status = reportDoc.data()?.status || "";
+      if (status === "resolved" || status === "dismissed") {
+        res.status(200).send(renderAdminResponse("Już obsłużone", `To zgłoszenie ma status: ${status}.`));
+        return;
+      }
+
+      await db.collection("photo_reports").doc(reportId).update({
+        status: "dismissed",
+        resolvedAtMillis: Date.now(),
+        action: "dismissed",
+      });
+
+      res.status(200).send(renderAdminResponse(
+        "Zgłoszenie odrzucone",
+        "Zgłoszenie zostało oznaczone jako odrzucone. Zdjęcie pozostaje bez zmian."
+      ));
+    } catch (err) {
+      console.error("adminDismissPhotoReport error:", err);
+      res.status(500).send(renderAdminResponse("Błąd serwera", `Wystąpił błąd: ${err}`));
+    }
+  }
+);
+
+/**
+ * Dekoduje Firebase Storage download URL na ścieżkę pliku w bucket-cie.
+ * Format URL: https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}?...
+ */
+function decodeStoragePath(downloadUrl: string): string {
+  try {
+    const url = new URL(downloadUrl);
+    const pathSegment = url.pathname.split("/o/")[1];
+    if (!pathSegment) return "";
+    return decodeURIComponent(pathSegment);
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Renderuje prostą stronę HTML z wynikiem akcji admina.
+ */
+function renderAdminResponse(title: string, message: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>kidZone Admin - ${title}</title>
+  <style>
+    body { margin: 0; padding: 40px 20px; background: #f5f8fb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; }
+    .card { max-width: 500px; margin: 0 auto; background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    h1 { color: #1976D2; margin-bottom: 12px; font-size: 24px; }
+    p { color: #555; font-size: 16px; line-height: 1.5; }
+    .logo { color: #1976D2; font-size: 14px; margin-top: 24px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>${title}</h1>
+    <p>${message}</p>
+    <p class="logo">kidZone Admin Panel</p>
+  </div>
+</body>
+</html>`;
+}
