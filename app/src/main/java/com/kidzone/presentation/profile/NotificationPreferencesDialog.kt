@@ -14,7 +14,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,7 +33,7 @@ fun NotificationPreferencesDialog(
     onSave: (NotificationPrefs) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var prefs by rememberSaveable(currentPrefs) { mutableStateOf(currentPrefs) }
+    var prefs by remember(currentPrefs) { mutableStateOf(currentPrefs) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
