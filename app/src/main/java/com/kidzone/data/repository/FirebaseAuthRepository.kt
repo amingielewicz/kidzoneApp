@@ -185,7 +185,19 @@ class FirebaseAuthRepository @Inject constructor(
     }
 
     override suspend fun signOut() {
-        com.kidzone.messaging.KidZoneMessagingService.unregisterToken()
+        // Usuń FCM token PRZED wylogowaniem (po signOut uid = null)
+        val uid = firebaseAuth.currentUser?.uid
+        if (uid != null) {
+            try {
+                val token = kotlinx.coroutines.tasks.await(
+                    com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                )
+                firestore.collection(FirestoreCollections.USERS)
+                    .document(uid)
+                    .update("fcmTokens", com.google.firebase.firestore.FieldValue.arrayRemove(token))
+                    .await()
+            } catch (_: Exception) { /* best-effort */ }
+        }
         firebaseAuth.signOut()
     }
 
