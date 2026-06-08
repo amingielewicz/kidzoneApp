@@ -189,9 +189,8 @@ class FirebaseAuthRepository @Inject constructor(
         val uid = firebaseAuth.currentUser?.uid
         if (uid != null) {
             try {
-                val token = kotlinx.coroutines.tasks.await(
-                    com.google.firebase.messaging.FirebaseMessaging.getInstance().token
-                )
+                val token = com.google.firebase.messaging.FirebaseMessaging.getInstance()
+                    .token.await()
                 firestore.collection(FirestoreCollections.USERS)
                     .document(uid)
                     .update("fcmTokens", com.google.firebase.firestore.FieldValue.arrayRemove(token))
