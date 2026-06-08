@@ -100,6 +100,20 @@ fun LoginScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
+    // Legacy Google Sign-In launcher (fallback dla Xiaomi/MIUI/emulatorów
+    // gdzie Credential Manager nie działa)
+    val legacyGoogleSignInLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { activityResult ->
+        val result = parseLegacyGoogleSignInResult(activityResult.data)
+        when (result) {
+            is GoogleSignInResult.Success -> viewModel.signInWithGoogle(result.idToken)
+            GoogleSignInResult.Cancelled -> Unit
+            is GoogleSignInResult.Error -> viewModel.showInlineMessage(result.message)
+            else -> Unit
+        }
+    }
+
     // Po pomyślnym logowaniu - nawigacja na main.
     LaunchedEffect(state.isSignedIn) {
         if (state.isSignedIn) onLoginSuccess()
@@ -357,12 +371,13 @@ fun LoginScreen(
                                         is GoogleSignInResult.Success ->
                                             viewModel.signInWithGoogle(result.idToken)
                                         GoogleSignInResult.Cancelled -> Unit // user anulował
-                                        GoogleSignInResult.NoMatchingGoogleCredential ->
-                                            viewModel.showInlineMessage(
-                                                "Nie udało się znaleźć pasującego konta Google. " +
-                                                    "Sprawdź, czy Google Sign-In jest włączony w Firebase, " +
-                                                    "SHA-1 aplikacji jest dodany i masz aktualny google-services.json."
-                                            )
+                                        GoogleSignInResult.NoMatchingGoogleCredential,
+                                        GoogleSignInResult.FallbackToLegacy -> {
+                                            // Credential Manager nie działa (Xiaomi/MIUI/emulator)
+                                            // – uruchamiamy legacy Google Sign-In Intent
+                                            val intent = buildLegacyGoogleSignInIntent(context, webClientId)
+                                            legacyGoogleSignInLauncher.launch(intent)
+                                        }
                                         is GoogleSignInResult.Error ->
                                             viewModel.showInlineMessage(result.message)
                                     }
