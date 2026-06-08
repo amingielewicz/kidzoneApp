@@ -1,7 +1,9 @@
 package com.kidzone.presentation.home
 
 import android.Manifest
+import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -45,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -52,6 +55,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.google.android.gms.common.api.ResolvableApiException
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationSettingsRequest
+import com.google.android.gms.location.Priority
+import kotlinx.coroutines.tasks.await
 import com.kidzone.R
 import com.kidzone.domain.model.Place
 import com.kidzone.presentation.common.GpsAcquiringBanner
@@ -118,6 +127,53 @@ fun HomeScreen(
         // dok\u0142adno\u015b\u0107 z grubsza jest tu OK (radius 10km).
         if (result.values.any { it }) {
             viewModel.onLocationPermissionGranted()
+        }
+    }
+
+    // --- SettingsClient: systemowy dialog "Włącz GPS" bez wychodzenia z apki ---
+    val context = LocalContext.current
+    val gpsSettingsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            // User włączył GPS w systemowym dialogu – odśwież dane
+            viewModel.refresh()
+        }
+    }
+
+    // Automatycznie wyświetl dialog SettingsClient gdy GPS jest wyłączony
+    // a permission jest nadany. Używamy LaunchedEffect z kluczem gpsEnabled,
+    // żeby dialog pokazał się raz (nie w kółko).
+    var hasRequestedGpsDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(state.locationGranted, gpsEnabled) {
+        if (state.locationGranted && !gpsEnabled && !hasRequestedGpsDialog) {
+            hasRequestedGpsDialog = true
+            try {
+                val locationRequest = LocationRequest.Builder(
+                    Priority.PRIORITY_HIGH_ACCURACY,
+                    10_000L
+                ).build()
+                val settingsRequest = LocationSettingsRequest.Builder()
+                    .addLocationRequest(locationRequest)
+                    .setAlwaysShow(true) // force show dialog even if previously dismissed
+                    .build()
+                val settingsClient = LocationServices.getSettingsClient(context)
+                settingsClient.checkLocationSettings(settingsRequest).await()
+                // GPS jest już włączony (edge case – zmieniono w tle)
+            } catch (e: Exception) {
+                if (e is ResolvableApiException) {
+                    // Pokazuje systemowy dialog "Włącz lokalizację"
+                    val intentSender = e.resolution.intentSender
+                    gpsSettingsLauncher.launch(
+                        IntentSenderRequest.Builder(intentSender).build()
+                    )
+                }
+            }
+        }
+        // Reset flagi gdy GPS zostanie włączony (żeby następne wyłączenie
+        // znów wyzwoliło dialog)
+        if (gpsEnabled) {
+            hasRequestedGpsDialog = false
         }
     }
 

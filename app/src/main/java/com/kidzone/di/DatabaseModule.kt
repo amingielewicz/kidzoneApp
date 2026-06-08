@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.kidzone.data.local.KidZoneDatabase
 import com.kidzone.data.local.PlaceDao
+import com.kidzone.data.local.ReviewDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -37,4 +38,9 @@ object DatabaseModule {
     @Singleton
     fun providePlaceDao(database: KidZoneDatabase): PlaceDao =
         database.placeDao()
+
+    @Provides
+    @Singleton
+    fun provideReviewDao(database: KidZoneDatabase): ReviewDao =
+        database.reviewDao()
 }
