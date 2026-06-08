@@ -114,11 +114,16 @@ fun FullscreenPhotoViewer(
                 )
             }
 
+            // Safe current page index – guards against IndexOutOfBoundsException
+            // when photoUrls list shrinks after deletion while pagerState hasn't
+            // updated yet.
+            val safeCurrentPage = pagerState.currentPage.coerceIn(0, photoUrls.lastIndex)
+
             // Report button (top-right) - only if callback provided AND photo is reportable
-            if (onReportPhoto != null && canReportPhoto(photoUrls[pagerState.currentPage])) {
+            if (onReportPhoto != null && canReportPhoto(photoUrls[safeCurrentPage])) {
                 FilledTonalIconButton(
                     onClick = {
-                        val currentUrl = photoUrls[pagerState.currentPage]
+                        val currentUrl = photoUrls[safeCurrentPage]
                         onReportPhoto(currentUrl)
                     },
                     modifier = Modifier
@@ -137,13 +142,12 @@ fun FullscreenPhotoViewer(
             }
 
             // Delete button (top-right, below report) - only for user's own photos
-            if (onDeletePhoto != null && canDeletePhoto(photoUrls[pagerState.currentPage])) {
+            if (onDeletePhoto != null && canDeletePhoto(photoUrls[safeCurrentPage])) {
                 FilledTonalIconButton(
                     onClick = {
-                        val currentUrl = photoUrls[pagerState.currentPage]
+                        val currentUrl = photoUrls[safeCurrentPage]
                         onDeletePhoto(currentUrl)
-                        // Dismiss viewer after deletion if no photos remain
-                        if (photoUrls.size <= 1) onDismiss()
+                        onDismiss()
                     },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -163,7 +167,7 @@ fun FullscreenPhotoViewer(
             // Page indicator (bottom-center)
             if (photoUrls.size > 1) {
                 Text(
-                    text = "${pagerState.currentPage + 1} / ${photoUrls.size}",
+                    text = "${safeCurrentPage + 1} / ${photoUrls.size}",
                     color = Color.White,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier

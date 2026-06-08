@@ -531,10 +531,7 @@ fun PlaceDetailsScreen(
             },
             onDeletePhoto = { url ->
                 viewModel.deletePhotoFromPlace(url)
-                fullscreenPhotos = fullscreenPhotos - url
-                if (fullscreenPhotos.isEmpty()) {
-                    // zamknij viewer jeśli nie ma więcej zdjęć
-                }
+                // Viewer dismisses itself after deletion (onDismiss called inside)
             },
             canDeletePhoto = { url ->
                 // Pokaż kosz tylko na zdjęciach dodanych przez bieżącego usera
