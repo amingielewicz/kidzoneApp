@@ -947,7 +947,7 @@ export const onBadgeEarned = onDocumentUpdated(
 );
 
 
-// --- Trigger: ktos dodal zdjecie do Twojego miejsca ---
+// --- Trigger: ktos dodal/usunal zdjecie do/z Twojego miejsca ---
 export const onPhotoAddedToPlace = onDocumentUpdated(
   {document: "places/{placeId}"},
   async (event) => {
@@ -957,17 +957,27 @@ export const onPhotoAddedToPlace = onDocumentUpdated(
 
     const beforePhotos: string[] = beforeData.photoUrls || [];
     const afterPhotos: string[] = afterData.photoUrls || [];
-    if (afterPhotos.length <= beforePhotos.length) return;
+
+    const photosAdded = afterPhotos.length > beforePhotos.length;
+    const photosRemoved = afterPhotos.length < beforePhotos.length;
+
+    if (!photosAdded && !photosRemoved) return;
 
     const ownerUserId = afterData.ownerUserId || "";
     if (!ownerUserId) return;
 
+    // Sprawdz kto dokonal zmiany (dodal/usunal)
     const afterUploaders: Record<string, string> = afterData.photoUploadedBy || {};
-    const newPhotos = afterPhotos.filter((url: string) => !beforePhotos.includes(url));
-    if (newPhotos.length === 0) return;
 
-    const uploaderIds = newPhotos.map((url: string) => afterUploaders[url] || "");
-    if (uploaderIds.every((uid: string) => uid === ownerUserId)) return;
+    if (photosAdded) {
+      const newPhotos = afterPhotos.filter((url: string) => !beforePhotos.includes(url));
+      if (newPhotos.length === 0) return;
+      const uploaderIds = newPhotos.map((url: string) => afterUploaders[url] || "");
+      // Nie wysylaj jesli wlasciciel sam dodal
+      if (uploaderIds.every((uid: string) => uid === ownerUserId)) return;
+    }
+
+    // Przy usunieciu: nie mamy info kto usunal (admin?). Wysylamy zawsze do ownera.
 
     const placeName = afterData.name || "Twoje miejsce";
     const placeId = event.params.placeId;
@@ -981,13 +991,17 @@ export const onPhotoAddedToPlace = onDocumentUpdated(
     const notifPrefs = ownerData?.notificationPreferences || {};
     if (notifPrefs.newPhotoOnMyPlace === false) return;
 
+    const title = photosAdded
+      ? `\u{1F4F7} Nowe zdj\u0119cie do \u201E${placeName}\u201D`
+      : `\u{1F5D1} Usuni\u0119to zdj\u0119cie z \u201E${placeName}\u201D`;
+    const body = photosAdded
+      ? "Kto\u015B doda\u0142 zdj\u0119cie do Twojego miejsca. Sprawd\u017A!"
+      : "Zdj\u0119cie zosta\u0142o usuni\u0119te z Twojego miejsca.";
+
     const message: admin.messaging.MulticastMessage = {
       tokens: fcmTokens,
-      notification: {
-        title: `\u{1F4F7} Nowe zdj\u0119cie do \u201E${placeName}\u201D`,
-        body: "Kto\u015B doda\u0142 zdj\u0119cie do Twojego miejsca. Sprawd\u017A!",
-      },
-      data: {type: "new_review", placeId: placeId},
+      notification: {title, body},
+      data: {type: "new_photo", placeId: placeId},
       android: {priority: "high", notification: {channelId: "kidzone_general"}},
     };
 

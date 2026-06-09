@@ -60,8 +60,8 @@ fun NotificationPreferencesDialog(
                     onCheckedChange = { prefs = prefs.copy(newBadgeEarned = it) }
                 )
                 NotificationToggle(
-                    title = "Nowe zdj\u0119cie do mojego miejsca",
-                    description = "Kto\u015B doda\u0142 zdj\u0119cie do miejsca, kt\u00F3re doda\u0142e\u015B",
+                    title = "Zdj\u0119cia w moim miejscu",
+                    description = "Kto\u015B doda\u0142 lub usun\u0105\u0142 zdj\u0119cie z miejsca, kt\u00F3re doda\u0142e\u015B",
                     checked = prefs.newPhotoOnMyPlace,
                     onCheckedChange = { prefs = prefs.copy(newPhotoOnMyPlace = it) }
                 )
