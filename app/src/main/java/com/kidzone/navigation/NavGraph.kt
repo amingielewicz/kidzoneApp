@@ -39,7 +39,11 @@ fun KidZoneNavGraph(
     intent: android.content.Intent? = null
 ) {
     // Deep link z push notification — konsumujemy po zalogowaniu.
-    val pendingDeepLink = androidx.compose.runtime.remember { mutableStateOf(intent?.data) }
+    val pendingDeepLink = androidx.compose.runtime.remember {
+        val uriFromData = intent?.data
+        val uriFromExtra = intent?.getStringExtra("deepLink")?.let { android.net.Uri.parse(it) }
+        mutableStateOf(uriFromData ?: uriFromExtra)
+    }
 
     NavHost(
         navController = navController,
@@ -140,9 +144,9 @@ fun KidZoneNavGraph(
                 rankingTab = rankingTab,
                 onFocusConsumed = {
                     savedHandle[NEW_PLACE_LAT] = null
-                    savedHandle[NEW_PLACE_LNG] = null
                     savedHandle["focusTab"] = ""
                     savedHandle["rankingTab"] = ""
+                    savedHandle[NEW_PLACE_LNG] = null
                 },
                 onOpenPlaceDetails = { placeId ->
                     navController.navigate(Route.PlaceDetails.create(placeId))

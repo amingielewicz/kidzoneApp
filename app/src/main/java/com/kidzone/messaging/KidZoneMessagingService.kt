@@ -50,14 +50,14 @@ class KidZoneMessagingService : FirebaseMessagingService() {
         val deepLinkUri = buildDeepLinkUri(data)
 
         val intent = Intent(this, MainActivity::class.java).apply {
-            // CLEAR_TASK + NEW_TASK restartuje Activity z nowym intentem.
-            // Deep link z push dziala nawet gdy apka jest zminimalizowana.
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             if (deepLinkUri != null) {
                 this.data = android.net.Uri.parse(deepLinkUri)
+                putExtra("deepLink", deepLinkUri)
             }
             data.forEach { (key, value) -> putExtra(key, value) }
         }
+
         val pendingIntent = PendingIntent.getActivity(
             this, System.currentTimeMillis().toInt(), intent,
             PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
