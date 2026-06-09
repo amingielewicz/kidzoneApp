@@ -50,6 +50,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../services/firebase';
+import { adminFetch } from '../services/api';
 import { Place, PLACE_CATEGORY_LABELS, PlaceCategory } from '../types';
 
 const ALL_AMENITIES: Record<string, string> = {
@@ -188,7 +189,7 @@ export function PlacesPage() {
     if (!deleteTarget || !deleteReason.trim()) return;
     const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
     const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeletePlace?placeId=${deleteTarget.id}&reason=${encodeURIComponent(deleteReason)}`;
-    try { await fetch(url); } catch (e) { console.error('Failed to delete place:', e); }
+    try { await adminFetch(url); } catch (e) { console.error('Failed to delete place:', e); }
     setDeleteDialogOpen(false);
     setDetailPlace(null);
     await fetchPlaces();
@@ -260,7 +261,7 @@ export function PlacesPage() {
     const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
     const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeleteReview?reviewId=${encodeURIComponent(reviewId)}&reason=${encodeURIComponent(reason)}`;
     try {
-      const resp = await fetch(url);
+      const resp = await adminFetch(url);
       if (!resp.ok) {
         console.error('Cloud Function error:', resp.status);
       }
@@ -319,7 +320,7 @@ export function PlacesPage() {
     if (!detailPlace || !deletePhotoReason.trim()) return;
     const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
     const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeletePhotoFromPlace?placeId=${detailPlace.id}&photoUrl=${encodeURIComponent(deletePhotoUrl)}&reason=${encodeURIComponent(deletePhotoReason)}`;
-    try { await fetch(url); } catch (e) { console.error('Failed to delete photo:', e); }
+    try { await adminFetch(url); } catch (e) { console.error('Failed to delete photo:', e); }
     const updatedUrls = (detailPlace.photoUrls || []).filter((u) => u !== deletePhotoUrl);
     setDetailPlace((prev) => (prev ? { ...prev, photoUrls: updatedUrls } : null));
     setDeletePhotoDialogOpen(false);

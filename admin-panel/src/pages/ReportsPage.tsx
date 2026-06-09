@@ -44,6 +44,7 @@ import {
   getDoc,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
+import { adminFetch } from '../services/api';
 import {
   PlaceReport,
   ReviewReport,
@@ -187,14 +188,14 @@ export function ReportsPage() {
   async function resolveAndDeletePlace(report: PlaceReport, reason: string) {
     const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
     const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeletePlace?placeId=${report.placeId}&reason=${encodeURIComponent(reason)}`;
-    try { await fetch(url); } catch(e) { console.error(e); }
+    try { await adminFetch(url); } catch(e) { console.error(e); }
     await resolveReport('place_reports', report.id);
   }
 
   async function resolveAndDeleteReview(report: ReviewReport, reason: string) {
     const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
     const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeleteReview?reviewId=${report.reviewId}&reason=${encodeURIComponent(reason)}`;
-    try { await fetch(url); } catch (e) { console.error('Failed to delete review:', e); }
+    try { await adminFetch(url); } catch (e) { console.error('Failed to delete review:', e); }
     await resolveReport('review_reports', report.id);
   }
 
@@ -202,7 +203,7 @@ export function ReportsPage() {
     const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
     const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeletePhoto?reportId=${reportId}&reason=${encodeURIComponent(reason)}`;
     try {
-      await fetch(url);
+      await adminFetch(url);
       await fetchAll();
     } catch (err) {
       console.error('Failed to delete photo via Cloud Function:', err);

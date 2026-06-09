@@ -53,6 +53,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db, auth } from '../services/firebase';
+import { adminFetch } from '../services/api';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { useAuth } from '../hooks/useAuth';
 import { AppUser } from '../types';
@@ -237,7 +238,7 @@ export function UsersPage() {
     if (!deleteUserTarget || !deleteUserReason.trim()) return;
     const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
     const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeleteUser?userId=${deleteUserTarget.id}&reason=${encodeURIComponent(deleteUserReason)}`;
-    try { await fetch(url); } catch (e) { console.error('Failed to delete user:', e); }
+    try { await adminFetch(url); } catch (e) { console.error('Failed to delete user:', e); }
     setDeleteUserDialogOpen(false);
     await fetchUsers();
   }
