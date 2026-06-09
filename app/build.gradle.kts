@@ -40,7 +40,9 @@ android {
         applicationId = "com.kidzone"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
+        versionCode = providers.exec {
+            commandLine("git", "rev-list", "--count", "HEAD")
+        }.standardOutput.asText.get().trim().toIntOrNull() ?: 1
         versionName = run {
             val baseVersion = "0.1.0"
             // Na branchach dev/feature dodajemy suffix dev#<numerPR>.

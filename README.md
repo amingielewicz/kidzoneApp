@@ -369,6 +369,47 @@ Reguły bezpieczeństwa są w `firestore.rules` i `storage.rules` w roocie repo.
   miejsc nie deaktywowała plakietki przy mikroskopijnych różnicach
   ocen w pobliżu progu.
 
+## Wersjonowanie
+
+Automatyczne — `build.gradle.kts` zarządza `versionCode` i `versionName` bez ręcznej
+interwencji przy codziennej pracy.
+
+### versionCode (Google Play wymaga rosnącej liczby)
+
+```kotlin
+versionCode = git rev-list --count HEAD   // ilość commitów na HEAD
+```
+
+Rośnie automatycznie z każdym commitem/merge. Nie trzeba go nigdy edytować ręcznie.
+Google Play porównuje tę liczbę — musi być większa niż poprzedni upload.
+
+### versionName (wyświetlana userowi)
+
+```kotlin
+val baseVersion = "0.1.0"   // ← bumpujesz ręcznie TYLKO przy release
+```
+
+| Sytuacja | Wynik | Przykład |
+|----------|-------|----------|
+| Branch `main`/`master` | Czysta wersja | `0.1.0` |
+| Branch z cyframi | `baseVersion-dev#<cyfry>` | `0.1.0-dev#73` |
+| Branch bez cyfr | `baseVersion-dev#<hash>` | `0.1.0-dev#a1e7898` |
+| CI z `PR_NUMBER` env | `baseVersion-dev#<PR>` | `0.1.0-dev#73` |
+
+### Workflow release:
+
+1. Mergujesz PRy do main → `versionCode` rośnie automatycznie
+2. Przed publikacją do Google Play → edytujesz `baseVersion` w `build.gradle.kts`
+   (np. `"0.1.0"` → `"0.2.0"`)
+3. Commit + tag → `./gradlew assembleRelease` → upload do Play Console
+4. Done
+
+### Schemat numeracji:
+
+- **0.x.y** — pre-release / beta (do wyjścia z MVP)
+- **1.0.0** — pierwszy publiczny release na Google Play
+- **1.x.y** — stabilne releasey (`x` = nowe ficzery, `y` = bugfixy)
+
 ## Uruchomienie lokalne
 
 ### 1. Wymagania
