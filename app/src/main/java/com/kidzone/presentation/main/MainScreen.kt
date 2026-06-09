@@ -86,6 +86,8 @@ fun MainScreen(
     onSignOut: () -> Unit,
     focusLatitude: Double? = null,
     focusLongitude: Double? = null,
+    focusTab: String = "",
+    rankingTab: String = "",
     onFocusConsumed: () -> Unit = {}
 ) {
     val navController = rememberNavController()
@@ -156,6 +158,20 @@ fun MainScreen(
     // nie mieć uid (cold start bez sesji). Tu user jest na pewno zalogowany.
     LaunchedEffect(Unit) {
         com.kidzone.messaging.KidZoneMessagingService.registerCurrentToken(context)
+    }
+
+    // Deep link: przełączenie na konkretną zakładkę (profile, ranking, map)
+    LaunchedEffect(focusTab) {
+        if (focusTab.isNotBlank()) {
+            navController.navigate(focusTab) {
+                popUpTo(navController.graph.findStartDestination().id) {
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
+            }
+            onFocusConsumed()
+        }
     }
 
     LaunchedEffect(focusLatitude, focusLongitude) {

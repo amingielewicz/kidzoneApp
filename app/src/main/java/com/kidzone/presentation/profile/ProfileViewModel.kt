@@ -257,7 +257,8 @@ class ProfileViewModel @Inject constructor(
                 "notificationPreferences" to mapOf(
                     "newReviewOnMyPlace" to prefs.newReviewOnMyPlace,
                     "newBadgeEarned" to prefs.newBadgeEarned,
-                    "newPhotoOnMyPlace" to prefs.newPhotoOnMyPlace
+                    "newPhotoOnMyPlace" to prefs.newPhotoOnMyPlace,
+                    "rankings" to prefs.rankings
                 )
             )
             try {
@@ -283,7 +284,8 @@ class ProfileViewModel @Inject constructor(
                         it.copy(notificationPrefs = NotificationPrefs(
                             newReviewOnMyPlace = prefsMap["newReviewOnMyPlace"] ?: true,
                             newBadgeEarned = prefsMap["newBadgeEarned"] ?: true,
-                            newPhotoOnMyPlace = prefsMap["newPhotoOnMyPlace"] ?: true
+                            newPhotoOnMyPlace = prefsMap["newPhotoOnMyPlace"] ?: true,
+                            rankings = prefsMap["rankings"] ?: true
                         ))
                     }
                 }
