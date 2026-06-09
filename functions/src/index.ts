@@ -1297,3 +1297,96 @@ export const backfillGeohash = onRequest(async (req, res) => {
     res.status(500).send(renderAdminResponse("Błąd", `Backfill failed: ${err}`));
   }
 });
+
+
+
+
+// --- Trigger: admin zablokował użytkownika → push + email ---
+export const onUserBanned = onDocumentUpdated(
+  {
+    document: "users/{userId}",
+    secrets: [gmailEmail, gmailPassword],
+  },
+  async (event) => {
+    const beforeData = event.data?.before?.data();
+    const afterData = event.data?.after?.data();
+    if (!beforeData || !afterData) return;
+
+    const beforeBanned = beforeData.bannedUntilMillis || 0;
+    const afterBanned = afterData.bannedUntilMillis || 0;
+
+    // Sprawdź czy blokada została właśnie nadana (wcześniej brak, teraz jest)
+    if (afterBanned === 0 || afterBanned === beforeBanned) return;
+    // Jeśli wcześniej był zablokowany tak samo → nic nie rób
+    if (beforeBanned === afterBanned) return;
+
+    const userId = event.params.userId;
+    const userName = afterData.name || "Użytkowniku";
+    const userEmail = afterData.email || "";
+    const banReason = afterData.banReason || "Naruszenie regulaminu";
+    const fcmTokens: string[] = afterData.fcmTokens || [];
+
+    let banInfo: string;
+    if (afterBanned === -1) {
+      banInfo = "Twoje konto zostało zablokowane bezpowrotnie.";
+    } else {
+      const date = new Date(afterBanned).toLocaleDateString("pl-PL", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      banInfo = `Twoje konto zostało zablokowane do ${date}.`;
+    }
+
+    // --- Push notification ---
+    if (fcmTokens.length > 0) {
+      const message: admin.messaging.MulticastMessage = {
+        tokens: fcmTokens,
+        data: {
+          type: "account_banned",
+          title: "Konto zablokowane",
+          body: banInfo,
+          bannedUntilMillis: String(afterBanned),
+          banReason: banReason,
+        },
+        android: {priority: "high"},
+      };
+
+      try {
+        const response = await admin.messaging().sendEachForMulticast(message);
+        console.log(`Ban push for ${userId}: ${response.successCount} ok`);
+        await cleanStaleTokens(response, fcmTokens, userId);
+      } catch (err) {
+        console.error("Ban push error:", err);
+      }
+    }
+
+    // --- Email ---
+    if (userEmail) {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
+      });
+
+      const html = wrapInTemplate("Konto zablokowane", `
+        <p>Cześć, ${userName}.</p>
+        <p>${banInfo}</p>
+        <table>
+          <tr><td>Powód:</td><td>${banReason}</td></tr>
+        </table>
+        <p>Jeśli uważasz, że to pomyłka, skontaktuj się z nami odpowiadając na ten email.</p>
+      `);
+
+      await transporter.sendMail({
+        from: `kidZone <${gmailEmail.value()}>`,
+        to: userEmail,
+        subject: "[kidZone] Twoje konto zostało zablokowane",
+        html,
+      });
+
+      console.log(`Ban email sent to ${userEmail} for user ${userId}`);
+    }
+  }
+);

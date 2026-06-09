@@ -94,6 +94,7 @@ export function UsersPage() {
   // Edit dialog
   const [editUser, setEditUser] = useState<AppUser | null>(null);
   const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
   const [editRole, setEditRole] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -168,8 +169,8 @@ export function UsersPage() {
   function getBanLabel(user: any): string {
     const bannedUntil = user.bannedUntilMillis;
     if (!bannedUntil) return '';
-    if (bannedUntil === -1) return 'Ban permanentny';
-    if (bannedUntil > Date.now()) return `Ban do ${formatBanDate(bannedUntil)}`;
+    if (bannedUntil === -1) return 'Zablokowany bezpowrotnie';
+    if (bannedUntil > Date.now()) return `Zablokowany do ${formatBanDate(bannedUntil)}`;
     return '';
   }
 
@@ -205,6 +206,7 @@ export function UsersPage() {
     closeMenu();
     setEditUser(user);
     setEditName(user.name || '');
+    setEditEmail(user.email || '');
     setEditRole(user.role || 'user');
   }
 
@@ -212,7 +214,7 @@ export function UsersPage() {
     if (!editUser) return;
     setSaving(true);
     try {
-      const updates: any = { name: editName };
+      const updates: any = { name: editName, email: editEmail };
       if (!isCurrentUser(editUser)) {
         if (editRole === 'admin') {
           updates.role = 'admin';
@@ -250,7 +252,7 @@ export function UsersPage() {
       setBanDialog({ open: false, user: null });
       await fetchUsers();
     } catch (err) {
-      console.error('Failed to ban user:', err);
+      console.error('Failed to block user:', err);
     } finally {
       setSaving(false);
     }
@@ -322,8 +324,8 @@ export function UsersPage() {
           <InputLabel>Status</InputLabel>
           <Select value={banFilter} label="Status" onChange={(e) => setBanFilter(e.target.value)}>
             <MenuItem value="all">Wszystkie</MenuItem>
-            <MenuItem value="active">Aktywne</MenuItem>
-            <MenuItem value="banned">Zbanowane</MenuItem>
+            <MenuItem value="active">Aktywni</MenuItem>
+            <MenuItem value="banned">Zablokowani</MenuItem>
           </Select>
         </FormControl>
       </Box>
@@ -454,12 +456,12 @@ export function UsersPage() {
             !isUserBanned(menuUser) ? (
               <MenuItem key="ban" onClick={() => menuUser && openBanDialog(menuUser)}>
                 <ListItemIcon><BlockIcon fontSize="small" color="warning" /></ListItemIcon>
-                <ListItemText>Zbanuj</ListItemText>
+                <ListItemText>Zablokuj</ListItemText>
               </MenuItem>
             ) : (
               <MenuItem key="unban" onClick={() => menuUser && unbanUser(menuUser)}>
                 <ListItemIcon><LockOpenIcon fontSize="small" color="success" /></ListItemIcon>
-                <ListItemText>Odbanuj</ListItemText>
+                <ListItemText>Odblokuj</ListItemText>
               </MenuItem>
             ),
             menuUser.role === 'admin' ? (
@@ -505,7 +507,7 @@ export function UsersPage() {
         )}
         {menuUser && isCurrentUser(menuUser) && (
           <MenuItem disabled>
-            <ListItemText sx={{ color: 'text.secondary' }}>Nie możesz zmieniać własnej roli/banu</ListItemText>
+            <ListItemText sx={{ color: 'text.secondary' }}>Nie możesz zmieniać własnej roli/blokady</ListItemText>
           </MenuItem>
         )}
       </Menu>
@@ -521,6 +523,13 @@ export function UsersPage() {
                   label="Imię / Nazwa"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
+                  fullWidth
+                  size="small"
+                />
+                <TextField
+                  label="Email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
                   fullWidth
                   size="small"
                 />
@@ -554,12 +563,12 @@ export function UsersPage() {
         {banDialog.user && (
           <>
             <DialogTitle>
-              Zbanuj: {banDialog.user.name || banDialog.user.email}
+              Zablokuj: {banDialog.user.name || banDialog.user.email}
             </DialogTitle>
             <DialogContent>
               <Box display="flex" flexDirection="column" gap={2} mt={1}>
                 <Alert severity="warning" variant="outlined">
-                  Zbanowany użytkownik nie będzie mógł się zalogować do aplikacji.
+                  Zablokowany użytkownik nie będzie mógł się zalogować do aplikacji.
                 </Alert>
                 <FormControl size="small" fullWidth>
                   <InputLabel>Czas trwania</InputLabel>
@@ -586,7 +595,7 @@ export function UsersPage() {
                   </Select>
                 </FormControl>
                 <TextField
-                  label="Powód bana"
+                  label="Powód blokady"
                   value={banReason}
                   onChange={(e) => setBanReason(e.target.value)}
                   fullWidth
@@ -595,12 +604,12 @@ export function UsersPage() {
                 />
                 {!banPermanent && (
                   <Typography variant="body2" color="text.secondary">
-                    Ban wygaśnie: {formatBanDate(Date.now() + parseInt(banDays) * 24 * 60 * 60 * 1000)}
+                    Blokada wygaśnie: {formatBanDate(Date.now() + parseInt(banDays) * 24 * 60 * 60 * 1000)}
                   </Typography>
                 )}
                 {banPermanent && (
                   <Typography variant="body2" color="error">
-                    Ban permanentny — użytkownik nigdy nie będzie mógł się zalogować.
+                    Blokada bezpowrotna — użytkownik nigdy nie będzie mógł się zalogować.
                   </Typography>
                 )}
               </Box>
@@ -608,7 +617,7 @@ export function UsersPage() {
             <DialogActions>
               <Button onClick={() => setBanDialog({ open: false, user: null })}>Anuluj</Button>
               <Button variant="contained" color="error" onClick={applyBan} disabled={saving}>
-                {saving ? <CircularProgress size={20} /> : 'Zbanuj'}
+                {saving ? <CircularProgress size={20} /> : 'Zablokuj'}
               </Button>
             </DialogActions>
           </>

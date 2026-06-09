@@ -20,9 +20,11 @@ import {
   DialogActions,
   Button,
   Tooltip,
-  ToggleButtonGroup,
-  ToggleButton,
   Rating,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -169,7 +171,6 @@ export function ReportsPage() {
       await fetchAll();
     } catch (err) {
       console.error('Failed to delete photo via Cloud Function:', err);
-      // Fallback: oznacz jako resolved ręcznie
       await resolveReport('photo_reports', reportId);
     }
   }
@@ -261,24 +262,26 @@ export function ReportsPage() {
         Zgłoszenia
       </Typography>
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-        <Tab label={`Miejsca (${pendingPlaceCount})`} />
-        <Tab label={`Opinie (${pendingReviewCount})`} />
-        <Tab label={`Zdjęcia (${pendingPhotoCount})`} />
-      </Tabs>
+      <Box display="flex" gap={2} mb={3} flexWrap="wrap" alignItems="center">
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ flexGrow: 1 }}>
+          <Tab label={`Miejsca (${pendingPlaceCount})`} />
+          <Tab label={`Opinie (${pendingReviewCount})`} />
+          <Tab label={`Zdjęcia (${pendingPhotoCount})`} />
+        </Tabs>
 
-      <Box mb={3}>
-        <ToggleButtonGroup
-          value={statusFilter}
-          exclusive
-          onChange={(_, v) => v && setStatusFilter(v)}
-          size="small"
-        >
-          <ToggleButton value="pending">Oczekujące</ToggleButton>
-          <ToggleButton value="resolved">Rozwiązane</ToggleButton>
-          <ToggleButton value="dismissed">Odrzucone</ToggleButton>
-          <ToggleButton value="all">Wszystkie</ToggleButton>
-        </ToggleButtonGroup>
+        <FormControl size="small" sx={{ minWidth: 150 }}>
+          <InputLabel>Status</InputLabel>
+          <Select
+            value={statusFilter}
+            label="Status"
+            onChange={(e) => setStatusFilter(e.target.value as ReportStatus | 'all')}
+          >
+            <MenuItem value="pending">Oczekujące</MenuItem>
+            <MenuItem value="resolved">Rozwiązane</MenuItem>
+            <MenuItem value="dismissed">Odrzucone</MenuItem>
+            <MenuItem value="all">Wszystkie</MenuItem>
+          </Select>
+        </FormControl>
       </Box>
 
       {tab === 0 && (
@@ -317,28 +320,12 @@ export function ReportsPage() {
                     {report.status === 'pending' && (
                       <>
                         <Tooltip title="Usuń miejsce i rozwiąż">
-                          <IconButton
-                            color="error"
-                            size="small"
-                            onClick={() =>
-                              confirm('Usunąć miejsce i rozwiązać zgłoszenie?', () =>
-                                resolveAndDeletePlace(report)
-                              )
-                            }
-                          >
+                          <IconButton color="error" size="small" onClick={() => confirm('Usunąć miejsce i rozwiązać?', () => resolveAndDeletePlace(report))}>
                             <DeleteIcon />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Odrzuć zgłoszenie">
-                          <IconButton
-                            color="default"
-                            size="small"
-                            onClick={() =>
-                              confirm('Odrzucić zgłoszenie?', () =>
-                                dismissReport('place_reports', report.id)
-                              )
-                            }
-                          >
+                        <Tooltip title="Odrzuć">
+                          <IconButton size="small" onClick={() => confirm('Odrzucić?', () => dismissReport('place_reports', report.id))}>
                             <CancelIcon />
                           </IconButton>
                         </Tooltip>
@@ -348,11 +335,7 @@ export function ReportsPage() {
                 </TableRow>
               ))}
               {filteredPlaceReports.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} align="center">
-                    Brak zgłoszeń
-                  </TableCell>
-                </TableRow>
+                <TableRow><TableCell colSpan={6} align="center">Brak zgłoszeń</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -376,49 +359,21 @@ export function ReportsPage() {
               {filteredReviewReports.map((report) => (
                 <TableRow key={report.id} hover>
                   <TableCell>{formatDate(report.createdAtMillis)}</TableCell>
-                  <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>
-                    {report.reviewId.slice(0, 8)}...
-                  </TableCell>
-                  <TableCell>
-                    {REVIEW_REPORT_REASON_LABELS[report.reason as ReviewReportReason] || report.reason}
-                  </TableCell>
-                  <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {report.comment || '—'}
-                  </TableCell>
+                  <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{report.reviewId.slice(0, 8)}...</TableCell>
+                  <TableCell>{REVIEW_REPORT_REASON_LABELS[report.reason as ReviewReportReason] || report.reason}</TableCell>
+                  <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{report.comment || '—'}</TableCell>
                   <TableCell>{statusChip(report.status)}</TableCell>
                   <TableCell>
                     <Tooltip title="Szczegóły">
-                      <IconButton size="small" onClick={() => openDetailReviewReport(report)}>
-                        <VisibilityIcon />
-                      </IconButton>
+                      <IconButton size="small" onClick={() => openDetailReviewReport(report)}><VisibilityIcon /></IconButton>
                     </Tooltip>
                     {report.status === 'pending' && (
                       <>
                         <Tooltip title="Usuń opinię i rozwiąż">
-                          <IconButton
-                            color="error"
-                            size="small"
-                            onClick={() =>
-                              confirm('Usunąć opinię i rozwiązać zgłoszenie?', () =>
-                                resolveAndDeleteReview(report)
-                              )
-                            }
-                          >
-                            <DeleteIcon />
-                          </IconButton>
+                          <IconButton color="error" size="small" onClick={() => confirm('Usunąć opinię?', () => resolveAndDeleteReview(report))}><DeleteIcon /></IconButton>
                         </Tooltip>
-                        <Tooltip title="Odrzuć zgłoszenie">
-                          <IconButton
-                            color="default"
-                            size="small"
-                            onClick={() =>
-                              confirm('Odrzucić zgłoszenie?', () =>
-                                dismissReport('review_reports', report.id)
-                              )
-                            }
-                          >
-                            <CancelIcon />
-                          </IconButton>
+                        <Tooltip title="Odrzuć">
+                          <IconButton size="small" onClick={() => confirm('Odrzucić?', () => dismissReport('review_reports', report.id))}><CancelIcon /></IconButton>
                         </Tooltip>
                       </>
                     )}
@@ -426,11 +381,7 @@ export function ReportsPage() {
                 </TableRow>
               ))}
               {filteredReviewReports.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} align="center">
-                    Brak zgłoszeń
-                  </TableCell>
-                </TableRow>
+                <TableRow><TableCell colSpan={6} align="center">Brak zgłoszeń</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -457,59 +408,24 @@ export function ReportsPage() {
                   <TableCell>
                     {report.photoUrl && (
                       <a href={report.photoUrl} target="_blank" rel="noopener noreferrer">
-                        <img
-                          src={report.photoUrl}
-                          alt="Zgłoszone zdjęcie"
-                          style={{
-                            width: 60,
-                            height: 60,
-                            objectFit: 'cover',
-                            borderRadius: 4,
-                          }}
-                        />
+                        <img src={report.photoUrl} alt="Zdjęcie" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4 }} />
                       </a>
                     )}
                   </TableCell>
-                  <TableCell>
-                    {PHOTO_REPORT_REASON_LABELS[report.reason as PhotoReportReason] || report.reason}
-                  </TableCell>
-                  <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {report.comment || '—'}
-                  </TableCell>
+                  <TableCell>{PHOTO_REPORT_REASON_LABELS[report.reason as PhotoReportReason] || report.reason}</TableCell>
+                  <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{report.comment || '—'}</TableCell>
                   <TableCell>{statusChip(report.status)}</TableCell>
                   <TableCell>
                     <Tooltip title="Szczegóły">
-                      <IconButton size="small" onClick={() => openDetailPhotoReport(report)}>
-                        <VisibilityIcon />
-                      </IconButton>
+                      <IconButton size="small" onClick={() => openDetailPhotoReport(report)}><VisibilityIcon /></IconButton>
                     </Tooltip>
                     {report.status === 'pending' && (
                       <>
-                        <Tooltip title="Usuń zdjęcie (Cloud Function)">
-                          <IconButton
-                            color="error"
-                            size="small"
-                            onClick={() =>
-                              confirm('Usunąć zdjęcie ze Storage i wszystkich dokumentów?', () =>
-                                deletePhotoViaCloudFunction(report.id)
-                              )
-                            }
-                          >
-                            <DeleteIcon />
-                          </IconButton>
+                        <Tooltip title="Usuń zdjęcie">
+                          <IconButton color="error" size="small" onClick={() => confirm('Usunąć zdjęcie?', () => deletePhotoViaCloudFunction(report.id))}><DeleteIcon /></IconButton>
                         </Tooltip>
-                        <Tooltip title="Odrzuć zgłoszenie">
-                          <IconButton
-                            color="default"
-                            size="small"
-                            onClick={() =>
-                              confirm('Odrzucić zgłoszenie?', () =>
-                                dismissReport('photo_reports', report.id)
-                              )
-                            }
-                          >
-                            <CancelIcon />
-                          </IconButton>
+                        <Tooltip title="Odrzuć">
+                          <IconButton size="small" onClick={() => confirm('Odrzucić?', () => dismissReport('photo_reports', report.id))}><CancelIcon /></IconButton>
                         </Tooltip>
                       </>
                     )}
@@ -517,11 +433,7 @@ export function ReportsPage() {
                 </TableRow>
               ))}
               {filteredPhotoReports.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} align="center">
-                    Brak zgłoszeń
-                  </TableCell>
-                </TableRow>
+                <TableRow><TableCell colSpan={6} align="center">Brak zgłoszeń</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -529,12 +441,7 @@ export function ReportsPage() {
       )}
 
       {/* Detail Dialog */}
-      <Dialog
-        open={detailDialog.open}
-        onClose={() => setDetailDialog((prev) => ({ ...prev, open: false }))}
-        maxWidth="sm"
-        fullWidth
-      >
+      <Dialog open={detailDialog.open} onClose={() => setDetailDialog((p) => ({ ...p, open: false }))} maxWidth="sm" fullWidth>
         <DialogTitle>
           {detailDialog.type === 'place' && 'Szczegóły zgłoszenia miejsca'}
           {detailDialog.type === 'review' && 'Szczegóły zgłoszenia opinii'}
@@ -542,158 +449,67 @@ export function ReportsPage() {
         </DialogTitle>
         <DialogContent dividers>
           {detailDialog.loadingInfo ? (
-            <Box display="flex" justifyContent="center" py={3}>
-              <CircularProgress size={24} />
-            </Box>
+            <Box display="flex" justifyContent="center" py={3}><CircularProgress size={24} /></Box>
           ) : (
             <Box display="flex" flexDirection="column" gap={1.5}>
-              {/* Zgłaszający */}
-              <Typography variant="subtitle2" color="primary">
-                Zgłaszający:
-              </Typography>
+              <Typography variant="subtitle2" color="primary">Zgłaszający:</Typography>
               <Typography variant="body2">
-                {detailDialog.info.reporterName || 'Nieznany'}{' '}
-                {detailDialog.info.reporterEmail && `(${detailDialog.info.reporterEmail})`}
+                {detailDialog.info.reporterName || 'Nieznany'} {detailDialog.info.reporterEmail && `(${detailDialog.info.reporterEmail})`}
               </Typography>
 
-              {/* Place Report details */}
               {detailDialog.type === 'place' && detailDialog.report && (
                 <>
-                  <Typography variant="subtitle2" color="primary" mt={1}>
-                    Zgłoszone miejsce:
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Nazwa:</strong> {detailDialog.info.placeName || '—'}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Place ID:</strong>{' '}
-                    <code>{(detailDialog.report as PlaceReport).placeId}</code>
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Powód:</strong>{' '}
-                    {PLACE_REPORT_REASON_LABELS[(detailDialog.report as PlaceReport).reason as PlaceReportReason] ||
-                      (detailDialog.report as PlaceReport).reason}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Komentarz:</strong>{' '}
-                    {(detailDialog.report as PlaceReport).comment || '(brak)'}
-                  </Typography>
+                  <Typography variant="subtitle2" color="primary" mt={1}>Zgłoszone miejsce:</Typography>
+                  <Typography variant="body2"><strong>Nazwa:</strong> {detailDialog.info.placeName || '—'}</Typography>
+                  <Typography variant="body2"><strong>Place ID:</strong> <code>{(detailDialog.report as PlaceReport).placeId}</code></Typography>
+                  <Typography variant="body2"><strong>Powód:</strong> {PLACE_REPORT_REASON_LABELS[(detailDialog.report as PlaceReport).reason as PlaceReportReason]}</Typography>
+                  <Typography variant="body2"><strong>Komentarz:</strong> {(detailDialog.report as PlaceReport).comment || '(brak)'}</Typography>
                 </>
               )}
 
-              {/* Review Report details */}
               {detailDialog.type === 'review' && detailDialog.report && (
                 <>
-                  <Typography variant="subtitle2" color="primary" mt={1}>
-                    Zgłoszona opinia:
-                  </Typography>
-                  {detailDialog.info.placeName && (
-                    <Typography variant="body2">
-                      <strong>Miejsce:</strong> {detailDialog.info.placeName}
-                    </Typography>
-                  )}
-                  <Typography variant="body2">
-                    <strong>Autor opinii:</strong> {detailDialog.info.reviewAuthor || '—'}
-                  </Typography>
+                  <Typography variant="subtitle2" color="primary" mt={1}>Zgłoszona opinia:</Typography>
+                  {detailDialog.info.placeName && <Typography variant="body2"><strong>Miejsce:</strong> {detailDialog.info.placeName}</Typography>}
+                  <Typography variant="body2"><strong>Autor:</strong> {detailDialog.info.reviewAuthor || '—'}</Typography>
                   {detailDialog.info.reviewRating != null && (
-                    <Box display="flex" alignItems="center" gap={1}>
-                      <strong>Ocena:</strong>
-                      <Rating value={detailDialog.info.reviewRating} size="small" readOnly />
-                    </Box>
+                    <Box display="flex" alignItems="center" gap={1}><strong>Ocena:</strong><Rating value={detailDialog.info.reviewRating} size="small" readOnly /></Box>
                   )}
-                  <Typography variant="body2">
-                    <strong>Treść opinii:</strong> {detailDialog.info.reviewComment || '(brak)'}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Powód zgłoszenia:</strong>{' '}
-                    {REVIEW_REPORT_REASON_LABELS[(detailDialog.report as ReviewReport).reason as ReviewReportReason] ||
-                      (detailDialog.report as ReviewReport).reason}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Komentarz zgłaszającego:</strong>{' '}
-                    {(detailDialog.report as ReviewReport).comment || '(brak)'}
-                  </Typography>
+                  <Typography variant="body2"><strong>Treść:</strong> {detailDialog.info.reviewComment || '(brak)'}</Typography>
+                  <Typography variant="body2"><strong>Powód:</strong> {REVIEW_REPORT_REASON_LABELS[(detailDialog.report as ReviewReport).reason as ReviewReportReason]}</Typography>
                 </>
               )}
 
-              {/* Photo Report details */}
               {detailDialog.type === 'photo' && detailDialog.report && (
                 <>
-                  <Typography variant="subtitle2" color="primary" mt={1}>
-                    Zgłoszone zdjęcie:
-                  </Typography>
+                  <Typography variant="subtitle2" color="primary" mt={1}>Zgłoszone zdjęcie:</Typography>
                   {(detailDialog.report as PhotoReport).photoUrl && (
                     <Box textAlign="center">
-                      <a
-                        href={(detailDialog.report as PhotoReport).photoUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <img
-                          src={(detailDialog.report as PhotoReport).photoUrl}
-                          alt="Zgłoszone zdjęcie"
-                          style={{
-                            maxWidth: '100%',
-                            maxHeight: 300,
-                            borderRadius: 8,
-                            objectFit: 'contain',
-                          }}
-                        />
-                      </a>
+                      <img src={(detailDialog.report as PhotoReport).photoUrl} alt="Zdjęcie" style={{ maxWidth: '100%', maxHeight: 300, borderRadius: 8, objectFit: 'contain' }} />
                     </Box>
                   )}
-                  <Typography variant="body2">
-                    <strong>Powód:</strong>{' '}
-                    {PHOTO_REPORT_REASON_LABELS[(detailDialog.report as PhotoReport).reason as PhotoReportReason] ||
-                      (detailDialog.report as PhotoReport).reason}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Komentarz:</strong>{' '}
-                    {(detailDialog.report as PhotoReport).comment || '(brak)'}
-                  </Typography>
+                  <Typography variant="body2"><strong>Powód:</strong> {PHOTO_REPORT_REASON_LABELS[(detailDialog.report as PhotoReport).reason as PhotoReportReason]}</Typography>
+                  <Typography variant="body2"><strong>Komentarz:</strong> {(detailDialog.report as PhotoReport).comment || '(brak)'}</Typography>
                 </>
               )}
 
-              <Typography variant="body2" mt={1}>
-                <strong>Data zgłoszenia:</strong>{' '}
-                {detailDialog.report && formatDate(detailDialog.report.createdAtMillis)}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Status:</strong> {detailDialog.report?.status}
-              </Typography>
+              <Typography variant="body2" mt={1}><strong>Data:</strong> {detailDialog.report && formatDate(detailDialog.report.createdAtMillis)}</Typography>
+              <Typography variant="body2"><strong>Status:</strong> {detailDialog.report?.status}</Typography>
             </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDetailDialog((prev) => ({ ...prev, open: false }))}>
-            Zamknij
-          </Button>
+          <Button onClick={() => setDetailDialog((p) => ({ ...p, open: false }))}>Zamknij</Button>
         </DialogActions>
       </Dialog>
 
       {/* Confirm Dialog */}
-      <Dialog
-        open={confirmDialog.open}
-        onClose={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
-      >
+      <Dialog open={confirmDialog.open} onClose={() => setConfirmDialog((p) => ({ ...p, open: false }))}>
         <DialogTitle>Potwierdzenie</DialogTitle>
-        <DialogContent>
-          <Typography>{confirmDialog.title}</Typography>
-        </DialogContent>
+        <DialogContent><Typography>{confirmDialog.title}</Typography></DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}>
-            Anuluj
-          </Button>
-          <Button
-            variant="contained"
-            color="error"
-            onClick={async () => {
-              await confirmDialog.action();
-              setConfirmDialog((prev) => ({ ...prev, open: false }));
-            }}
-          >
-            Potwierdź
-          </Button>
+          <Button onClick={() => setConfirmDialog((p) => ({ ...p, open: false }))}>Anuluj</Button>
+          <Button variant="contained" color="error" onClick={async () => { await confirmDialog.action(); setConfirmDialog((p) => ({ ...p, open: false })); }}>Potwierdź</Button>
         </DialogActions>
       </Dialog>
     </Box>

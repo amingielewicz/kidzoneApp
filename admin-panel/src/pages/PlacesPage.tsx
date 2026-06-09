@@ -41,8 +41,10 @@ import {
   updateDoc,
   limit,
   where,
+  arrayUnion,
 } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../services/firebase';
 import { Place, PLACE_CATEGORY_LABELS, PlaceCategory } from '../types';
 
 function formatDate(millis: number): string {
@@ -228,6 +230,30 @@ export function PlacesPage() {
     }
   }
 
+  // Photos upload
+  const [uploading, setUploading] = useState(false);
+
+  async function uploadPhoto(file: File) {
+    if (!detailPlace) return;
+    setUploading(true);
+    try {
+      const fileName = `${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, `places/${detailPlace.id}/${fileName}`);
+      await uploadBytes(storageRef, file);
+      const downloadUrl = await getDownloadURL(storageRef);
+      await updateDoc(doc(db, 'places', detailPlace.id), {
+        photoUrls: arrayUnion(downloadUrl),
+      });
+      const newUrls = [...(detailPlace.photoUrls || []), downloadUrl];
+      setDetailPlace((prev) => prev ? { ...prev, photoUrls: newUrls } : null);
+      await fetchPlaces();
+    } catch (err) {
+      console.error('Upload failed:', err);
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function deletePhoto(photoUrl: string) {
     if (!detailPlace) return;
     const updatedUrls = (detailPlace.photoUrls || []).filter((u) => u !== photoUrl);
@@ -406,7 +432,7 @@ export function PlacesPage() {
               </Typography>
             </DialogTitle>
             <DialogContent dividers>
-              <Tabs value={detailTab} onChange={(_, v) => { setDetailTab(v); if (v === 2 && placeReviews.length === 0) fetchReviews(detailPlace.id); }} sx={{ mb: 2 }}>
+              <Tabs value={detailTab} onChange={(_, v) => { setDetailTab(v); if (v === 2) fetchReviews(detailPlace.id); }} sx={{ mb: 2 }}>
                 <Tab label="Dane" />
                 <Tab label={`Zdjęcia (${detailPlace.photoUrls?.length || 0})`} />
                 <Tab label="Opinie" />
@@ -469,6 +495,25 @@ export function PlacesPage() {
               {/* Tab 1: Photos */}
               {detailTab === 1 && (
                 <Box>
+                  <Box mb={2}>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      disabled={uploading}
+                    >
+                      {uploading ? <CircularProgress size={20} /> : 'Dodaj zdjęcie'}
+                      <input
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) uploadPhoto(file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </Button>
+                  </Box>
                   {(!detailPlace.photoUrls || detailPlace.photoUrls.length === 0) ? (
                     <Typography color="text.secondary">Brak zdjęć</Typography>
                   ) : (

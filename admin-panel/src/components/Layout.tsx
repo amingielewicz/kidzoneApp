@@ -134,7 +134,9 @@ export function Layout({ children }: LayoutProps) {
           flexGrow: 1,
           p: 3,
           width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
+          ml: { md: `${DRAWER_WIDTH}px` },
           mt: '64px',
+          minHeight: 'calc(100vh - 64px)',
         }}
       >
         {children}

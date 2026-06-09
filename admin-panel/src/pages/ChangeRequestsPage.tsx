@@ -18,8 +18,6 @@ import {
   DialogActions,
   Button,
   Tooltip,
-  ToggleButtonGroup,
-  ToggleButton,
   TableSortLabel,
   FormControl,
   InputLabel,
@@ -221,17 +219,19 @@ export function ChangeRequestsPage() {
       </Typography>
 
       <Box display="flex" gap={2} mb={3} flexWrap="wrap" alignItems="center">
-        <ToggleButtonGroup
-          value={statusFilter}
-          exclusive
-          onChange={(_, v) => v && setStatusFilter(v)}
-          size="small"
-        >
-          <ToggleButton value="pending">Oczekujące ({pendingCount})</ToggleButton>
-          <ToggleButton value="resolved">Zatwierdzone</ToggleButton>
-          <ToggleButton value="dismissed">Odrzucone</ToggleButton>
-          <ToggleButton value="all">Wszystkie</ToggleButton>
-        </ToggleButtonGroup>
+        <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
+          Użytkownicy proponują korekty danych lub lokalizacji miejsc. Zatwierdź lub odrzuć.
+        </Typography>
+
+        <FormControl size="small" sx={{ minWidth: 150 }}>
+          <InputLabel>Status</InputLabel>
+          <Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value as any)}>
+            <MenuItem value="pending">Oczekujące ({pendingCount})</MenuItem>
+            <MenuItem value="resolved">Zatwierdzone</MenuItem>
+            <MenuItem value="dismissed">Odrzucone</MenuItem>
+            <MenuItem value="all">Wszystkie</MenuItem>
+          </Select>
+        </FormControl>
 
         <FormControl size="small" sx={{ minWidth: 140 }}>
           <InputLabel>Typ</InputLabel>
