@@ -343,8 +343,8 @@ export function ReportsPage() {
             <TableHead>
               <TableRow>
                 <TableCell sx={{ width: 100 }}><TableSortLabel active direction={sortDir} onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}>Data</TableSortLabel></TableCell>
-                <TableCell>Nazwa miejsca</TableCell>
-                <TableCell sx={{ width: 180 }}>Place ID</TableCell>
+                <TableCell sx={{ width: 150 }}>Nazwa miejsca</TableCell>
+                <TableCell>Place ID</TableCell>
                 <TableCell sx={{ width: 160 }}>Powód</TableCell>
                 <TableCell>Komentarz</TableCell>
                 <TableCell sx={{ width: 110 }}>Status</TableCell>
@@ -368,10 +368,10 @@ export function ReportsPage() {
                   </TableCell>
                   <TableCell>{statusChip(report.status)}</TableCell>
                   <TableCell>
-                    <Box display="flex" flexDirection="column" alignItems="flex-start">
+                    <Box display="flex" flexDirection="row" alignItems="flex-start">
                       <Tooltip title="Szczegóły"><IconButton size="small" onClick={() => openDetailPlaceReport(report)}><VisibilityIcon /></IconButton></Tooltip>
                       {report.status === 'pending' && (
-                        <Box>
+                        <Box display="flex" flexDirection="column">
                           <Tooltip title="Usuń miejsce"><IconButton color="error" size="small" onClick={() => confirm('Usunąć miejsce?', () => resolveAndDeletePlace(report))}><DeleteIcon /></IconButton></Tooltip>
                           <Tooltip title="Odrzuć"><IconButton size="small" sx={{ color: '#1976D2' }} onClick={() => confirm('Odrzucić?', () => dismissReport('place_reports', report.id))}><CancelIcon /></IconButton></Tooltip>
                         </Box>
@@ -417,10 +417,10 @@ export function ReportsPage() {
                   </TableCell>
                   <TableCell>{statusChip(report.status)}</TableCell>
                   <TableCell>
-                    <Box display="flex" flexDirection="column" alignItems="flex-start">
+                    <Box display="flex" flexDirection="row" alignItems="flex-start">
                       <Tooltip title="Szczegóły"><IconButton size="small" onClick={() => openDetailReviewReport(report)}><VisibilityIcon /></IconButton></Tooltip>
                       {report.status === 'pending' && (
-                        <Box>
+                        <Box display="flex" flexDirection="column">
                           <Tooltip title="Usuń opinię"><IconButton color="error" size="small" onClick={() => confirm('Usunąć opinię?', () => resolveAndDeleteReview(report))}><DeleteIcon /></IconButton></Tooltip>
                           <Tooltip title="Odrzuć"><IconButton size="small" sx={{ color: '#1976D2' }} onClick={() => confirm('Odrzucić?', () => dismissReport('review_reports', report.id))}><CancelIcon /></IconButton></Tooltip>
                         </Box>
@@ -472,10 +472,10 @@ export function ReportsPage() {
                   </TableCell>
                   <TableCell>{photoMissing && report.status === 'pending' ? <Chip label="Nieaktualne" size="small" color="default" /> : statusChip(report.status)}</TableCell>
                   <TableCell>
-                    <Box display="flex" flexDirection="column" alignItems="flex-start">
+                    <Box display="flex" flexDirection="row" alignItems="flex-start">
                       <Tooltip title="Szczegóły"><IconButton size="small" onClick={() => openDetailPhotoReport(report)}><VisibilityIcon /></IconButton></Tooltip>
                       {report.status === 'pending' && (
-                        <Box>
+                        <Box display="flex" flexDirection="column">
                           <Tooltip title="Usuń zdjęcie"><IconButton color="error" size="small" disabled={photoMissing} onClick={() => confirm('Usunąć zdjęcie?', () => deletePhotoViaCloudFunction(report.id))}><DeleteIcon /></IconButton></Tooltip>
                           <Tooltip title="Odrzuć"><IconButton size="small" sx={{ color: photoMissing ? undefined : '#1976D2' }} disabled={photoMissing} onClick={() => confirm('Odrzucić?', () => dismissReport('photo_reports', report.id))}><CancelIcon /></IconButton></Tooltip>
                         </Box>

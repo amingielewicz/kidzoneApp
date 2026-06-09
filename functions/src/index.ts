@@ -566,6 +566,104 @@ export const onUserDeleted = onDocumentDeleted(
 
 
 
+// --- HTTP Endpoint: Admin usuwa opinię i wysyła email do autora ---
+export const adminDeleteReview = onRequest(
+  {secrets: [gmailEmail, gmailPassword], cors: true},
+  async (req, res) => {
+    const reviewId = req.query.reviewId as string;
+    const reason = req.query.reason as string || "Naruszenie regulaminu";
+
+    if (!reviewId) {
+      res.status(400).send(renderAdminResponse("Błąd", "Brak reviewId w żądaniu."));
+      return;
+    }
+
+    try {
+      // 1. Fetch the review document
+      const reviewDoc = await db.collection("reviews").doc(reviewId).get();
+      if (!reviewDoc.exists) {
+        res.status(404).send(renderAdminResponse("Nie znaleziono", "Opinia nie istnieje lub została już usunięta."));
+        return;
+      }
+
+      const reviewData = reviewDoc.data();
+      const userId = reviewData?.userId || "";
+      const placeId = reviewData?.placeId || "";
+      const reviewRating = reviewData?.rating || 0;
+      const reviewComment = reviewData?.comment || "(brak)";
+      const authorName = reviewData?.authorName || "Użytkowniku";
+
+      // 2. Fetch user document to get email
+      let userEmail = "";
+      if (userId) {
+        const userDoc = await db.collection("users").doc(userId).get();
+        if (userDoc.exists) {
+          userEmail = userDoc.data()?.email || "";
+        }
+      }
+
+      // 3. Delete the review
+      await db.collection("reviews").doc(reviewId).delete();
+
+      // 4. Update the place's reviewsCount and averageRating
+      if (placeId) {
+        const placeDoc = await db.collection("places").doc(placeId).get();
+        if (placeDoc.exists) {
+          const placeData = placeDoc.data();
+          const currentCount = placeData?.reviewsCount || 0;
+          const currentAvg = placeData?.averageRating || 0;
+
+          const newCount = Math.max(0, currentCount - 1);
+          let newAvg = 0;
+          if (newCount > 0 && currentCount > 0) {
+            newAvg = (currentAvg * currentCount - reviewRating) / newCount;
+            newAvg = Math.round(newAvg * 100) / 100;
+          }
+
+          await db.collection("places").doc(placeId).update({
+            reviewsCount: newCount,
+            averageRating: newAvg,
+          });
+        }
+      }
+
+      // 5. Send email to the review author
+      if (userEmail) {
+        const transporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
+        });
+
+        const html = wrapInTemplate("Twoja opinia została usunięta", `
+          <p>Cześć, ${authorName}.</p>
+          <p>Twoja opinia w aplikacji kidZone została usunięta przez administratora.</p>
+          <table>
+            <tr><td>Treść opinii:</td><td>${reviewComment}</td></tr>
+            <tr><td>Ocena:</td><td>${"★".repeat(reviewRating)}${"☆".repeat(5 - reviewRating)} (${reviewRating}/5)</td></tr>
+            <tr><td>Powód usunięcia:</td><td>${reason}</td></tr>
+          </table>
+          <p>Jeśli uważasz, że to pomyłka, skontaktuj się z nami odpowiadając na ten email.</p>
+        `);
+
+        await transporter.sendMail({
+          from: `kidZone <${gmailEmail.value()}>`,
+          to: userEmail,
+          subject: "[kidZone] Twoja opinia została usunięta",
+          html,
+        });
+      }
+
+      res.status(200).send(renderAdminResponse(
+        "Opinia usunięta",
+        `Opinia została usunięta. ${userEmail ? "Email z powiadomieniem wysłany do autora." : "Nie znaleziono adresu email autora."}`
+      ));
+    } catch (err) {
+      console.error("adminDeleteReview error:", err);
+      res.status(500).send(renderAdminResponse("Błąd serwera", `Wystąpił błąd: ${err}`));
+    }
+  }
+);
+
 // --- HTTP Endpoint: Admin usuwa zgłoszone zdjęcie ---
 export const adminDeletePhoto = onRequest(
   {secrets: [gmailEmail, gmailPassword, adminEmail], cors: true},

@@ -29,6 +29,7 @@ import {
   Select,
   TableSortLabel,
   Alert,
+  Snackbar,
 } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
@@ -37,6 +38,8 @@ import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import BlockIcon from '@mui/icons-material/Block';
 import EditIcon from '@mui/icons-material/Edit';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import CancelIcon from '@mui/icons-material/Cancel';
 import {
   collection,
@@ -49,7 +52,8 @@ import {
   deleteField,
   limit,
 } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { db, auth } from '../services/firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { useAuth } from '../hooks/useAuth';
 import { AppUser } from '../types';
 
@@ -97,6 +101,9 @@ export function UsersPage() {
   const [confirmDesc, setConfirmDesc] = useState('');
   const [confirmColor, setConfirmColor] = useState<'error' | 'primary' | 'success'>('primary');
   const confirmActionRef = useRef<(() => Promise<void>) | null>(null);
+
+  // Snackbar for password reset
+  const [snackbarMsg, setSnackbarMsg] = useState('');
 
   useEffect(() => { fetchUsers(); }, []);
 
@@ -215,6 +222,18 @@ export function UsersPage() {
     await fetchUsers();
   }
 
+  async function resetPassword(user: AppUser) {
+    closeMenu();
+    if (!user.email) return;
+    try {
+      await sendPasswordResetEmail(auth, user.email);
+      setSnackbarMsg(`Email z resetem hasła wysłany do ${user.email}`);
+    } catch (err) {
+      console.error('Failed to send password reset:', err);
+      setSnackbarMsg('Błąd wysyłania emaila z resetem hasła');
+    }
+  }
+
   function handleSort(field: SortField) {
     if (sortField === field) setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
     else { setSortField(field); setSortDir('asc'); }
@@ -271,7 +290,10 @@ export function UsersPage() {
                     <Avatar src={(user as any).avatarUrl} sx={{ width: 32, height: 32, fontSize: 14 }}>{user.name?.charAt(0) || '?'}</Avatar>
                     <Box>
                       <Typography variant="body2" fontWeight={500}>{user.name || '(bez nazwy)'}{isCurrentUser(user) && <Chip label="Ty" size="small" color="info" sx={{ ml: 1 }} />}</Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>{user.id.slice(0, 12)}...</Typography>
+                      <Box display="flex" alignItems="center" gap={0.5}>
+                        <Tooltip title={user.id}><Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>{user.id.slice(0, 12)}...</Typography></Tooltip>
+                        <Tooltip title="Kopiuj UID"><IconButton size="small" onClick={() => navigator.clipboard.writeText(user.id)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
+                      </Box>
                     </Box>
                   </Box>
                 </TableCell>
@@ -292,6 +314,9 @@ export function UsersPage() {
       {/* Context Menu */}
       <Menu anchorEl={menuAnchor} open={!!menuAnchor} onClose={closeMenu}>
         <MenuItem onClick={() => menuUser && openEditDialog(menuUser)}><ListItemIcon><EditIcon fontSize="small" /></ListItemIcon><ListItemText>Edytuj</ListItemText></MenuItem>
+        {menuUser && !isCurrentUser(menuUser) && menuUser.email && (
+          <MenuItem onClick={() => menuUser && resetPassword(menuUser)}><ListItemIcon><VpnKeyIcon fontSize="small" /></ListItemIcon><ListItemText>Resetuj hasło</ListItemText></MenuItem>
+        )}
         {menuUser && !isCurrentUser(menuUser) && [
           !isUserBanned(menuUser) ? (
             <MenuItem key="ban" onClick={() => menuUser && openBanDialog(menuUser)}><ListItemIcon><BlockIcon fontSize="small" color="warning" /></ListItemIcon><ListItemText>Zablokuj</ListItemText></MenuItem>
@@ -387,6 +412,11 @@ export function UsersPage() {
           <Button variant="contained" color={confirmColor} onClick={handleConfirm}>Potwierdź</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Snackbar */}
+      <Snackbar open={!!snackbarMsg} autoHideDuration={4000} onClose={() => setSnackbarMsg('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert onClose={() => setSnackbarMsg('')} severity="success" variant="filled">{snackbarMsg}</Alert>
+      </Snackbar>
     </Box>
   );
 }

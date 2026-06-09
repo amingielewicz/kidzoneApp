@@ -106,16 +106,16 @@ export function PlacesPage() {
   const [editCategory, setEditCategory] = useState('');
   const [editLat, setEditLat] = useState('');
   const [editLng, setEditLng] = useState('');
-  const [editOwner, setEditOwner] = useState('');
   const [editAmenities, setEditAmenities] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   // Reviews for place
   const [placeReviews, setPlaceReviews] = useState<any[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
-  const [editReview, setEditReview] = useState<any | null>(null);
-  const [editReviewComment, setEditReviewComment] = useState('');
-  const [editReviewRating, setEditReviewRating] = useState<number>(0);
+
+  // Delete review with reason
+  const [deleteReviewDialog, setDeleteReviewDialog] = useState<{ open: boolean; review: any | null }>({ open: false, review: null });
+  const [deleteReviewReason, setDeleteReviewReason] = useState('');
 
   // Confirm
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -192,7 +192,6 @@ export function PlacesPage() {
     setEditCategory(place.category || '');
     setEditLat(String(place.latitude || ''));
     setEditLng(String(place.longitude || ''));
-    setEditOwner(place.ownerUserId || '');
     setEditAmenities(place.amenities || []);
     setPlaceReviews([]);
     setOwnerEmail('');
@@ -215,7 +214,6 @@ export function PlacesPage() {
         category: editCategory,
         latitude: parseFloat(editLat) || detailPlace.latitude,
         longitude: parseFloat(editLng) || detailPlace.longitude,
-        ownerUserId: editOwner,
         amenities: editAmenities,
       };
       await updateDoc(doc(db, 'places', detailPlace.id), updates);
@@ -244,43 +242,20 @@ export function PlacesPage() {
     }
   }
 
-  async function deleteReview(reviewId: string) {
-    await deleteDoc(doc(db, 'reviews', reviewId));
-    if (detailPlace) {
-      await fetchReviews(detailPlace.id);
-      // Update review count
-      const newCount = placeReviews.length - 1;
-      await updateDoc(doc(db, 'places', detailPlace.id), { reviewsCount: newCount >= 0 ? newCount : 0 });
-      await fetchPlaces();
-    }
-  }
-
-  async function saveReviewEdit() {
-    if (!editReview) return;
-    setSaving(true);
+  async function deleteReview(reviewId: string, reason: string) {
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
+    const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeleteReview?reviewId=${encodeURIComponent(reviewId)}&reason=${encodeURIComponent(reason)}`;
     try {
-      await updateDoc(doc(db, 'reviews', editReview.id), {
-        comment: editReviewComment,
-        rating: editReviewRating,
-      });
-      setEditReview(null);
-      if (detailPlace) {
-        await fetchReviews(detailPlace.id);
-        // Recalculate average
-        const snap = await getDocs(
-          query(collection(db, 'reviews'), where('placeId', '==', detailPlace.id))
-        );
-        const reviews = snap.docs.map((d) => d.data());
-        if (reviews.length > 0) {
-          const avg = reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length;
-          await updateDoc(doc(db, 'places', detailPlace.id), { averageRating: Math.round(avg * 100) / 100 });
-          await fetchPlaces();
-        }
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        console.error('Cloud Function error:', resp.status);
       }
     } catch (err) {
-      console.error('Failed to save review:', err);
-    } finally {
-      setSaving(false);
+      console.error('Failed to delete review via Cloud Function:', err);
+    }
+    if (detailPlace) {
+      await fetchReviews(detailPlace.id);
+      await fetchPlaces();
     }
   }
 
@@ -538,11 +513,10 @@ export function PlacesPage() {
                     </Grid>
                   </Grid>
 
-                  <TextField label="Właściciel (UID)" value={editOwner} onChange={(e) => setEditOwner(e.target.value)} fullWidth size="small" />
                   <Box sx={{ p: 1.5, bgcolor: '#f5f5f5', borderRadius: 1 }}>
                     <Box display="flex" alignItems="center" gap={0.5}>
-                      <Typography variant="body2" color="text.secondary"><strong>UID:</strong> {editOwner || '(brak)'}</Typography>
-                      {editOwner && <Tooltip title="Kopiuj UID"><IconButton size="small" onClick={() => navigator.clipboard.writeText(editOwner)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>}
+                      <Typography variant="body2" color="text.secondary"><strong>Właściciel UID:</strong> {detailPlace.ownerUserId || '(brak)'}</Typography>
+                      {detailPlace.ownerUserId && <Tooltip title="Kopiuj UID"><IconButton size="small" onClick={() => navigator.clipboard.writeText(detailPlace.ownerUserId || '')}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>}
                     </Box>
                     <Typography variant="body2" color="text.secondary"><strong>Email:</strong> {ownerEmail || '(brak / nie pobrano)'}</Typography>
                   </Box>
@@ -674,25 +648,14 @@ export function PlacesPage() {
                             </TableCell>
                             <TableCell>{formatDate(review.createdAtMillis)}</TableCell>
                             <TableCell>
-                              <Tooltip title="Edytuj opinię">
-                                <IconButton
-                                  size="small"
-                                  onClick={() => {
-                                    setEditReview(review);
-                                    setEditReviewComment(review.comment || '');
-                                    setEditReviewRating(review.rating || 0);
-                                  }}
-                                >
-                                  <EditIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
                               <Tooltip title="Usuń opinię">
                                 <IconButton
                                   size="small"
                                   color="error"
-                                  onClick={() =>
-                                    confirm('Usunąć tę opinię?', () => deleteReview(review.id))
-                                  }
+                                  onClick={() => {
+                                    setDeleteReviewDialog({ open: true, review });
+                                    setDeleteReviewReason('');
+                                  }}
                                 >
                                   <DeleteIcon fontSize="small" />
                                 </IconButton>
@@ -719,45 +682,52 @@ export function PlacesPage() {
         )}
       </Dialog>
 
-      {/* Edit Review Dialog */}
+      {/* Delete Review Dialog */}
       <Dialog
-        open={!!editReview}
-        onClose={() => setEditReview(null)}
+        open={deleteReviewDialog.open}
+        onClose={() => setDeleteReviewDialog({ open: false, review: null })}
         maxWidth="sm"
         fullWidth
       >
-        {editReview && (
+        {deleteReviewDialog.review && (
           <>
             <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Edytuj opinię</span>
-              <IconButton size="small" onClick={() => setEditReview(null)}><CancelIcon /></IconButton>
+              <span>Usuń opinię</span>
+              <IconButton size="small" onClick={() => setDeleteReviewDialog({ open: false, review: null })}><CancelIcon /></IconButton>
             </DialogTitle>
             <DialogContent>
               <Box display="flex" flexDirection="column" gap={2} mt={1}>
                 <Typography variant="body2">
-                  <strong>Autor:</strong> {editReview.authorName}
+                  <strong>Autor:</strong> {deleteReviewDialog.review.authorName || 'Anonim'}
                 </Typography>
-                <Box>
-                  <Typography variant="body2" mb={0.5}>Ocena:</Typography>
-                  <Rating
-                    value={editReviewRating}
-                    onChange={(_, v) => setEditReviewRating(v || 0)}
-                  />
-                </Box>
+                <Typography variant="body2">
+                  <strong>Treść:</strong> {deleteReviewDialog.review.comment || '(brak)'}
+                </Typography>
                 <TextField
-                  label="Komentarz"
-                  value={editReviewComment}
-                  onChange={(e) => setEditReviewComment(e.target.value)}
+                  label="Powód usunięcia"
+                  value={deleteReviewReason}
+                  onChange={(e) => setDeleteReviewReason(e.target.value)}
                   fullWidth
                   multiline
                   rows={3}
+                  placeholder="Podaj powód usunięcia opinii (zostanie wysłany autorowi emailem)"
                 />
               </Box>
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => setEditReview(null)}>Anuluj</Button>
-              <Button variant="contained" onClick={saveReviewEdit} disabled={saving}>
-                {saving ? <CircularProgress size={20} /> : 'Zapisz'}
+              <Button onClick={() => setDeleteReviewDialog({ open: false, review: null })}>Anuluj</Button>
+              <Button
+                variant="contained"
+                color="error"
+                disabled={!deleteReviewReason.trim() || saving}
+                onClick={async () => {
+                  setSaving(true);
+                  await deleteReview(deleteReviewDialog.review.id, deleteReviewReason);
+                  setDeleteReviewDialog({ open: false, review: null });
+                  setSaving(false);
+                }}
+              >
+                {saving ? <CircularProgress size={20} /> : 'Usuń i powiadom'}
               </Button>
             </DialogActions>
           </>

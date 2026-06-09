@@ -297,7 +297,7 @@ export function ChangeRequestsPage() {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell sx={{ width: 140 }}>
+              <TableCell sx={{ width: 100 }}>
                 <TableSortLabel
                   active={sortField === 'createdAtMillis'}
                   direction={sortField === 'createdAtMillis' ? sortDir : 'desc'}
@@ -315,10 +315,10 @@ export function ChangeRequestsPage() {
                   Typ
                 </TableSortLabel>
               </TableCell>
-              <TableCell sx={{ width: 150 }}>Place ID</TableCell>
+              <TableCell>Place ID</TableCell>
               <TableCell>Zmiany</TableCell>
               <TableCell sx={{ width: 110 }}>Status</TableCell>
-              <TableCell sx={{ width: 120 }}>Akcje</TableCell>
+              <TableCell sx={{ width: 100 }}>Akcje</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -351,41 +351,43 @@ export function ChangeRequestsPage() {
                 </TableCell>
                 <TableCell>{statusChip(request.status)}</TableCell>
                 <TableCell>
-                  <Tooltip title="Szczegóły">
-                    <IconButton size="small" onClick={() => openDetail(request)}>
-                      <VisibilityIcon />
-                    </IconButton>
-                  </Tooltip>
-                  {request.status === 'pending' && (
-                    <>
-                      <Tooltip title="Zatwierdź zmiany">
-                        <IconButton
-                          color="success"
-                          size="small"
-                          onClick={() =>
-                            confirm('Zatwierdzić i zastosować zmiany do miejsca?', () =>
-                              approveRequest(request)
-                            )
-                          }
-                        >
-                          <CheckCircleIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Odrzuć">
-                        <IconButton
-                          color="default"
-                          size="small"
-                          onClick={() =>
-                            confirm('Odrzucić propozycję zmian?', () =>
-                              dismissRequest(request.id)
-                            )
-                          }
-                        >
-                          <CancelIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </>
-                  )}
+                  <Box display="flex" flexDirection="row" alignItems="flex-start">
+                    <Tooltip title="Szczegóły">
+                      <IconButton size="small" onClick={() => openDetail(request)}>
+                        <VisibilityIcon />
+                      </IconButton>
+                    </Tooltip>
+                    {request.status === 'pending' && (
+                      <Box display="flex" flexDirection="column">
+                        <Tooltip title="Zatwierdź zmiany">
+                          <IconButton
+                            color="success"
+                            size="small"
+                            onClick={() =>
+                              confirm('Zatwierdzić i zastosować zmiany do miejsca?', () =>
+                                approveRequest(request)
+                              )
+                            }
+                          >
+                            <CheckCircleIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Odrzuć">
+                          <IconButton
+                            size="small"
+                            sx={{ color: '#1976D2' }}
+                            onClick={() =>
+                              confirm('Odrzucić propozycję zmian?', () =>
+                                dismissRequest(request.id)
+                              )
+                            }
+                          >
+                            <CancelIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    )}
+                  </Box>
                 </TableCell>
               </TableRow>
             ))}
