@@ -7,6 +7,11 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
     function changedKeys() {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
@@ -27,10 +32,11 @@ service cloud.firestore {
         resource.data.ownerUserId == request.auth.uid
         || changedKeys().hasOnly(['averageRating', 'reviewsCount'])
         || changedKeys().hasOnly(['photoUrls', 'photoUploadedBy'])
+        || isAdmin()
       );
 
       allow delete: if isSignedIn()
-        && resource.data.ownerUserId == request.auth.uid;
+        && (resource.data.ownerUserId == request.auth.uid || isAdmin());
     }
 
     match /reviews/{reviewId} {
@@ -40,38 +46,38 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid;
 
       allow update: if isSignedIn()
-        && resource.data.userId == request.auth.uid;
+        && (resource.data.userId == request.auth.uid || isAdmin());
 
       allow delete: if isSignedIn()
-        && resource.data.userId == request.auth.uid;
+        && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
-    // Zgłoszenia naruszeń — każdy zalogowany może utworzyć
+    // Zgłoszenia naruszeń — każdy zalogowany może utworzyć, admin może czytać/edytować
     match /place_reports/{reportId} {
       allow create: if isSignedIn()
         && request.resource.data.reporterId == request.auth.uid;
-      allow read, update, delete: if false;
+      allow read, update, delete: if isAdmin();
     }
 
-    // Propozycje zmian — każdy zalogowany może utworzyć
+    // Propozycje zmian — każdy zalogowany może utworzyć, admin może czytać/edytować
     match /place_change_requests/{requestId} {
       allow create: if isSignedIn()
         && request.resource.data.requesterId == request.auth.uid;
-      allow read, update, delete: if false;
+      allow read, update, delete: if isAdmin();
     }
 
-    // Zgłoszenia opinii jako spam — każdy zalogowany może utworzyć
+    // Zgłoszenia opinii jako spam — każdy zalogowany może utworzyć, admin może czytać/edytować
     match /review_reports/{reportId} {
       allow create: if isSignedIn()
         && request.resource.data.reporterId == request.auth.uid;
-      allow read, update, delete: if false;
+      allow read, update, delete: if isAdmin();
     }
 
-    // Zgłoszenia zdjęć — każdy zalogowany może utworzyć
+    // Zgłoszenia zdjęć — każdy zalogowany może utworzyć, admin może czytać/edytować
     match /photo_reports/{reportId} {
       allow create: if isSignedIn()
         && request.resource.data.reporterId == request.auth.uid;
-      allow read, update, delete: if false;
+      allow read, update, delete: if isAdmin();
     }
   }
 }
