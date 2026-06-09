@@ -312,6 +312,47 @@ class PlaceDetailsViewModel @Inject constructor(
         _uiState.update { it.copy(deleteErrorMessage = null) }
     }
 
+    /**
+     * Pull-to-refresh – ponownie ładuje miejsce, autora i ranking.
+     * Opinie odświeżają się same (snapshot listener), ale re-fetch place
+     * zaktualizuje np. zmieniony opis, zdjęcia dodane przez innych userów itp.
+     */
+    fun refresh() {
+        loadPlace()
+    }
+
+    /**
+     * Usuwa opinię bieżącego usera z ekranu szczegółów.
+     * Dostępne tylko dla autora opinii (UI to filtruje).
+     */
+    fun deleteReview(reviewId: String) {
+        val place = _uiState.value.place ?: return
+        viewModelScope.launch {
+            when (val result = reviewRepository.deleteReview(reviewId)) {
+                is OpResult.Success -> {
+                    // Optymistycznie przelicz agregaty (tak jak repo robi w transakcji)
+                    val deleted = _uiState.value.reviews.firstOrNull { it.id == reviewId }
+                    if (deleted != null) {
+                        val oldCount = place.reviewsCount
+                        val oldAvg = place.averageRating
+                        val newCount = (oldCount - 1).coerceAtLeast(0)
+                        val newAvg = if (newCount > 0) {
+                            ((oldAvg * oldCount) - deleted.rating) / newCount
+                        } else 0.0
+                        _uiState.update {
+                            it.copy(
+                                place = place.copy(reviewsCount = newCount, averageRating = newAvg)
+                            )
+                        }
+                    }
+                }
+                is OpResult.Failure -> {
+                    // Snapshot listener sam odświeży listę – brak specjalnego handling
+                }
+            }
+        }
+    }
+
     fun setSortOrder(order: ReviewSortOrder) {
         _uiState.update { it.copy(sortOrder = order) }
     }
