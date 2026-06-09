@@ -38,6 +38,7 @@ import {
   query,
   orderBy,
   getDocs,
+  getDoc,
   doc,
   deleteDoc,
   updateDoc,
@@ -177,6 +178,9 @@ export function PlacesPage() {
     await fetchPlaces();
   }
 
+  // Owner email
+  const [ownerEmail, setOwnerEmail] = useState('');
+
   function openDetail(place: Place) {
     setDetailPlace(place);
     setDetailTab(0);
@@ -189,6 +193,13 @@ export function PlacesPage() {
     setEditOwner(place.ownerUserId || '');
     setEditAmenities(place.amenities || []);
     setPlaceReviews([]);
+    setOwnerEmail('');
+    // Fetch owner email
+    if (place.ownerUserId) {
+      getDoc(doc(db, 'users', place.ownerUserId)).then((snap) => {
+        if (snap.exists()) setOwnerEmail(snap.data()?.email || '');
+      }).catch(() => {});
+    }
   }
 
   async function saveBasicInfo() {
@@ -282,8 +293,15 @@ export function PlacesPage() {
       const storageRef = ref(storage, `places/${detailPlace.id}/${fileName}`);
       await uploadBytes(storageRef, file);
       const downloadUrl = await getDownloadURL(storageRef);
+
+      // Get current photoUploadedBy map
+      const placeSnap = await getDoc(doc(db, 'places', detailPlace.id));
+      const currentMap = placeSnap.data()?.photoUploadedBy || {};
+      currentMap[downloadUrl] = 'admin';
+
       await updateDoc(doc(db, 'places', detailPlace.id), {
         photoUrls: arrayUnion(downloadUrl),
+        photoUploadedBy: currentMap,
       });
       const newUrls = [...(detailPlace.photoUrls || []), downloadUrl];
       setDetailPlace((prev) => prev ? { ...prev, photoUrls: newUrls } : null);
@@ -515,7 +533,7 @@ export function PlacesPage() {
                     </Grid>
                   </Grid>
 
-                  <TextField label="Właściciel (UID)" value={editOwner} onChange={(e) => setEditOwner(e.target.value)} fullWidth size="small" />
+                  <TextField label="Właściciel (UID)" value={editOwner} onChange={(e) => setEditOwner(e.target.value)} fullWidth size="small" helperText={ownerEmail ? `Email: ${ownerEmail}` : ''} />
 
                   <Typography variant="subtitle2" mt={1}>Udogodnienia:</Typography>
                   <Box display="flex" flexWrap="wrap" gap={0}>
