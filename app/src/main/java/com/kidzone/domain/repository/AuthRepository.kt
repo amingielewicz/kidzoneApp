@@ -242,4 +242,15 @@ interface AuthRepository {
      *   nowo zdobytych odznak. Pusta lista = no-op (zwraca Success(Unit)).
      */
     suspend fun recordBadgesEarned(badgeNames: List<String>): OpResult<Unit>
+
+    /**
+     * Usuwa odznaki z mapy `badgeEarnedAt` gdy user przestał spełniać próg.
+     *
+     * Wywoływane przez ProfileViewModel gdy `computeBadges()` zwraca mniejszy
+     * zestaw niż zapisany w Firestore — np. po usunięciu miejsca/opinii,
+     * gdy licznik spadł poniżej progu odznaki.
+     *
+     * @param badgeNames lista nazw odznak do usunięcia z `badgeEarnedAt`.
+     */
+    suspend fun revokeBadges(badgeNames: List<String>): OpResult<Unit>
 }

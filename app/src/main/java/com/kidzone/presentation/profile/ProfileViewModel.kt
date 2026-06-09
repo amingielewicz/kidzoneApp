@@ -591,6 +591,9 @@ class ProfileViewModel @Inject constructor(
             // (Pierwszy ślad przed Odkrywca przed Kartograf itd.).
             .sortedBy { it.ordinal }
 
+        // Odznaki utracone — user spadł poniżej progu (np. usunął miejsce/opinię).
+        val revoked = (seen - current)
+
         if (newlyEarned.isNotEmpty()) {
             _uiState.update { state ->
                 state.copy(
@@ -604,6 +607,15 @@ class ProfileViewModel @Inject constructor(
             // skutkuje tylko sortem na koniec w `chronologicalOrder`.
             viewModelScope.launch {
                 authRepository.recordBadgesEarned(newlyEarned.map { it.name })
+            }
+        }
+
+        // Usuń utracone odznaki z Firestore (badgeEarnedAt) — żeby były
+        // spójne z faktycznym stanem (UI nie pokaże odznaki, ale Firestore
+        // też nie powinien jej trzymać → chronologia + karta w rankingu).
+        if (revoked.isNotEmpty()) {
+            viewModelScope.launch {
+                authRepository.revokeBadges(revoked.map { it.name })
             }
         }
 
