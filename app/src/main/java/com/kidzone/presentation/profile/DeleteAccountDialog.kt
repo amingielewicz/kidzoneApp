@@ -79,20 +79,23 @@ fun DeleteAccountDialog(
         text = {
             Column {
                 Text(
-                    text = "Operacja jest nieodwracalna. Zostanie usunięte:",
+                    text = "Operacja jest nieodwracalna. Po usunięciu konta:",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(Modifier.height(8.dp))
-                BulletLine(text = "Twoje konto i dane profilu (imię, nazwisko, avatar)")
-                BulletLine(text = "$reviewsCount " + pluralize(reviewsCount, "opinia", "opinie", "opinii"))
+                BulletLine(text = "Twoje dane osobowe (profil, email, avatar) zostaną usunięte")
                 BulletLine(
-                    text = "$placesCount " + pluralize(placesCount, "miejsce", "miejsca", "miejsc") +
-                        " które dodałaś/eś"
+                    text = "Twoje opinie ($reviewsCount) zostaną zanonimizowane — " +
+                        "treść pozostanie, autor zmieni się na „Nieaktywny użytkownik""
+                )
+                BulletLine(
+                    text = "Twoje miejsca ($placesCount) pozostaną widoczne, " +
+                        "ale bez powiązania z Twoim kontem"
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "Opinie innych użytkowników wystawione na Twoich miejscach " +
-                        "mogą zostać widoczne jako osierocone do czasu ręcznego sprzątnięcia.",
+                    text = "Treści tworzone przez Ciebie stanowią wartość dla społeczności " +
+                        "i pozostaną dostępne w formie zanonimizowanej (zgodnie z RODO).",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
