@@ -554,6 +554,7 @@ przy pierwszym wejściu, `AddPlaceScreen` przy kliknięciu "Pobierz lokalizację
 | FCM token registration po zalogowaniu (MainScreen)   | ✅     |
 | POST_NOTIFICATIONS permission request (Android 13+)  | ✅     |
 | Dev versioning: PR number / commit hash (nie "local") | ✅     |
+| Zero deprecation warnings (Compose, Material3, Icons)  | ✅     |
 
 ## Cloud Functions (backend)
 

@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION") // Legacy GoogleSignIn API — intentional fallback
+
 package com.kidzone.presentation.auth
 
 import android.app.Activity
@@ -109,11 +111,15 @@ suspend fun launchGoogleSignIn(
 }
 
 // --- Legacy Google Sign-In (Intent-based, działa na każdym telefonie) ---
+// Celowo używamy deprecated GoogleSignIn / GoogleSignInOptions jako fallback
+// dla urządzeń, na których Credential Manager nie działa (Xiaomi/MIUI, stare
+// Play Services, emulatory). Suppression jest świadoma — alternatywy brak.
 
 /**
  * Tworzy Intent dla legacy Google Sign-In.
  * UI uruchamia go przez ActivityResultLauncher.
  */
+@Suppress("DEPRECATION")
 fun buildLegacyGoogleSignInIntent(context: Context, webClientId: String): Intent {
     val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
         .requestIdToken(webClientId)
@@ -129,6 +135,7 @@ fun buildLegacyGoogleSignInIntent(context: Context, webClientId: String): Intent
  * Parsuje wynik z legacy Google Sign-In Intent.
  * Wołane z onActivityResult / ActivityResultCallback.
  */
+@Suppress("DEPRECATION")
 fun parseLegacyGoogleSignInResult(data: Intent?): GoogleSignInResult {
     return try {
         val task = GoogleSignIn.getSignedInAccountFromIntent(data)
