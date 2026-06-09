@@ -433,32 +433,37 @@ export function ReportsPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredPhotoReports.map((report) => (
-                <TableRow key={report.id} hover>
+              {filteredPhotoReports.map((report) => {
+                const photoMissing = !report.photoUrl || report.status === 'resolved';
+                return (
+                <TableRow key={report.id} hover sx={photoMissing ? { opacity: 0.6 } : undefined}>
                   <TableCell>{formatDate(report.createdAtMillis)}</TableCell>
                   <TableCell>
-                    {report.photoUrl && (
+                    {report.photoUrl ? (
                       <a href={report.photoUrl} target="_blank" rel="noopener noreferrer">
                         <img src={report.photoUrl} alt="Zdjęcie" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4 }} />
                       </a>
+                    ) : (
+                      <Chip label="Usunięte" size="small" variant="outlined" />
                     )}
                   </TableCell>
                   <TableCell>{PHOTO_REPORT_REASON_LABELS[report.reason as PhotoReportReason] || report.reason}</TableCell>
                   <TableCell sx={{ maxWidth: 200 }}>
                     <Tooltip title={report.comment || ''}><Typography variant="body2" noWrap>{report.comment || '—'}</Typography></Tooltip>
                   </TableCell>
-                  <TableCell>{statusChip(report.status)}</TableCell>
+                  <TableCell>{!report.photoUrl && report.status === 'pending' ? <Chip label="Nieaktualne" size="small" color="default" /> : statusChip(report.status)}</TableCell>
                   <TableCell>
                     <Tooltip title="Szczegóły"><IconButton size="small" onClick={() => openDetailPhotoReport(report)}><VisibilityIcon /></IconButton></Tooltip>
                     {report.status === 'pending' && (
                       <>
-                        <Tooltip title="Usuń zdjęcie"><IconButton color="error" size="small" onClick={() => confirm('Usunąć zdjęcie?', () => deletePhotoViaCloudFunction(report.id))}><DeleteIcon /></IconButton></Tooltip>
-                        <Tooltip title="Odrzuć"><IconButton size="small" onClick={() => confirm('Odrzucić?', () => dismissReport('photo_reports', report.id))}><CancelIcon /></IconButton></Tooltip>
+                        <Tooltip title="Usuń zdjęcie"><IconButton color="error" size="small" disabled={!report.photoUrl} onClick={() => confirm('Usunąć zdjęcie?', () => deletePhotoViaCloudFunction(report.id))}><DeleteIcon /></IconButton></Tooltip>
+                        <Tooltip title="Odrzuć"><IconButton size="small" disabled={!report.photoUrl} onClick={() => confirm('Odrzucić?', () => dismissReport('photo_reports', report.id))}><CancelIcon /></IconButton></Tooltip>
                       </>
                     )}
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
               {filteredPhotoReports.length === 0 && (
                 <TableRow><TableCell colSpan={6} align="center">Brak zgłoszeń</TableCell></TableRow>
               )}
@@ -515,10 +520,12 @@ export function ReportsPage() {
               {detailDialog.type === 'photo' && detailDialog.report && (
                 <>
                   <Typography variant="subtitle2" color="primary" mt={1}>Zgłoszone zdjęcie:</Typography>
-                  {(detailDialog.report as PhotoReport).photoUrl && (
+                  {(detailDialog.report as PhotoReport).photoUrl ? (
                     <Box textAlign="center">
                       <img src={(detailDialog.report as PhotoReport).photoUrl} alt="Zdjęcie" style={{ maxWidth: '100%', maxHeight: 300, borderRadius: 8, objectFit: 'contain' }} />
                     </Box>
+                  ) : (
+                    <Chip label="Zdjęcie zostało usunięte — zgłoszenie nieaktualne" color="default" />
                   )}
                   <Typography variant="body2"><strong>Powód:</strong> {PHOTO_REPORT_REASON_LABELS[(detailDialog.report as PhotoReport).reason as PhotoReportReason]}</Typography>
                   <Typography variant="body2"><strong>Komentarz:</strong> {(detailDialog.report as PhotoReport).comment || '(brak)'}</Typography>
@@ -531,23 +538,28 @@ export function ReportsPage() {
           )}
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, px: 3, py: 2 }}>
-          <Box display="flex" gap={1} flexWrap="wrap">
-            {detailDialog.report && detailDialog.report.status !== 'pending' && (
-              <Button size="small" color="warning" variant="outlined" onClick={() => changeReportStatus('pending')}>
-                Przywróć do oczekujących
-              </Button>
-            )}
-            {detailDialog.report && detailDialog.report.status !== 'resolved' && (
-              <Button size="small" color="success" variant="outlined" onClick={() => changeReportStatus('resolved')}>
-                Oznacz jako rozwiązane
-              </Button>
-            )}
-            {detailDialog.report && detailDialog.report.status !== 'dismissed' && (
-              <Button size="small" variant="outlined" onClick={() => changeReportStatus('dismissed')}>
-                Odrzuć
-              </Button>
-            )}
-          </Box>
+          {(() => {
+            const isPhotoMissing = detailDialog.type === 'photo' && detailDialog.report && !(detailDialog.report as PhotoReport).photoUrl;
+            return (
+              <Box display="flex" gap={1} flexWrap="wrap">
+                {detailDialog.report && detailDialog.report.status !== 'pending' && (
+                  <Button size="small" color="warning" variant="outlined" disabled={!!isPhotoMissing} onClick={() => changeReportStatus('pending')}>
+                    Przywróć do oczekujących
+                  </Button>
+                )}
+                {detailDialog.report && detailDialog.report.status !== 'resolved' && (
+                  <Button size="small" color="success" variant="outlined" disabled={!!isPhotoMissing} onClick={() => changeReportStatus('resolved')}>
+                    Oznacz jako rozwiązane
+                  </Button>
+                )}
+                {detailDialog.report && detailDialog.report.status !== 'dismissed' && (
+                  <Button size="small" variant="outlined" disabled={!!isPhotoMissing} onClick={() => changeReportStatus('dismissed')}>
+                    Odrzuć
+                  </Button>
+                )}
+              </Box>
+            );
+          })()}
           <Button onClick={() => setDetailDialog((p) => ({ ...p, open: false }))}>Zamknij</Button>
         </DialogActions>
       </Dialog>
