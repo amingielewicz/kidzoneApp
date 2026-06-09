@@ -498,7 +498,10 @@ export function ReportsPage() {
                 <>
                   <Typography variant="subtitle2" color="primary" mt={1}>Zgłoszone miejsce:</Typography>
                   <Typography variant="body2"><strong>Nazwa:</strong> {detailDialog.info.placeName || '—'}</Typography>
-                  <Typography variant="body2"><strong>Place ID:</strong> <code>{(detailDialog.report as PlaceReport).placeId}</code></Typography>
+                  <Box display="flex" alignItems="center" gap={0.5}>
+                    <Typography variant="body2"><strong>Place ID:</strong> <code>{(detailDialog.report as PlaceReport).placeId}</code></Typography>
+                    <Tooltip title="Kopiuj"><IconButton size="small" onClick={() => copyToClipboard((detailDialog.report as PlaceReport).placeId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
+                  </Box>
                   <Typography variant="body2"><strong>Powód:</strong> {PLACE_REPORT_REASON_LABELS[(detailDialog.report as PlaceReport).reason as PlaceReportReason]}</Typography>
                   <Typography variant="body2"><strong>Komentarz:</strong> {(detailDialog.report as PlaceReport).comment || '(brak)'}</Typography>
                 </>
@@ -508,6 +511,10 @@ export function ReportsPage() {
                 <>
                   <Typography variant="subtitle2" color="primary" mt={1}>Zgłoszona opinia:</Typography>
                   {detailDialog.info.placeName && <Typography variant="body2"><strong>Miejsce:</strong> {detailDialog.info.placeName}</Typography>}
+                  <Box display="flex" alignItems="center" gap={0.5}>
+                    <Typography variant="body2"><strong>Review ID:</strong> <code>{(detailDialog.report as ReviewReport).reviewId}</code></Typography>
+                    <Tooltip title="Kopiuj"><IconButton size="small" onClick={() => copyToClipboard((detailDialog.report as ReviewReport).reviewId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
+                  </Box>
                   <Typography variant="body2"><strong>Autor:</strong> {detailDialog.info.reviewAuthor || '—'}</Typography>
                   {detailDialog.info.reviewRating != null && (
                     <Box display="flex" alignItems="center" gap={1}><strong>Ocena:</strong><Rating value={detailDialog.info.reviewRating} size="small" readOnly /></Box>

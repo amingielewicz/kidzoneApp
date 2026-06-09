@@ -78,10 +78,35 @@ function formatChangeValue(key: string, value: unknown): string {
     return PLACE_CATEGORY_LABELS[value as PlaceCategory] || String(value);
   }
   if (key === 'amenities' && Array.isArray(value)) {
-    return value.join(', ');
+    return (value as string[]).map((a) => AMENITY_LABELS[a] || a).join(', ');
   }
   return String(value);
 }
+
+const AMENITY_LABELS: Record<string, string> = {
+  CHANGING_TABLE: 'Przewijak',
+  TOILET: 'Czysta toaleta',
+  STROLLER_ACCESS: 'Dostęp dla wózka',
+  PARKING: 'Parking',
+  FENCING: 'Ogrodzenie',
+  SOFT_SURFACE: 'Miękka nawierzchnia',
+  SHADED_BENCHES: 'Ławki w cieniu',
+  TODDLER_ZONE: 'Strefa 0–3',
+  CAR_FREE_AREA: 'Brak ruchu samochodowego',
+  KIDS_MENU: 'Menu dziecięce',
+  HIGH_CHAIR: 'Krzesełka do karmienia',
+  KIDS_TABLEWARE: 'Naczynia dziecięce',
+  FAST_SERVICE: 'Szybka obsługa',
+  KIDS_ENTERTAINMENT: 'Kredki, zabawki',
+  KIDS_CORNER_VISIBLE: 'Kącik widoczny od stolika',
+  AGE_ZONES: 'Podział na strefy wiekowe',
+  ANIMATOR: 'Animator',
+  MONITORING: 'Monitoring',
+  TOY_SANITIZATION: 'Dezynfekcja zabawek',
+  PARENT_ZONE: 'Strefa dla rodziców',
+  LOCKERS: 'Szafki na rzeczy',
+  WIFI: 'WiFi',
+};
 
 type SortField = 'createdAtMillis' | 'type';
 type SortDir = 'asc' | 'desc';
@@ -165,11 +190,20 @@ export function ChangeRequestsPage() {
     }
   }
 
+  const [requesterEmail, setRequesterEmail] = useState('');
+
   async function openDetail(request: PlaceChangeRequest) {
     setDetailRequest(request);
+    setRequesterEmail('');
     try {
-      const placeDoc = await getDoc(doc(db, 'places', request.placeId));
+      const [placeDoc, userDoc] = await Promise.all([
+        getDoc(doc(db, 'places', request.placeId)),
+        getDoc(doc(db, 'users', request.requesterId)),
+      ]);
       setPlaceName(placeDoc.exists() ? (placeDoc.data()?.name || 'Bez nazwy') : 'Miejsce usunięte');
+      if (userDoc.exists()) {
+        setRequesterEmail(userDoc.data()?.email || '');
+      }
     } catch {
       setPlaceName('Błąd pobierania');
     }
@@ -384,14 +418,17 @@ export function ChangeRequestsPage() {
                 <Typography variant="body2">
                   <strong>Miejsce:</strong> {placeName}
                 </Typography>
-                <Typography variant="body2">
-                  <strong>Place ID:</strong>{' '}
-                  <code style={{ fontSize: 12 }}>{detailRequest.placeId}</code>
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Zgłaszający (UID):</strong>{' '}
-                  <code style={{ fontSize: 12 }}>{detailRequest.requesterId}</code>
-                </Typography>
+                <Box display="flex" alignItems="center" gap={0.5}>
+                  <Typography variant="body2"><strong>Place ID:</strong> <code style={{ fontSize: 12 }}>{detailRequest.placeId}</code></Typography>
+                  <Tooltip title="Kopiuj Place ID"><IconButton size="small" onClick={() => navigator.clipboard.writeText(detailRequest.placeId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
+                </Box>
+                <Box>
+                  <Typography variant="body2"><strong>Zgłaszający:</strong> {requesterEmail || '—'}</Typography>
+                  <Box display="flex" alignItems="center" gap={0.5}>
+                    <Typography variant="caption" color="text.secondary">UID: <code style={{ fontSize: 11 }}>{detailRequest.requesterId}</code></Typography>
+                    <Tooltip title="Kopiuj UID"><IconButton size="small" onClick={() => navigator.clipboard.writeText(detailRequest.requesterId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
+                  </Box>
+                </Box>
                 <Typography variant="body2">
                   <strong>Data:</strong> {formatDate(detailRequest.createdAtMillis)}
                 </Typography>
