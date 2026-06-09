@@ -121,12 +121,17 @@ class PlaceListViewModel @Inject constructor(
         /** Czy są jeszcze miejsca do załadowania (infinite scroll). */
         val hasMore: Boolean = false,
         /** Łączna liczba miejsc po filtrach (przed paginacją). */
-        val totalCount: Int = 0
+        val totalCount: Int = 0,
+        /** Aktualna fraza wyszukiwania (filtr po nazwie). */
+        val searchQuery: String = ""
     )
 
     private val selectedCategory = MutableStateFlow<PlaceCategory?>(null)
     private val selectedAmenities = MutableStateFlow<Set<Amenity>>(emptySet())
     private val sortOrder = MutableStateFlow(SortOrder.NEAREST)
+
+    /** Fraza wyszukiwania po nazwie miejsca (case-insensitive, contains). */
+    private val searchQuery = MutableStateFlow("")
 
     /**
      * Lokalizacja usera - fetched async po nadaniu uprawnienia (zob. [refreshLocation]).
@@ -184,7 +189,8 @@ class PlaceListViewModel @Inject constructor(
         selectedAmenities,
         sortContextFlow,
         _isRefreshing,
-        visibleCount
+        visibleCount,
+        searchQuery
     ) { args ->
         val load = args[0] as PlacesLoad
         val category = args[1] as PlaceCategory?
@@ -192,6 +198,7 @@ class PlaceListViewModel @Inject constructor(
         val sortCtx = args[3] as SortContext
         val refreshing = args[4] as Boolean
         val visible = args[5] as Int
+        val query = args[6] as String
 
         when (load) {
             PlacesLoad.Loading -> UiState(
@@ -208,6 +215,11 @@ class PlaceListViewModel @Inject constructor(
             is PlacesLoad.Success -> {
                 val filtered = load.list
                     .filter { place -> amenities.all { it in place.amenities } }
+                    .let { list ->
+                        // Filtr po nazwie (wyszukiwarka)
+                        if (query.isBlank()) list
+                        else list.filter { it.name.contains(query, ignoreCase = true) }
+                    }
                     .let { list ->
                         if (sortCtx.sortOrder == SortOrder.ADDED_BY_ME) {
                             val uid = sortCtx.currentUserId
@@ -238,7 +250,8 @@ class PlaceListViewModel @Inject constructor(
                     isRefreshing = refreshing,
                     errorMessage = null,
                     hasMore = paginated.size < totalCount,
-                    totalCount = totalCount
+                    totalCount = totalCount,
+                    searchQuery = query
                 )
             }
             is PlacesLoad.Error -> UiState(
@@ -264,6 +277,12 @@ class PlaceListViewModel @Inject constructor(
         // nadał permission, lista od razu pojawi się posortowana po odległości.
         // Bez permission [refreshLocation] nic nie robi (no-op).
         refreshLocation()
+    }
+
+    /** Zmiana frazy wyszukiwania — filtruje listę po nazwie (klient-side). */
+    fun onSearchQueryChange(query: String) {
+        searchQuery.value = query
+        visibleCount.value = PAGE_SIZE // Reset paginacji przy zmianie wyszukiwania
     }
 
     fun onCategorySelected(category: PlaceCategory?) {
