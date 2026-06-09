@@ -2,11 +2,13 @@ package com.kidzone
 
 import android.app.Application
 import com.kidzone.data.local.PlaceDao
+import com.kidzone.logging.CrashlyticsTree
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 /**
@@ -35,8 +37,23 @@ class KidZoneApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        initTimber()
         cleanStaleCache()
         com.kidzone.messaging.KidZoneMessagingService.registerCurrentToken(this)
+    }
+
+    /**
+     * Inicjalizacja Timber:
+     *  - Debug: DebugTree (pelen Logcat output z tagiem = nazwa klasy)
+     *  - Release: CrashlyticsTree (WARN+ → Crashlytics breadcrumbs)
+     */
+    private fun initTimber() {
+        if (BuildConfig.DEBUG) {
+            Timber.plant(Timber.DebugTree())
+        } else {
+            Timber.plant(CrashlyticsTree())
+        }
+        Timber.d("Timber initialized (debug=${BuildConfig.DEBUG})")
     }
 
     private fun cleanStaleCache() {

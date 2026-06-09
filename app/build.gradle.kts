@@ -151,6 +151,7 @@ dependencies {
     implementation(libs.firebase.storage.ktx)
     implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.messaging)
+    implementation(libs.firebase.analytics)
 
     // Credential Manager (Google Sign-In przez nowoczesne API)
     implementation(libs.androidx.credentials)
@@ -188,4 +189,7 @@ dependencies {
     // In-App Update
     implementation(libs.play.app.update)
     implementation(libs.play.app.update.ktx)
+
+    // Logging
+    implementation(libs.timber)
 }

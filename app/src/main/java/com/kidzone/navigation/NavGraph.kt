@@ -14,6 +14,7 @@ import androidx.navigation.navDeepLink
 import com.kidzone.presentation.auth.LoginScreen
 import com.kidzone.presentation.auth.RegisterScreen
 import com.kidzone.presentation.main.MainScreen
+import com.kidzone.presentation.onboarding.OnboardingScreen
 import com.kidzone.presentation.place.add.AddPlaceScreen
 import com.kidzone.presentation.place.details.PlaceDetailsScreen
 import com.kidzone.presentation.place.myplaces.MyPlacesScreen
@@ -28,6 +29,10 @@ import com.kidzone.presentation.splash.SplashScreen
  */
 private const val NEW_PLACE_LAT = "newPlaceLat"
 private const val NEW_PLACE_LNG = "newPlaceLng"
+
+/** SharedPreferences klucz – czy user widzial onboarding. */
+private const val ONBOARDING_PREFS = "kidzone_onboarding"
+private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
 
 /**
  * Główny graf nawigacji aplikacji – obsługuje przejścia pre-auth oraz
@@ -55,6 +60,10 @@ fun KidZoneNavGraph(
     }
 
 
+    val onboardingPrefs = androidx.compose.runtime.remember {
+        context.getSharedPreferences(ONBOARDING_PREFS, android.content.Context.MODE_PRIVATE)
+    }
+
     NavHost(
         navController = navController,
         startDestination = Route.Splash.path
@@ -62,7 +71,9 @@ fun KidZoneNavGraph(
         composable(Route.Splash.path) {
             SplashScreen(
                 onSignedIn = {
-                    navController.navigate(Route.Main.path) {
+                    val onboardingDone = onboardingPrefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
+                    val destination = if (onboardingDone) Route.Main.path else Route.Onboarding.path
+                    navController.navigate(destination) {
                         popUpTo(Route.Splash.path) { inclusive = true }
                     }
                     // Obsłuż deep link z push notification
@@ -107,7 +118,9 @@ fun KidZoneNavGraph(
         composable(Route.Login.path) {
             LoginScreen(
                 onLoginSuccess = {
-                    navController.navigate(Route.Main.path) {
+                    val onboardingDone = onboardingPrefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
+                    val destination = if (onboardingDone) Route.Main.path else Route.Onboarding.path
+                    navController.navigate(destination) {
                         popUpTo(Route.Login.path) { inclusive = true }
                     }
                 },
@@ -125,6 +138,17 @@ fun KidZoneNavGraph(
                     }
                 },
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Route.Onboarding.path) {
+            OnboardingScreen(
+                onComplete = {
+                    onboardingPrefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, true).apply()
+                    navController.navigate(Route.Main.path) {
+                        popUpTo(Route.Onboarding.path) { inclusive = true }
+                    }
+                }
             )
         }
 

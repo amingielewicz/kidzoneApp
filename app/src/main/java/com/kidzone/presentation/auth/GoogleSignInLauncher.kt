@@ -6,7 +6,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import android.util.Log
+import timber.log.Timber
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
@@ -19,8 +19,6 @@ import com.google.android.gms.common.api.ApiException
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
-
-private const val TAG = "GoogleSignInLauncher"
 
 /**
  * Wynik próby logowania przez Google.
@@ -96,16 +94,16 @@ suspend fun launchGoogleSignIn(
         GoogleSignInResult.Cancelled
     } catch (e: NoCredentialException) {
         // Credential Manager nie znalazł providera – fallback na legacy
-        Log.w(TAG, "NoCredentialException – falling back to legacy GoogleSignIn", e)
+        Timber.w(e, "NoCredentialException – falling back to legacy GoogleSignIn")
         GoogleSignInResult.FallbackToLegacy
     } catch (e: GoogleIdTokenParsingException) {
         GoogleSignInResult.Error(e.message ?: "Błąd parsowania tokena Google")
     } catch (e: GetCredentialException) {
         // Ogólny błąd Credential Manager – fallback na legacy
-        Log.w(TAG, "GetCredentialException – falling back to legacy GoogleSignIn", e)
+        Timber.w(e, "GetCredentialException – falling back to legacy GoogleSignIn")
         GoogleSignInResult.FallbackToLegacy
     } catch (e: Exception) {
-        Log.e(TAG, "Unexpected error in Credential Manager", e)
+        Timber.e(e, "Unexpected error in Credential Manager")
         GoogleSignInResult.FallbackToLegacy
     }
 }
@@ -150,7 +148,7 @@ fun parseLegacyGoogleSignInResult(data: Intent?): GoogleSignInResult {
         when (e.statusCode) {
             12501 -> GoogleSignInResult.Cancelled // user cancelled
             else -> {
-                Log.e(TAG, "Legacy GoogleSignIn ApiException: ${e.statusCode}", e)
+                Timber.e(e, "Legacy GoogleSignIn ApiException: ${e.statusCode}")
                 GoogleSignInResult.Error("Błąd logowania Google (kod: ${e.statusCode})")
             }
         }
