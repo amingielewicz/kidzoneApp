@@ -345,7 +345,7 @@ export function ReportsPage() {
               <TableRow>
                 <TableCell sx={{ width: 100 }}><TableSortLabel active direction={sortDir} onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}>Data</TableSortLabel></TableCell>
                 <TableCell sx={{ width: 150 }}>Nazwa miejsca</TableCell>
-                <TableCell>Place ID</TableCell>
+                <TableCell sx={{ minWidth: 220 }}>Place ID</TableCell>
                 <TableCell sx={{ width: 160 }}>Powód</TableCell>
                 <TableCell>Komentarz</TableCell>
                 <TableCell sx={{ width: 110 }}>Status</TableCell>
@@ -357,9 +357,9 @@ export function ReportsPage() {
                 <TableRow key={report.id} hover>
                   <TableCell>{formatDate(report.createdAtMillis)}</TableCell>
                   <TableCell><Typography variant="body2" fontWeight={500}>{placeNames[report.placeId] || '—'}</Typography></TableCell>
-                  <TableCell>
+                  <TableCell sx={{ minWidth: 220 }}>
                     <Box display="flex" alignItems="center" gap={0.5}>
-                      <Tooltip title={report.placeId}><Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12 }}>{report.placeId.slice(0, 16)}...</Typography></Tooltip>
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 11 }}>{report.placeId}</Typography>
                       <Tooltip title="Kopiuj ID"><IconButton size="small" onClick={() => copyToClipboard(report.placeId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
                     </Box>
                   </TableCell>
@@ -395,7 +395,7 @@ export function ReportsPage() {
             <TableHead>
               <TableRow>
                 <TableCell sx={{ width: 140 }}><TableSortLabel active direction={sortDir} onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}>Data</TableSortLabel></TableCell>
-                <TableCell sx={{ width: 150 }}>Review ID</TableCell>
+                <TableCell sx={{ minWidth: 220 }}>Review ID</TableCell>
                 <TableCell sx={{ width: 180 }}>Powód</TableCell>
                 <TableCell>Komentarz</TableCell>
                 <TableCell sx={{ width: 110 }}>Status</TableCell>
@@ -406,9 +406,9 @@ export function ReportsPage() {
               {filteredReviewReports.map((report) => (
                 <TableRow key={report.id} hover>
                   <TableCell>{formatDate(report.createdAtMillis)}</TableCell>
-                  <TableCell>
+                  <TableCell sx={{ minWidth: 220 }}>
                     <Box display="flex" alignItems="center" gap={0.5}>
-                      <Tooltip title={report.reviewId}><Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12 }}>{report.reviewId.slice(0, 16)}...</Typography></Tooltip>
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 11 }}>{report.reviewId}</Typography>
                       <Tooltip title="Kopiuj ID"><IconButton size="small" onClick={() => copyToClipboard(report.reviewId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
                     </Box>
                   </TableCell>
@@ -444,7 +444,7 @@ export function ReportsPage() {
             <TableHead>
               <TableRow>
                 <TableCell sx={{ width: 100 }}><TableSortLabel active direction={sortDir} onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}>Data</TableSortLabel></TableCell>
-                <TableCell sx={{ width: 80 }}>Zdjęcie</TableCell>
+                <TableCell sx={{ width: 100 }}>Zdjęcie</TableCell>
                 <TableCell sx={{ width: 160 }}>Powód</TableCell>
                 <TableCell>Komentarz</TableCell>
                 <TableCell sx={{ width: 110 }}>Status</TableCell>
