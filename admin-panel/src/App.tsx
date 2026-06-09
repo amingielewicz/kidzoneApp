@@ -3,6 +3,7 @@ import { useAuth } from './hooks/useAuth';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { ChangeRequestsPage } from './pages/ChangeRequestsPage';
 import { PlacesPage } from './pages/PlacesPage';
 import { UsersPage } from './pages/UsersPage';
 import { Layout } from './components/Layout';
@@ -41,6 +42,7 @@ function App() {
       <Routes>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/change-requests" element={<ChangeRequestsPage />} />
         <Route path="/places" element={<PlacesPage />} />
         <Route path="/users" element={<UsersPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

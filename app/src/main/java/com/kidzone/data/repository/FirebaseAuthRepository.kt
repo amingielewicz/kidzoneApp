@@ -72,6 +72,12 @@ class FirebaseAuthRepository @Inject constructor(
                 return@addSnapshotListener
             }
             val user = snapshot?.toObject(UserDto::class.java)?.toDomain()
+            // Auto-wyloguj jeśli konto zostało zablokowane w trakcie sesji
+            if (user != null && user.isBanned) {
+                firebaseAuth.signOut()
+                trySend(null)
+                return@addSnapshotListener
+            }
             trySend(user)
         }
         awaitClose { registration.remove() }
@@ -95,6 +101,10 @@ class FirebaseAuthRepository @Inject constructor(
             }
 
             ensureUserDoc(firebaseUser)
+
+            // Sprawdź blokadę konta
+            checkBanStatus(firebaseUser.uid)
+
             firebaseUser.toDomain()
         }
 
@@ -166,6 +176,9 @@ class FirebaseAuthRepository @Inject constructor(
         // logikę "twórz tylko gdy isNewUser" – była zawodna dla legacy userów, którzy
         // logowali się Google'em zanim tworzyliśmy doc.
         ensureUserDoc(firebaseUser)
+
+        // Sprawdź blokadę konta
+        checkBanStatus(firebaseUser.uid)
 
         firebaseUser.toDomain()
     }
@@ -750,6 +763,38 @@ class FirebaseAuthRepository @Inject constructor(
         email = email.orEmpty(),
         avatarUrl = photoUrl?.toString()
     )
+
+    /**
+     * Sprawdza czy konto użytkownika jest zablokowane.
+     * Jeśli tak — wylogowuje i rzuca [AuthException.AccountBanned].
+     */
+    private suspend fun checkBanStatus(userId: String) {
+        try {
+            val snap = firestore.collection(FirestoreCollections.USERS)
+                .document(userId).get().await()
+            if (!snap.exists()) return
+            val bannedUntil = snap.getLong("bannedUntilMillis") ?: 0L
+            if (bannedUntil == 0L) return
+
+            val isBanned = bannedUntil == -1L || bannedUntil > System.currentTimeMillis()
+            if (isBanned) {
+                val reason = snap.getString("banReason") ?: "Naruszenie regulaminu"
+                val message = if (bannedUntil == -1L) {
+                    "Twoje konto zostało zablokowane bezpowrotnie."
+                } else {
+                    val date = java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale("pl"))
+                        .format(java.util.Date(bannedUntil))
+                    "Twoje konto jest zablokowane do $date."
+                }
+                firebaseAuth.signOut()
+                throw AuthException.AccountBanned(message, reason)
+            }
+        } catch (e: AuthException.AccountBanned) {
+            throw e
+        } catch (_: Exception) {
+            // Nie blokuj logowania jeśli Firestore jest niedostępny
+        }
+    }
 
     /**
      * Uruchamia [block] wewnatrz try/catch i mapuje wyjatki Firebase na

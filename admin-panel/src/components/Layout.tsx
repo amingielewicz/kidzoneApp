@@ -17,6 +17,7 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import ReportIcon from '@mui/icons-material/Report';
+import EditNoteIcon from '@mui/icons-material/EditNote';
 import PlaceIcon from '@mui/icons-material/Place';
 import PeopleIcon from '@mui/icons-material/People';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -27,6 +28,7 @@ const DRAWER_WIDTH = 240;
 const menuItems = [
   { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
   { path: '/reports', label: 'Zgłoszenia', icon: <ReportIcon /> },
+  { path: '/change-requests', label: 'Propozycje zmian', icon: <EditNoteIcon /> },
   { path: '/places', label: 'Miejsca', icon: <PlaceIcon /> },
   { path: '/users', label: 'Użytkownicy', icon: <PeopleIcon /> },
 ];
@@ -88,6 +90,7 @@ export function Layout({ children }: LayoutProps) {
           >
             <MenuIcon />
           </IconButton>
+          <Box component="img" src="/logo.png" alt="kidZone" sx={{ height: 32, mr: 1 }} />
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             kidZone Admin Panel
           </Typography>
@@ -132,7 +135,9 @@ export function Layout({ children }: LayoutProps) {
           flexGrow: 1,
           p: 3,
           width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
+          ml: { md: `${DRAWER_WIDTH}px` },
           mt: '64px',
+          minHeight: 'calc(100vh - 64px)',
         }}
       >
         {children}

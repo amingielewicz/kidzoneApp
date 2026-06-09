@@ -37,7 +37,9 @@ data class UserDto(
      * w UI traktuje brak wpisu jako "nieznana data" i sortuje takie
      * odznaki na koniec.
      */
-    val badgeEarnedAt: Map<String, Long> = emptyMap()
+    val badgeEarnedAt: Map<String, Long> = emptyMap(),
+    val bannedUntilMillis: Long = 0L,
+    val banReason: String = ""
 ) {
     fun toDomain(): User = User(
         id = id,
@@ -50,7 +52,9 @@ data class UserDto(
         reviewsCount = reviewsCount,
         createdAtMillis = createdAtMillis,
         nameLowercase = nameLowercase,
-        badgeEarnedAt = badgeEarnedAt
+        badgeEarnedAt = badgeEarnedAt,
+        bannedUntilMillis = bannedUntilMillis,
+        banReason = banReason
     )
 
     companion object {
@@ -65,7 +69,9 @@ data class UserDto(
             reviewsCount = user.reviewsCount,
             createdAtMillis = user.createdAtMillis,
             nameLowercase = user.nameLowercase,
-            badgeEarnedAt = user.badgeEarnedAt
+            badgeEarnedAt = user.badgeEarnedAt,
+            bannedUntilMillis = user.bannedUntilMillis,
+            banReason = user.banReason
         )
     }
 }

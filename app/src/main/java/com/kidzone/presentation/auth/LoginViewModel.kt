@@ -44,7 +44,9 @@ class LoginViewModel @Inject constructor(
         val message: String? = null,
         val isMessageError: Boolean = true,
         val isSignedIn: Boolean = false,
-        val showResendVerification: Boolean = false
+        val showResendVerification: Boolean = false,
+        val banMessage: String? = null,
+        val banReason: String? = null
     ) {
         /** Oba pola wypełnione – tylko wtedy można kliknąć "Zaloguj się". */
         val isFormValid: Boolean
@@ -75,12 +77,15 @@ class LoginViewModel @Inject constructor(
                 when (result) {
                     is OpResult.Success -> it.copy(isLoading = false, isSignedIn = true)
                     is OpResult.Failure -> {
+                        val isBanned = result.error is AuthException.AccountBanned
                         val isEmailNotVerified = result.error is AuthException.EmailNotVerified
                         it.copy(
                             isLoading = false,
                             message = mapError(result.error),
                             isMessageError = true,
-                            showResendVerification = isEmailNotVerified
+                            showResendVerification = isEmailNotVerified,
+                            banMessage = if (isBanned) (result.error as AuthException.AccountBanned).banMessage else null,
+                            banReason = if (isBanned) (result.error as AuthException.AccountBanned).banReason else null
                         )
                     }
                 }
@@ -94,16 +99,21 @@ class LoginViewModel @Inject constructor(
      */
     fun signInWithGoogle(idToken: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, message = null) }
+            _uiState.update { it.copy(isLoading = true, message = null, banMessage = null) }
             val result = authRepository.signInWithGoogle(idToken)
             _uiState.update {
                 when (result) {
                     is OpResult.Success -> it.copy(isLoading = false, isSignedIn = true)
-                    is OpResult.Failure -> it.copy(
-                        isLoading = false,
-                        message = mapError(result.error),
-                        isMessageError = true
-                    )
+                    is OpResult.Failure -> {
+                        val isBanned = result.error is AuthException.AccountBanned
+                        it.copy(
+                            isLoading = false,
+                            message = mapError(result.error),
+                            isMessageError = true,
+                            banMessage = if (isBanned) (result.error as AuthException.AccountBanned).banMessage else null,
+                            banReason = if (isBanned) (result.error as AuthException.AccountBanned).banReason else null
+                        )
+                    }
                 }
             }
         }
@@ -147,6 +157,7 @@ class LoginViewModel @Inject constructor(
     }
 
     private fun mapError(throwable: Throwable): String = when (throwable) {
+        is AuthException.AccountBanned -> throwable.banMessage
         is AuthException -> throwable.message ?: "Nieznany błąd"
         else -> throwable.message ?: "Nieznany błąd"
     }

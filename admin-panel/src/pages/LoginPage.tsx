@@ -10,7 +10,6 @@ import {
   CircularProgress,
   Divider,
 } from '@mui/material';
-import LockIcon from '@mui/icons-material/Lock';
 import GoogleIcon from '@mui/icons-material/Google';
 import { useAuth } from '../hooks/useAuth';
 
@@ -38,19 +37,11 @@ export function LoginPage() {
         <CardContent sx={{ p: 4 }}>
           <Box display="flex" flexDirection="column" alignItems="center" mb={3}>
             <Box
-              sx={{
-                width: 56,
-                height: 56,
-                borderRadius: '50%',
-                bgcolor: 'primary.main',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mb: 2,
-              }}
-            >
-              <LockIcon sx={{ color: 'white', fontSize: 28 }} />
-            </Box>
+              component="img"
+              src="/logo.png"
+              alt="kidZone"
+              sx={{ width: 64, height: 64, mb: 2 }}
+            />
             <Typography variant="h5" fontWeight={700}>
               kidZone Admin
             </Typography>
