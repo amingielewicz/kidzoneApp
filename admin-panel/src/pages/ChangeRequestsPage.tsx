@@ -297,7 +297,7 @@ export function ChangeRequestsPage() {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>
+              <TableCell sx={{ width: 140 }}>
                 <TableSortLabel
                   active={sortField === 'createdAtMillis'}
                   direction={sortField === 'createdAtMillis' ? sortDir : 'desc'}
@@ -306,7 +306,7 @@ export function ChangeRequestsPage() {
                   Data
                 </TableSortLabel>
               </TableCell>
-              <TableCell>
+              <TableCell sx={{ width: 100 }}>
                 <TableSortLabel
                   active={sortField === 'type'}
                   direction={sortField === 'type' ? sortDir : 'asc'}
@@ -315,10 +315,10 @@ export function ChangeRequestsPage() {
                   Typ
                 </TableSortLabel>
               </TableCell>
-              <TableCell>Place ID</TableCell>
+              <TableCell sx={{ width: 150 }}>Place ID</TableCell>
               <TableCell>Zmiany</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Akcje</TableCell>
+              <TableCell sx={{ width: 110 }}>Status</TableCell>
+              <TableCell sx={{ width: 120 }}>Akcje</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>

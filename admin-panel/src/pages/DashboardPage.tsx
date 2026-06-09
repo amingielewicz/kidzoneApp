@@ -31,7 +31,6 @@ import {
   orderBy,
   getDocs,
   getCountFromServer,
-  where,
   limit,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
@@ -91,21 +90,12 @@ export function DashboardPage() {
 
   async function fetchDashboard() {
     try {
-      // Stats
-      const [placesC, reviewsC, usersC, prC, rrC, phC] = await Promise.all([
+      // Stats - basic counts
+      const [placesC, reviewsC, usersC] = await Promise.all([
         getCountFromServer(collection(db, 'places')),
         getCountFromServer(collection(db, 'reviews')),
         getCountFromServer(collection(db, 'users')),
-        getCountFromServer(query(collection(db, 'place_reports'), where('status', '==', 'pending'))),
-        getCountFromServer(query(collection(db, 'review_reports'), where('status', '==', 'pending'))),
-        getCountFromServer(query(collection(db, 'photo_reports'), where('status', '==', 'pending'))),
       ]);
-      setStats({
-        places: placesC.data().count,
-        reviews: reviewsC.data().count,
-        users: usersC.data().count,
-        pendingReports: prC.data().count + rrC.data().count + phC.data().count,
-      });
 
       // Recent users
       const usersSnap = await getDocs(query(collection(db, 'users'), orderBy('createdAtMillis', 'desc'), limit(5)));
@@ -119,19 +109,41 @@ export function DashboardPage() {
       const reviewsSnap = await getDocs(query(collection(db, 'reviews'), orderBy('createdAtMillis', 'desc'), limit(5)));
       setRecentReviews(reviewsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as RecentReview)));
 
-      // Recent reports (pending) - no orderBy to avoid composite index requirement
-      const [prSnap2, rrSnap2, phSnap2] = await Promise.all([
-        getDocs(query(collection(db, 'place_reports'), where('status', '==', 'pending'))),
-        getDocs(query(collection(db, 'review_reports'), where('status', '==', 'pending'))),
-        getDocs(query(collection(db, 'photo_reports'), where('status', '==', 'pending'))),
-      ]);
-      const reports: RecentReport[] = [
-        ...prSnap2.docs.map((d) => ({ id: d.id, type: 'place' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
-        ...rrSnap2.docs.map((d) => ({ id: d.id, type: 'review' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
-        ...phSnap2.docs.map((d) => ({ id: d.id, type: 'photo' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
-      ];
-      reports.sort((a, b) => b.createdAtMillis - a.createdAtMillis);
-      setRecentReports(reports.slice(0, 5));
+      // Reports - fetch ALL and filter client-side to avoid composite index requirement
+      let pendingReportsCount = 0;
+      try {
+        const [prSnap2, rrSnap2, phSnap2] = await Promise.all([
+          getDocs(collection(db, 'place_reports')),
+          getDocs(collection(db, 'review_reports')),
+          getDocs(collection(db, 'photo_reports')),
+        ]);
+        const allReportDocs = [
+          ...prSnap2.docs.map((d) => ({ id: d.id, type: 'place' as const, ...d.data() })),
+          ...rrSnap2.docs.map((d) => ({ id: d.id, type: 'review' as const, ...d.data() })),
+          ...phSnap2.docs.map((d) => ({ id: d.id, type: 'photo' as const, ...d.data() })),
+        ];
+        const pendingDocs = allReportDocs.filter((d) => d.status === 'pending');
+        pendingReportsCount = pendingDocs.length;
+        const reports: RecentReport[] = pendingDocs.map((d) => ({
+          id: d.id,
+          type: d.type,
+          reason: d.reason || '',
+          comment: d.comment || '',
+          createdAtMillis: d.createdAtMillis || 0,
+        }));
+        reports.sort((a, b) => b.createdAtMillis - a.createdAtMillis);
+        setRecentReports(reports.slice(0, 5));
+      } catch (reportErr) {
+        console.error('Failed to fetch reports for dashboard:', reportErr);
+        setRecentReports([]);
+      }
+
+      setStats({
+        places: placesC.data().count,
+        reviews: reviewsC.data().count,
+        users: usersC.data().count,
+        pendingReports: pendingReportsCount,
+      });
     } catch (err) {
       console.error('Dashboard fetch error:', err);
     } finally {

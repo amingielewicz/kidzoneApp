@@ -398,9 +398,9 @@ export function PlacesPage() {
                   Nazwa
                 </TableSortLabel>
               </TableCell>
-              <TableCell>Kategoria</TableCell>
+              <TableCell sx={{ width: 130 }}>Kategoria</TableCell>
               <TableCell>Adres</TableCell>
-              <TableCell>
+              <TableCell sx={{ width: 160 }}>
                 <TableSortLabel
                   active={sortField === 'averageRating'}
                   direction={sortField === 'averageRating' ? sortDir : 'asc'}
@@ -409,7 +409,7 @@ export function PlacesPage() {
                   Ocena
                 </TableSortLabel>
               </TableCell>
-              <TableCell>
+              <TableCell sx={{ width: 80 }}>
                 <TableSortLabel
                   active={sortField === 'reviewsCount'}
                   direction={sortField === 'reviewsCount' ? sortDir : 'asc'}
@@ -418,7 +418,7 @@ export function PlacesPage() {
                   Opinie
                 </TableSortLabel>
               </TableCell>
-              <TableCell>
+              <TableCell sx={{ width: 120 }}>
                 <TableSortLabel
                   active={sortField === 'createdAtMillis'}
                   direction={sortField === 'createdAtMillis' ? sortDir : 'asc'}
@@ -427,7 +427,7 @@ export function PlacesPage() {
                   Data
                 </TableSortLabel>
               </TableCell>
-              <TableCell>Akcje</TableCell>
+              <TableCell sx={{ width: 100 }}>Akcje</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -538,7 +538,10 @@ export function PlacesPage() {
                   </Grid>
 
                   <TextField label="Właściciel (UID)" value={editOwner} onChange={(e) => setEditOwner(e.target.value)} fullWidth size="small" />
-                  {ownerEmail && <Typography variant="body2" color="text.secondary">Email właściciela: <strong>{ownerEmail}</strong></Typography>}
+                  <Box sx={{ p: 1.5, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary"><strong>UID:</strong> {editOwner || '(brak)'}</Typography>
+                    <Typography variant="body2" color="text.secondary"><strong>Email:</strong> {ownerEmail || '(brak / nie pobrano)'}</Typography>
+                  </Box>
 
                   <Typography variant="subtitle2" mt={1}>Udogodnienia:</Typography>
                   <Box display="flex" flexWrap="wrap" gap={0}>

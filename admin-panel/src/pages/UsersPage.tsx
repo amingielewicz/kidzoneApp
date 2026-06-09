@@ -255,12 +255,12 @@ export function UsersPage() {
             <TableRow>
               <TableCell><TableSortLabel active={sortField === 'name'} direction={sortField === 'name' ? sortDir : 'asc'} onClick={() => handleSort('name')}>Użytkownik</TableSortLabel></TableCell>
               <TableCell><TableSortLabel active={sortField === 'email'} direction={sortField === 'email' ? sortDir : 'asc'} onClick={() => handleSort('email')}>Email</TableSortLabel></TableCell>
-              <TableCell>Rola</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell><TableSortLabel active={sortField === 'placesAddedCount'} direction={sortField === 'placesAddedCount' ? sortDir : 'asc'} onClick={() => handleSort('placesAddedCount')}>Miejsca</TableSortLabel></TableCell>
-              <TableCell><TableSortLabel active={sortField === 'reviewsCount'} direction={sortField === 'reviewsCount' ? sortDir : 'asc'} onClick={() => handleSort('reviewsCount')}>Opinie</TableSortLabel></TableCell>
-              <TableCell><TableSortLabel active={sortField === 'createdAtMillis'} direction={sortField === 'createdAtMillis' ? sortDir : 'asc'} onClick={() => handleSort('createdAtMillis')}>Rejestracja</TableSortLabel></TableCell>
-              <TableCell>Akcje</TableCell>
+              <TableCell sx={{ width: 100 }}>Rola</TableCell>
+              <TableCell sx={{ width: 150 }}>Status</TableCell>
+              <TableCell sx={{ width: 80 }}><TableSortLabel active={sortField === 'placesAddedCount'} direction={sortField === 'placesAddedCount' ? sortDir : 'asc'} onClick={() => handleSort('placesAddedCount')}>Miejsca</TableSortLabel></TableCell>
+              <TableCell sx={{ width: 80 }}><TableSortLabel active={sortField === 'reviewsCount'} direction={sortField === 'reviewsCount' ? sortDir : 'asc'} onClick={() => handleSort('reviewsCount')}>Opinie</TableSortLabel></TableCell>
+              <TableCell sx={{ width: 120 }}><TableSortLabel active={sortField === 'createdAtMillis'} direction={sortField === 'createdAtMillis' ? sortDir : 'asc'} onClick={() => handleSort('createdAtMillis')}>Rejestracja</TableSortLabel></TableCell>
+              <TableCell sx={{ width: 80 }}>Akcje</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>

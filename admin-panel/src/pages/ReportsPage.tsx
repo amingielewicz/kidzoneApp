@@ -331,13 +331,39 @@ export function ReportsPage() {
             <TableHead>
               <TableRow>
                 <TableCell sx={{ width: 140 }}><TableSortLabel active direction={sortDir} onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}>Data</TableSortLabel></TableCell>
-                <TableCell sx={{ width: 130 }}>Place ID</TableCell>
+                <TableCell sx={{ width: 150 }}>Place ID</TableCell>
                 <TableCell sx={{ width: 180 }}>Powód</TableCell>
                 <TableCell>Komentarz</TableCell>
                 <TableCell sx={{ width: 110 }}>Status</TableCell>
                 <TableCell sx={{ width: 120 }}>Akcje</TableCell>
               </TableRow>
             </TableHead>
+            <TableBody>
+              {filteredPlaceReports.map((report) => (
+                <TableRow key={report.id} hover>
+                  <TableCell>{formatDate(report.createdAtMillis)}</TableCell>
+                  <TableCell>
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                      <Tooltip title={report.placeId}><Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12 }}>{report.placeId.slice(0, 8)}...</Typography></Tooltip>
+                      <Tooltip title="Kopiuj ID"><IconButton size="small" onClick={() => copyToClipboard(report.placeId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
+                    </Box>
+                  </TableCell>
+                  <TableCell>{PLACE_REPORT_REASON_LABELS[report.reason as PlaceReportReason] || report.reason}</TableCell>
+                  <TableCell sx={{ maxWidth: 200 }}>
+                    <Tooltip title={report.comment || ''}><Typography variant="body2" noWrap>{report.comment || '—'}</Typography></Tooltip>
+                  </TableCell>
+                  <TableCell>{statusChip(report.status)}</TableCell>
+                  <TableCell>
+                    <Tooltip title="Szczegóły"><IconButton size="small" onClick={() => openDetailPlaceReport(report)}><VisibilityIcon /></IconButton></Tooltip>
+                    {report.status === 'pending' && (
+                      <>
+                        <Tooltip title="Usuń miejsce i rozwiąż"><IconButton color="error" size="small" onClick={() => confirm('Usunąć miejsce?', () => resolveAndDeletePlace(report))}><DeleteIcon /></IconButton></Tooltip>
+                        <Tooltip title="Odrzuć"><IconButton size="small" onClick={() => confirm('Odrzucić?', () => dismissReport('place_reports', report.id))}><CancelIcon /></IconButton></Tooltip>
+                      </>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
               {filteredPlaceReports.length === 0 && (
                 <TableRow><TableCell colSpan={6} align="center">Brak zgłoszeń</TableCell></TableRow>
               )}
@@ -351,12 +377,12 @@ export function ReportsPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell><TableSortLabel active direction={sortDir} onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}>Data</TableSortLabel></TableCell>
-                <TableCell>Review ID</TableCell>
-                <TableCell>Powód</TableCell>
+                <TableCell sx={{ width: 140 }}><TableSortLabel active direction={sortDir} onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}>Data</TableSortLabel></TableCell>
+                <TableCell sx={{ width: 150 }}>Review ID</TableCell>
+                <TableCell sx={{ width: 180 }}>Powód</TableCell>
                 <TableCell>Komentarz</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Akcje</TableCell>
+                <TableCell sx={{ width: 110 }}>Status</TableCell>
+                <TableCell sx={{ width: 120 }}>Akcje</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -398,19 +424,19 @@ export function ReportsPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell><TableSortLabel active direction={sortDir} onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}>Data</TableSortLabel></TableCell>
-                <TableCell>Zdjęcie</TableCell>
-                <TableCell>Powód</TableCell>
+                <TableCell sx={{ width: 140 }}><TableSortLabel active direction={sortDir} onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}>Data</TableSortLabel></TableCell>
+                <TableCell sx={{ width: 80 }}>Zdjęcie</TableCell>
+                <TableCell sx={{ width: 180 }}>Powód</TableCell>
                 <TableCell>Komentarz</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Akcje</TableCell>
+                <TableCell sx={{ width: 110 }}>Status</TableCell>
+                <TableCell sx={{ width: 120 }}>Akcje</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredPhotoReports.map((report) => {
-                const photoMissing = !report.photoUrl || report.status === 'resolved';
+                const isNotPending = report.status === 'resolved' || report.status === 'dismissed';
                 return (
-                <TableRow key={report.id} hover sx={photoMissing ? { opacity: 0.6 } : undefined}>
+                <TableRow key={report.id} hover sx={isNotPending ? { opacity: 0.6 } : undefined}>
                   <TableCell>{formatDate(report.createdAtMillis)}</TableCell>
                   <TableCell>
                     {report.photoUrl ? (
@@ -425,7 +451,7 @@ export function ReportsPage() {
                   <TableCell sx={{ maxWidth: 200 }}>
                     <Tooltip title={report.comment || ''}><Typography variant="body2" noWrap>{report.comment || '—'}</Typography></Tooltip>
                   </TableCell>
-                  <TableCell>{!report.photoUrl && report.status === 'pending' ? <Chip label="Nieaktualne" size="small" color="default" /> : statusChip(report.status)}</TableCell>
+                  <TableCell>{statusChip(report.status)}</TableCell>
                   <TableCell>
                     <Tooltip title="Szczegóły"><IconButton size="small" onClick={() => openDetailPhotoReport(report)}><VisibilityIcon /></IconButton></Tooltip>
                     {report.status === 'pending' && (
@@ -519,28 +545,23 @@ export function ReportsPage() {
           )}
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, px: 3, py: 2 }}>
-          {(() => {
-            const isPhotoMissing = detailDialog.type === 'photo' && detailDialog.report && !(detailDialog.report as PhotoReport).photoUrl;
-            return (
-              <Box display="flex" gap={1} flexWrap="wrap">
-                {detailDialog.report && detailDialog.report.status !== 'pending' && (
-                  <Button size="small" color="warning" variant="outlined" disabled={!!isPhotoMissing} onClick={() => changeReportStatus('pending')}>
-                    Przywróć do oczekujących
-                  </Button>
-                )}
-                {detailDialog.report && detailDialog.report.status !== 'resolved' && (
-                  <Button size="small" color="success" variant="outlined" disabled={!!isPhotoMissing} onClick={() => changeReportStatus('resolved')}>
-                    Oznacz jako rozwiązane
-                  </Button>
-                )}
-                {detailDialog.report && detailDialog.report.status !== 'dismissed' && (
-                  <Button size="small" variant="outlined" disabled={!!isPhotoMissing} onClick={() => changeReportStatus('dismissed')}>
-                    Odrzuć
-                  </Button>
-                )}
-              </Box>
-            );
-          })()}
+          <Box display="flex" gap={1} flexWrap="wrap">
+            {detailDialog.report && detailDialog.report.status !== 'pending' && (
+              <Button size="small" color="warning" variant="outlined" onClick={() => changeReportStatus('pending')}>
+                Przywróć do oczekujących
+              </Button>
+            )}
+            {detailDialog.report && detailDialog.report.status !== 'resolved' && (
+              <Button size="small" color="success" variant="outlined" onClick={() => changeReportStatus('resolved')}>
+                Oznacz jako rozwiązane
+              </Button>
+            )}
+            {detailDialog.report && detailDialog.report.status !== 'dismissed' && (
+              <Button size="small" variant="outlined" onClick={() => changeReportStatus('dismissed')}>
+                Odrzuć
+              </Button>
+            )}
+          </Box>
           <Button onClick={() => setDetailDialog((p) => ({ ...p, open: false }))}>Zamknij</Button>
         </DialogActions>
       </Dialog>
