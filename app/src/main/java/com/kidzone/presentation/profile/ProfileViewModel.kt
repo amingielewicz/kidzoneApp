@@ -256,7 +256,7 @@ class ProfileViewModel @Inject constructor(
             val data = mapOf(
                 "notificationPreferences" to mapOf(
                     "newReviewOnMyPlace" to prefs.newReviewOnMyPlace,
-                    "newPlaceNearby" to prefs.newPlaceNearby,
+                    "newBadgeEarned" to prefs.newBadgeEarned,
                     "weeklyDigest" to prefs.weeklyDigest
                 )
             )
@@ -282,7 +282,7 @@ class ProfileViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(notificationPrefs = NotificationPrefs(
                             newReviewOnMyPlace = prefsMap["newReviewOnMyPlace"] ?: true,
-                            newPlaceNearby = prefsMap["newPlaceNearby"] ?: true,
+                            newBadgeEarned = prefsMap["newBadgeEarned"] ?: true,
                             weeklyDigest = prefsMap["weeklyDigest"] ?: true
                         ))
                     }
