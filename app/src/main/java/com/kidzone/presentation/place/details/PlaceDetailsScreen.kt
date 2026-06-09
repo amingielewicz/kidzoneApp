@@ -368,6 +368,10 @@ fun PlaceDetailsScreen(
                     }
                 }
                 else -> {
+                    androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                        isRefreshing = state.isLoading,
+                        onRefresh = viewModel::refresh
+                    ) {
                     PlaceDetailsContent(
                         place = state.place!!,
                         author = state.author,
@@ -378,6 +382,7 @@ fun PlaceDetailsScreen(
                         onSortOrderChange = viewModel::setSortOrder,
                         onAddReview = viewModel::openAddReviewSheet,
                         onEditReview = viewModel::openEditReviewSheet,
+                        onDeleteReview = { review -> viewModel.deleteReview(review.id) },
                         onReportReview = { review ->
                             reviewToReport = review
                             showReportReviewDialog = true
@@ -411,6 +416,7 @@ fun PlaceDetailsScreen(
                         } else null,
                         isUploadingPlacePhoto = state.isUploadingPlacePhoto
                     )
+                    } // PullToRefreshBox
                 }
             }
         }
@@ -572,6 +578,7 @@ private fun PlaceDetailsContent(
     onSortOrderChange: (PlaceDetailsViewModel.ReviewSortOrder) -> Unit,
     onAddReview: () -> Unit,
     onEditReview: (Review) -> Unit,
+    onDeleteReview: (Review) -> Unit,
     onReportReview: (Review) -> Unit,
     onOpenPhotoViewer: (photos: List<String>, startIndex: Int, areMine: Boolean) -> Unit = { _, _, _ -> },
     onAddPlacePhoto: (() -> Unit)? = null,
@@ -747,6 +754,9 @@ private fun PlaceDetailsContent(
                 isMine = isMine,
                 onEdit = if (isMine) {
                     { onEditReview(review) }
+                } else null,
+                onDelete = if (isMine) {
+                    { onDeleteReview(review) }
                 } else null,
                 onReport = if (!isMine && currentUserId != null) {
                     { onReportReview(review) }
@@ -1026,6 +1036,7 @@ private fun ReviewCard(
     review: Review,
     isMine: Boolean = false,
     onEdit: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
     onReport: (() -> Unit)? = null,
     onPhotoClick: ((index: Int) -> Unit)? = null
 ) {
@@ -1079,6 +1090,19 @@ private fun ReviewCard(
                                 imageVector = Icons.Filled.Edit,
                                 contentDescription = "Edytuj swoją opinię",
                                 tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    if (onDelete != null) {
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Delete,
+                                contentDescription = "Usuń swoją opinię",
+                                tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
