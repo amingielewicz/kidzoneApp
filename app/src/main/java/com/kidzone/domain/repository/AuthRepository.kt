@@ -242,4 +242,9 @@ interface AuthRepository {
      *   nowo zdobytych odznak. Pusta lista = no-op (zwraca Success(Unit)).
      */
     suspend fun recordBadgesEarned(badgeNames: List<String>): OpResult<Unit>
+
+    /**
+     * Usuwa odznaki z mapy `badgeEarnedAt` gdy user przestal spelnic prog.
+     */
+    suspend fun revokeBadges(badgeNames: List<String>): OpResult<Unit>
 }

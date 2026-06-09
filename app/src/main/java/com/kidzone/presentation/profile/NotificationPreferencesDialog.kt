@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 
 data class NotificationPrefs(
     val newReviewOnMyPlace: Boolean = true,
-    val newPlaceNearby: Boolean = true,
+    val newBadgeEarned: Boolean = true,
     val weeklyDigest: Boolean = true
 )
 
@@ -47,16 +47,16 @@ fun NotificationPreferencesDialog(
                 )
                 Spacer(Modifier.height(16.dp))
                 NotificationToggle(
-                    title = "Nowa opinia na moim miejscu",
-                    description = "Ktoś wystawił opinię na miejscu, które dodałeś",
+                    title = "Nowa opinia o moim miejscu",
+                    description = "Kto\u015B wystawi\u0142 opini\u0119 o miejscu, kt\u00F3re doda\u0142e\u015B",
                     checked = prefs.newReviewOnMyPlace,
                     onCheckedChange = { prefs = prefs.copy(newReviewOnMyPlace = it) }
                 )
                 NotificationToggle(
-                    title = "Nowe miejsce w okolicy",
-                    description = "Ktoś dodał nowe miejsce blisko Ciebie",
-                    checked = prefs.newPlaceNearby,
-                    onCheckedChange = { prefs = prefs.copy(newPlaceNearby = it) }
+                    title = "Nowa odznaka",
+                    description = "Zdoby\u0142e\u015B lub straci\u0142e\u015B odznak\u0119",
+                    checked = prefs.newBadgeEarned,
+                    onCheckedChange = { prefs = prefs.copy(newBadgeEarned = it) }
                 )
                 NotificationToggle(
                     title = "Podsumowanie tygodniowe",

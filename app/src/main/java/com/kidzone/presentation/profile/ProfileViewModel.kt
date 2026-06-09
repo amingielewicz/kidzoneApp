@@ -586,10 +586,9 @@ class ProfileViewModel @Inject constructor(
             .toSet()
 
         val newlyEarned = (current - seen)
-            // Stabilna kolejność według enum.ordinal - jeśli user wbił
-            // kilka odznak naraz, pokazujemy je w "logicznej" kolejności
-            // (Pierwszy ślad przed Odkrywca przed Kartograf itd.).
             .sortedBy { it.ordinal }
+
+        val revoked = (seen - current)
 
         if (newlyEarned.isNotEmpty()) {
             _uiState.update { state ->
@@ -597,19 +596,17 @@ class ProfileViewModel @Inject constructor(
                     newlyEarnedBadges = state.newlyEarnedBadges + newlyEarned
                 )
             }
-
-            // Asynchroniczny zapis timestampów do Firestore. Best-effort -
-            // błąd nie blokuje UI ani SharedPreferences (lokalnie i tak
-            // wiemy, że odznakę widzieliśmy). Brak timestampu w Firestore
-            // skutkuje tylko sortem na koniec w `chronologicalOrder`.
             viewModelScope.launch {
                 authRepository.recordBadgesEarned(newlyEarned.map { it.name })
             }
         }
 
-        // Persist aktualny set odznak - również gdy user nic nowego nie
-        // zdobył (idempotent), żeby state SharedPreferences zawsze
-        // odzwierciedlał ostatnio zaobserwowany stan.
+        if (revoked.isNotEmpty()) {
+            viewModelScope.launch {
+                authRepository.revokeBadges(revoked.map { it.name })
+            }
+        }
+
         if (seen != current) {
             prefs.edit()
                 .putStringSet(key, current.map { it.name }.toSet())

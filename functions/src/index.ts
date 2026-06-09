@@ -925,7 +925,11 @@ export const onBadgeEarned = onDocumentUpdated(
     const newBadgeNames = Object.keys(afterBadges).filter(
       (badge) => !(badge in beforeBadges)
     );
-    if (newBadgeNames.length === 0) return;
+    const revokedBadgeNames = Object.keys(beforeBadges).filter(
+      (badge) => !(badge in afterBadges)
+    );
+
+    if (newBadgeNames.length === 0 && revokedBadgeNames.length === 0) return;
 
     const userId = event.params.userId;
     const fcmTokens: string[] = afterData.fcmTokens || [];
@@ -939,33 +943,44 @@ export const onBadgeEarned = onDocumentUpdated(
       "FIRST_REVIEW": "Pierwsza opinia",
       "EXPLORER": "Odkrywca",
       "CARTOGRAPHER": "Kartograf",
-      "TRACKER": "Tropiciel",
+      "PATHFINDER": "Tropiciel",
       "REVIEWER": "Recenzent",
       "CRITIC": "Krytyk",
-      "SEASONED_REVIEWER": "Wytrawny recenzent",
+      "SENIOR_REVIEWER": "Wytrawny recenzent",
       "COMMUNITY_PILLAR": "Filar spo\u0142eczno\u015Bci",
       "FAMILY_EXPERT": "Ekspert rodzinny",
-      "BRONZE_LEADER": "Br\u0105zowy lider",
-      "SILVER_LEADER": "Srebrny lider",
-      "GOLD_LEADER": "Z\u0142oty lider",
-      "LOCAL_FAVORITE": "Lokalny faworyt",
-      "PLAY_ARCHITECT": "Architekt zabawy",
+      "LEADER_BRONZE": "Br\u0105zowy lider",
+      "LEADER_SILVER": "Srebrny lider",
+      "LEADER_GOLD": "Z\u0142oty lider",
+      "PLACE_TOP3": "Lokalny faworyt",
+      "PLACE_TOP1": "Architekt zabawy",
     };
 
-    const badgeNamesHuman = newBadgeNames
-      .map((b) => badgeLabels[b] || b)
-      .join(", ");
+    let title = "";
+    let body = "";
 
-    const title = newBadgeNames.length === 1
-      ? `\u{1F3C5} Nowa odznaka: ${badgeNamesHuman}!`
-      : `\u{1F3C5} Nowe odznaki: ${badgeNamesHuman}!`;
+    if (newBadgeNames.length > 0) {
+      const names = newBadgeNames.map((b) => badgeLabels[b] || b).join(", ");
+      title = newBadgeNames.length === 1
+        ? `\u{1F3C5} Nowa odznaka: ${names}!`
+        : `\u{1F3C5} Nowe odznaki: ${names}!`;
+      body = "Otw\u00F3rz profil w kidZone, by zobaczy\u0107 swoje osi\u0105gni\u0119cia.";
+    } else if (revokedBadgeNames.length > 0) {
+      const names = revokedBadgeNames.map((b) => badgeLabels[b] || b).join(", ");
+      title = revokedBadgeNames.length === 1
+        ? `Utracona odznaka: ${names}`
+        : `Utracone odznaki: ${names}`;
+      body = "Spe\u0142nij ponownie wymagania, by j\u0105 odzyska\u0107.";
+    }
+
+    if (!title) return;
 
     const message: admin.messaging.MulticastMessage = {
       tokens: fcmTokens,
-      notification: {title, body: "Otw\u00F3rz profil w kidZone, by zobaczy\u0107 swoje osi\u0105gni\u0119cia."},
+      notification: {title, body},
       data: {
         type: "new_badge",
-        badges: newBadgeNames.join(","),
+        badges: (newBadgeNames.length > 0 ? newBadgeNames : revokedBadgeNames).join(","),
       },
       android: {
         priority: "high",
@@ -975,7 +990,7 @@ export const onBadgeEarned = onDocumentUpdated(
 
     try {
       const response = await admin.messaging().sendEachForMulticast(message);
-      console.log(`Badge push for user ${userId} (${badgeNamesHuman}): ${response.successCount} ok`);
+      console.log(`Badge push for user ${userId}: ${response.successCount} ok`);
       await cleanStaleTokens(response, fcmTokens, userId);
     } catch (err) {
       console.error("Badge push error:", err);
