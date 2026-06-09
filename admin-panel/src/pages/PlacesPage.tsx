@@ -34,6 +34,7 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import CancelIcon from '@mui/icons-material/Cancel';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import {
   collection,
   query,
@@ -539,7 +540,10 @@ export function PlacesPage() {
 
                   <TextField label="Właściciel (UID)" value={editOwner} onChange={(e) => setEditOwner(e.target.value)} fullWidth size="small" />
                   <Box sx={{ p: 1.5, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-                    <Typography variant="body2" color="text.secondary"><strong>UID:</strong> {editOwner || '(brak)'}</Typography>
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                      <Typography variant="body2" color="text.secondary"><strong>UID:</strong> {editOwner || '(brak)'}</Typography>
+                      {editOwner && <Tooltip title="Kopiuj UID"><IconButton size="small" onClick={() => navigator.clipboard.writeText(editOwner)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>}
+                    </Box>
                     <Typography variant="body2" color="text.secondary"><strong>Email:</strong> {ownerEmail || '(brak / nie pobrano)'}</Typography>
                   </Box>
 

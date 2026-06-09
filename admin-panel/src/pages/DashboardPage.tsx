@@ -75,6 +75,19 @@ function formatDate(millis: number): string {
   });
 }
 
+const REASON_LABELS: Record<string, string> = {
+  NOT_EXISTS: 'Nie istnieje / zamknięte',
+  INAPPROPRIATE: 'Nieodpowiednia treść',
+  DUPLICATE: 'Duplikat',
+  FALSE_DATA: 'Fałszywe dane',
+  SPAM: 'Spam / reklama',
+  OFFENSIVE: 'Obraźliwa treść',
+  FALSE_INFO: 'Fałszywe informacje',
+  NOT_RELEVANT: 'Nie dotyczy miejsca',
+  COPYRIGHT: 'Prawa autorskie',
+  OTHER: 'Inne',
+};
+
 export function DashboardPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -348,7 +361,7 @@ export function DashboardPage() {
                         variant="outlined"
                         color={r.type === 'place' ? 'error' : r.type === 'review' ? 'warning' : 'secondary'}
                       />
-                      <Typography variant="body2">{r.reason}</Typography>
+                      <Typography variant="body2">{REASON_LABELS[r.reason] || r.reason}</Typography>
                     </Box>
                   }
                   secondary={`${formatDate(r.createdAtMillis)}${r.comment ? ' — ' + (r.comment.length > 40 ? r.comment.slice(0, 40) + '...' : r.comment) : ''}`}
