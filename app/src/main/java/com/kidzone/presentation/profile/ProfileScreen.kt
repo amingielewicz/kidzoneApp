@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -156,6 +157,7 @@ fun ProfileScreen(
                     onChangePassword = viewModel::openChangePassword,
                     onChangeEmail = viewModel::openChangeEmail,
                     onDeleteAccount = viewModel::openDeleteAccount,
+                    onTermsOfService = viewModel::openTermsOfService,
                     onPrivacyPolicy = viewModel::openPrivacyPolicy,
                     onNotificationPrefs = viewModel::openNotificationPrefs,
                     onSignOut = { viewModel.signOut(onSignOut) }
@@ -184,6 +186,10 @@ fun ProfileScreen(
                 viewModel.saveProfile(displayName, firstName, lastName, newAvatarUri)
             }
         )
+    }
+
+    if (ui.isTermsOfServiceOpen) {
+        TermsOfServiceDialog(onDismiss = viewModel::dismissTermsOfService)
     }
 
     if (ui.isPrivacyPolicyOpen) {
@@ -268,6 +274,7 @@ private fun ProfileContent(
     onChangePassword: () -> Unit,
     onChangeEmail: () -> Unit,
     onDeleteAccount: () -> Unit,
+    onTermsOfService: () -> Unit,
     onPrivacyPolicy: () -> Unit,
     onNotificationPrefs: () -> Unit,
     onSignOut: () -> Unit
@@ -310,6 +317,7 @@ private fun ProfileContent(
 
         item {
             SettingsCard(
+                onTermsOfService = onTermsOfService,
                 onPrivacyPolicy = onPrivacyPolicy,
                 onNotificationPrefs = onNotificationPrefs,
                 onSignOut = onSignOut
@@ -820,6 +828,7 @@ private fun AccountSecurityCard(
 
 @Composable
 private fun SettingsCard(
+    onTermsOfService: () -> Unit,
     onPrivacyPolicy: () -> Unit,
     onNotificationPrefs: () -> Unit,
     onSignOut: () -> Unit
@@ -829,6 +838,12 @@ private fun SettingsCard(
             icon = Icons.Filled.Notifications,
             label = "Powiadomienia push",
             onClick = onNotificationPrefs
+        )
+        Spacer(Modifier.height(4.dp))
+        NavRow(
+            icon = Icons.Filled.Gavel,
+            label = "Regulamin użytkowania",
+            onClick = onTermsOfService
         )
         Spacer(Modifier.height(4.dp))
         NavRow(

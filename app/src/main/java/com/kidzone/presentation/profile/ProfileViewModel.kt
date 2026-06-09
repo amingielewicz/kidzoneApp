@@ -88,6 +88,7 @@ class ProfileViewModel @Inject constructor(
         val isSaving: Boolean = false,
         val saveError: String? = null,
         val isPrivacyPolicyOpen: Boolean = false,
+        val isTermsOfServiceOpen: Boolean = false,
         val signInProvider: SignInProvider = SignInProvider.UNKNOWN,
         val isChangePasswordOpen: Boolean = false,
         val isChangeEmailOpen: Boolean = false,
@@ -237,6 +238,16 @@ class ProfileViewModel @Inject constructor(
 
     fun openPrivacyPolicy() {
         _uiState.update { it.copy(isPrivacyPolicyOpen = true) }
+    }
+
+    // -------- Regulamin --------
+
+    fun openTermsOfService() {
+        _uiState.update { it.copy(isTermsOfServiceOpen = true) }
+    }
+
+    fun dismissTermsOfService() {
+        _uiState.update { it.copy(isTermsOfServiceOpen = false) }
     }
 
     // -------- Preferencje powiadomień --------

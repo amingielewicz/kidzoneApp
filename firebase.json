@@ -21,6 +21,10 @@
           "destination": "/privacy-policy.html"
         },
         {
+          "source": "/terms-of-service",
+          "destination": "/terms-of-service.html"
+        },
+        {
           "source": "/place/**",
           "destination": "/place/index.html"
         }
