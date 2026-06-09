@@ -204,10 +204,9 @@
                 btnMaps.style.display = 'inline-block';
             }
 
-            // Auto-redirect na Androidzie
-            if (isAndroid && placeId) {
-                setTimeout(openApp, 800);
-            }
+            // Brak auto-redirect — user klika sam.
+            // Auto-redirect w WebView powoduje race condition:
+            // timeout odpala Play Store zanim system zdąży otworzyć apkę.
         })();
     </script>
 </body>
