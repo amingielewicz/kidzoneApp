@@ -410,6 +410,29 @@ val baseVersion = "0.1.0"   // ← bumpujesz ręcznie TYLKO przy release
 - **1.0.0** — pierwszy publiczny release na Google Play
 - **1.x.y** — stabilne releasey (`x` = nowe ficzery, `y` = bugfixy)
 
+## Usuwanie konta — anonimizacja UGC
+
+Przy usunięciu konta **nie kasujemy** treści tworzonych przez użytkownika
+(miejsc, opinii, zdjęć). Zamiast tego:
+
+- **Dane osobowe** (profil, email, avatar, tokeny FCM) → **usunięte** (RODO Art. 17)
+- **Opinie** → `authorName` = "Nieaktywny użytkownik", `userId` = "" (treść zostaje)
+- **Miejsca** → `ownerUserId` = "" (nazwa, opis, zdjęcia, udogodnienia zostają)
+
+### Dlaczego tak?
+
+1. RODO i Google Play wymagają usunięcia **danych osobowych**, nie UGC (user-generated content)
+2. Tak robią: Google Maps ("Użytkownik Google"), Reddit ("[deleted]"), TripAdvisor ("Były członek")
+3. Treści społeczności nie znikają gdy ktoś usunie konto (30 opinii + 15 miejsc → wartość dla innych)
+4. Ranking i średnie ocen pozostają akuratne
+5. Szybsze usuwanie (update zamiast delete + kaskady)
+
+### UI po anonimizacji
+
+- Karta opinii: "Nieaktywny użytkownik | ★★★★☆ | treść..."
+- Szczegóły miejsca: brak linku "Dodano przez..." (ownerUserId = "")
+- Edycja/usunięcie zanonimizowanego miejsca: niemożliwe (brak ownera)
+
 ## Uruchomienie lokalne
 
 ### 1. Wymagania
@@ -554,6 +577,7 @@ przy pierwszym wejściu, `AddPlaceScreen` przy kliknięciu "Pobierz lokalizację
 | FCM token registration po zalogowaniu (MainScreen)   | ✅     |
 | POST_NOTIFICATIONS permission request (Android 13+)  | ✅     |
 | Dev versioning: PR number / commit hash (nie "local") | ✅     |
+| Soft-delete konta: anonimizacja UGC zamiast usuwania   | ✅     |
 
 ## Cloud Functions (backend)
 

@@ -429,38 +429,48 @@ class FirebaseAuthRepository @Inject constructor(
         user.reauthenticate(credential).await()
 
         val uid = user.uid
+        val anonymousName = "Nieaktywny użytkownik"
 
-        // 2) Usuń wszystkie opinie usera.
-        // Reguły Firestore allow delete: userId == auth.uid – pasuje 1:1.
+        // 2) Anonimizacja opinii usera — zamieniamy authorName i czyścimy
+        //    userId, ale treść opinii ZOSTAJE (UGC nie jest daną osobową,
+        //    RODO + Google Play tego nie wymagają, a społeczność zachowuje
+        //    wartościowy content).
         val reviewsSnap = firestore.collection(FirestoreCollections.REVIEWS)
             .whereEqualTo("userId", uid)
             .get()
             .await()
-        reviewsSnap.documents.forEach { it.reference.delete().await() }
+        reviewsSnap.documents.forEach { doc ->
+            doc.reference.update(
+                mapOf(
+                    "authorName" to anonymousName,
+                    "userId" to ""
+                )
+            ).await()
+        }
 
-        // 3) Usuń wszystkie miejsca usera. Świadomie nie kasujemy cudzych
-        //    opinii na tych miejscach – reguły by tego nie pozwoliły, a
-        //    Cloud Function admin SDK wymaga Blaze. Zostają jako orphans
-        //    (placeId wskazujący na nieistniejący doc); UI listy opinii
-        //    użytkowników już dziś tego nie pokazuje, bo z poziomu
-        //    PlaceDetailsScreen nie wejdzie się na nieistniejące miejsce.
+        // 3) Anonimizacja miejsc usera — treść (nazwa, opis, zdjęcia,
+        //    udogodnienia) zostaje, ale ownerUserId czyszczony. Inne
+        //    userzy nadal mogą przeglądać, oceniać i proponować zmiany.
         val placesSnap = firestore.collection(FirestoreCollections.PLACES)
             .whereEqualTo("ownerUserId", uid)
             .get()
             .await()
-        placesSnap.documents.forEach { it.reference.delete().await() }
+        placesSnap.documents.forEach { doc ->
+            doc.reference.update(
+                mapOf(
+                    "ownerUserId" to ""
+                )
+            ).await()
+        }
 
-        // 4) Doc /users/{uid}. Wymaga, żeby firestore.rules pozwalały
-        //    na `delete: if request.auth.uid == userId` – patrz fix w
-        //    firestore.rules (PR #profile-account-management).
+        // 4) Doc /users/{uid} — usuwamy, bo zawiera dane osobowe
+        //    (email, imię, nazwisko, avatar URL, fcmTokens).
         firestore.collection(FirestoreCollections.USERS)
             .document(uid)
             .delete()
             .await()
 
-        // 5) Avatar w Storage – best effort. Brak pliku == sukces (404 i
-        //    tak wolimy zignorować). Inne błędy też tłumimy: priorytetem
-        //    jest dotrzeć do kroku 6.
+        // 5) Avatar w Storage – dane osobowe, usuwamy. Best effort.
         runCatching {
             firebaseStorage.reference
                 .child("avatars/$uid/avatar.jpg")
@@ -489,20 +499,35 @@ class FirebaseAuthRepository @Inject constructor(
         user.reauthenticate(credential).await()
 
         val uid = user.uid
+        val anonymousName = "Nieaktywny użytkownik"
 
-        // Kaskada: opinie → miejsca → doc usera → avatar → Auth (identycznie
-        // jak w deleteAccount dla email/password).
+        // Kaskada anonimizacji (identycznie jak w deleteAccount):
+        // opinie → zanonimizuj, miejsca → zanonimizuj ownerUserId,
+        // doc usera → usuń, avatar → usuń, Auth → usuń.
         val reviewsSnap = firestore.collection(FirestoreCollections.REVIEWS)
             .whereEqualTo("userId", uid)
             .get()
             .await()
-        reviewsSnap.documents.forEach { it.reference.delete().await() }
+        reviewsSnap.documents.forEach { doc ->
+            doc.reference.update(
+                mapOf(
+                    "authorName" to anonymousName,
+                    "userId" to ""
+                )
+            ).await()
+        }
 
         val placesSnap = firestore.collection(FirestoreCollections.PLACES)
             .whereEqualTo("ownerUserId", uid)
             .get()
             .await()
-        placesSnap.documents.forEach { it.reference.delete().await() }
+        placesSnap.documents.forEach { doc ->
+            doc.reference.update(
+                mapOf(
+                    "ownerUserId" to ""
+                )
+            ).await()
+        }
 
         firestore.collection(FirestoreCollections.USERS)
             .document(uid)

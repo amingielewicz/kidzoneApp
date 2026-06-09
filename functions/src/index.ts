@@ -527,11 +527,11 @@ export const onUserDeleted = onDocumentDeleted(
     if (userEmail) {
       const farewellHtml = wrapInTemplate(`Żegnaj, ${userName}!`, `
         <p>Twoje konto w kidZone zostało pomyślnie usunięte.</p>
-        <p>Usunięto również:</p>
+        <p>Co się stało z Twoimi danymi:</p>
         <ul>
-          <li>Wszystkie Twoje miejsca</li>
-          <li>Wszystkie Twoje opinie</li>
-          <li>Twoje zdjęcie profilowe</li>
+          <li>Twoje dane osobowe (profil, email, avatar) — <strong>usunięte</strong></li>
+          <li>Twoje opinie — zanonimizowane (autor: „Nieaktywny użytkownik")</li>
+          <li>Twoje miejsca — pozostają widoczne dla społeczności, bez powiązania z Tobą</li>
         </ul>
         <p>Jeśli zmienisz zdanie, zawsze możesz założyć nowe konto.</p>
       `);
