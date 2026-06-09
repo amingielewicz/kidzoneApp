@@ -27,6 +27,7 @@ import {
   Select,
   MenuItem,
 } from '@mui/material';
+import TextField from '@mui/material/TextField';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CancelIcon from '@mui/icons-material/Cancel';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -109,6 +110,8 @@ export function ReportsPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTitle, setConfirmTitle] = useState('');
   const confirmActionRef = useRef<(() => Promise<void>) | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{open: boolean; title: string; action: (reason: string) => Promise<void>}>({open: false, title: '', action: async () => {}});
+  const [deleteReason, setDeleteReason] = useState('');
 
   function confirm(title: string, action: () => Promise<void>) {
     confirmActionRef.current = action;
@@ -180,12 +183,10 @@ export function ReportsPage() {
     await fetchAll();
   }
 
-  async function resolveAndDeletePlace(report: PlaceReport) {
-    const placeRef = doc(db, 'places', report.placeId);
-    const placeSnap = await getDoc(placeRef);
-    if (placeSnap.exists()) {
-      await deleteDoc(placeRef);
-    }
+  async function resolveAndDeletePlace(report: PlaceReport, reason: string) {
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
+    const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeletePlace?placeId=${report.placeId}&reason=${encodeURIComponent(reason)}`;
+    try { await fetch(url); } catch(e) { console.error(e); }
     await resolveReport('place_reports', report.id);
   }
 
@@ -198,9 +199,9 @@ export function ReportsPage() {
     await resolveReport('review_reports', report.id);
   }
 
-  async function deletePhotoViaCloudFunction(reportId: string) {
+  async function deletePhotoViaCloudFunction(reportId: string, reason: string) {
     const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
-    const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeletePhoto?reportId=${reportId}`;
+    const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeletePhoto?reportId=${reportId}&reason=${encodeURIComponent(reason)}`;
     try {
       await fetch(url);
       await fetchAll();
@@ -358,7 +359,7 @@ export function ReportsPage() {
                   <TableCell><Typography variant="body2" fontWeight={500}>{placeNames[report.placeId] || '—'}</Typography></TableCell>
                   <TableCell>
                     <Box display="flex" alignItems="center" gap={0.5}>
-                      <Tooltip title={report.placeId}><Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12 }}>{report.placeId.slice(0, 8)}...</Typography></Tooltip>
+                      <Tooltip title={report.placeId}><Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12 }}>{report.placeId.slice(0, 16)}...</Typography></Tooltip>
                       <Tooltip title="Kopiuj ID"><IconButton size="small" onClick={() => copyToClipboard(report.placeId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
                     </Box>
                   </TableCell>
@@ -372,7 +373,7 @@ export function ReportsPage() {
                       <Tooltip title="Szczegóły"><IconButton size="small" onClick={() => openDetailPlaceReport(report)}><VisibilityIcon /></IconButton></Tooltip>
                       {report.status === 'pending' && (
                         <Box display="flex" flexDirection="column">
-                          <Tooltip title="Usuń miejsce"><IconButton color="error" size="small" onClick={() => confirm('Usunąć miejsce?', () => resolveAndDeletePlace(report))}><DeleteIcon /></IconButton></Tooltip>
+                          <Tooltip title="Usuń miejsce"><IconButton color="error" size="small" onClick={() => { setDeleteReason(''); setDeleteDialog({ open: true, title: 'Podaj powód usunięcia miejsca:', action: async (reason) => { await resolveAndDeletePlace(report, reason); } }); }}><DeleteIcon /></IconButton></Tooltip>
                           <Tooltip title="Odrzuć"><IconButton size="small" sx={{ color: '#1976D2' }} onClick={() => confirm('Odrzucić?', () => dismissReport('place_reports', report.id))}><CancelIcon /></IconButton></Tooltip>
                         </Box>
                       )}
@@ -407,7 +408,7 @@ export function ReportsPage() {
                   <TableCell>{formatDate(report.createdAtMillis)}</TableCell>
                   <TableCell>
                     <Box display="flex" alignItems="center" gap={0.5}>
-                      <Tooltip title={report.reviewId}><Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12 }}>{report.reviewId.slice(0, 8)}...</Typography></Tooltip>
+                      <Tooltip title={report.reviewId}><Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12 }}>{report.reviewId.slice(0, 16)}...</Typography></Tooltip>
                       <Tooltip title="Kopiuj ID"><IconButton size="small" onClick={() => copyToClipboard(report.reviewId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
                     </Box>
                   </TableCell>
@@ -476,7 +477,7 @@ export function ReportsPage() {
                       <Tooltip title="Szczegóły"><IconButton size="small" onClick={() => openDetailPhotoReport(report)}><VisibilityIcon /></IconButton></Tooltip>
                       {report.status === 'pending' && (
                         <Box display="flex" flexDirection="column">
-                          <Tooltip title="Usuń zdjęcie"><IconButton color="error" size="small" disabled={photoMissing} onClick={() => confirm('Usunąć zdjęcie?', () => deletePhotoViaCloudFunction(report.id))}><DeleteIcon /></IconButton></Tooltip>
+                          <Tooltip title="Usuń zdjęcie"><IconButton color="error" size="small" disabled={photoMissing} onClick={() => { setDeleteReason(''); setDeleteDialog({ open: true, title: 'Podaj powód usunięcia zdjęcia:', action: async (reason) => { await deletePhotoViaCloudFunction(report.id, reason); } }); }}><DeleteIcon /></IconButton></Tooltip>
                           <Tooltip title="Odrzuć"><IconButton size="small" sx={{ color: photoMissing ? undefined : '#1976D2' }} disabled={photoMissing} onClick={() => confirm('Odrzucić?', () => dismissReport('photo_reports', report.id))}><CancelIcon /></IconButton></Tooltip>
                         </Box>
                       )}
@@ -584,6 +585,28 @@ export function ReportsPage() {
             )}
           </Box>
           <Button onClick={() => setDetailDialog((p) => ({ ...p, open: false }))}>Zamknij</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete with Reason Dialog */}
+      <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog(prev => ({...prev, open: false}))} maxWidth="sm" fullWidth>
+        <DialogTitle>{deleteDialog.title}</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            rows={3}
+            label="Powód usunięcia"
+            value={deleteReason}
+            onChange={(e) => setDeleteReason(e.target.value)}
+            placeholder="Wpisz powód usunięcia (zostanie wysłany do użytkownika)"
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialog(prev => ({...prev, open: false}))}>Anuluj</Button>
+          <Button variant="contained" color="error" disabled={!deleteReason.trim()} onClick={async () => { await deleteDialog.action(deleteReason); setDeleteDialog(prev => ({...prev, open: false})); }}>Usuń</Button>
         </DialogActions>
       </Dialog>
 

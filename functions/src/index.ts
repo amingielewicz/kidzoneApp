@@ -664,11 +664,88 @@ export const adminDeleteReview = onRequest(
   }
 );
 
+// --- HTTP Endpoint: Admin usuwa miejsce i wysyła email do właściciela ---
+export const adminDeletePlace = onRequest(
+  {secrets: [gmailEmail, gmailPassword], cors: true},
+  async (req, res) => {
+    const placeId = req.query.placeId as string;
+    const reason = req.query.reason as string || "Naruszenie regulaminu";
+
+    if (!placeId) {
+      res.status(400).send(renderAdminResponse("Błąd", "Brak placeId w żądaniu."));
+      return;
+    }
+
+    try {
+      // 1. Pobierz dokument miejsca
+      const placeDoc = await db.collection("places").doc(placeId).get();
+      if (!placeDoc.exists) {
+        res.status(404).send(renderAdminResponse("Nie znaleziono", "Miejsce nie istnieje lub zostało już usunięte."));
+        return;
+      }
+
+      const placeData = placeDoc.data();
+      const ownerUserId = placeData?.ownerUserId || "";
+      const placeName = placeData?.name || "Bez nazwy";
+
+      // 2. Pobierz email właściciela
+      let ownerEmail = "";
+      let ownerName = "Użytkowniku";
+      if (ownerUserId) {
+        const ownerDoc = await db.collection("users").doc(ownerUserId).get();
+        if (ownerDoc.exists) {
+          ownerEmail = ownerDoc.data()?.email || "";
+          ownerName = ownerDoc.data()?.name || "Użytkowniku";
+        }
+      }
+
+      // 3. Usuń dokument miejsca
+      await db.collection("places").doc(placeId).delete();
+
+      // 4. Wyślij email do właściciela
+      let emailSent = false;
+      if (ownerEmail) {
+        const transporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
+        });
+
+        const html = wrapInTemplate("Twoje miejsce zostało usunięte", `
+          <p>Cześć, ${ownerName}.</p>
+          <p>Twoje miejsce <strong>${placeName}</strong> w aplikacji kidZone zostało usunięte przez administratora.</p>
+          <table>
+            <tr><td>Nazwa miejsca:</td><td>${placeName}</td></tr>
+            <tr><td>Powód usunięcia:</td><td>${reason}</td></tr>
+          </table>
+          <p>Jeśli uważasz, że to pomyłka, skontaktuj się z nami odpowiadając na ten email.</p>
+        `);
+
+        await transporter.sendMail({
+          from: `kidZone <${gmailEmail.value()}>`,
+          to: ownerEmail,
+          subject: `[kidZone] Twoje miejsce "${placeName}" zostało usunięte`,
+          html,
+        });
+        emailSent = true;
+      }
+
+      res.status(200).send(renderAdminResponse(
+        "Miejsce usunięte",
+        `Miejsce "${placeName}" zostało usunięte. ${emailSent ? "Email z powiadomieniem wysłany do właściciela." : "Nie znaleziono adresu email właściciela."}`
+      ));
+    } catch (err) {
+      console.error("adminDeletePlace error:", err);
+      res.status(500).send(renderAdminResponse("Błąd serwera", `Wystąpił błąd: ${err}`));
+    }
+  }
+);
+
 // --- HTTP Endpoint: Admin usuwa zgłoszone zdjęcie ---
 export const adminDeletePhoto = onRequest(
   {secrets: [gmailEmail, gmailPassword, adminEmail], cors: true},
   async (req, res) => {
     const reportId = req.query.reportId as string;
+    const reason = req.query.reason as string || "Naruszenie regulaminu";
     if (!reportId) {
       res.status(400).send(renderAdminResponse("Błąd", "Brak reportId w żądaniu."));
       return;
@@ -700,20 +777,20 @@ export const adminDeletePhoto = onRequest(
           }
         } catch (storageErr) {
           console.warn(`Could not delete photo from storage: ${storageErr}`);
-          // Kontynuuj – może zdjęcie zostało już usunięte ręcznie
         }
       }
 
-      // 2. Usuń URL z dokumentów reviews/places które go zawierają
+      // 2. Usuń URL z dokumentów reviews/places które go zawierają + znajdź uploaderaa
+      let uploaderUserId = "";
       if (photoUrl) {
         // Szukaj w reviews
         const reviewsSnap = await db.collection("reviews")
           .where("photoUrls", "array-contains", photoUrl)
           .get();
         const batch = db.batch();
-        reviewsSnap.docs.forEach((doc) => {
-          const urls: string[] = doc.data().photoUrls || [];
-          batch.update(doc.ref, {
+        reviewsSnap.docs.forEach((d) => {
+          const urls: string[] = d.data().photoUrls || [];
+          batch.update(d.ref, {
             photoUrls: urls.filter((u: string) => u !== photoUrl),
           });
         });
@@ -722,11 +799,16 @@ export const adminDeletePhoto = onRequest(
         const placesSnap = await db.collection("places")
           .where("photoUrls", "array-contains", photoUrl)
           .get();
-        placesSnap.docs.forEach((doc) => {
-          const urls: string[] = doc.data().photoUrls || [];
-          batch.update(doc.ref, {
+        placesSnap.docs.forEach((d) => {
+          const urls: string[] = d.data().photoUrls || [];
+          batch.update(d.ref, {
             photoUrls: urls.filter((u: string) => u !== photoUrl),
           });
+          // Sprawdź kto uploadował to zdjęcie
+          const uploadedBy: Record<string, string> = d.data().photoUploadedBy || {};
+          if (uploadedBy[photoUrl]) {
+            uploaderUserId = uploadedBy[photoUrl];
+          }
         });
 
         await batch.commit();
@@ -739,9 +821,42 @@ export const adminDeletePhoto = onRequest(
         action: "deleted",
       });
 
+      // 4. Wyślij email do osoby, która uploadowała zdjęcie
+      let emailSent = false;
+      if (uploaderUserId) {
+        const uploaderDoc = await db.collection("users").doc(uploaderUserId).get();
+        if (uploaderDoc.exists) {
+          const uploaderEmail = uploaderDoc.data()?.email || "";
+          const uploaderName = uploaderDoc.data()?.name || "Użytkowniku";
+          if (uploaderEmail) {
+            const transporter = nodemailer.createTransport({
+              service: "gmail",
+              auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
+            });
+
+            const html = wrapInTemplate("Twoje zdjęcie zostało usunięte", `
+              <p>Cześć, ${uploaderName}.</p>
+              <p>Twoje zdjęcie w aplikacji kidZone zostało usunięte przez administratora.</p>
+              <table>
+                <tr><td>Powód usunięcia:</td><td>${reason}</td></tr>
+              </table>
+              <p>Jeśli uważasz, że to pomyłka, skontaktuj się z nami odpowiadając na ten email.</p>
+            `);
+
+            await transporter.sendMail({
+              from: `kidZone <${gmailEmail.value()}>`,
+              to: uploaderEmail,
+              subject: "[kidZone] Twoje zdjęcie zostało usunięte",
+              html,
+            });
+            emailSent = true;
+          }
+        }
+      }
+
       res.status(200).send(renderAdminResponse(
         "Zdjęcie usunięte",
-        "Zdjęcie zostało usunięte z Storage oraz ze wszystkich opinii i miejsc, które je zawierały."
+        `Zdjęcie zostało usunięte z Storage oraz ze wszystkich opinii i miejsc, które je zawierały. ${emailSent ? "Email z powiadomieniem wysłany do autora." : ""}`
       ));
     } catch (err) {
       console.error("adminDeletePhoto error:", err);
