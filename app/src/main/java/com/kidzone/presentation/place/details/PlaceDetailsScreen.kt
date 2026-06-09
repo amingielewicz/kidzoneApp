@@ -281,6 +281,7 @@ fun PlaceDetailsScreen(
                                                 append(place.address)
                                             }
                                             append("\n\nhttps://playground-705e7162.web.app/place/${place.id}")
+                                            append("?lat=${place.latitude}&lng=${place.longitude}")
                                         }
                                         val intent = Intent(Intent.ACTION_SEND).apply {
                                             type = "text/plain"

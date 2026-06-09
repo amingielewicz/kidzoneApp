@@ -89,6 +89,19 @@
             transform: translateY(0);
         }
 
+        .btn-maps {
+            display: inline-block;
+            margin-top: 12px;
+            background: #43A047;
+            color: white;
+            padding: 14px 32px;
+            font-size: 14px;
+        }
+
+        .btn-maps:hover {
+            box-shadow: 0 4px 16px rgba(67, 160, 71, 0.4);
+        }
+
         .footer {
             margin-top: 24px;
             font-size: 12px;
@@ -108,6 +121,8 @@
 
         <a class="btn" id="btn-open" href="#">Otwórz w kidZone</a>
 
+        <a class="btn btn-maps" id="btn-maps" href="#" style="display:none;">Otwórz w Google Maps</a>
+
         <div class="footer">
             Jeśli nie masz aplikacji, zostaniesz przekierowany do Google Play.
         </div>
@@ -125,10 +140,14 @@
                 if (placeId === 'index.html') placeId = '';
             }
 
+            var params = new URLSearchParams(window.location.search);
             if (!placeId) {
-                var params = new URLSearchParams(window.location.search);
                 placeId = params.get('id') || '';
             }
+
+            // Współrzędne GPS z query params (dodawane przez Share intent)
+            var lat = params.get('lat') || '';
+            var lng = params.get('lng') || '';
 
             // Intent URL: próbuje otworzyć apkę, a jak nie ma — fallback do Play Store
             var intentUrl = 'intent://place/' + (placeId || '')
@@ -137,11 +156,19 @@
                     'https://play.google.com/store/apps/details?id=com.kidzone'
                 ) + ';end';
 
-            // Ustaw link przycisku
+            // Ustaw link przycisku kidZone
             var btnOpen = document.getElementById('btn-open');
             btnOpen.href = intentUrl;
 
-            // Na Androidzie: auto-redirect po 600ms (apka się otworzy lub Play Store)
+            // Przycisk Google Maps (pokaż tylko jeśli mamy współrzędne)
+            var btnMaps = document.getElementById('btn-maps');
+            if (lat && lng) {
+                var mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + lat + ',' + lng;
+                btnMaps.href = mapsUrl;
+                btnMaps.style.display = 'inline-block';
+            }
+
+            // Na Androidzie: auto-redirect po 600ms
             var isAndroid = /android/i.test(navigator.userAgent);
             if (isAndroid && placeId) {
                 setTimeout(function() {
@@ -149,7 +176,7 @@
                 }, 600);
             }
 
-            // Na iOS / desktop: fallback do Play Store (bo apki iOS nie ma)
+            // Na iOS / desktop: fallback do Play Store
             if (!isAndroid) {
                 btnOpen.href = 'https://play.google.com/store/apps/details?id=com.kidzone';
             }
