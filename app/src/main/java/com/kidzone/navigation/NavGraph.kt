@@ -3,6 +3,7 @@ package com.kidzone.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -34,8 +35,12 @@ private const val NEW_PLACE_LNG = "newPlaceLng"
  */
 @Composable
 fun KidZoneNavGraph(
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    intent: android.content.Intent? = null
 ) {
+    // Deep link z push notification — konsumujemy po zalogowaniu.
+    val pendingDeepLink = androidx.compose.runtime.remember { mutableStateOf(intent?.data) }
+
     NavHost(
         navController = navController,
         startDestination = Route.Splash.path
@@ -46,11 +51,26 @@ fun KidZoneNavGraph(
                     navController.navigate(Route.Main.path) {
                         popUpTo(Route.Splash.path) { inclusive = true }
                     }
+                    // Obsłuż deep link z push notification
+                    pendingDeepLink.value?.let { uri ->
+                        when (uri.host.orEmpty()) {
+                            "place" -> {
+                                val placeId = uri.pathSegments?.firstOrNull()
+                                if (!placeId.isNullOrBlank()) {
+                                    navController.navigate(Route.PlaceDetails.create(placeId))
+                                }
+                            }
+                            // "profile" → MainScreen startuje na Home, user musi kliknąć Profile.
+                            // Przyszły feature: automatyczne przełączenie na zakładkę Profile.
+                        }
+                        pendingDeepLink.value = null
+                    }
                 },
                 onSignedOut = {
                     navController.navigate(Route.Login.path) {
                         popUpTo(Route.Splash.path) { inclusive = true }
                     }
+                    pendingDeepLink.value = null
                 }
             )
         }
