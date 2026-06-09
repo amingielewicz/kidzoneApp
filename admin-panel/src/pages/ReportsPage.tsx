@@ -29,6 +29,8 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import CancelIcon from '@mui/icons-material/Cancel';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import TableSortLabel from '@mui/material/TableSortLabel';
 import {
   collection,
   query,
@@ -88,6 +90,7 @@ interface DetailInfo {
 export function ReportsPage() {
   const [tab, setTab] = useState(0);
   const [statusFilter, setStatusFilter] = useState<ReportStatus | 'all'>('pending');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [placeReports, setPlaceReports] = useState<PlaceReport[]>([]);
   const [reviewReports, setReviewReports] = useState<ReviewReport[]>([]);
   const [photoReports, setPhotoReports] = useState<PhotoReport[]>([]);
@@ -113,6 +116,14 @@ export function ReportsPage() {
     if (confirmActionRef.current) await confirmActionRef.current();
     setConfirmOpen(false);
     confirmActionRef.current = null;
+  }
+
+  function copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text);
+  }
+
+  function sortByDate<T extends { createdAtMillis: number }>(items: T[]): T[] {
+    return [...items].sort((a, b) => sortDir === 'desc' ? b.createdAtMillis - a.createdAtMillis : a.createdAtMillis - b.createdAtMillis);
   }
 
   useEffect(() => {
@@ -257,9 +268,9 @@ export function ReportsPage() {
   const pendingReviewCount = reviewReports.filter((r) => r.status === 'pending').length;
   const pendingPhotoCount = photoReports.filter((r) => r.status === 'pending').length;
 
-  const filteredPlaceReports = filterByStatus(placeReports);
-  const filteredReviewReports = filterByStatus(reviewReports);
-  const filteredPhotoReports = filterByStatus(photoReports);
+  const filteredPlaceReports = sortByDate(filterByStatus(placeReports));
+  const filteredReviewReports = sortByDate(filterByStatus(reviewReports));
+  const filteredPhotoReports = sortByDate(filterByStatus(photoReports));
 
   return (
     <Box>
@@ -297,7 +308,7 @@ export function ReportsPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Data</TableCell>
+                <TableCell><TableSortLabel active direction={sortDir} onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}>Data</TableSortLabel></TableCell>
                 <TableCell>Place ID</TableCell>
                 <TableCell>Powód</TableCell>
                 <TableCell>Komentarz</TableCell>
@@ -309,34 +320,23 @@ export function ReportsPage() {
               {filteredPlaceReports.map((report) => (
                 <TableRow key={report.id} hover>
                   <TableCell>{formatDate(report.createdAtMillis)}</TableCell>
-                  <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>
-                    {report.placeId.slice(0, 8)}...
-                  </TableCell>
                   <TableCell>
-                    {PLACE_REPORT_REASON_LABELS[report.reason as PlaceReportReason] || report.reason}
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                      <Tooltip title={report.placeId}><Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12 }}>{report.placeId.slice(0, 8)}...</Typography></Tooltip>
+                      <Tooltip title="Kopiuj ID"><IconButton size="small" onClick={() => copyToClipboard(report.placeId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
+                    </Box>
                   </TableCell>
-                  <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {report.comment || '—'}
+                  <TableCell>{PLACE_REPORT_REASON_LABELS[report.reason as PlaceReportReason] || report.reason}</TableCell>
+                  <TableCell sx={{ maxWidth: 200 }}>
+                    <Tooltip title={report.comment || ''}><Typography variant="body2" noWrap>{report.comment || '—'}</Typography></Tooltip>
                   </TableCell>
                   <TableCell>{statusChip(report.status)}</TableCell>
                   <TableCell>
-                    <Tooltip title="Szczegóły">
-                      <IconButton size="small" onClick={() => openDetailPlaceReport(report)}>
-                        <VisibilityIcon />
-                      </IconButton>
-                    </Tooltip>
+                    <Tooltip title="Szczegóły"><IconButton size="small" onClick={() => openDetailPlaceReport(report)}><VisibilityIcon /></IconButton></Tooltip>
                     {report.status === 'pending' && (
                       <>
-                        <Tooltip title="Usuń miejsce i rozwiąż">
-                          <IconButton color="error" size="small" onClick={() => confirm('Usunąć miejsce i rozwiązać?', () => resolveAndDeletePlace(report))}>
-                            <DeleteIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Odrzuć">
-                          <IconButton size="small" onClick={() => confirm('Odrzucić?', () => dismissReport('place_reports', report.id))}>
-                            <CancelIcon />
-                          </IconButton>
-                        </Tooltip>
+                        <Tooltip title="Usuń miejsce i rozwiąż"><IconButton color="error" size="small" onClick={() => confirm('Usunąć miejsce i rozwiązać?', () => resolveAndDeletePlace(report))}><DeleteIcon /></IconButton></Tooltip>
+                        <Tooltip title="Odrzuć"><IconButton size="small" onClick={() => confirm('Odrzucić?', () => dismissReport('place_reports', report.id))}><CancelIcon /></IconButton></Tooltip>
                       </>
                     )}
                   </TableCell>
@@ -355,7 +355,7 @@ export function ReportsPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Data</TableCell>
+                <TableCell><TableSortLabel active direction={sortDir} onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}>Data</TableSortLabel></TableCell>
                 <TableCell>Review ID</TableCell>
                 <TableCell>Powód</TableCell>
                 <TableCell>Komentarz</TableCell>
@@ -367,22 +367,23 @@ export function ReportsPage() {
               {filteredReviewReports.map((report) => (
                 <TableRow key={report.id} hover>
                   <TableCell>{formatDate(report.createdAtMillis)}</TableCell>
-                  <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{report.reviewId.slice(0, 8)}...</TableCell>
+                  <TableCell>
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                      <Tooltip title={report.reviewId}><Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12 }}>{report.reviewId.slice(0, 8)}...</Typography></Tooltip>
+                      <Tooltip title="Kopiuj ID"><IconButton size="small" onClick={() => copyToClipboard(report.reviewId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
+                    </Box>
+                  </TableCell>
                   <TableCell>{REVIEW_REPORT_REASON_LABELS[report.reason as ReviewReportReason] || report.reason}</TableCell>
-                  <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{report.comment || '—'}</TableCell>
+                  <TableCell sx={{ maxWidth: 200 }}>
+                    <Tooltip title={report.comment || ''}><Typography variant="body2" noWrap>{report.comment || '—'}</Typography></Tooltip>
+                  </TableCell>
                   <TableCell>{statusChip(report.status)}</TableCell>
                   <TableCell>
-                    <Tooltip title="Szczegóły">
-                      <IconButton size="small" onClick={() => openDetailReviewReport(report)}><VisibilityIcon /></IconButton>
-                    </Tooltip>
+                    <Tooltip title="Szczegóły"><IconButton size="small" onClick={() => openDetailReviewReport(report)}><VisibilityIcon /></IconButton></Tooltip>
                     {report.status === 'pending' && (
                       <>
-                        <Tooltip title="Usuń opinię i rozwiąż">
-                          <IconButton color="error" size="small" onClick={() => confirm('Usunąć opinię?', () => resolveAndDeleteReview(report))}><DeleteIcon /></IconButton>
-                        </Tooltip>
-                        <Tooltip title="Odrzuć">
-                          <IconButton size="small" onClick={() => confirm('Odrzucić?', () => dismissReport('review_reports', report.id))}><CancelIcon /></IconButton>
-                        </Tooltip>
+                        <Tooltip title="Usuń opinię i rozwiąż"><IconButton color="error" size="small" onClick={() => confirm('Usunąć opinię?', () => resolveAndDeleteReview(report))}><DeleteIcon /></IconButton></Tooltip>
+                        <Tooltip title="Odrzuć"><IconButton size="small" onClick={() => confirm('Odrzucić?', () => dismissReport('review_reports', report.id))}><CancelIcon /></IconButton></Tooltip>
                       </>
                     )}
                   </TableCell>
@@ -401,7 +402,7 @@ export function ReportsPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Data</TableCell>
+                <TableCell><TableSortLabel active direction={sortDir} onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}>Data</TableSortLabel></TableCell>
                 <TableCell>Zdjęcie</TableCell>
                 <TableCell>Powód</TableCell>
                 <TableCell>Komentarz</TableCell>
@@ -421,20 +422,16 @@ export function ReportsPage() {
                     )}
                   </TableCell>
                   <TableCell>{PHOTO_REPORT_REASON_LABELS[report.reason as PhotoReportReason] || report.reason}</TableCell>
-                  <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{report.comment || '—'}</TableCell>
+                  <TableCell sx={{ maxWidth: 200 }}>
+                    <Tooltip title={report.comment || ''}><Typography variant="body2" noWrap>{report.comment || '—'}</Typography></Tooltip>
+                  </TableCell>
                   <TableCell>{statusChip(report.status)}</TableCell>
                   <TableCell>
-                    <Tooltip title="Szczegóły">
-                      <IconButton size="small" onClick={() => openDetailPhotoReport(report)}><VisibilityIcon /></IconButton>
-                    </Tooltip>
+                    <Tooltip title="Szczegóły"><IconButton size="small" onClick={() => openDetailPhotoReport(report)}><VisibilityIcon /></IconButton></Tooltip>
                     {report.status === 'pending' && (
                       <>
-                        <Tooltip title="Usuń zdjęcie">
-                          <IconButton color="error" size="small" onClick={() => confirm('Usunąć zdjęcie?', () => deletePhotoViaCloudFunction(report.id))}><DeleteIcon /></IconButton>
-                        </Tooltip>
-                        <Tooltip title="Odrzuć">
-                          <IconButton size="small" onClick={() => confirm('Odrzucić?', () => dismissReport('photo_reports', report.id))}><CancelIcon /></IconButton>
-                        </Tooltip>
+                        <Tooltip title="Usuń zdjęcie"><IconButton color="error" size="small" onClick={() => confirm('Usunąć zdjęcie?', () => deletePhotoViaCloudFunction(report.id))}><DeleteIcon /></IconButton></Tooltip>
+                        <Tooltip title="Odrzuć"><IconButton size="small" onClick={() => confirm('Odrzucić?', () => dismissReport('photo_reports', report.id))}><CancelIcon /></IconButton></Tooltip>
                       </>
                     )}
                   </TableCell>
@@ -450,10 +447,15 @@ export function ReportsPage() {
 
       {/* Detail Dialog */}
       <Dialog open={detailDialog.open} onClose={() => setDetailDialog((p) => ({ ...p, open: false }))} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {detailDialog.type === 'place' && 'Szczegóły zgłoszenia miejsca'}
-          {detailDialog.type === 'review' && 'Szczegóły zgłoszenia opinii'}
-          {detailDialog.type === 'photo' && 'Szczegóły zgłoszenia zdjęcia'}
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>
+            {detailDialog.type === 'place' && 'Szczegóły zgłoszenia miejsca'}
+            {detailDialog.type === 'review' && 'Szczegóły zgłoszenia opinii'}
+            {detailDialog.type === 'photo' && 'Szczegóły zgłoszenia zdjęcia'}
+          </span>
+          <IconButton size="small" onClick={() => setDetailDialog((p) => ({ ...p, open: false }))}>
+            <CancelIcon />
+          </IconButton>
         </DialogTitle>
         <DialogContent dividers>
           {detailDialog.loadingInfo ? (
