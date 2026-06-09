@@ -25,8 +25,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AssistChip
@@ -42,8 +44,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -186,6 +190,15 @@ fun PlaceListScreen(
     val gpsEnabled = rememberLocationServiceEnabled()
 
     Column(modifier = Modifier.fillMaxSize()) {
+        // Wyszukiwarka po nazwie miejsca
+        SearchBar(
+            query = state.searchQuery,
+            onQueryChange = viewModel::onSearchQueryChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        )
+
         CategoryFilterBar(
             selectedCategory = state.selectedCategory,
             onCategorySelected = viewModel::onCategorySelected
@@ -341,6 +354,45 @@ private fun emptyMessageFor(
     sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME ->
         "Nie dodałaś/eś jeszcze żadnego miejsca"
     else -> "Brak miejsc pasujących do filtrów"
+}
+
+/**
+ * Pole wyszukiwania po nazwie miejsca. Debouncing jest naturalny
+ * (MutableStateFlow w VM pomija duplikaty), więc nie potrzebujemy
+ * dodatkowego delay — lista filtruje się natychmiast.
+ */
+@Composable
+private fun SearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        placeholder = { Text("Szukaj miejsca po nazwie\u2026") },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Filled.Search,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+        },
+        trailingIcon = {
+            if (query.isNotBlank()) {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Wyczy\u015B\u0107 wyszukiwanie",
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        },
+        singleLine = true,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+        modifier = modifier.height(52.dp)
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

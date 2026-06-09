@@ -563,6 +563,7 @@ przy pierwszym wejściu, `AddPlaceScreen` przy kliknięciu "Pobierz lokalizację
 | Push: utracona odznaka → deep link do profilu          | ✅     |
 | Notification deep links (klik → odpowiedni ekran)      | ✅     |
 | Scheduled ranking check (codziennie 09:00 PL)          | ✅     |
+| Wyszukiwarka miejsc po nazwie (SearchBar na liście)    | ✅     |
 | Zero deprecation warnings (Compose, Material3, Icons)  | ✅     |
 
 ## Cloud Functions (backend)
