@@ -832,79 +832,10 @@ export const onReviewCreatedPush = onDocumentCreated(
 
 
 
-// --- Trigger: nowa opinia podnosi miejsce do TOP 10 → push do właściciela ---
-export const onReviewCreatedTopRank = onDocumentCreated(
-  {
-    document: "reviews/{reviewId}",
-  },
-  async (event) => {
-    const data = event.data?.data();
-    if (!data) return;
-
-    const placeId = data.placeId || "";
-    if (!placeId) return;
-
-    const topSnap = await db.collection("places")
-      .orderBy("averageRating", "desc")
-      .where("reviewsCount", ">", 0)
-      .limit(11)
-      .get();
-
-    const topPlaceIds = topSnap.docs.map((doc) => doc.id);
-    const rank = topPlaceIds.indexOf(placeId);
-    if (rank < 0 || rank >= 10) return;
-
-    const placeDoc = await db.collection("places").doc(placeId).get();
-    if (!placeDoc.exists) return;
-    const placeData = placeDoc.data();
-    const ownerUserId = placeData?.ownerUserId || "";
-    const placeName = placeData?.name || "Twoje miejsce";
-
-    if (!ownerUserId) return;
-    if (data.userId === ownerUserId) return;
-
-    const ownerDoc = await db.collection("users").doc(ownerUserId).get();
-    if (!ownerDoc.exists) return;
-    const ownerData = ownerDoc.data();
-    const fcmTokens: string[] = ownerData?.fcmTokens || [];
-    if (fcmTokens.length === 0) return;
-
-    const notifPrefs = ownerData?.notificationPreferences || {};
-    if (notifPrefs.placeInTopRanking === false) return;
-
-    // Rate limit: max 1 push per 24h per place
-    const lastNotified = placeData?.lastTopRankNotifiedAt || 0;
-    const now = Date.now();
-    if (now - lastNotified < 24 * 60 * 60 * 1000) return;
-
-    const position = rank + 1;
-
-    const message: admin.messaging.MulticastMessage = {
-      tokens: fcmTokens,
-      notification: {
-        title: `\u{1F3C6} \u201E${placeName}\u201D w TOP ${position}!`,
-        body: `Twoje miejsce jest na ${position}. pozycji w rankingu kidZone!`,
-      },
-      data: {
-        type: "place_top_rank",
-        placeId: placeId,
-      },
-      android: {
-        priority: "high",
-        notification: {channelId: "kidzone_general"},
-      },
-    };
-
-    try {
-      const response = await admin.messaging().sendEachForMulticast(message);
-      console.log(`TOP rank push for place ${placeId} (#${position}): ${response.successCount} ok`);
-      await db.collection("places").doc(placeId).update({lastTopRankNotifiedAt: now});
-      await cleanStaleTokens(response, fcmTokens, ownerUserId);
-    } catch (err) {
-      console.error("Top rank push error:", err);
-    }
-  }
-);
+// --- onReviewCreatedTopRank USUNIETY ---
+// Zastapiony przez dailyRankingCheck (scheduled, raz dziennie).
+// Powod: real-time trigger przy kazdej opinii jest zbyt kosztowny
+// i nie obsluguje rankingu uzytkownikow.
 
 
 // --- Trigger: zmiana dokumentu usera → server-side badge computation ---
@@ -1016,7 +947,7 @@ export const onBadgeEarned = onDocumentUpdated(
 );
 
 
-// --- Trigger: ktos dodal zdjecie do Twojego miejsca ---
+// --- Trigger: ktos dodal/usunal zdjecie do/z Twojego miejsca ---
 export const onPhotoAddedToPlace = onDocumentUpdated(
   {document: "places/{placeId}"},
   async (event) => {
@@ -1026,17 +957,27 @@ export const onPhotoAddedToPlace = onDocumentUpdated(
 
     const beforePhotos: string[] = beforeData.photoUrls || [];
     const afterPhotos: string[] = afterData.photoUrls || [];
-    if (afterPhotos.length <= beforePhotos.length) return;
+
+    const photosAdded = afterPhotos.length > beforePhotos.length;
+    const photosRemoved = afterPhotos.length < beforePhotos.length;
+
+    if (!photosAdded && !photosRemoved) return;
 
     const ownerUserId = afterData.ownerUserId || "";
     if (!ownerUserId) return;
 
+    // Sprawdz kto dokonal zmiany (dodal/usunal)
     const afterUploaders: Record<string, string> = afterData.photoUploadedBy || {};
-    const newPhotos = afterPhotos.filter((url: string) => !beforePhotos.includes(url));
-    if (newPhotos.length === 0) return;
 
-    const uploaderIds = newPhotos.map((url: string) => afterUploaders[url] || "");
-    if (uploaderIds.every((uid: string) => uid === ownerUserId)) return;
+    if (photosAdded) {
+      const newPhotos = afterPhotos.filter((url: string) => !beforePhotos.includes(url));
+      if (newPhotos.length === 0) return;
+      const uploaderIds = newPhotos.map((url: string) => afterUploaders[url] || "");
+      // Nie wysylaj jesli wlasciciel sam dodal
+      if (uploaderIds.every((uid: string) => uid === ownerUserId)) return;
+    }
+
+    // Przy usunieciu: nie mamy info kto usunal (admin?). Wysylamy zawsze do ownera.
 
     const placeName = afterData.name || "Twoje miejsce";
     const placeId = event.params.placeId;
@@ -1050,13 +991,17 @@ export const onPhotoAddedToPlace = onDocumentUpdated(
     const notifPrefs = ownerData?.notificationPreferences || {};
     if (notifPrefs.newPhotoOnMyPlace === false) return;
 
+    const title = photosAdded
+      ? `\u{1F4F7} Nowe zdj\u0119cie do \u201E${placeName}\u201D`
+      : `\u{1F5D1} Usuni\u0119to zdj\u0119cie z \u201E${placeName}\u201D`;
+    const body = photosAdded
+      ? "Kto\u015B doda\u0142 zdj\u0119cie do Twojego miejsca. Sprawd\u017A!"
+      : "Zdj\u0119cie zosta\u0142o usuni\u0119te z Twojego miejsca.";
+
     const message: admin.messaging.MulticastMessage = {
       tokens: fcmTokens,
-      notification: {
-        title: `\u{1F4F7} Nowe zdj\u0119cie do \u201E${placeName}\u201D`,
-        body: "Kto\u015B doda\u0142 zdj\u0119cie do Twojego miejsca. Sprawd\u017A!",
-      },
-      data: {type: "new_review", placeId: placeId},
+      notification: {title, body},
+      data: {type: "new_photo", placeId: placeId},
       android: {priority: "high", notification: {channelId: "kidzone_general"}},
     };
 
@@ -1093,5 +1038,169 @@ async function cleanStaleTokens(
     await db.collection("users").doc(userId).update({
       fcmTokens: admin.firestore.FieldValue.arrayRemove(...tokensToRemove),
     });
+  }
+}
+
+
+
+// --- Scheduled: daily ranking check → push for TOP 10/3/2/1 ---
+import {onSchedule} from "firebase-functions/v2/scheduler";
+
+export const dailyRankingCheck = onSchedule(
+  {
+    schedule: "every day 09:00",
+    timeZone: "Europe/Warsaw",
+  },
+  async () => {
+    // --- TOP users ---
+    const usersSnap = await db.collection("users")
+      .orderBy("placesAddedCount", "desc")
+      .limit(100)
+      .get();
+
+    const activeUsers = usersSnap.docs.filter((doc) => {
+      const d = doc.data();
+      return (d.placesAddedCount || 0) > 0 || (d.reviewsCount || 0) > 0;
+    });
+
+    for (let i = 0; i < Math.min(activeUsers.length, 10); i++) {
+      const userDoc = activeUsers[i];
+      const userData = userDoc.data();
+      const userId = userDoc.id;
+      const position = i + 1;
+      const lastRank: number = userData.lastKnownUserRank || 0;
+
+      // Sprawdz czy user awansowal na nowa pozycje warta powiadomienia
+      const milestone = getMilestone(position);
+      const lastMilestone = getMilestone(lastRank);
+
+      if (milestone !== null && milestone !== lastMilestone) {
+        // Awans na nowy milestone!
+        const fcmTokens: string[] = userData.fcmTokens || [];
+        const notifPrefs = userData.notificationPreferences || {};
+
+        if (fcmTokens.length > 0 && notifPrefs.rankings !== false) {
+          const title = getUserRankTitle(position);
+          const body = `Jeste\u015B na ${position}. pozycji w rankingu u\u017Cytkownik\u00F3w kidZone!`;
+
+          const message: admin.messaging.MulticastMessage = {
+            tokens: fcmTokens,
+            notification: {title, body},
+            data: {type: "user_top_rank", rank: String(position)},
+            android: {priority: "high", notification: {channelId: "kidzone_general"}},
+          };
+
+          try {
+            const response = await admin.messaging().sendEachForMulticast(message);
+            console.log(`User rank push for ${userId} (#${position}): ${response.successCount} ok`);
+            await cleanStaleTokens(response, fcmTokens, userId);
+          } catch (err) {
+            console.error(`User rank push error for ${userId}:`, err);
+          }
+        }
+      }
+
+      // Zapisz aktualny rank
+      await db.collection("users").doc(userId).update({lastKnownUserRank: position});
+    }
+
+    // Wyzeruj rank dla userow ktory wypadli z TOP 10
+    for (let i = 10; i < activeUsers.length && i < 20; i++) {
+      const doc = activeUsers[i];
+      if ((doc.data().lastKnownUserRank || 0) <= 10) {
+        await db.collection("users").doc(doc.id).update({lastKnownUserRank: 0});
+      }
+    }
+
+    // --- TOP places ---
+    const placesSnap = await db.collection("places")
+      .orderBy("averageRating", "desc")
+      .where("reviewsCount", ">", 0)
+      .limit(100)
+      .get();
+
+    for (let i = 0; i < Math.min(placesSnap.docs.length, 10); i++) {
+      const placeDoc = placesSnap.docs[i];
+      const placeData = placeDoc.data();
+      const placeId = placeDoc.id;
+      const position = i + 1;
+      const lastRank: number = placeData.lastKnownPlaceRank || 0;
+      const ownerUserId = placeData.ownerUserId || "";
+
+      const milestone = getMilestone(position);
+      const lastMilestone = getMilestone(lastRank);
+
+      if (milestone !== null && milestone !== lastMilestone && ownerUserId) {
+        const ownerDoc = await db.collection("users").doc(ownerUserId).get();
+        if (ownerDoc.exists) {
+          const ownerData = ownerDoc.data();
+          const fcmTokens: string[] = ownerData?.fcmTokens || [];
+          const notifPrefs = ownerData?.notificationPreferences || {};
+
+          if (fcmTokens.length > 0 && notifPrefs.rankings !== false) {
+            const placeName = placeData.name || "Twoje miejsce";
+            const title = getPlaceRankTitle(position, placeName);
+            const body = `Na ${position}. pozycji w rankingu najlepszych miejsc kidZone!`;
+
+            const message: admin.messaging.MulticastMessage = {
+              tokens: fcmTokens,
+              notification: {title, body},
+              data: {type: "place_top_rank", placeId: placeId},
+              android: {priority: "high", notification: {channelId: "kidzone_general"}},
+            };
+
+            try {
+              const response = await admin.messaging().sendEachForMulticast(message);
+              console.log(`Place rank push for ${placeId} (#${position}): ${response.successCount} ok`);
+              await cleanStaleTokens(response, fcmTokens, ownerUserId);
+            } catch (err) {
+              console.error(`Place rank push error for ${placeId}:`, err);
+            }
+          }
+        }
+      }
+
+      await db.collection("places").doc(placeId).update({lastKnownPlaceRank: position});
+    }
+
+    // Wyzeruj rank dla miejsc ktore wypadly z TOP 10
+    for (let i = 10; i < placesSnap.docs.length && i < 20; i++) {
+      const doc = placesSnap.docs[i];
+      if ((doc.data().lastKnownPlaceRank || 0) <= 10) {
+        await db.collection("places").doc(doc.id).update({lastKnownPlaceRank: 0});
+      }
+    }
+
+    console.log("Daily ranking check completed.");
+  }
+);
+
+/**
+ * Milestone: TOP10, TOP3, #2, #1.
+ * Zwraca unikalny identyfikator milestone lub null jesli poza TOP10.
+ */
+function getMilestone(position: number): string | null {
+  if (position === 1) return "TOP1";
+  if (position === 2) return "TOP2";
+  if (position === 3) return "TOP3";
+  if (position >= 4 && position <= 10) return "TOP10";
+  return null;
+}
+
+function getUserRankTitle(position: number): string {
+  switch (position) {
+    case 1: return "\u{1F3C6} Z\u0142oto! Jeste\u015B #1 w rankingu kidZone!";
+    case 2: return "\u{1F948} Srebrna pozycja! Jeste\u015B na 2. miejscu!";
+    case 3: return "\u{1F949} Br\u0105z! Jeste\u015B na 3. miejscu w rankingu!";
+    default: return "\u{1F3C5} Awans! Jeste\u015B w TOP 10 u\u017Cytkownik\u00F3w kidZone!";
+  }
+}
+
+function getPlaceRankTitle(position: number, placeName: string): string {
+  switch (position) {
+    case 1: return `\u{1F3C6} \u201E${placeName}\u201D na 1. miejscu w rankingu!`;
+    case 2: return `\u{1F948} \u201E${placeName}\u201D na 2. miejscu!`;
+    case 3: return `\u{1F949} \u201E${placeName}\u201D na 3. miejscu!`;
+    default: return `\u{1F3C5} \u201E${placeName}\u201D w TOP 10 miejsc kidZone!`;
   }
 }

@@ -24,7 +24,8 @@ import androidx.compose.ui.unit.dp
 data class NotificationPrefs(
     val newReviewOnMyPlace: Boolean = true,
     val newBadgeEarned: Boolean = true,
-    val newPhotoOnMyPlace: Boolean = true
+    val newPhotoOnMyPlace: Boolean = true,
+    val rankings: Boolean = true
 )
 
 @Composable
@@ -59,10 +60,16 @@ fun NotificationPreferencesDialog(
                     onCheckedChange = { prefs = prefs.copy(newBadgeEarned = it) }
                 )
                 NotificationToggle(
-                    title = "Nowe zdj\u0119cie do mojego miejsca",
-                    description = "Kto\u015B doda\u0142 zdj\u0119cie do miejsca, kt\u00F3re doda\u0142e\u015B",
+                    title = "Zdj\u0119cia w moim miejscu",
+                    description = "Kto\u015B doda\u0142 lub usun\u0105\u0142 zdj\u0119cie z miejsca, kt\u00F3re doda\u0142e\u015B",
                     checked = prefs.newPhotoOnMyPlace,
                     onCheckedChange = { prefs = prefs.copy(newPhotoOnMyPlace = it) }
+                )
+                NotificationToggle(
+                    title = "Rankingi",
+                    description = "Zdobywasz w rankingu TOP 10 / TOP 3 / podium",
+                    checked = prefs.rankings,
+                    onCheckedChange = { prefs = prefs.copy(rankings = it) }
                 )
             }
         },

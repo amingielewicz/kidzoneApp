@@ -53,15 +53,30 @@ fun KidZoneNavGraph(
                     }
                     // Obsłuż deep link z push notification
                     pendingDeepLink.value?.let { uri ->
-                        when (uri.host.orEmpty()) {
+                        val host = uri.host.orEmpty()
+                        val firstSegment = uri.pathSegments?.firstOrNull().orEmpty()
+                        when (host) {
                             "place" -> {
-                                val placeId = uri.pathSegments?.firstOrNull()
-                                if (!placeId.isNullOrBlank()) {
+                                val placeId = firstSegment
+                                if (placeId.isNotBlank()) {
                                     navController.navigate(Route.PlaceDetails.create(placeId))
                                 }
                             }
-                            // "profile" → MainScreen startuje na Home, user musi kliknąć Profile.
-                            // Przyszły feature: automatyczne przełączenie na zakładkę Profile.
+                            "profile" -> {
+                                navController.currentBackStackEntry
+                                    ?.savedStateHandle
+                                    ?.set("focusTab", Route.Profile.path)
+                            }
+                            "ranking" -> {
+                                // firstSegment = "places" or "users"
+                                val tab = if (firstSegment == "users") "users" else "places"
+                                navController.currentBackStackEntry
+                                    ?.savedStateHandle
+                                    ?.set("focusTab", Route.Ranking.path)
+                                navController.currentBackStackEntry
+                                    ?.savedStateHandle
+                                    ?.set("rankingTab", tab)
+                            }
                         }
                         pendingDeepLink.value = null
                     }
@@ -111,13 +126,23 @@ fun KidZoneNavGraph(
             val focusLng by savedHandle
                 .getStateFlow<Double?>(NEW_PLACE_LNG, null)
                 .collectAsState()
+            val focusTab by savedHandle
+                .getStateFlow("focusTab", "")
+                .collectAsState()
+            val rankingTab by savedHandle
+                .getStateFlow("rankingTab", "")
+                .collectAsState()
 
             MainScreen(
                 focusLatitude = focusLat,
                 focusLongitude = focusLng,
+                focusTab = focusTab,
+                rankingTab = rankingTab,
                 onFocusConsumed = {
                     savedHandle[NEW_PLACE_LAT] = null
                     savedHandle[NEW_PLACE_LNG] = null
+                    savedHandle["focusTab"] = ""
+                    savedHandle["rankingTab"] = ""
                 },
                 onOpenPlaceDetails = { placeId ->
                     navController.navigate(Route.PlaceDetails.create(placeId))
