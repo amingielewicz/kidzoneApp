@@ -291,25 +291,14 @@ fun MapScreen(
                 modifier = Modifier.fillMaxWidth()
             )
             if (!locationPermissionGranted) {
-                // shouldShowRequestPermissionRationale == false po odmowie
-                // oznacza "permanent deny" — system nie pokaze dialogu,
-                // wiec "Pozwol" musi isc do Ustawien.
-                val activity = (context as? android.app.Activity)
-                val canAskAgain = activity?.shouldShowRequestPermissionRationale(
-                    Manifest.permission.ACCESS_FINE_LOCATION
-                ) ?: true
-
+                // MIUI/Xiaomi: shouldShowRequestPermissionRationale() zawsze
+                // zwraca false. Dlatego nie mozemy na nim polegac.
+                // Strategia: "Pozwol" ZAWSZE odpala launcher. Jesli system
+                // nie pokaze dialogu (permanent deny), callback zwroci false
+                // i banner zostanie. User musi uzyc "Ustawienia".
                 LocationPermissionBanner(
                     onAllowClick = {
-                        if (canAskAgain) {
-                            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                        } else {
-                            // Permanent deny — jedyna opcja to ustawienia
-                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.fromParts("package", context.packageName, null)
-                            }
-                            context.startActivity(intent)
-                        }
+                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                     },
                     onOpenSettingsClick = {
                         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
