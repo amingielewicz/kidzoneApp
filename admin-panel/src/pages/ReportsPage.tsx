@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -88,7 +89,9 @@ interface DetailInfo {
 }
 
 export function ReportsPage() {
-  const [tab, setTab] = useState(0);
+  const [searchParams] = useSearchParams();
+  const initialTab = parseInt(searchParams.get('tab') || '0') || 0;
+  const [tab, setTab] = useState(initialTab);
   const [statusFilter, setStatusFilter] = useState<ReportStatus | 'all'>('pending');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [placeReports, setPlaceReports] = useState<PlaceReport[]>([]);

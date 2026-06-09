@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Grid,
@@ -10,6 +11,7 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
+  ListItemButton,
   Avatar,
   Chip,
   Paper,
@@ -19,6 +21,8 @@ import PlaceIcon from '@mui/icons-material/Place';
 import ReviewsIcon from '@mui/icons-material/RateReview';
 import PeopleIcon from '@mui/icons-material/People';
 import ReportIcon from '@mui/icons-material/Report';
+import WarningIcon from '@mui/icons-material/Warning';
+import PhotoIcon from '@mui/icons-material/Photo';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import {
@@ -56,6 +60,14 @@ interface RecentReview {
   createdAtMillis: number;
 }
 
+interface RecentReport {
+  id: string;
+  type: 'place' | 'review' | 'photo';
+  reason: string;
+  comment: string;
+  createdAtMillis: number;
+}
+
 function formatDate(millis: number): string {
   return new Date(millis).toLocaleDateString('pl-PL', {
     day: '2-digit',
@@ -65,11 +77,13 @@ function formatDate(millis: number): string {
 }
 
 export function DashboardPage() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ places: 0, reviews: 0, users: 0, pendingReports: 0 });
   const [recentUsers, setRecentUsers] = useState<RecentUser[]>([]);
   const [recentPlaces, setRecentPlaces] = useState<RecentPlace[]>([]);
   const [recentReviews, setRecentReviews] = useState<RecentReview[]>([]);
+  const [recentReports, setRecentReports] = useState<RecentReport[]>([]);
 
   useEffect(() => {
     fetchDashboard();
@@ -104,6 +118,20 @@ export function DashboardPage() {
       // Recent reviews
       const reviewsSnap = await getDocs(query(collection(db, 'reviews'), orderBy('createdAtMillis', 'desc'), limit(5)));
       setRecentReviews(reviewsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as RecentReview)));
+
+      // Recent reports (pending)
+      const [prSnap, rrSnap, phSnap] = await Promise.all([
+        getDocs(query(collection(db, 'place_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'), limit(5))),
+        getDocs(query(collection(db, 'review_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'), limit(5))),
+        getDocs(query(collection(db, 'photo_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'), limit(5))),
+      ]);
+      const reports: RecentReport[] = [
+        ...prSnap.docs.map((d) => ({ id: d.id, type: 'place' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
+        ...rrSnap.docs.map((d) => ({ id: d.id, type: 'review' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
+        ...phSnap.docs.map((d) => ({ id: d.id, type: 'photo' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
+      ];
+      reports.sort((a, b) => b.createdAtMillis - a.createdAtMillis);
+      setRecentReports(reports.slice(0, 5));
     } catch (err) {
       console.error('Dashboard fetch error:', err);
     } finally {
@@ -270,6 +298,55 @@ export function DashboardPage() {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Recent reports */}
+      <Paper sx={{ p: 2, mt: 3 }}>
+        <Box display="flex" alignItems="center" gap={1} mb={2}>
+          <ReportIcon color="error" />
+          <Typography variant="h6" fontWeight={600}>Nowe zgłoszenia</Typography>
+          <Chip label={recentReports.length} size="small" color="error" />
+        </Box>
+        {recentReports.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">Brak oczekujących zgłoszeń</Typography>
+        ) : (
+          <List dense disablePadding>
+            {recentReports.map((r) => (
+              <ListItemButton
+                key={r.id}
+                onClick={() => {
+                  if (r.type === 'place') navigate('/reports?tab=0');
+                  else if (r.type === 'review') navigate('/reports?tab=1');
+                  else navigate('/reports?tab=2');
+                }}
+                sx={{ borderRadius: 1, mb: 0.5 }}
+              >
+                <ListItemAvatar>
+                  <Avatar sx={{ width: 32, height: 32, bgcolor: r.type === 'place' ? '#ffebee' : r.type === 'review' ? '#fff3e0' : '#fce4ec' }}>
+                    {r.type === 'place' && <PlaceIcon sx={{ fontSize: 18, color: '#D32F2F' }} />}
+                    {r.type === 'review' && <WarningIcon sx={{ fontSize: 18, color: '#F57C00' }} />}
+                    {r.type === 'photo' && <PhotoIcon sx={{ fontSize: 18, color: '#C2185B' }} />}
+                  </Avatar>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <Chip
+                        label={r.type === 'place' ? 'Miejsce' : r.type === 'review' ? 'Opinia' : 'Zdjęcie'}
+                        size="small"
+                        variant="outlined"
+                        color={r.type === 'place' ? 'error' : r.type === 'review' ? 'warning' : 'secondary'}
+                      />
+                      <Typography variant="body2">{r.reason}</Typography>
+                    </Box>
+                  }
+                  secondary={`${formatDate(r.createdAtMillis)}${r.comment ? ' — ' + (r.comment.length > 40 ? r.comment.slice(0, 40) + '...' : r.comment) : ''}`}
+                  secondaryTypographyProps={{ variant: 'caption' }}
+                />
+              </ListItemButton>
+            ))}
+          </List>
+        )}
+      </Paper>
     </Box>
   );
 }
