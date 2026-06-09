@@ -110,8 +110,11 @@ export function DashboardPage() {
 
   return (
     <Box>
-      <Typography variant="h4" fontWeight={700} mb={3}>
+      <Typography variant="h4" fontWeight={700} mb={1}>
         Dashboard
+      </Typography>
+      <Typography variant="body2" color="text.secondary" mb={3}>
+        Podsumowanie statystyk aplikacji kidZone.
       </Typography>
 
       <Grid container spacing={3}>

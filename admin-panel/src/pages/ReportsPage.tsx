@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -100,11 +100,21 @@ export function ReportsPage() {
     info: DetailInfo;
     loadingInfo: boolean;
   }>({ open: false, type: 'place', report: null, info: {}, loadingInfo: false });
-  const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean;
-    title: string;
-    action: () => Promise<void>;
-  }>({ open: false, title: '', action: async () => {} });
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState('');
+  const confirmActionRef = useRef<(() => Promise<void>) | null>(null);
+
+  function confirm(title: string, action: () => Promise<void>) {
+    confirmActionRef.current = action;
+    setConfirmTitle(title);
+    setConfirmOpen(true);
+  }
+
+  async function handleConfirm() {
+    if (confirmActionRef.current) await confirmActionRef.current();
+    setConfirmOpen(false);
+    confirmActionRef.current = null;
+  }
 
   useEffect(() => {
     fetchAll();
@@ -258,8 +268,11 @@ export function ReportsPage() {
 
   return (
     <Box>
-      <Typography variant="h4" fontWeight={700} mb={3}>
+      <Typography variant="h4" fontWeight={700} mb={1}>
         Zgłoszenia
+      </Typography>
+      <Typography variant="body2" color="text.secondary" mb={3}>
+        Przeglądaj zgłoszenia naruszeń od użytkowników. Rozwiąż lub odrzuć.
       </Typography>
 
       <Box display="flex" gap={2} mb={3} flexWrap="wrap" alignItems="center">
@@ -504,12 +517,12 @@ export function ReportsPage() {
       </Dialog>
 
       {/* Confirm Dialog */}
-      <Dialog open={confirmDialog.open} onClose={() => setConfirmDialog((p) => ({ ...p, open: false }))}>
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <DialogTitle>Potwierdzenie</DialogTitle>
-        <DialogContent><Typography>{confirmDialog.title}</Typography></DialogContent>
+        <DialogContent><Typography>{confirmTitle}</Typography></DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDialog((p) => ({ ...p, open: false }))}>Anuluj</Button>
-          <Button variant="contained" color="error" onClick={async () => { await confirmDialog.action(); setConfirmDialog((p) => ({ ...p, open: false })); }}>Potwierdź</Button>
+          <Button onClick={() => setConfirmOpen(false)}>Anuluj</Button>
+          <Button variant="contained" color="error" onClick={handleConfirm}>Potwierdź</Button>
         </DialogActions>
       </Dialog>
     </Box>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -83,11 +83,9 @@ export function PlacesPage() {
   const [editReviewRating, setEditReviewRating] = useState<number>(0);
 
   // Confirm
-  const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean;
-    title: string;
-    action: () => Promise<void>;
-  }>({ open: false, title: '', action: async () => {} });
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState('');
+  const confirmActionRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     fetchPlaces();
@@ -272,7 +270,15 @@ export function PlacesPage() {
   }
 
   function confirm(title: string, action: () => Promise<void>) {
-    setConfirmDialog({ open: true, title, action });
+    confirmActionRef.current = action;
+    setConfirmTitle(title);
+    setConfirmOpen(true);
+  }
+
+  async function handleConfirm() {
+    if (confirmActionRef.current) await confirmActionRef.current();
+    setConfirmOpen(false);
+    confirmActionRef.current = null;
   }
 
   if (loading) {
@@ -285,8 +291,11 @@ export function PlacesPage() {
 
   return (
     <Box>
-      <Typography variant="h4" fontWeight={700} mb={3}>
+      <Typography variant="h4" fontWeight={700} mb={1}>
         Miejsca ({places.length})
+      </Typography>
+      <Typography variant="body2" color="text.secondary" mb={3}>
+        Przeglądaj, edytuj i zarządzaj wszystkimi miejscami w aplikacji.
       </Typography>
 
       <Box display="flex" gap={2} mb={3} flexWrap="wrap">
@@ -676,26 +685,12 @@ export function PlacesPage() {
       </Dialog>
 
       {/* Confirm Dialog */}
-      <Dialog
-        open={confirmDialog.open}
-        onClose={() => setConfirmDialog((p) => ({ ...p, open: false }))}
-      >
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <DialogTitle>Potwierdzenie</DialogTitle>
-        <DialogContent>
-          <Typography>{confirmDialog.title}</Typography>
-        </DialogContent>
+        <DialogContent><Typography>{confirmTitle}</Typography></DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDialog((p) => ({ ...p, open: false }))}>Anuluj</Button>
-          <Button
-            variant="contained"
-            color="error"
-            onClick={async () => {
-              await confirmDialog.action();
-              setConfirmDialog((p) => ({ ...p, open: false }));
-            }}
-          >
-            Potwierdź
-          </Button>
+          <Button onClick={() => setConfirmOpen(false)}>Anuluj</Button>
+          <Button variant="contained" color="error" onClick={handleConfirm}>Potwierdź</Button>
         </DialogActions>
       </Dialog>
     </Box>

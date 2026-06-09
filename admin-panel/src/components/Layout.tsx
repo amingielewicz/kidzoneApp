@@ -90,6 +90,7 @@ export function Layout({ children }: LayoutProps) {
           >
             <MenuIcon />
           </IconButton>
+          <Box component="img" src="/logo.png" alt="kidZone" sx={{ height: 32, mr: 1 }} />
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             kidZone Admin Panel
           </Typography>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -94,11 +94,21 @@ export function ChangeRequestsPage() {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [detailRequest, setDetailRequest] = useState<PlaceChangeRequest | null>(null);
   const [placeName, setPlaceName] = useState<string>('');
-  const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean;
-    title: string;
-    action: () => Promise<void>;
-  }>({ open: false, title: '', action: async () => {} });
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState('');
+  const confirmActionRef = useRef<(() => Promise<void>) | null>(null);
+
+  function confirm(title: string, action: () => Promise<void>) {
+    confirmActionRef.current = action;
+    setConfirmTitle(title);
+    setConfirmOpen(true);
+  }
+
+  async function handleConfirm() {
+    if (confirmActionRef.current) await confirmActionRef.current();
+    setConfirmOpen(false);
+    confirmActionRef.current = null;
+  }
 
   useEffect(() => {
     fetchRequests();
@@ -213,9 +223,6 @@ export function ChangeRequestsPage() {
     <Box>
       <Typography variant="h4" fontWeight={700} mb={1}>
         Propozycje zmian
-      </Typography>
-      <Typography variant="body2" color="text.secondary" mb={3}>
-        Użytkownicy proponują korekty danych lub lokalizacji miejsc. Zatwierdź lub odrzuć.
       </Typography>
 
       <Box display="flex" gap={2} mb={3} flexWrap="wrap" alignItems="center">
@@ -428,28 +435,12 @@ export function ChangeRequestsPage() {
       </Dialog>
 
       {/* Confirm Dialog */}
-      <Dialog
-        open={confirmDialog.open}
-        onClose={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
-      >
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <DialogTitle>Potwierdzenie</DialogTitle>
-        <DialogContent>
-          <Typography>{confirmDialog.title}</Typography>
-        </DialogContent>
+        <DialogContent><Typography>{confirmTitle}</Typography></DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}>
-            Anuluj
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={async () => {
-              await confirmDialog.action();
-              setConfirmDialog((prev) => ({ ...prev, open: false }));
-            }}
-          >
-            Potwierdź
-          </Button>
+          <Button onClick={() => setConfirmOpen(false)}>Anuluj</Button>
+          <Button variant="contained" color="primary" onClick={handleConfirm}>Potwierdź</Button>
         </DialogActions>
       </Dialog>
     </Box>
