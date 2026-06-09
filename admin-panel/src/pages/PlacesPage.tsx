@@ -173,9 +173,23 @@ export function PlacesPage() {
     }
   }
 
-  async function handleDelete(place: Place) {
-    await deleteDoc(doc(db, 'places', place.id));
-    setConfirmOpen(false);
+  // Delete place with reason
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<Place | null>(null);
+
+  function openDeleteDialog(place: Place) {
+    setDeleteTarget(place);
+    setDeleteReason('');
+    setDeleteDialogOpen(true);
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget || !deleteReason.trim()) return;
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
+    const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeletePlace?placeId=${deleteTarget.id}&reason=${encodeURIComponent(deleteReason)}`;
+    try { await fetch(url); } catch (e) { console.error('Failed to delete place:', e); }
+    setDeleteDialogOpen(false);
     setDetailPlace(null);
     await fetchPlaces();
   }
@@ -444,7 +458,7 @@ export function PlacesPage() {
                     <IconButton
                       size="small"
                       color="error"
-                      onClick={() => confirm(`Usunąć "${place.name}"?`, () => handleDelete(place))}
+                      onClick={() => openDeleteDialog(place)}
                     >
                       <DeleteIcon />
                     </IconButton>
@@ -672,7 +686,7 @@ export function PlacesPage() {
             <DialogActions>
               <Button
                 color="error"
-                onClick={() => confirm(`Usunąć "${detailPlace.name}"?`, () => handleDelete(detailPlace))}
+                onClick={() => openDeleteDialog(detailPlace)}
               >
                 Usuń miejsce
               </Button>
@@ -732,6 +746,30 @@ export function PlacesPage() {
             </DialogActions>
           </>
         )}
+      </Dialog>
+
+      {/* Delete Place Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Usuń miejsce: {deleteTarget?.name}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Podaj powód usunięcia. Zostanie wysłany do właściciela miejsca.
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            rows={3}
+            label="Powód usunięcia"
+            value={deleteReason}
+            onChange={(e) => setDeleteReason(e.target.value)}
+            placeholder="Wpisz powód usunięcia..."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Anuluj</Button>
+          <Button variant="contained" color="error" disabled={!deleteReason.trim()} onClick={handleDelete}>Usuń</Button>
+        </DialogActions>
       </Dialog>
 
       {/* Confirm Dialog */}

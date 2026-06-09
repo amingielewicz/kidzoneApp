@@ -1603,3 +1603,64 @@ export const onUserBanned = onDocumentUpdated(
     }
   }
 );
+
+
+
+
+// --- HTTP Endpoint: Admin usuwa użytkownika z powodem ---
+export const adminDeleteUser = onRequest(
+  {secrets: [gmailEmail, gmailPassword], cors: true},
+  async (req, res) => {
+    const userId = req.query.userId as string;
+    const reason = req.query.reason as string || "Naruszenie regulaminu";
+
+    if (!userId) {
+      res.status(400).send(renderAdminResponse("Błąd", "Brak userId w żądaniu."));
+      return;
+    }
+
+    try {
+      const userDoc = await db.collection("users").doc(userId).get();
+      if (!userDoc.exists) {
+        res.status(404).send(renderAdminResponse("Nie znaleziono", "Użytkownik nie istnieje."));
+        return;
+      }
+
+      const userData = userDoc.data();
+      const userName = userData?.name || "Użytkowniku";
+      const userEmail = userData?.email || "";
+
+      // Usuń dokument użytkownika
+      await db.collection("users").doc(userId).delete();
+
+      // Wyślij email z powodem usunięcia
+      if (userEmail) {
+        const transporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
+        });
+
+        const html = wrapInTemplate("Konto usunięte", `
+          <p>Cześć, ${userName}.</p>
+          <p>Twoje konto w kidZone zostało usunięte przez administratora.</p>
+          <table>
+            <tr><td>Powód:</td><td>${reason}</td></tr>
+          </table>
+          <p>Jeśli uważasz, że to pomyłka, skontaktuj się z nami odpowiadając na ten email.</p>
+        `);
+
+        await transporter.sendMail({
+          from: `kidZone <${gmailEmail.value()}>`,
+          to: userEmail,
+          subject: "[kidZone] Twoje konto zostało usunięte",
+          html,
+        });
+      }
+
+      res.status(200).send(renderAdminResponse("Użytkownik usunięty", `Konto ${userName} zostało usunięte. Email z powodem wysłany.`));
+    } catch (err) {
+      console.error("adminDeleteUser error:", err);
+      res.status(500).send(renderAdminResponse("Błąd serwera", `${err}`));
+    }
+  }
+);

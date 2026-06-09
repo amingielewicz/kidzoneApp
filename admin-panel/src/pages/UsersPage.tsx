@@ -222,6 +222,26 @@ export function UsersPage() {
     await fetchUsers();
   }
 
+  // Delete user with reason
+  const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
+  const [deleteUserReason, setDeleteUserReason] = useState('');
+  const [deleteUserTarget, setDeleteUserTarget] = useState<AppUser | null>(null);
+
+  function openDeleteUserDialog(user: AppUser) {
+    setDeleteUserTarget(user);
+    setDeleteUserReason('');
+    setDeleteUserDialogOpen(true);
+  }
+
+  async function handleDeleteUser() {
+    if (!deleteUserTarget || !deleteUserReason.trim()) return;
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
+    const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeleteUser?userId=${deleteUserTarget.id}&reason=${encodeURIComponent(deleteUserReason)}`;
+    try { await fetch(url); } catch (e) { console.error('Failed to delete user:', e); }
+    setDeleteUserDialogOpen(false);
+    await fetchUsers();
+  }
+
   async function resetPassword(user: AppUser) {
     closeMenu();
     if (!user.email) return;
@@ -328,7 +348,7 @@ export function UsersPage() {
           ) : (
             <MenuItem key="promote" onClick={() => { if (!menuUser) return; const u = menuUser; closeMenu(); openConfirm('Nadać rolę admina?', `${u.name || u.email} uzyska pełny dostęp do panelu.`, 'success', async () => { await updateDoc(doc(db, 'users', u.id), { role: 'admin' }); await fetchUsers(); }); }}><ListItemIcon><AdminPanelSettingsIcon fontSize="small" /></ListItemIcon><ListItemText>Nadaj admin</ListItemText></MenuItem>
           ),
-          <MenuItem key="delete" onClick={() => { if (!menuUser) return; const u = menuUser; closeMenu(); openConfirm('Usunąć użytkownika?', `Usunięcie dokumentu "${u.name || u.email}" z Firestore.`, 'error', async () => { await deleteDoc(doc(db, 'users', u.id)); await fetchUsers(); }); }} sx={{ color: 'error.main' }}><ListItemIcon><DeleteForeverIcon fontSize="small" color="error" /></ListItemIcon><ListItemText>Usuń użytkownika</ListItemText></MenuItem>,
+          <MenuItem key="delete" onClick={() => { if (!menuUser) return; const u = menuUser; closeMenu(); openDeleteUserDialog(u); }} sx={{ color: 'error.main' }}><ListItemIcon><DeleteForeverIcon fontSize="small" color="error" /></ListItemIcon><ListItemText>Usuń użytkownika</ListItemText></MenuItem>,
         ]}
         {menuUser && isCurrentUser(menuUser) && <MenuItem disabled><ListItemText sx={{ color: 'text.secondary' }}>Nie możesz zmieniać własnej roli/blokady</ListItemText></MenuItem>}
       </Menu>
@@ -401,6 +421,30 @@ export function UsersPage() {
             </DialogActions>
           </>
         )}
+      </Dialog>
+
+      {/* Delete User Dialog */}
+      <Dialog open={deleteUserDialogOpen} onClose={() => setDeleteUserDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Usuń użytkownika: {deleteUserTarget?.name || deleteUserTarget?.email}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Podaj powód usunięcia konta. Zostanie wysłany do użytkownika emailem.
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            rows={3}
+            label="Powód usunięcia"
+            value={deleteUserReason}
+            onChange={(e) => setDeleteUserReason(e.target.value)}
+            placeholder="Wpisz powód usunięcia konta..."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteUserDialogOpen(false)}>Anuluj</Button>
+          <Button variant="contained" color="error" disabled={!deleteUserReason.trim()} onClick={handleDeleteUser}>Usuń</Button>
+        </DialogActions>
       </Dialog>
 
       {/* Confirm Dialog */}
