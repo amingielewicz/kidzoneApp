@@ -98,6 +98,7 @@ fun LoginScreen(
     // Do uruchamiania Google Sign-In z poziomu UI (Credential Manager
     // wymaga Activity context).
     val context = LocalContext.current
+    val activity = context.findActivity()
     val coroutineScope = rememberCoroutineScope()
 
     // Legacy Google Sign-In launcher (fallback dla Xiaomi/MIUI/emulatorów
@@ -367,7 +368,15 @@ fun LoginScreen(
                                         return@launch
                                     }
 
-                                    when (val result = launchGoogleSignIn(context, webClientId)) {
+                                    when (val result = launchGoogleSignIn(
+                                        activity ?: run {
+                                            viewModel.showInlineMessage(
+                                                "Nie udało się uruchomić logowania Google (brak Activity)"
+                                            )
+                                            return@launch
+                                        },
+                                        webClientId
+                                    )) {
                                         is GoogleSignInResult.Success ->
                                             viewModel.signInWithGoogle(result.idToken)
                                         GoogleSignInResult.Cancelled -> Unit // user anulował

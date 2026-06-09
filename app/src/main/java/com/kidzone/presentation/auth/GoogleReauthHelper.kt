@@ -25,6 +25,7 @@ fun rememberGoogleSignInLauncher(
     onError: (message: String) -> Unit
 ): () -> Unit {
     val context = LocalContext.current
+    val activity = context.findActivity()
     val scope = rememberCoroutineScope()
 
     val webClientId = try {
@@ -49,8 +50,13 @@ fun rememberGoogleSignInLauncher(
     }
 
     return {
+        val currentActivity = activity
+        if (currentActivity == null) {
+            onError("Nie udało się uruchomić logowania Google (brak Activity)")
+            return@rememberGoogleSignInLauncher
+        }
         scope.launch {
-            when (val result = launchGoogleSignIn(context, webClientId)) {
+            when (val result = launchGoogleSignIn(currentActivity, webClientId)) {
                 is GoogleSignInResult.Success -> onTokenReceived(result.idToken)
                 is GoogleSignInResult.Cancelled -> { /* user cancelled */ }
                 is GoogleSignInResult.FallbackToLegacy -> {
