@@ -1664,3 +1664,84 @@ export const adminDeleteUser = onRequest(
     }
   }
 );
+
+
+
+
+// --- HTTP Endpoint: Admin usuwa zdjęcie z miejsca (z panelu szczegółów) ---
+export const adminDeletePhotoFromPlace = onRequest(
+  {secrets: [gmailEmail, gmailPassword], cors: true},
+  async (req, res) => {
+    const placeId = req.query.placeId as string;
+    const photoUrl = req.query.photoUrl as string;
+    const reason = req.query.reason as string || "Naruszenie regulaminu";
+
+    if (!placeId || !photoUrl) {
+      res.status(400).send(renderAdminResponse("Błąd", "Brak placeId lub photoUrl."));
+      return;
+    }
+
+    try {
+      const placeDoc = await db.collection("places").doc(placeId).get();
+      if (!placeDoc.exists) {
+        res.status(404).send(renderAdminResponse("Nie znaleziono", "Miejsce nie istnieje."));
+        return;
+      }
+
+      const placeData = placeDoc.data();
+      const placeName = placeData?.name || "Nieznane miejsce";
+      const photoUploadedBy: Record<string, string> = placeData?.photoUploadedBy || {};
+      const uploaderId = photoUploadedBy[photoUrl] || "";
+
+      // Usuń URL z listy photoUrls
+      const currentUrls: string[] = placeData?.photoUrls || [];
+      const updatedUrls = currentUrls.filter((u: string) => u !== photoUrl);
+      await db.collection("places").doc(placeId).update({photoUrls: updatedUrls});
+
+      // Usuń plik z Storage
+      try {
+        const filePath = decodeStoragePath(photoUrl);
+        if (filePath) {
+          const bucket = admin.storage().bucket();
+          await bucket.file(filePath).delete();
+        }
+      } catch (storageErr) {
+        console.warn(`Could not delete photo from storage: ${storageErr}`);
+      }
+
+      // Wyślij email do uploadera
+      if (uploaderId && uploaderId !== "admin") {
+        const userDoc = await db.collection("users").doc(uploaderId).get();
+        if (userDoc.exists) {
+          const userEmail = userDoc.data()?.email;
+          const userName = userDoc.data()?.name || "Użytkowniku";
+          if (userEmail) {
+            const transporter = nodemailer.createTransport({
+              service: "gmail",
+              auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
+            });
+            const html = wrapInTemplate("Zdjęcie usunięte", `
+              <p>Cześć, ${userName}.</p>
+              <p>Twoje zdjęcie dodane do miejsca <strong>${placeName}</strong> zostało usunięte przez administratora.</p>
+              <table>
+                <tr><td>Powód:</td><td>${reason}</td></tr>
+              </table>
+              <p>Jeśli uważasz, że to pomyłka, skontaktuj się z nami odpowiadając na ten email.</p>
+            `);
+            await transporter.sendMail({
+              from: `kidZone <${gmailEmail.value()}>`,
+              to: userEmail,
+              subject: `[kidZone] Twoje zdjęcie zostało usunięte z "${placeName}"`,
+              html,
+            });
+          }
+        }
+      }
+
+      res.status(200).send(renderAdminResponse("Zdjęcie usunięte", `Zdjęcie z "${placeName}" zostało usunięte. Email z powodem wysłany.`));
+    } catch (err) {
+      console.error("adminDeletePhotoFromPlace error:", err);
+      res.status(500).send(renderAdminResponse("Błąd serwera", `${err}`));
+    }
+  }
+);

@@ -304,11 +304,25 @@ export function PlacesPage() {
     }
   }
 
-  async function deletePhoto(photoUrl: string) {
-    if (!detailPlace) return;
-    const updatedUrls = (detailPlace.photoUrls || []).filter((u) => u !== photoUrl);
-    await updateDoc(doc(db, 'places', detailPlace.id), { photoUrls: updatedUrls });
+  // Delete photo with reason
+  const [deletePhotoDialogOpen, setDeletePhotoDialogOpen] = useState(false);
+  const [deletePhotoReason, setDeletePhotoReason] = useState('');
+  const [deletePhotoUrl, setDeletePhotoUrl] = useState('');
+
+  function openDeletePhotoDialog(url: string) {
+    setDeletePhotoUrl(url);
+    setDeletePhotoReason('');
+    setDeletePhotoDialogOpen(true);
+  }
+
+  async function handleDeletePhoto() {
+    if (!detailPlace || !deletePhotoReason.trim()) return;
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
+    const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeletePhotoFromPlace?placeId=${detailPlace.id}&photoUrl=${encodeURIComponent(deletePhotoUrl)}&reason=${encodeURIComponent(deletePhotoReason)}`;
+    try { await fetch(url); } catch (e) { console.error('Failed to delete photo:', e); }
+    const updatedUrls = (detailPlace.photoUrls || []).filter((u) => u !== deletePhotoUrl);
     setDetailPlace((prev) => (prev ? { ...prev, photoUrls: updatedUrls } : null));
+    setDeletePhotoDialogOpen(false);
     await fetchPlaces();
   }
 
@@ -617,9 +631,7 @@ export function PlacesPage() {
                               boxShadow: 1,
                               '&:hover': { bgcolor: '#ffebee' },
                             }}
-                            onClick={() =>
-                              confirm('Usunąć to zdjęcie?', () => deletePhoto(url))
-                            }
+                            onClick={() => openDeletePhotoDialog(url)}
                           >
                             <DeleteIcon fontSize="small" />
                           </IconButton>
@@ -746,6 +758,30 @@ export function PlacesPage() {
             </DialogActions>
           </>
         )}
+      </Dialog>
+
+      {/* Delete Photo Dialog */}
+      <Dialog open={deletePhotoDialogOpen} onClose={() => setDeletePhotoDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Usuń zdjęcie</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Podaj powód usunięcia zdjęcia. Zostanie wysłany do użytkownika, który je dodał.
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            rows={3}
+            label="Powód usunięcia"
+            value={deletePhotoReason}
+            onChange={(e) => setDeletePhotoReason(e.target.value)}
+            placeholder="Wpisz powód usunięcia zdjęcia..."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeletePhotoDialogOpen(false)}>Anuluj</Button>
+          <Button variant="contained" color="error" disabled={!deletePhotoReason.trim()} onClick={handleDeletePhoto}>Usuń</Button>
+        </DialogActions>
       </Dialog>
 
       {/* Delete Place Dialog */}
