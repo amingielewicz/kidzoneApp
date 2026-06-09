@@ -2,7 +2,6 @@ package com.kidzone
 
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -20,6 +19,7 @@ import com.google.android.play.core.install.model.UpdateAvailability
 import com.kidzone.navigation.KidZoneNavGraph
 import com.kidzone.ui.theme.KidZoneTheme
 import dagger.hilt.android.AndroidEntryPoint
+import timber.log.Timber
 
 /**
  * Jedyna aktywność aplikacji – host dla całej hierarchii Compose.
@@ -53,7 +53,7 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
         if (result.resultCode != RESULT_OK) {
-            Log.w(TAG, "In-app update cancelled or failed (code=${result.resultCode})")
+            Timber.w("In-app update cancelled or failed (code=${result.resultCode})")
         }
     }
 
@@ -133,11 +133,8 @@ class MainActivity : ComponentActivity() {
             }
         }.addOnFailureListener { e ->
             // Brak Play Store / brak sieci / emulator – nie blokujemy startu.
-            Log.w(TAG, "In-app update check failed: ${e.message}")
+            Timber.w(e, "In-app update check failed")
         }
     }
 
-    companion object {
-        private const val TAG = "InAppUpdate"
-    }
 }

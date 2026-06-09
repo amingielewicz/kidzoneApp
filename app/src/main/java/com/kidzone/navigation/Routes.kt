@@ -12,6 +12,7 @@ sealed class Route(val path: String) {
     data object Splash : Route("splash")
     data object Login : Route("login")
     data object Register : Route("register")
+    data object Onboarding : Route("onboarding")
 
     // --- Main shell (zawiera bottom navigation) ---
     data object Main : Route("main")

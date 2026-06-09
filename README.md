@@ -24,7 +24,8 @@ Pozostałe TODO są w sekcji [Status MVP](#status-mvp).
 
 - **Kotlin 2.0.20** + **Jetpack Compose** (Material 3, BOM 2024.09.03)
 - **Hilt 2.52** (DI) + KSP 2.0.20-1.0.25
-- **Firebase** BOM 33.4.0 — Auth, Firestore, Storage
+- **Firebase** BOM 33.4.0 — Auth, Firestore, Storage, Analytics, Crashlytics, Cloud Messaging
+- **Timber 5.0.1** — logging (DebugTree w debug, CrashlyticsTree w release → WARN+ jako breadcrumbs)
 - **Google Maps** SDK 19.0.0 + `maps-compose` 4.4.1, `play-services-location` 21.3.0
 - **Credential Manager** 1.3.0 + `googleid` 1.1.1 (nowoczesne Google Sign-In)
 - **androidx.core:core-splashscreen** 1.0.1 (Splash Screen API Android 12+, backportowane)
@@ -189,8 +190,14 @@ przez użytkownika (locale `pl_PL`, żeby polskie znaki działały):
 
 ```
 app/src/main/java/com/kidzone
-├── KidZoneApplication.kt    # @HiltAndroidApp
+├── KidZoneApplication.kt    # @HiltAndroidApp, Timber init
 ├── MainActivity.kt          # @AndroidEntryPoint, installSplashScreen + Compose
+│
+├── analytics
+│   └── AnalyticsHelper.kt       # singleton wrapper Firebase Analytics (typed events)
+│
+├── logging
+│   └── CrashlyticsTree.kt       # Timber Tree: WARN+ → Crashlytics breadcrumbs
 │
 ├── data
 │   ├── remote
@@ -219,6 +226,7 @@ app/src/main/java/com/kidzone
 │
 ├── presentation
 │   ├── splash/              # SplashScreen + SplashViewModel
+│   ├── onboarding/          # OnboardingScreen (3 slajdy HorizontalPager, po 1. logowaniu)
 │   ├── auth
 │   │   ├── LoginScreen.kt        # gradient, karta, e-mail + Google + reset
 │   │   ├── LoginViewModel.kt
@@ -298,7 +306,7 @@ app/src/main/java/com/kidzone
 │
 ├── di
 │   ├── DatabaseModule.kt    # @Provides Room DB + PlaceDao
-│   ├── FirebaseModule.kt    # @Provides FirebaseAuth/Firestore/Storage
+│   ├── FirebaseModule.kt    # @Provides FirebaseAuth/Firestore/Storage/Analytics
 │   └── RepositoryModule.kt  # @Binds dla 3 repo
 │
 └── utils
@@ -565,6 +573,9 @@ przy pierwszym wejściu, `AddPlaceScreen` przy kliknięciu "Pobierz lokalizację
 | Scheduled ranking check (codziennie 09:00 PL)          | ✅     |
 | Wyszukiwarka miejsc po nazwie (SearchBar na liście)    | ✅     |
 | Zero deprecation warnings (Compose, Material3, Icons)  | ✅     |
+| Firebase Analytics (AnalyticsHelper + typed events)    | ✅     |
+| Timber logging (DebugTree + CrashlyticsTree release)   | ✅     |
+| Onboarding (3 slajdy po 1. logowaniu, HorizontalPager)| ✅     |
 
 ## Cloud Functions (backend)
 
@@ -638,7 +649,7 @@ developera znającego projekt; w zespole 2-osobowym czas kalendarzowy
 | 3.1 | **Pełny offline mode (Room sync)** | Room jako single source of truth. Firestore sync w background. Offline writes z queue + retry. Status sync indicator w UI. | 20h |
 | 3.2 | **Server-side paginacja** | Cursor-based pagination na Firestore (startAfter) dla >1000 miejsc. Infinite scroll + `PagingSource` (Paging 3). | 12h |
 | 3.3 | **Moderacja AI (Cloud Function)** | Auto-flagowanie obraźliwych opinii/zdjęć przez Cloud Natural Language API / Vision API. Auto-hide + email do admina. | 16h |
-| 3.4 | **Analytics + Crashlytics** | Firebase Analytics (eventy: dodanie miejsca, opinii, zdjęcia, share, report) + Crashlytics (crash reporting). | 6h |
+| 3.4 | **Analytics + Crashlytics** | Firebase Analytics (eventy: dodanie miejsca, opinii, zdjęcia, share, report) + Crashlytics (crash reporting). | ✅ done |
 | 3.5 | **Widget Android** | Glance widget "Blisko Ciebie" — 3 najbliższe miejsca z mini-info (nazwa + rating + dystans). | 10h |
 | 3.6 | **Wersja iOS (KMP)** | Kotlin Multiplatform — shared domain + data layer, natywny UI (SwiftUI). | 120h+ |
 
