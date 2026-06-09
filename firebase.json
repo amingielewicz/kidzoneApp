@@ -5,24 +5,42 @@
   "storage": {
     "rules": "storage.rules"
   },
-  "hosting": {
-    "public": "public",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "/privacy-policy",
-        "destination": "/privacy-policy.html"
-      },
-      {
-        "source": "/place/**",
-        "destination": "/place/index.html"
-      }
-    ]
-  },
+  "hosting": [
+    {
+      "target": "app",
+      "public": "public",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "/privacy-policy",
+          "destination": "/privacy-policy.html"
+        },
+        {
+          "source": "/place/**",
+          "destination": "/place/index.html"
+        }
+      ]
+    },
+    {
+      "target": "admin",
+      "public": "admin-panel/dist",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
+    }
+  ],
   "functions": [
     {
       "source": "functions",

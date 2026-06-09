@@ -1,0 +1,142 @@
+import { ReactNode, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  AppBar,
+  Box,
+  Drawer,
+  IconButton,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Toolbar,
+  Typography,
+  Divider,
+  Button,
+} from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import ReportIcon from '@mui/icons-material/Report';
+import PlaceIcon from '@mui/icons-material/Place';
+import PeopleIcon from '@mui/icons-material/People';
+import LogoutIcon from '@mui/icons-material/Logout';
+import { useAuth } from '../hooks/useAuth';
+
+const DRAWER_WIDTH = 240;
+
+const menuItems = [
+  { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
+  { path: '/reports', label: 'Zgłoszenia', icon: <ReportIcon /> },
+  { path: '/places', label: 'Miejsca', icon: <PlaceIcon /> },
+  { path: '/users', label: 'Użytkownicy', icon: <PeopleIcon /> },
+];
+
+interface LayoutProps {
+  children: ReactNode;
+}
+
+export function Layout({ children }: LayoutProps) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { signOut, user } = useAuth();
+
+  const drawer = (
+    <Box>
+      <Toolbar>
+        <Typography variant="h6" fontWeight={700} color="primary">
+          kidZone Admin
+        </Typography>
+      </Toolbar>
+      <Divider />
+      <List>
+        {menuItems.map((item) => (
+          <ListItemButton
+            key={item.path}
+            selected={location.pathname === item.path}
+            onClick={() => {
+              navigate(item.path);
+              setMobileOpen(false);
+            }}
+          >
+            <ListItemIcon>{item.icon}</ListItemIcon>
+            <ListItemText primary={item.label} />
+          </ListItemButton>
+        ))}
+      </List>
+      <Divider />
+      <Box px={2} py={1}>
+        <Typography variant="caption" color="text.secondary">
+          {user?.email}
+        </Typography>
+      </Box>
+    </Box>
+  );
+
+  return (
+    <Box sx={{ display: 'flex' }}>
+      <AppBar
+        position="fixed"
+        sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}
+      >
+        <Toolbar>
+          <IconButton
+            color="inherit"
+            edge="start"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            sx={{ mr: 2, display: { md: 'none' } }}
+          >
+            <MenuIcon />
+          </IconButton>
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+            kidZone Admin Panel
+          </Typography>
+          <Button
+            color="inherit"
+            startIcon={<LogoutIcon />}
+            onClick={signOut}
+          >
+            Wyloguj
+          </Button>
+        </Toolbar>
+      </AppBar>
+
+      {/* Mobile drawer */}
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        sx={{
+          display: { xs: 'block', md: 'none' },
+          '& .MuiDrawer-paper': { width: DRAWER_WIDTH },
+        }}
+      >
+        {drawer}
+      </Drawer>
+
+      {/* Desktop drawer */}
+      <Drawer
+        variant="permanent"
+        sx={{
+          display: { xs: 'none', md: 'block' },
+          '& .MuiDrawer-paper': { width: DRAWER_WIDTH, boxSizing: 'border-box' },
+        }}
+        open
+      >
+        {drawer}
+      </Drawer>
+
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: 3,
+          width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
+          mt: '64px',
+        }}
+      >
+        {children}
+      </Box>
+    </Box>
+  );
+}
