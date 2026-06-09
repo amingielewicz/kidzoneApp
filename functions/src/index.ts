@@ -780,21 +780,14 @@ export const onReviewCreatedPush = onDocumentCreated(
 
     const message: admin.messaging.MulticastMessage = {
       tokens: fcmTokens,
-      notification: {
-        title: `${reviewAuthorName} ocenił/a „${placeName}"`,
-        body: body,
-      },
       data: {
         type: "new_review",
         placeId: placeId,
         reviewId: event.params.reviewId,
+        title: `${reviewAuthorName} oceni\u0142/a \u201E${placeName}\u201D`,
+        body: body,
       },
-      android: {
-        priority: "high",
-        notification: {
-          channelId: "kidzone_general",
-        },
-      },
+      android: {priority: "high"},
     };
 
     try {
@@ -931,9 +924,8 @@ export const onBadgeEarned = onDocumentUpdated(
 
     const message: admin.messaging.MulticastMessage = {
       tokens: fcmTokens,
-      notification: {title, body},
-      data: {type: "new_badge", badges: (toGrant.length > 0 ? toGrant : toRevoke).join(",")},
-      android: {priority: "high", notification: {channelId: "kidzone_general"}},
+      data: {type: "new_badge", badges: (toGrant.length > 0 ? toGrant : toRevoke).join(","), title: title, body: body},
+      android: {priority: "high"},
     };
 
     try {
@@ -1000,9 +992,8 @@ export const onPhotoAddedToPlace = onDocumentUpdated(
 
     const message: admin.messaging.MulticastMessage = {
       tokens: fcmTokens,
-      notification: {title, body},
-      data: {type: "new_photo", placeId: placeId},
-      android: {priority: "high", notification: {channelId: "kidzone_general"}},
+      data: {type: "new_photo", placeId: placeId, title: title, body: body},
+      android: {priority: "high"},
     };
 
     try {
@@ -1085,9 +1076,8 @@ export const dailyRankingCheck = onSchedule(
 
           const message: admin.messaging.MulticastMessage = {
             tokens: fcmTokens,
-            notification: {title, body},
-            data: {type: "user_top_rank", rank: String(position)},
-            android: {priority: "high", notification: {channelId: "kidzone_general"}},
+            data: {type: "user_top_rank", rank: String(position), title: title, body: body},
+            android: {priority: "high"},
           };
 
           try {
@@ -1144,9 +1134,8 @@ export const dailyRankingCheck = onSchedule(
 
             const message: admin.messaging.MulticastMessage = {
               tokens: fcmTokens,
-              notification: {title, body},
-              data: {type: "place_top_rank", placeId: placeId},
-              android: {priority: "high", notification: {channelId: "kidzone_general"}},
+              data: {type: "place_top_rank", placeId: placeId, title: title, body: body},
+              android: {priority: "high"},
             };
 
             try {
