@@ -1193,3 +1193,107 @@ function getPlaceRankTitle(position: number, placeName: string): string {
     default: return `\u{1F3C5} \u201E${placeName}\u201D w TOP 10 miejsc kidZone!`;
   }
 }
+
+
+
+// --- HTTP Endpoint: Jednorazowy backfill geohash na starych dokumentach places ---
+/**
+ * Geohash backfill — przechodzi po wszystkich dokumentach w kolekcji `places`,
+ * sprawdza czy pole `geohash` jest puste/brakujące, i oblicza je z lat/lng.
+ *
+ * Użycie: wywołaj raz przez URL:
+ *   https://us-central1-{projectId}.cloudfunctions.net/backfillGeohash
+ *
+ * Po wykonaniu możesz usunąć tę funkcję z deploymentu.
+ */
+export const backfillGeohash = onRequest(async (req, res) => {
+  const BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
+
+  function encodeGeohash(latitude: number, longitude: number, precision = 7): string {
+    let latMin = -90.0;
+    let latMax = 90.0;
+    let lngMin = -180.0;
+    let lngMax = 180.0;
+    let isLng = true;
+    let bit = 0;
+    let charIndex = 0;
+    let hash = "";
+
+    while (hash.length < precision) {
+      if (isLng) {
+        const mid = (lngMin + lngMax) / 2;
+        if (longitude >= mid) {
+          charIndex = charIndex | (1 << (4 - bit));
+          lngMin = mid;
+        } else {
+          lngMax = mid;
+        }
+      } else {
+        const mid = (latMin + latMax) / 2;
+        if (latitude >= mid) {
+          charIndex = charIndex | (1 << (4 - bit));
+          latMin = mid;
+        } else {
+          latMax = mid;
+        }
+      }
+      isLng = !isLng;
+      bit++;
+      if (bit === 5) {
+        hash += BASE32[charIndex];
+        bit = 0;
+        charIndex = 0;
+      }
+    }
+    return hash;
+  }
+
+  try {
+    const placesSnap = await db.collection("places").get();
+    let updated = 0;
+    let skipped = 0;
+
+    const batch = db.batch();
+    let batchCount = 0;
+
+    for (const doc of placesSnap.docs) {
+      const data = doc.data();
+      const existingGeohash = data.geohash || "";
+
+      if (existingGeohash) {
+        skipped++;
+        continue;
+      }
+
+      const lat = data.latitude;
+      const lng = data.longitude;
+
+      if (typeof lat !== "number" || typeof lng !== "number") {
+        skipped++;
+        continue;
+      }
+
+      const geohash = encodeGeohash(lat, lng);
+      batch.update(doc.ref, {geohash});
+      updated++;
+      batchCount++;
+
+      // Firestore batch limit = 500
+      if (batchCount >= 500) {
+        await batch.commit();
+        batchCount = 0;
+      }
+    }
+
+    if (batchCount > 0) {
+      await batch.commit();
+    }
+
+    const message = `Backfill complete. Updated: ${updated}, Skipped (already had geohash): ${skipped}, Total: ${placesSnap.size}`;
+    console.log(message);
+    res.status(200).send(renderAdminResponse("Backfill Geohash", message));
+  } catch (err) {
+    console.error("Backfill error:", err);
+    res.status(500).send(renderAdminResponse("Błąd", `Backfill failed: ${err}`));
+  }
+});

@@ -280,8 +280,8 @@ fun PlaceDetailsScreen(
                                                 append("\n")
                                                 append(place.address)
                                             }
-                                            append("\n\nhttps://www.google.com/maps/search/?api=1")
-                                            append("&query=${place.latitude},${place.longitude}")
+                                            append("\n\nhttps://playground-705e7162.web.app/place/${place.id}")
+                                            append("?lat=${place.latitude}&lng=${place.longitude}")
                                         }
                                         val intent = Intent(Intent.ACTION_SEND).apply {
                                             type = "text/plain"

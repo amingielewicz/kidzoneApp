@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>kidZone — Mapa miejsc przyjaznych dzieciom</title>
+
+    <!-- Open Graph (preview w messengerach / social media) -->
+    <meta property="og:title" content="kidZone — sprawdź to miejsce!">
+    <meta property="og:description" content="Najlepsze miejsca dla dzieci w Twojej okolicy. Place zabaw, parki, atrakcje.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://playground-705e7162.web.app">
+    <meta property="og:image" content="https://playground-705e7162.web.app/logo.png">
+
+    <!-- Android App Link -->
+    <link rel="alternate" href="android-app://com.kidzone/kidzone/place/">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #E3F2FD 0%, #F5F8FB 50%, #E8F5E9 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            padding: 48px 32px;
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+
+        .logo {
+            width: 180px;
+            height: auto;
+            margin-bottom: 8px;
+        }
+
+        .tagline {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 32px;
+        }
+
+        .message {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .description {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 32px;
+            line-height: 1.5;
+        }
+
+        .buttons {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 16px 40px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+            background: #1E88E5;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(30, 136, 229, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-maps {
+            background: #43A047;
+            padding: 14px 32px;
+            font-size: 14px;
+        }
+
+        .btn-maps:hover {
+            box-shadow: 0 4px 16px rgba(67, 160, 71, 0.4);
+        }
+
+        .footer {
+            margin-top: 24px;
+            font-size: 12px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <img class="logo" src="/logo.png" alt="kidZone logo">
+        <div class="tagline">Mapa miejsc przyjaznych dzieciom</div>
+
+        <div class="message">Ktoś udostępnił Ci miejsce!</div>
+        <div class="description">
+            Otwórz w aplikacji kidZone, aby zobaczyć szczegóły, zdjęcia i opinie innych rodziców.
+        </div>
+
+        <div class="buttons">
+            <a class="btn" id="btn-open" href="#">Otwórz w kidZone</a>
+            <a class="btn btn-maps" id="btn-maps" href="#" style="display:none;">Otwórz w Google Maps</a>
+        </div>
+
+        <div class="footer">
+            Jeśli nie masz aplikacji, zostaniesz przekierowany do Google Play.
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            var path = window.location.pathname;
+            var segments = path.split('/').filter(Boolean);
+            var placeId = '';
+
+            if (segments.length >= 2 && segments[0] === 'place') {
+                placeId = segments[1];
+                if (placeId === 'index.html') placeId = '';
+            }
+
+            var params = new URLSearchParams(window.location.search);
+            if (!placeId) placeId = params.get('id') || '';
+
+            var lat = params.get('lat') || '';
+            var lng = params.get('lng') || '';
+
+            var deepLink = 'kidzone://place/' + (placeId || '');
+            var playStoreUrl = 'https://play.google.com/store/apps/details?id=com.kidzone';
+            var isAndroid = /android/i.test(navigator.userAgent);
+
+            // --- Przycisk Google Maps ---
+            var btnMaps = document.getElementById('btn-maps');
+            if (lat && lng) {
+                btnMaps.href = 'https://www.google.com/maps/search/?api=1&query=' + lat + ',' + lng;
+                btnMaps.style.display = 'inline-block';
+            }
+
+            // --- Przycisk "Otwórz w kidZone" ---
+            // Kliknięcie:
+            //  - Ma apkę → kidzone:// otworzy apkę, strona przejdzie w tło
+            //  - Nie ma apki → kidzone:// nic nie zrobi, po 2s → Play Store
+            var btnOpen = document.getElementById('btn-open');
+            btnOpen.addEventListener('click', function(e) {
+                e.preventDefault();
+
+                if (!isAndroid) {
+                    window.location.href = playStoreUrl;
+                    return;
+                }
+
+                // Próbuj otworzyć apkę przez custom scheme
+                window.location.href = deepLink;
+
+                // Jeśli apka się otworzyła — strona przejdzie w hidden,
+                // więc anulujemy timeout. Jeśli nie — po 2s → Play Store.
+                var fallbackTimeout = setTimeout(function() {
+                    window.location.href = playStoreUrl;
+                }, 2000);
+
+                document.addEventListener('visibilitychange', function handler() {
+                    if (document.hidden) {
+                        clearTimeout(fallbackTimeout);
+                        document.removeEventListener('visibilitychange', handler);
+                    }
+                });
+            });
+
+            // BEZ auto-redirect. User zawsze klika sam.
+        })();
+    </script>
+</body>
+</html>
