@@ -16,6 +16,10 @@
       {
         "source": "/privacy-policy",
         "destination": "/privacy-policy.html"
+      },
+      {
+        "source": "/place/**",
+        "destination": "/place/index.html"
       }
     ]
   },
