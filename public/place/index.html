@@ -162,49 +162,36 @@
             }
 
             // --- Przycisk "Otwórz w kidZone" ---
-            // Kliknięcie = próba otwarcia apki, fallback Play Store
+            // Kliknięcie:
+            //  - Ma apkę → kidzone:// otworzy apkę, strona przejdzie w tło
+            //  - Nie ma apki → kidzone:// nic nie zrobi, po 2s → Play Store
             var btnOpen = document.getElementById('btn-open');
             btnOpen.addEventListener('click', function(e) {
                 e.preventDefault();
+
                 if (!isAndroid) {
                     window.location.href = playStoreUrl;
                     return;
                 }
-                // Spróbuj custom scheme — jeśli apka nie zainstalowana,
-                // po 2s przekieruj do Play Store
-                var hidden = false;
-                var timeout = setTimeout(function() {
-                    if (!hidden) window.location.href = playStoreUrl;
+
+                // Próbuj otworzyć apkę przez custom scheme
+                window.location.href = deepLink;
+
+                // Jeśli apka się otworzyła — strona przejdzie w hidden,
+                // więc anulujemy timeout. Jeśli nie — po 2s → Play Store.
+                var fallbackTimeout = setTimeout(function() {
+                    window.location.href = playStoreUrl;
                 }, 2000);
 
-                document.addEventListener('visibilitychange', function() {
+                document.addEventListener('visibilitychange', function handler() {
                     if (document.hidden) {
-                        hidden = true;
-                        clearTimeout(timeout);
+                        clearTimeout(fallbackTimeout);
+                        document.removeEventListener('visibilitychange', handler);
                     }
                 });
-
-                window.location.href = deepLink;
             });
 
-            // --- Auto-otwarcie apki (jeśli zainstalowana) ---
-            // Na Androidzie: od razu próbujemy deep link.
-            // Jeśli apka jest — strona zniknie (system ją otworzy).
-            // Jeśli apki nie ma — nic się nie stanie, user widzi stronę
-            // i może kliknąć przycisk (→ Play Store) lub Google Maps.
-            if (isAndroid && placeId) {
-                // Ukryty iframe próbuje otworzyć custom scheme
-                // bez przekierowania strony (nie traci kontekstu)
-                var iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                iframe.src = deepLink;
-                document.body.appendChild(iframe);
-
-                // Cleanup po 3s
-                setTimeout(function() {
-                    document.body.removeChild(iframe);
-                }, 3000);
-            }
+            // BEZ auto-redirect. User zawsze klika sam.
         })();
     </script>
 </body>
