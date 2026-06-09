@@ -53,20 +53,20 @@ fun rememberGoogleSignInLauncher(
         val currentActivity = activity
         if (currentActivity == null) {
             onError("Nie udało się uruchomić logowania Google (brak Activity)")
-            return@rememberGoogleSignInLauncher
-        }
-        scope.launch {
-            when (val result = launchGoogleSignIn(currentActivity, webClientId)) {
-                is GoogleSignInResult.Success -> onTokenReceived(result.idToken)
-                is GoogleSignInResult.Cancelled -> { /* user cancelled */ }
-                is GoogleSignInResult.FallbackToLegacy -> {
-                    val intent = buildLegacyGoogleSignInIntent(context, webClientId)
-                    legacyLauncher.launch(intent)
-                }
-                is GoogleSignInResult.Error -> onError(result.message)
-                is GoogleSignInResult.NoMatchingGoogleCredential -> {
-                    val intent = buildLegacyGoogleSignInIntent(context, webClientId)
-                    legacyLauncher.launch(intent)
+        } else {
+            scope.launch {
+                when (val result = launchGoogleSignIn(currentActivity, webClientId)) {
+                    is GoogleSignInResult.Success -> onTokenReceived(result.idToken)
+                    is GoogleSignInResult.Cancelled -> { /* user cancelled */ }
+                    is GoogleSignInResult.FallbackToLegacy -> {
+                        val intent = buildLegacyGoogleSignInIntent(context, webClientId)
+                        legacyLauncher.launch(intent)
+                    }
+                    is GoogleSignInResult.Error -> onError(result.message)
+                    is GoogleSignInResult.NoMatchingGoogleCredential -> {
+                        val intent = buildLegacyGoogleSignInIntent(context, webClientId)
+                        legacyLauncher.launch(intent)
+                    }
                 }
             }
         }
