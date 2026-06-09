@@ -31,8 +31,11 @@ service cloud.firestore {
 
       allow update: if isSignedIn() && (
         resource.data.ownerUserId == request.auth.uid
-        || changedKeys().hasOnly(['averageRating', 'reviewsCount'])
-        || changedKeys().hasOnly(['photoUrls', 'photoUploadedBy'])
+        || (changedKeys().hasOnly(['averageRating', 'reviewsCount'])
+            && request.resource.data.reviewsCount is int
+            && request.resource.data.averageRating is number)
+        || (changedKeys().hasOnly(['photoUrls', 'photoUploadedBy'])
+            && request.resource.data.photoUrls is list)
         || isAdmin()
       );
 
