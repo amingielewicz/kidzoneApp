@@ -145,40 +145,68 @@
                 placeId = params.get('id') || '';
             }
 
-            // Współrzędne GPS z query params (dodawane przez Share intent)
+            // Współrzędne GPS z query params
             var lat = params.get('lat') || '';
             var lng = params.get('lng') || '';
 
-            // Intent URL: próbuje otworzyć apkę, a jak nie ma — fallback do Play Store
+            // Deep link do apki
+            var deepLink = 'kidzone://place/' + (placeId || '');
+            var playStoreUrl = 'https://play.google.com/store/apps/details?id=com.kidzone';
+
+            // Intent URL (działa tylko w Chrome, nie w WebView)
             var intentUrl = 'intent://place/' + (placeId || '')
                 + '#Intent;scheme=kidzone;package=com.kidzone;'
-                + 'S.browser_fallback_url=' + encodeURIComponent(
-                    'https://play.google.com/store/apps/details?id=com.kidzone'
-                ) + ';end';
+                + 'S.browser_fallback_url=' + encodeURIComponent(playStoreUrl)
+                + ';end';
 
-            // Ustaw link przycisku kidZone
+            var isAndroid = /android/i.test(navigator.userAgent);
+            var isChrome = /chrome/i.test(navigator.userAgent) && !/edg/i.test(navigator.userAgent);
+
+            // Próbuj otworzyć apkę, fallback na Play Store
+            function openApp() {
+                if (!isAndroid) {
+                    window.location.href = playStoreUrl;
+                    return;
+                }
+
+                if (isChrome && !(/messenger|fbav|fban|instagram|line|whatsapp/i.test(navigator.userAgent))) {
+                    // Prawdziwy Chrome (nie in-app browser) — intent:// działa
+                    window.location.href = intentUrl;
+                } else {
+                    // WebView (Messenger/FB/Insta/itp.) — timeout strategy:
+                    // Próbuj custom scheme, po 1.5s fallback na Play Store
+                    var start = Date.now();
+                    var timeout = setTimeout(function() {
+                        if (Date.now() - start < 2000) {
+                            window.location.href = playStoreUrl;
+                        }
+                    }, 1500);
+
+                    window.addEventListener('visibilitychange', function() {
+                        if (document.hidden) clearTimeout(timeout);
+                    });
+
+                    window.location.href = deepLink;
+                }
+            }
+
+            // Przycisk kidZone
             var btnOpen = document.getElementById('btn-open');
-            btnOpen.href = intentUrl;
+            btnOpen.addEventListener('click', function(e) {
+                e.preventDefault();
+                openApp();
+            });
 
-            // Przycisk Google Maps (pokaż tylko jeśli mamy współrzędne)
+            // Przycisk Google Maps
             var btnMaps = document.getElementById('btn-maps');
             if (lat && lng) {
-                var mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + lat + ',' + lng;
-                btnMaps.href = mapsUrl;
+                btnMaps.href = 'https://www.google.com/maps/search/?api=1&query=' + lat + ',' + lng;
                 btnMaps.style.display = 'inline-block';
             }
 
-            // Na Androidzie: auto-redirect po 600ms
-            var isAndroid = /android/i.test(navigator.userAgent);
+            // Auto-redirect na Androidzie
             if (isAndroid && placeId) {
-                setTimeout(function() {
-                    window.location.href = intentUrl;
-                }, 600);
-            }
-
-            // Na iOS / desktop: fallback do Play Store
-            if (!isAndroid) {
-                btnOpen.href = 'https://play.google.com/store/apps/details?id=com.kidzone';
+                setTimeout(openApp, 800);
             }
         })();
     </script>
