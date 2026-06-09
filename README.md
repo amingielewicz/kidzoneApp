@@ -510,6 +510,9 @@ przy pierwszym wejściu, `AddPlaceScreen` przy kliknięciu "Pobierz lokalizację
 | Zgłaszanie zdjęcia (dialog + `photo_reports`)        | ✅     |
 | Cloud Function: email admin po zgłoszeniu zdjęcia    | ✅     |
 | Admin: Usuń zdjęcie / Odrzuć zgłoszenie (HTTP endpoints) | ✅ |
+| FCM token registration po zalogowaniu (MainScreen)   | ✅     |
+| POST_NOTIFICATIONS permission request (Android 13+)  | ✅     |
+| Dev versioning: PR number / commit hash (nie "local") | ✅     |
 
 ## Cloud Functions (backend)
 

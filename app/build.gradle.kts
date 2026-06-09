@@ -46,6 +46,12 @@ android {
             // Na branchach dev/feature dodajemy suffix dev#<numerPR>.
             // Np. branch po merge jako PR #63 → "0.1.0-dev#63".
             // Na main (release) zostaje czyste "0.1.0".
+            //
+            // Łańcuch rozwiązywania numeru:
+            //  1. Zmienna środowiskowa PR_NUMBER (ustawiana w CI/CD)
+            //  2. Gradle property -PPR_NUMBER=72 (lokalne override)
+            //  3. Cyfry wyciągnięte z nazwy brancha (np. fix/72-opis → "72")
+            //  4. Skrócony commit hash (7 znaków) jako ostateczny fallback
             val branch = providers.exec {
                 commandLine("git", "rev-parse", "--abbrev-ref", "HEAD")
             }.standardOutput.asText.get().trim()
@@ -53,9 +59,11 @@ android {
                 baseVersion
             } else {
                 val prNumber = System.getenv("PR_NUMBER")
-                    ?: branch.replace(Regex(".*?(\\d+).*"), "$1")
-                        .takeIf { it.all(Char::isDigit) }
-                    ?: "local"
+                    ?: (project.findProperty("PR_NUMBER") as String?)
+                    ?: Regex("\\d+").find(branch)?.value
+                    ?: providers.exec {
+                        commandLine("git", "rev-parse", "--short=7", "HEAD")
+                    }.standardOutput.asText.get().trim()
                 "$baseVersion-dev#$prNumber"
             }
         }
