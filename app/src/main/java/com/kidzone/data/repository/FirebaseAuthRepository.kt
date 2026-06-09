@@ -569,6 +569,26 @@ class FirebaseAuthRepository @Inject constructor(
         OpResult.failure(e)
     }
 
+    override suspend fun revokeBadges(
+        badgeNames: List<String>
+    ): OpResult<Unit> = try {
+        if (badgeNames.isEmpty()) {
+            OpResult.success(Unit)
+        } else {
+            val firebaseUser = firebaseAuth.currentUser
+                ?: throw IllegalStateException("Brak zalogowanego uzytkownika")
+            val docRef = firestore.collection(FirestoreCollections.USERS)
+                .document(firebaseUser.uid)
+            val deletes = badgeNames.associate { name ->
+                "badgeEarnedAt.$name" to com.google.firebase.firestore.FieldValue.delete()
+            }
+            docRef.update(deletes).await()
+            OpResult.success(Unit)
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
     /**
      * Lowercase nazwy użytkownika dla case-insensitive zapytań w Firestore.
      *

@@ -256,8 +256,8 @@ class ProfileViewModel @Inject constructor(
             val data = mapOf(
                 "notificationPreferences" to mapOf(
                     "newReviewOnMyPlace" to prefs.newReviewOnMyPlace,
-                    "newPlaceNearby" to prefs.newPlaceNearby,
-                    "weeklyDigest" to prefs.weeklyDigest
+                    "newBadgeEarned" to prefs.newBadgeEarned,
+                    "newPhotoOnMyPlace" to prefs.newPhotoOnMyPlace
                 )
             )
             try {
@@ -282,8 +282,8 @@ class ProfileViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(notificationPrefs = NotificationPrefs(
                             newReviewOnMyPlace = prefsMap["newReviewOnMyPlace"] ?: true,
-                            newPlaceNearby = prefsMap["newPlaceNearby"] ?: true,
-                            weeklyDigest = prefsMap["weeklyDigest"] ?: true
+                            newBadgeEarned = prefsMap["newBadgeEarned"] ?: true,
+                            newPhotoOnMyPlace = prefsMap["newPhotoOnMyPlace"] ?: true
                         ))
                     }
                 }
@@ -586,10 +586,9 @@ class ProfileViewModel @Inject constructor(
             .toSet()
 
         val newlyEarned = (current - seen)
-            // Stabilna kolejność według enum.ordinal - jeśli user wbił
-            // kilka odznak naraz, pokazujemy je w "logicznej" kolejności
-            // (Pierwszy ślad przed Odkrywca przed Kartograf itd.).
             .sortedBy { it.ordinal }
+
+        val revoked = (seen - current)
 
         if (newlyEarned.isNotEmpty()) {
             _uiState.update { state ->
@@ -597,19 +596,22 @@ class ProfileViewModel @Inject constructor(
                     newlyEarnedBadges = state.newlyEarnedBadges + newlyEarned
                 )
             }
-
-            // Asynchroniczny zapis timestampów do Firestore. Best-effort -
-            // błąd nie blokuje UI ani SharedPreferences (lokalnie i tak
-            // wiemy, że odznakę widzieliśmy). Brak timestampu w Firestore
-            // skutkuje tylko sortem na koniec w `chronologicalOrder`.
             viewModelScope.launch {
                 authRepository.recordBadgesEarned(newlyEarned.map { it.name })
             }
         }
 
-        // Persist aktualny set odznak - również gdy user nic nowego nie
-        // zdobył (idempotent), żeby state SharedPreferences zawsze
-        // odzwierciedlał ostatnio zaobserwowany stan.
+        if (revoked.isNotEmpty()) {
+            _uiState.update { state ->
+                state.copy(
+                    newlyEarnedBadges = state.newlyEarnedBadges.filter { it !in revoked }
+                )
+            }
+            viewModelScope.launch {
+                authRepository.revokeBadges(revoked.map { it.name })
+            }
+        }
+
         if (seen != current) {
             prefs.edit()
                 .putStringSet(key, current.map { it.name }.toSet())

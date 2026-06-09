@@ -907,75 +907,107 @@ export const onReviewCreatedTopRank = onDocumentCreated(
 );
 
 
-// --- Trigger: nowa odznaka zdobyta → push do usera ---
+// --- Trigger: zmiana dokumentu usera → server-side badge computation ---
 import {onDocumentUpdated} from "firebase-functions/v2/firestore";
 
 export const onBadgeEarned = onDocumentUpdated(
-  {
-    document: "users/{userId}",
-  },
+  {document: "users/{userId}"},
   async (event) => {
     const beforeData = event.data?.before?.data();
     const afterData = event.data?.after?.data();
     if (!beforeData || !afterData) return;
 
-    const beforeBadges: Record<string, number> = beforeData.badgeEarnedAt || {};
-    const afterBadges: Record<string, number> = afterData.badgeEarnedAt || {};
-
-    const newBadgeNames = Object.keys(afterBadges).filter(
-      (badge) => !(badge in beforeBadges)
-    );
-    if (newBadgeNames.length === 0) return;
-
     const userId = event.params.userId;
+    const beforePlaces = beforeData.placesAddedCount || 0;
+    const afterPlaces = afterData.placesAddedCount || 0;
+    const beforeReviews = beforeData.reviewsCount || 0;
+    const afterReviews = afterData.reviewsCount || 0;
+    const beforeBadges = beforeData.badgeEarnedAt || {};
+    const afterBadges = afterData.badgeEarnedAt || {};
+
+    const countersChanged = beforePlaces !== afterPlaces || beforeReviews !== afterReviews;
+    const badgesChanged = JSON.stringify(beforeBadges) !== JSON.stringify(afterBadges);
+
+    if (!countersChanged && !badgesChanged) return;
+    if (badgesChanged && !countersChanged) return; // anti-loop
+
+    const deservedBadges = new Set<string>();
+    if (afterPlaces >= 1) deservedBadges.add("FIRST_PLACE");
+    if (afterReviews >= 1) deservedBadges.add("FIRST_REVIEW");
+    if (afterPlaces >= 5) deservedBadges.add("EXPLORER");
+    if (afterPlaces >= 15) deservedBadges.add("CARTOGRAPHER");
+    if (afterPlaces >= 30) deservedBadges.add("PATHFINDER");
+    if (afterReviews >= 10) deservedBadges.add("REVIEWER");
+    if (afterReviews >= 25) deservedBadges.add("CRITIC");
+    if (afterReviews >= 50) deservedBadges.add("SENIOR_REVIEWER");
+    if (afterPlaces >= 5 && afterReviews >= 5) deservedBadges.add("COMMUNITY_PILLAR");
+    if (afterPlaces >= 10 && afterReviews >= 20) deservedBadges.add("FAMILY_EXPERT");
+
+    const currentBadgeNames = new Set(Object.keys(afterBadges));
+    const countBased = [
+      "FIRST_PLACE", "FIRST_REVIEW", "EXPLORER", "CARTOGRAPHER", "PATHFINDER",
+      "REVIEWER", "CRITIC", "SENIOR_REVIEWER", "COMMUNITY_PILLAR", "FAMILY_EXPERT"
+    ];
+
+    const toGrant: string[] = [];
+    for (const badge of deservedBadges) {
+      if (!currentBadgeNames.has(badge)) toGrant.push(badge);
+    }
+    const toRevoke: string[] = [];
+    for (const badge of countBased) {
+      if (currentBadgeNames.has(badge) && !deservedBadges.has(badge)) toRevoke.push(badge);
+    }
+
+    if (toGrant.length === 0 && toRevoke.length === 0) return;
+
+    const updates: Record<string, any> = {};
+    const now = Date.now();
+    for (const badge of toGrant) updates[`badgeEarnedAt.${badge}`] = now;
+    for (const badge of toRevoke) updates[`badgeEarnedAt.${badge}`] = admin.firestore.FieldValue.delete();
+
+    try {
+      await db.collection("users").doc(userId).update(updates);
+    } catch (err) {
+      console.error(`Badge update failed for ${userId}:`, err);
+      return;
+    }
+
     const fcmTokens: string[] = afterData.fcmTokens || [];
     if (fcmTokens.length === 0) return;
-
     const notifPrefs = afterData.notificationPreferences || {};
     if (notifPrefs.newBadgeEarned === false) return;
 
     const badgeLabels: Record<string, string> = {
-      "FIRST_PLACE": "Pierwszy \u015Blad",
-      "FIRST_REVIEW": "Pierwsza opinia",
-      "EXPLORER": "Odkrywca",
-      "CARTOGRAPHER": "Kartograf",
-      "TRACKER": "Tropiciel",
-      "REVIEWER": "Recenzent",
-      "CRITIC": "Krytyk",
-      "SEASONED_REVIEWER": "Wytrawny recenzent",
-      "COMMUNITY_PILLAR": "Filar spo\u0142eczno\u015Bci",
-      "FAMILY_EXPERT": "Ekspert rodzinny",
-      "BRONZE_LEADER": "Br\u0105zowy lider",
-      "SILVER_LEADER": "Srebrny lider",
-      "GOLD_LEADER": "Z\u0142oty lider",
-      "LOCAL_FAVORITE": "Lokalny faworyt",
-      "PLAY_ARCHITECT": "Architekt zabawy",
+      "FIRST_PLACE": "Pierwszy \u015Blad", "FIRST_REVIEW": "Pierwsza opinia",
+      "EXPLORER": "Odkrywca", "CARTOGRAPHER": "Kartograf", "PATHFINDER": "Tropiciel",
+      "REVIEWER": "Recenzent", "CRITIC": "Krytyk", "SENIOR_REVIEWER": "Wytrawny recenzent",
+      "COMMUNITY_PILLAR": "Filar spo\u0142eczno\u015Bci", "FAMILY_EXPERT": "Ekspert rodzinny",
+      "LEADER_BRONZE": "Br\u0105zowy lider", "LEADER_SILVER": "Srebrny lider",
+      "LEADER_GOLD": "Z\u0142oty lider", "PLACE_TOP3": "Lokalny faworyt", "PLACE_TOP1": "Architekt zabawy",
     };
 
-    const badgeNamesHuman = newBadgeNames
-      .map((b) => badgeLabels[b] || b)
-      .join(", ");
-
-    const title = newBadgeNames.length === 1
-      ? `\u{1F3C5} Nowa odznaka: ${badgeNamesHuman}!`
-      : `\u{1F3C5} Nowe odznaki: ${badgeNamesHuman}!`;
+    let title = "";
+    let body = "";
+    if (toGrant.length > 0) {
+      const names = toGrant.map((b) => badgeLabels[b] || b).join(", ");
+      title = toGrant.length === 1 ? `\u{1F3C5} Nowa odznaka: ${names}!` : `\u{1F3C5} Nowe odznaki: ${names}!`;
+      body = "Otw\u00F3rz profil w kidZone, by zobaczy\u0107 swoje osi\u0105gni\u0119cia.";
+    } else {
+      const names = toRevoke.map((b) => badgeLabels[b] || b).join(", ");
+      title = toRevoke.length === 1 ? `Utracona odznaka: ${names}` : `Utracone odznaki: ${names}`;
+      body = "Spe\u0142nij ponownie wymagania, by j\u0105 odzyska\u0107.";
+    }
 
     const message: admin.messaging.MulticastMessage = {
       tokens: fcmTokens,
-      notification: {title, body: "Otw\u00F3rz profil w kidZone, by zobaczy\u0107 swoje osi\u0105gni\u0119cia."},
-      data: {
-        type: "new_badge",
-        badges: newBadgeNames.join(","),
-      },
-      android: {
-        priority: "high",
-        notification: {channelId: "kidzone_general"},
-      },
+      notification: {title, body},
+      data: {type: "new_badge", badges: (toGrant.length > 0 ? toGrant : toRevoke).join(",")},
+      android: {priority: "high", notification: {channelId: "kidzone_general"}},
     };
 
     try {
       const response = await admin.messaging().sendEachForMulticast(message);
-      console.log(`Badge push for user ${userId} (${badgeNamesHuman}): ${response.successCount} ok`);
+      console.log(`Badge push for ${userId}: ${response.successCount} ok`);
       await cleanStaleTokens(response, fcmTokens, userId);
     } catch (err) {
       console.error("Badge push error:", err);
@@ -984,7 +1016,62 @@ export const onBadgeEarned = onDocumentUpdated(
 );
 
 
-// --- Helper: usuwanie stale tokenów po wysyłce ---
+// --- Trigger: ktos dodal zdjecie do Twojego miejsca ---
+export const onPhotoAddedToPlace = onDocumentUpdated(
+  {document: "places/{placeId}"},
+  async (event) => {
+    const beforeData = event.data?.before?.data();
+    const afterData = event.data?.after?.data();
+    if (!beforeData || !afterData) return;
+
+    const beforePhotos: string[] = beforeData.photoUrls || [];
+    const afterPhotos: string[] = afterData.photoUrls || [];
+    if (afterPhotos.length <= beforePhotos.length) return;
+
+    const ownerUserId = afterData.ownerUserId || "";
+    if (!ownerUserId) return;
+
+    const afterUploaders: Record<string, string> = afterData.photoUploadedBy || {};
+    const newPhotos = afterPhotos.filter((url: string) => !beforePhotos.includes(url));
+    if (newPhotos.length === 0) return;
+
+    const uploaderIds = newPhotos.map((url: string) => afterUploaders[url] || "");
+    if (uploaderIds.every((uid: string) => uid === ownerUserId)) return;
+
+    const placeName = afterData.name || "Twoje miejsce";
+    const placeId = event.params.placeId;
+
+    const ownerDoc = await db.collection("users").doc(ownerUserId).get();
+    if (!ownerDoc.exists) return;
+    const ownerData = ownerDoc.data();
+    const fcmTokens: string[] = ownerData?.fcmTokens || [];
+    if (fcmTokens.length === 0) return;
+
+    const notifPrefs = ownerData?.notificationPreferences || {};
+    if (notifPrefs.newPhotoOnMyPlace === false) return;
+
+    const message: admin.messaging.MulticastMessage = {
+      tokens: fcmTokens,
+      notification: {
+        title: `\u{1F4F7} Nowe zdj\u0119cie do \u201E${placeName}\u201D`,
+        body: "Kto\u015B doda\u0142 zdj\u0119cie do Twojego miejsca. Sprawd\u017A!",
+      },
+      data: {type: "new_review", placeId: placeId},
+      android: {priority: "high", notification: {channelId: "kidzone_general"}},
+    };
+
+    try {
+      const response = await admin.messaging().sendEachForMulticast(message);
+      console.log(`Photo push for place ${placeId}: ${response.successCount} ok`);
+      await cleanStaleTokens(response, fcmTokens, ownerUserId);
+    } catch (err) {
+      console.error("Photo push error:", err);
+    }
+  }
+);
+
+
+// --- Helper: usuwanie stale tokenow ---
 async function cleanStaleTokens(
   response: admin.messaging.BatchResponse,
   tokens: string[],
@@ -1006,6 +1093,5 @@ async function cleanStaleTokens(
     await db.collection("users").doc(userId).update({
       fcmTokens: admin.firestore.FieldValue.arrayRemove(...tokensToRemove),
     });
-    console.log(`Removed ${tokensToRemove.length} stale tokens for user ${userId}`);
   }
 }

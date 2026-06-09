@@ -290,7 +290,11 @@ class FirestorePlaceRepository @Inject constructor(
     }
 
     override suspend fun deletePlace(placeId: String): OpResult<Unit> = try {
-        require(placeId.isNotBlank()) { "placeId nie może być puste" }
+        require(placeId.isNotBlank()) { "placeId nie moze byc puste" }
+
+        val placeDoc = placesCollection().document(placeId).get().await()
+        val ownerUserId = placeDoc.getString("ownerUserId").orEmpty()
+
         val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
             placesCollection().document(placeId).delete().await()
             true
@@ -298,11 +302,18 @@ class FirestorePlaceRepository @Inject constructor(
         if (completed == null) {
             OpResult.failure(
                 java.util.concurrent.TimeoutException(
-                    "Usunięcie trwa zbyt długo. Sprawdź połączenie z Internetem."
+                    "Usuni\u0119cie trwa zbyt d\u0142ugo. Sprawd\u017A po\u0142\u0105czenie z Internetem."
                 )
             )
         } else {
-            // Usuń z cache.
+            if (ownerUserId.isNotBlank()) {
+                try {
+                    firestore.collection(FirestoreCollections.USERS)
+                        .document(ownerUserId)
+                        .update("placesAddedCount", FieldValue.increment(-1))
+                        .await()
+                } catch (_: Exception) { /* best-effort */ }
+            }
             placeDao.deleteById(placeId)
             OpResult.success(Unit)
         }
