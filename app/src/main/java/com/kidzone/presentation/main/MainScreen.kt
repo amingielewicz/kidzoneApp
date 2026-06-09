@@ -94,11 +94,37 @@ fun MainScreen(
     val context = LocalContext.current
     val networkStatus by rememberNetworkStatus()
 
+    // --- POST_NOTIFICATIONS permission (Android 13+) ---
+    // Wymuszamy prośbę o uprawnienie na powiadomienia przy pierwszym wejściu
+    // do MainScreen (user jest zalogowany). Bez tego uprawnienia FCM push
+    // nie wyświetli się na Android 13+.
+    val notificationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { /* granted or denied — nie blokujemy UX */ }
+
+    LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            val permission = android.Manifest.permission.POST_NOTIFICATIONS
+            val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, permission
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                notificationPermissionLauncher.launch(permission)
+            }
+        }
+    }
+
     // Lokalny stan przekazywany dalej do MapScreen. Trzymamy go obok sygnału
     // z parent NavGraph, bo `onFocusConsumed()` od razu wyczyści savedStateHandle,
     // a my chcemy, by MapScreen otrzymał współrzędne i sam je skonsumował, gdy
     // zakończy animację kamery.
     var pendingMapFocus by remember { mutableStateOf<LatLng?>(null) }
+
+    // Rejestruj FCM token po zalogowaniu – Application.onCreate() może
+    // nie mieć uid (cold start bez sesji). Tu user jest na pewno zalogowany.
+    LaunchedEffect(Unit) {
+        com.kidzone.messaging.KidZoneMessagingService.registerCurrentToken(context)
+    }
 
     LaunchedEffect(focusLatitude, focusLongitude) {
         if (focusLatitude != null && focusLongitude != null) {
