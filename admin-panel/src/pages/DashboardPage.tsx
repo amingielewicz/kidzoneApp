@@ -131,8 +131,8 @@ export function DashboardPage() {
       {/* Stats cards */}
       <Grid container spacing={3} mb={4}>
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #1976D2' }}>
-            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Card sx={{ borderLeft: '4px solid #1976D2', height: '100%' }}>
+            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, height: '100%' }}>
               <PlaceIcon sx={{ fontSize: 36, color: '#1976D2' }} />
               <Box>
                 <Typography variant="h5" fontWeight={700}>{stats.places}</Typography>
@@ -142,8 +142,8 @@ export function DashboardPage() {
           </Card>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #388E3C' }}>
-            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Card sx={{ borderLeft: '4px solid #388E3C', height: '100%' }}>
+            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, height: '100%' }}>
               <ReviewsIcon sx={{ fontSize: 36, color: '#388E3C' }} />
               <Box>
                 <Typography variant="h5" fontWeight={700}>{stats.reviews}</Typography>
@@ -153,8 +153,8 @@ export function DashboardPage() {
           </Card>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #7B1FA2' }}>
-            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Card sx={{ borderLeft: '4px solid #7B1FA2', height: '100%' }}>
+            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, height: '100%' }}>
               <PeopleIcon sx={{ fontSize: 36, color: '#7B1FA2' }} />
               <Box>
                 <Typography variant="h5" fontWeight={700}>{stats.users}</Typography>
@@ -164,8 +164,8 @@ export function DashboardPage() {
           </Card>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #D32F2F' }}>
-            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Card sx={{ borderLeft: '4px solid #D32F2F', height: '100%' }}>
+            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, height: '100%' }}>
               <ReportIcon sx={{ fontSize: 36, color: '#D32F2F' }} />
               <Box>
                 <Typography variant="h5" fontWeight={700}>{stats.pendingReports}</Typography>
