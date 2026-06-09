@@ -780,7 +780,9 @@ export function PlacesPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeletePhotoDialogOpen(false)}>Anuluj</Button>
-          <Button variant="contained" color="error" disabled={!deletePhotoReason.trim()} onClick={handleDeletePhoto}>Usuń</Button>
+          <Button variant="contained" color="error" disabled={!deletePhotoReason.trim() || saving} onClick={async () => { setSaving(true); await handleDeletePhoto(); setSaving(false); }}>
+            {saving ? <CircularProgress size={20} color="inherit" /> : 'Usuń'}
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -804,7 +806,9 @@ export function PlacesPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)}>Anuluj</Button>
-          <Button variant="contained" color="error" disabled={!deleteReason.trim()} onClick={handleDelete}>Usuń</Button>
+          <Button variant="contained" color="error" disabled={!deleteReason.trim() || saving} onClick={async () => { setSaving(true); await handleDelete(); setSaving(false); }}>
+            {saving ? <CircularProgress size={20} color="inherit" /> : 'Usuń'}
+          </Button>
         </DialogActions>
       </Dialog>
 

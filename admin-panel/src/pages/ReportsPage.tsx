@@ -112,6 +112,7 @@ export function ReportsPage() {
   const confirmActionRef = useRef<(() => Promise<void>) | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{open: boolean; title: string; action: (reason: string) => Promise<void>}>({open: false, title: '', action: async () => {}});
   const [deleteReason, setDeleteReason] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   function confirm(title: string, action: () => Promise<void>) {
     confirmActionRef.current = action;
@@ -604,7 +605,9 @@ export function ReportsPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialog(prev => ({...prev, open: false}))}>Anuluj</Button>
-          <Button variant="contained" color="error" disabled={!deleteReason.trim()} onClick={async () => { await deleteDialog.action(deleteReason); setDeleteDialog(prev => ({...prev, open: false})); }}>Usuń</Button>
+          <Button variant="contained" color="error" disabled={!deleteReason.trim() || deleting} onClick={async () => { setDeleting(true); await deleteDialog.action(deleteReason); setDeleting(false); setDeleteDialog(prev => ({...prev, open: false})); }}>
+            {deleting ? <CircularProgress size={20} color="inherit" /> : 'Usuń'}
+          </Button>
         </DialogActions>
       </Dialog>
 

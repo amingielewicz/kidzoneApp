@@ -309,7 +309,7 @@ export function UsersPage() {
                   <Box display="flex" alignItems="center" gap={1}>
                     <Avatar src={(user as any).avatarUrl} sx={{ width: 32, height: 32, fontSize: 14 }}>{user.name?.charAt(0) || '?'}</Avatar>
                     <Box>
-                      <Typography variant="body2" fontWeight={500}>{user.name || '(bez nazwy)'}{isCurrentUser(user) && <Chip label="Ty" size="small" color="info" sx={{ ml: 1 }} />}</Typography>
+                      <Typography variant="body2" component="span" fontWeight={500}>{user.name || '(bez nazwy)'}</Typography>{isCurrentUser(user) && <Chip label="Ty" size="small" color="info" sx={{ ml: 1 }} />}
                       <Box display="flex" alignItems="center" gap={0.5}>
                         <Tooltip title={user.id}><Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: 11 }}>{user.id.slice(0, 12)}...</Typography></Tooltip>
                         <Tooltip title="Kopiuj UID"><IconButton size="small" onClick={() => navigator.clipboard.writeText(user.id)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
@@ -443,7 +443,9 @@ export function UsersPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteUserDialogOpen(false)}>Anuluj</Button>
-          <Button variant="contained" color="error" disabled={!deleteUserReason.trim()} onClick={handleDeleteUser}>Usuń</Button>
+          <Button variant="contained" color="error" disabled={!deleteUserReason.trim() || saving} onClick={async () => { setSaving(true); await handleDeleteUser(); setSaving(false); }}>
+            {saving ? <CircularProgress size={20} color="inherit" /> : 'Usuń'}
+          </Button>
         </DialogActions>
       </Dialog>
 
