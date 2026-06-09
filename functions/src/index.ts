@@ -8,6 +8,44 @@ admin.initializeApp();
 
 const db = admin.firestore();
 
+/**
+ * Weryfikuje czy request pochodzi od zalogowanego admina.
+ * Zwraca UID admina lub null (+ wysyła error response).
+ */
+async function verifyAdminRequest(
+  req: any,
+  res: any
+): Promise<string | null> {
+  const authHeader = req.headers.authorization || '';
+  if (!authHeader.startsWith('Bearer ')) {
+    res.status(401).send(renderAdminResponse('Brak autoryzacji', 'Wymagany token w nagłówku Authorization.'));
+    return null;
+  }
+  const idToken = authHeader.split('Bearer ')[1];
+  try {
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const uid = decoded.uid;
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists || userDoc.data()?.role !== 'admin') {
+      res.status(403).send(renderAdminResponse('Brak uprawnień', 'Tylko administrator może wykonać tę akcję.'));
+      return null;
+    }
+    return uid;
+  } catch (err) {
+    res.status(401).send(renderAdminResponse('Nieprawidłowy token', 'Token wygasł lub jest nieprawidłowy.'));
+    return null;
+  }
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 const gmailEmail = defineSecret("GMAIL_EMAIL");
 const gmailPassword = defineSecret("GMAIL_PASSWORD");
 const adminEmail = defineSecret("ADMIN_EMAIL");
@@ -570,6 +608,9 @@ export const onUserDeleted = onDocumentDeleted(
 export const adminDeleteReview = onRequest(
   {secrets: [gmailEmail, gmailPassword], cors: true},
   async (req, res) => {
+    const adminUid = await verifyAdminRequest(req, res);
+    if (!adminUid) return;
+
     const reviewId = req.query.reviewId as string;
     const reason = req.query.reason as string || "Naruszenie regulaminu";
 
@@ -640,7 +681,7 @@ export const adminDeleteReview = onRequest(
           <table>
             <tr><td>Treść opinii:</td><td>${reviewComment}</td></tr>
             <tr><td>Ocena:</td><td>${"★".repeat(reviewRating)}${"☆".repeat(5 - reviewRating)} (${reviewRating}/5)</td></tr>
-            <tr><td>Powód usunięcia:</td><td>${reason}</td></tr>
+            <tr><td>Powód usunięcia:</td><td>${escapeHtml(reason)}</td></tr>
           </table>
           <p>Jeśli uważasz, że to pomyłka, skontaktuj się z nami odpowiadając na ten email.</p>
         `);
@@ -668,6 +709,9 @@ export const adminDeleteReview = onRequest(
 export const adminDeletePlace = onRequest(
   {secrets: [gmailEmail, gmailPassword], cors: true},
   async (req, res) => {
+    const adminUid = await verifyAdminRequest(req, res);
+    if (!adminUid) return;
+
     const placeId = req.query.placeId as string;
     const reason = req.query.reason as string || "Naruszenie regulaminu";
 
@@ -715,7 +759,7 @@ export const adminDeletePlace = onRequest(
           <p>Twoje miejsce <strong>${placeName}</strong> w aplikacji kidZone zostało usunięte przez administratora.</p>
           <table>
             <tr><td>Nazwa miejsca:</td><td>${placeName}</td></tr>
-            <tr><td>Powód usunięcia:</td><td>${reason}</td></tr>
+            <tr><td>Powód usunięcia:</td><td>${escapeHtml(reason)}</td></tr>
           </table>
           <p>Jeśli uważasz, że to pomyłka, skontaktuj się z nami odpowiadając na ten email.</p>
         `);
@@ -744,6 +788,9 @@ export const adminDeletePlace = onRequest(
 export const adminDeletePhoto = onRequest(
   {secrets: [gmailEmail, gmailPassword, adminEmail], cors: true},
   async (req, res) => {
+    const adminUid = await verifyAdminRequest(req, res);
+    if (!adminUid) return;
+
     const reportId = req.query.reportId as string;
     const reason = req.query.reason as string || "Naruszenie regulaminu";
     if (!reportId) {
@@ -838,7 +885,7 @@ export const adminDeletePhoto = onRequest(
               <p>Cześć, ${uploaderName}.</p>
               <p>Twoje zdjęcie w aplikacji kidZone zostało usunięte przez administratora.</p>
               <table>
-                <tr><td>Powód usunięcia:</td><td>${reason}</td></tr>
+                <tr><td>Powód usunięcia:</td><td>${escapeHtml(reason)}</td></tr>
               </table>
               <p>Jeśli uważasz, że to pomyłka, skontaktuj się z nami odpowiadając na ten email.</p>
             `);
@@ -869,6 +916,9 @@ export const adminDeletePhoto = onRequest(
 export const adminDismissPhotoReport = onRequest(
   {secrets: [gmailEmail, gmailPassword, adminEmail], cors: true},
   async (req, res) => {
+    const adminUid = await verifyAdminRequest(req, res);
+    if (!adminUid) return;
+
     const reportId = req.query.reportId as string;
     if (!reportId) {
       res.status(400).send(renderAdminResponse("Błąd", "Brak reportId w żądaniu."));
@@ -1611,6 +1661,9 @@ export const onUserBanned = onDocumentUpdated(
 export const adminDeleteUser = onRequest(
   {secrets: [gmailEmail, gmailPassword], cors: true},
   async (req, res) => {
+    const adminUid = await verifyAdminRequest(req, res);
+    if (!adminUid) return;
+
     const userId = req.query.userId as string;
     const reason = req.query.reason as string || "Naruszenie regulaminu";
 
@@ -1644,7 +1697,7 @@ export const adminDeleteUser = onRequest(
           <p>Cześć, ${userName}.</p>
           <p>Twoje konto w kidZone zostało usunięte przez administratora.</p>
           <table>
-            <tr><td>Powód:</td><td>${reason}</td></tr>
+            <tr><td>Powód:</td><td>${escapeHtml(reason)}</td></tr>
           </table>
           <p>Jeśli uważasz, że to pomyłka, skontaktuj się z nami odpowiadając na ten email.</p>
         `);
@@ -1672,6 +1725,9 @@ export const adminDeleteUser = onRequest(
 export const adminDeletePhotoFromPlace = onRequest(
   {secrets: [gmailEmail, gmailPassword], cors: true},
   async (req, res) => {
+    const adminUid = await verifyAdminRequest(req, res);
+    if (!adminUid) return;
+
     const placeId = req.query.placeId as string;
     const photoUrl = req.query.photoUrl as string;
     const reason = req.query.reason as string || "Naruszenie regulaminu";
@@ -1724,7 +1780,7 @@ export const adminDeletePhotoFromPlace = onRequest(
               <p>Cześć, ${userName}.</p>
               <p>Twoje zdjęcie dodane do miejsca <strong>${placeName}</strong> zostało usunięte przez administratora.</p>
               <table>
-                <tr><td>Powód:</td><td>${reason}</td></tr>
+                <tr><td>Powód:</td><td>${escapeHtml(reason)}</td></tr>
               </table>
               <p>Jeśli uważasz, że to pomyłka, skontaktuj się z nami odpowiadając na ten email.</p>
             `);
