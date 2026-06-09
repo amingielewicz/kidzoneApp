@@ -357,7 +357,7 @@ export function ReportsPage() {
                   <TableCell><Typography variant="body2" fontWeight={500}>{placeNames[report.placeId] || '—'}</Typography></TableCell>
                   <TableCell>
                     <Box display="flex" alignItems="center" gap={0.5}>
-                      <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 11 }}>{report.placeId}</Typography>
+                      <Tooltip title={report.placeId}><Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 11 }}>{report.placeId.slice(0, 12)}...</Typography></Tooltip>
                       <Tooltip title="Kopiuj ID"><IconButton size="small" onClick={() => copyToClipboard(report.placeId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
                     </Box>
                   </TableCell>
@@ -406,7 +406,7 @@ export function ReportsPage() {
                   <TableCell>{formatDate(report.createdAtMillis)}</TableCell>
                   <TableCell>
                     <Box display="flex" alignItems="center" gap={0.5}>
-                      <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 11 }}>{report.reviewId}</Typography>
+                      <Tooltip title={report.reviewId}><Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 11 }}>{report.reviewId.slice(0, 12)}...</Typography></Tooltip>
                       <Tooltip title="Kopiuj ID"><IconButton size="small" onClick={() => copyToClipboard(report.reviewId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
                     </Box>
                   </TableCell>

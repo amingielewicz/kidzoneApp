@@ -335,7 +335,7 @@ export function ChangeRequestsPage() {
                 </TableCell>
                 <TableCell>
                   <Box display="flex" alignItems="center" gap={0.5}>
-                    <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 11 }}>{request.placeId}</Typography>
+                    <Tooltip title={request.placeId}><Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 11 }}>{request.placeId.slice(0, 12)}...</Typography></Tooltip>
                     <Tooltip title="Kopiuj ID"><IconButton size="small" onClick={() => navigator.clipboard.writeText(request.placeId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
                   </Box>
                 </TableCell>

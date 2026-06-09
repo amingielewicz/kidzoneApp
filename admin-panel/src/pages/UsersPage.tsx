@@ -291,7 +291,7 @@ export function UsersPage() {
                     <Box>
                       <Typography variant="body2" fontWeight={500}>{user.name || '(bez nazwy)'}{isCurrentUser(user) && <Chip label="Ty" size="small" color="info" sx={{ ml: 1 }} />}</Typography>
                       <Box display="flex" alignItems="center" gap={0.5}>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: 11 }}>{user.id}</Typography>
+                        <Tooltip title={user.id}><Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: 11 }}>{user.id.slice(0, 12)}...</Typography></Tooltip>
                         <Tooltip title="Kopiuj UID"><IconButton size="small" onClick={() => navigator.clipboard.writeText(user.id)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
                       </Box>
                     </Box>
