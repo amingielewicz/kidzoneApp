@@ -296,18 +296,16 @@ private fun ProfileContent(
 
         item { BadgesCard(obtainedBadges = obtainedBadges, onOpenInfo = onOpenBadgesInfo) }
 
-        // Sekcja "Konto i bezpieczeństwo" tylko dla email/password user.
-        // Dla Google sign-in zmiana hasła jest po stronie Google,
-        // a usunięcie konta wymaga reauth przez ponowne logowanie Google,
-        // czego MVP nie obsługuje – zostawiamy info w polityce prywatności.
-        if (signInProvider == SignInProvider.EMAIL_PASSWORD) {
-            item {
-                AccountSecurityCard(
-                    onChangePassword = onChangePassword,
-                    onChangeEmail = onChangeEmail,
-                    onDeleteAccount = onDeleteAccount
-                )
-            }
+        // Sekcja "Konto i bezpieczeństwo":
+        // - Email/password: zmiana hasła, zmiana e-maila, usunięcie konta
+        // - Google: tylko usunięcie konta (hasło/email zarządzane przez Google)
+        item {
+            AccountSecurityCard(
+                showPasswordAndEmail = signInProvider == SignInProvider.EMAIL_PASSWORD,
+                onChangePassword = onChangePassword,
+                onChangeEmail = onChangeEmail,
+                onDeleteAccount = onDeleteAccount
+            )
         }
 
         item {
@@ -785,23 +783,26 @@ private fun BadgeEarnedDialog(
 
 @Composable
 private fun AccountSecurityCard(
+    showPasswordAndEmail: Boolean = true,
     onChangePassword: () -> Unit,
     onChangeEmail: () -> Unit,
     onDeleteAccount: () -> Unit
 ) {
     SectionCard(title = "Konto i bezpieczeństwo") {
-        NavRow(
-            icon = Icons.Filled.Lock,
-            label = "Zmień hasło",
-            onClick = onChangePassword
-        )
-        Spacer(Modifier.height(4.dp))
-        NavRow(
-            icon = Icons.Filled.AlternateEmail,
-            label = "Zmień adres e-mail",
-            onClick = onChangeEmail
-        )
-        Spacer(Modifier.height(4.dp))
+        if (showPasswordAndEmail) {
+            NavRow(
+                icon = Icons.Filled.Lock,
+                label = "Zmień hasło",
+                onClick = onChangePassword
+            )
+            Spacer(Modifier.height(4.dp))
+            NavRow(
+                icon = Icons.Filled.AlternateEmail,
+                label = "Zmień adres e-mail",
+                onClick = onChangeEmail
+            )
+            Spacer(Modifier.height(4.dp))
+        }
         // "Usuń konto" jest celowo wyróżnione kolorem error – działanie
         // nieodwracalne, użytkownik powinien świadomie się zatrzymać przed
         // kliknięciem. Konsekwencje pokażemy w dialogu potwierdzenia.

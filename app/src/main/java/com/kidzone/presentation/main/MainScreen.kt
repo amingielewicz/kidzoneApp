@@ -94,22 +94,54 @@ fun MainScreen(
     val context = LocalContext.current
     val networkStatus by rememberNetworkStatus()
 
-    // --- POST_NOTIFICATIONS permission (Android 13+) ---
-    // Wymuszamy prośbę o uprawnienie na powiadomienia przy pierwszym wejściu
-    // do MainScreen (user jest zalogowany). Bez tego uprawnienia FCM push
-    // nie wyświetli się na Android 13+.
+    // --- Uprawnienia: POST_NOTIFICATIONS + ACCESS_FINE_LOCATION ---
+    // Wymuszamy oba uprawnienia po kolei przy pierwszym wejściu do MainScreen.
+    // Notification → Location (sekwencyjnie, żeby system dialogi nie walczyły).
+
+    val locationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { /* granted or denied — MapScreen zareaguje sam */ }
+
     val notificationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
-    ) { /* granted or denied — nie blokujemy UX */ }
+    ) { _ ->
+        // Po zakończeniu dialogu powiadomień → od razu prosimy o lokalizację
+        val locPermission = android.Manifest.permission.ACCESS_FINE_LOCATION
+        val locGranted = androidx.core.content.ContextCompat.checkSelfPermission(
+            context, locPermission
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (!locGranted) {
+            locationPermissionLauncher.launch(locPermission)
+        }
+    }
 
     LaunchedEffect(Unit) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            val permission = android.Manifest.permission.POST_NOTIFICATIONS
-            val granted = androidx.core.content.ContextCompat.checkSelfPermission(
-                context, permission
+            val notifPermission = android.Manifest.permission.POST_NOTIFICATIONS
+            val notifGranted = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, notifPermission
             ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            if (!granted) {
-                notificationPermissionLauncher.launch(permission)
+            if (!notifGranted) {
+                notificationPermissionLauncher.launch(notifPermission)
+            } else {
+                // Powiadomienia już nadane → proś od razu o lokalizację
+                val locPermission = android.Manifest.permission.ACCESS_FINE_LOCATION
+                val locGranted = androidx.core.content.ContextCompat.checkSelfPermission(
+                    context, locPermission
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                if (!locGranted) {
+                    locationPermissionLauncher.launch(locPermission)
+                }
+            }
+        } else {
+            // Android < 13: powiadomienia nie wymagają runtime permission,
+            // ale lokalizacja dalej wymaga.
+            val locPermission = android.Manifest.permission.ACCESS_FINE_LOCATION
+            val locGranted = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, locPermission
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!locGranted) {
+                locationPermissionLauncher.launch(locPermission)
             }
         }
     }
