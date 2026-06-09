@@ -69,21 +69,21 @@ private val onboardingPages = listOf(
         icon = Icons.Default.ChildCare,
         iconTint = BrandBlue,
         title = "Witaj w kidZone!",
-        description = "Znajdz najlepsze miejsca dla dzieci w Twojej okolicy. Place zabaw, parki, atrakcje – wszystko w jednym miejscu.",
+        description = "Znajdź najlepsze miejsca dla dzieci w Twojej okolicy. Place zabaw, parki, atrakcje \u2013 wszystko w jednym miejscu.",
         backgroundColor = Color(0xFFE3F2FD) // light blue tint
     ),
     OnboardingPage(
         icon = Icons.Default.Map,
         iconTint = BrandGreen,
         title = "Odkrywaj na mapie",
-        description = "Przegladaj miejsca na interaktywnej mapie. Filtruj po kategorii, odleglosci i ocenach innych rodzicow.",
+        description = "Przeglądaj miejsca na interaktywnej mapie. Filtruj po kategorii, odległości i ocenach innych rodziców.",
         backgroundColor = Color(0xFFE8F5E9) // light green tint
     ),
     OnboardingPage(
         icon = Icons.Filled.RateReview,
         iconTint = BrandYellow,
-        title = "Dziel sie opiniami",
-        description = "Dodawaj miejsca, wystawiaj opinie i pomagaj innym rodzicom w wyborze. Zdobywaj odznaki za aktywnosc!",
+        title = "Dziel się opiniami",
+        description = "Dodawaj miejsca, wystawiaj opinie i pomagaj innym rodzicom w wyborze. Zdobywaj odznaki za aktywność!",
         backgroundColor = Color(0xFFFFF8E1) // light yellow tint
     )
 )
@@ -125,7 +125,8 @@ fun OnboardingScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 32.dp),
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 48.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Dot indicators
@@ -197,7 +198,7 @@ fun OnboardingScreen(
                     onComplete()
                 }) {
                     Text(
-                        text = "Pomin",
+                        text = "Pomiń",
                         fontFamily = Poppins,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -251,7 +252,9 @@ private fun OnboardingPageContent(page: OnboardingPage) {
 
         Text(
             text = page.description,
-            style = MaterialTheme.typography.bodyLarge,
+            fontFamily = Poppins,
+            fontWeight = FontWeight.Normal,
+            fontSize = 16.sp,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f),
             lineHeight = 24.sp
