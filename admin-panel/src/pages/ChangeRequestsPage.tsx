@@ -315,7 +315,7 @@ export function ChangeRequestsPage() {
                   Typ
                 </TableSortLabel>
               </TableCell>
-              <TableCell sx={{ minWidth: 220 }}>Place ID</TableCell>
+              <TableCell>Place ID</TableCell>
               <TableCell>Zmiany</TableCell>
               <TableCell sx={{ width: 110 }}>Status</TableCell>
               <TableCell sx={{ width: 100 }}>Akcje</TableCell>
@@ -333,7 +333,7 @@ export function ChangeRequestsPage() {
                     color={request.type === 'LOCATION' ? 'info' : 'secondary'}
                   />
                 </TableCell>
-                <TableCell sx={{ minWidth: 220 }}>
+                <TableCell>
                   <Box display="flex" alignItems="center" gap={0.5}>
                     <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 11 }}>{request.placeId}</Typography>
                     <Tooltip title="Kopiuj ID"><IconButton size="small" onClick={() => navigator.clipboard.writeText(request.placeId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>

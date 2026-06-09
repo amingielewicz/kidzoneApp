@@ -190,12 +190,10 @@ export function ReportsPage() {
     await resolveReport('place_reports', report.id);
   }
 
-  async function resolveAndDeleteReview(report: ReviewReport) {
-    const reviewRef = doc(db, 'reviews', report.reviewId);
-    const reviewSnap = await getDoc(reviewRef);
-    if (reviewSnap.exists()) {
-      await deleteDoc(reviewRef);
-    }
+  async function resolveAndDeleteReview(report: ReviewReport, reason: string) {
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
+    const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeleteReview?reviewId=${report.reviewId}&reason=${encodeURIComponent(reason)}`;
+    try { await fetch(url); } catch (e) { console.error('Failed to delete review:', e); }
     await resolveReport('review_reports', report.id);
   }
 
@@ -345,7 +343,7 @@ export function ReportsPage() {
               <TableRow>
                 <TableCell sx={{ width: 100 }}><TableSortLabel active direction={sortDir} onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}>Data</TableSortLabel></TableCell>
                 <TableCell sx={{ width: 150 }}>Nazwa miejsca</TableCell>
-                <TableCell sx={{ minWidth: 220 }}>Place ID</TableCell>
+                <TableCell>Place ID</TableCell>
                 <TableCell sx={{ width: 160 }}>Powód</TableCell>
                 <TableCell>Komentarz</TableCell>
                 <TableCell sx={{ width: 110 }}>Status</TableCell>
@@ -357,7 +355,7 @@ export function ReportsPage() {
                 <TableRow key={report.id} hover>
                   <TableCell>{formatDate(report.createdAtMillis)}</TableCell>
                   <TableCell><Typography variant="body2" fontWeight={500}>{placeNames[report.placeId] || '—'}</Typography></TableCell>
-                  <TableCell sx={{ minWidth: 220 }}>
+                  <TableCell>
                     <Box display="flex" alignItems="center" gap={0.5}>
                       <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 11 }}>{report.placeId}</Typography>
                       <Tooltip title="Kopiuj ID"><IconButton size="small" onClick={() => copyToClipboard(report.placeId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
@@ -395,7 +393,7 @@ export function ReportsPage() {
             <TableHead>
               <TableRow>
                 <TableCell sx={{ width: 140 }}><TableSortLabel active direction={sortDir} onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}>Data</TableSortLabel></TableCell>
-                <TableCell sx={{ minWidth: 220 }}>Review ID</TableCell>
+                <TableCell>Review ID</TableCell>
                 <TableCell sx={{ width: 180 }}>Powód</TableCell>
                 <TableCell>Komentarz</TableCell>
                 <TableCell sx={{ width: 110 }}>Status</TableCell>
@@ -406,7 +404,7 @@ export function ReportsPage() {
               {filteredReviewReports.map((report) => (
                 <TableRow key={report.id} hover>
                   <TableCell>{formatDate(report.createdAtMillis)}</TableCell>
-                  <TableCell sx={{ minWidth: 220 }}>
+                  <TableCell>
                     <Box display="flex" alignItems="center" gap={0.5}>
                       <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 11 }}>{report.reviewId}</Typography>
                       <Tooltip title="Kopiuj ID"><IconButton size="small" onClick={() => copyToClipboard(report.reviewId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
@@ -422,7 +420,7 @@ export function ReportsPage() {
                       <Tooltip title="Szczegóły"><IconButton size="small" onClick={() => openDetailReviewReport(report)}><VisibilityIcon /></IconButton></Tooltip>
                       {report.status === 'pending' && (
                         <Box display="flex" flexDirection="column">
-                          <Tooltip title="Usuń opinię"><IconButton color="error" size="small" onClick={() => confirm('Usunąć opinię?', () => resolveAndDeleteReview(report))}><DeleteIcon /></IconButton></Tooltip>
+                          <Tooltip title="Usuń opinię"><IconButton color="error" size="small" onClick={() => { setDeleteReason(''); setDeleteDialog({ open: true, title: 'Podaj powód usunięcia opinii:', action: async (reason) => { await resolveAndDeleteReview(report, reason); } }); }}><DeleteIcon /></IconButton></Tooltip>
                           <Tooltip title="Odrzuć"><IconButton size="small" sx={{ color: '#1976D2' }} onClick={() => confirm('Odrzucić?', () => dismissReport('review_reports', report.id))}><CancelIcon /></IconButton></Tooltip>
                         </Box>
                       )}
