@@ -270,6 +270,16 @@ class FirestoreReviewRepository @Inject constructor(
         require(reviewId.isNotBlank()) { "reviewId nie może być puste" }
         require(reporterId.isNotBlank()) { "reporterId nie może być puste" }
 
+        // Sprawdź czy użytkownik już zgłosił tę opinię (1 zgłoszenie na użytkownika na cel)
+        val existing = firestore.collection(FirestoreCollections.REVIEW_REPORTS)
+            .whereEqualTo("reporterId", reporterId)
+            .whereEqualTo("reviewId", reviewId)
+            .get()
+            .await()
+        if (existing.documents.isNotEmpty()) {
+            throw IllegalStateException("Już zgłosiłeś tę opinię")
+        }
+
         val reportData = mapOf(
             "reviewId" to reviewId,
             "reporterId" to reporterId,

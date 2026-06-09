@@ -1,6 +1,9 @@
 package com.kidzone
 
 import android.app.Application
+import com.google.firebase.appcheck.FirebaseAppCheck
+import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
+import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
 import com.kidzone.data.local.PlaceDao
 import com.kidzone.logging.CrashlyticsTree
 import dagger.hilt.android.HiltAndroidApp
@@ -38,8 +41,28 @@ class KidZoneApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         initTimber()
+        initAppCheck()
         cleanStaleCache()
         com.kidzone.messaging.KidZoneMessagingService.registerCurrentToken(this)
+    }
+
+    /**
+     * Inicjalizacja Firebase App Check:
+     *  - Debug: DebugAppCheckProviderFactory (pozwala na testowanie w emulatorze)
+     *  - Release: PlayIntegrityAppCheckProviderFactory (produkcyjna weryfikacja)
+     */
+    private fun initAppCheck() {
+        val firebaseAppCheck = FirebaseAppCheck.getInstance()
+        if (BuildConfig.DEBUG) {
+            firebaseAppCheck.installAppCheckProviderFactory(
+                DebugAppCheckProviderFactory.getInstance()
+            )
+        } else {
+            firebaseAppCheck.installAppCheckProviderFactory(
+                PlayIntegrityAppCheckProviderFactory.getInstance()
+            )
+        }
+        Timber.d("Firebase App Check initialized (debug=${BuildConfig.DEBUG})")
     }
 
     /**
