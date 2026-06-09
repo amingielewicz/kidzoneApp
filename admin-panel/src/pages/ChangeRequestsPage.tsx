@@ -205,6 +205,18 @@ export function ChangeRequestsPage() {
     await fetchRequests();
   }
 
+  async function changeRequestStatus(requestId: string, newStatus: string) {
+    const updates: any = { status: newStatus };
+    if (newStatus === 'pending') {
+      updates.resolvedAtMillis = null;
+    } else {
+      updates.resolvedAtMillis = Date.now();
+    }
+    await updateDoc(doc(db, 'place_change_requests', requestId), updates);
+    setDetailRequest(null);
+    await fetchRequests();
+  }
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" py={6}>
@@ -401,35 +413,35 @@ export function ChangeRequestsPage() {
                 </Table>
               </Box>
             </DialogContent>
-            <DialogActions>
-              {detailRequest.status === 'pending' && (
-                <>
-                  <Button
-                    color="error"
-                    onClick={() =>
-                      confirm('Odrzucić propozycję zmian?', () =>
-                        dismissRequest(detailRequest.id)
-                      )
-                    }
-                  >
-                    Odrzuć
+            <DialogActions sx={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, px: 3, py: 2 }}>
+              <Box display="flex" gap={1} flexWrap="wrap">
+                {detailRequest.status === 'pending' && (
+                  <>
+                    <Button size="small" color="success" variant="contained" onClick={() => confirm('Zatwierdzić i zastosować zmiany?', () => approveRequest(detailRequest))}>
+                      Zatwierdź
+                    </Button>
+                    <Button size="small" variant="outlined" onClick={() => confirm('Odrzucić propozycję zmian?', () => dismissRequest(detailRequest.id))}>
+                      Odrzuć
+                    </Button>
+                  </>
+                )}
+                {detailRequest.status === 'resolved' && (
+                  <Button size="small" color="warning" variant="outlined" onClick={() => changeRequestStatus(detailRequest.id, 'pending')}>
+                    Przywróć do oczekujących
                   </Button>
-                  <Button
-                    variant="contained"
-                    color="success"
-                    onClick={() =>
-                      confirm('Zatwierdzić i zastosować zmiany?', () =>
-                        approveRequest(detailRequest)
-                      )
-                    }
-                  >
-                    Zatwierdź
-                  </Button>
-                </>
-              )}
-              {detailRequest.status !== 'pending' && (
-                <Button onClick={() => setDetailRequest(null)}>Zamknij</Button>
-              )}
+                )}
+                {detailRequest.status === 'dismissed' && (
+                  <>
+                    <Button size="small" color="warning" variant="outlined" onClick={() => changeRequestStatus(detailRequest.id, 'pending')}>
+                      Przywróć do oczekujących
+                    </Button>
+                    <Button size="small" color="success" variant="outlined" onClick={() => confirm('Zatwierdzić i zastosować zmiany?', () => approveRequest(detailRequest))}>
+                      Zatwierdź
+                    </Button>
+                  </>
+                )}
+              </Box>
+              <Button onClick={() => setDetailRequest(null)}>Zamknij</Button>
             </DialogActions>
           </>
         )}

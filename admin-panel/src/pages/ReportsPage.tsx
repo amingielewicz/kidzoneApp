@@ -195,6 +195,25 @@ export function ReportsPage() {
     }
   }
 
+  async function changeReportStatus(newStatus: ReportStatus) {
+    if (!detailDialog.report) return;
+    const report = detailDialog.report;
+    let collectionName = '';
+    if (detailDialog.type === 'place') collectionName = 'place_reports';
+    else if (detailDialog.type === 'review') collectionName = 'review_reports';
+    else collectionName = 'photo_reports';
+
+    const updates: any = { status: newStatus };
+    if (newStatus === 'pending') {
+      updates.resolvedAtMillis = null;
+    } else {
+      updates.resolvedAtMillis = Date.now();
+    }
+    await updateDoc(doc(db, collectionName, report.id), updates);
+    setDetailDialog((p) => ({ ...p, open: false }));
+    await fetchAll();
+  }
+
   async function openDetailPlaceReport(report: PlaceReport) {
     setDetailDialog({ open: true, type: 'place', report, info: {}, loadingInfo: true });
     const info: DetailInfo = {};
@@ -508,7 +527,24 @@ export function ReportsPage() {
             </Box>
           )}
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, px: 3, py: 2 }}>
+          <Box display="flex" gap={1} flexWrap="wrap">
+            {detailDialog.report && detailDialog.report.status !== 'pending' && (
+              <Button size="small" color="warning" variant="outlined" onClick={() => changeReportStatus('pending')}>
+                Przywróć do oczekujących
+              </Button>
+            )}
+            {detailDialog.report && detailDialog.report.status !== 'resolved' && (
+              <Button size="small" color="success" variant="outlined" onClick={() => changeReportStatus('resolved')}>
+                Oznacz jako rozwiązane
+              </Button>
+            )}
+            {detailDialog.report && detailDialog.report.status !== 'dismissed' && (
+              <Button size="small" variant="outlined" onClick={() => changeReportStatus('dismissed')}>
+                Odrzuć
+              </Button>
+            )}
+          </Box>
           <Button onClick={() => setDetailDialog((p) => ({ ...p, open: false }))}>Zamknij</Button>
         </DialogActions>
       </Dialog>
