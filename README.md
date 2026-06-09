@@ -554,6 +554,11 @@ przy pierwszym wejściu, `AddPlaceScreen` przy kliknięciu "Pobierz lokalizację
 | FCM token registration po zalogowaniu (MainScreen)   | ✅     |
 | POST_NOTIFICATIONS permission request (Android 13+)  | ✅     |
 | Dev versioning: PR number / commit hash (nie "local") | ✅     |
+| Soft-delete konta: anonimizacja UGC zamiast usuwania   | ✅     |
+| Push: nowa opinia → deep link do szczegółów miejsca    | ✅     |
+| Push: Twoje miejsce w TOP 10 → deep link do miejsca   | ✅     |
+| Push: nowa odznaka → deep link do profilu              | ✅     |
+| Notification deep links (klik → odpowiedni ekran)      | ✅     |
 | Zero deprecation warnings (Compose, Material3, Icons)  | ✅     |
 
 ## Cloud Functions (backend)
@@ -571,6 +576,8 @@ triggerowane przez zapis/usunięcie dokumentu w Firestore:
 | `onUserDeleted` | `users` (onDelete) | Email pożegnalny do usera + powiadomienie admina |
 | `adminDeletePhoto` | HTTP endpoint | Usuwa zdjęcie z Storage + czyści URL z reviews/places + oznacza report jako resolved |
 | `adminDismissPhotoReport` | HTTP endpoint | Oznacza zgłoszenie zdjęcia jako dismissed (zdjęcie zostaje) |
+| `onReviewCreatedTopRank` | `reviews` (onCreate) | FCM push do właściciela gdy miejsce wchodzi do TOP 10 |
+| `onBadgeEarned` | `users` (onUpdate) | FCM push po zdobyciu nowej odznaki (badgeEarnedAt diff) |
 
 Email zawiera: nazwę miejsca, dane zgłaszającego (imię, email, UID),
 powód / proponowane zmiany (zmapowane na czytelne polskie etykiety) +

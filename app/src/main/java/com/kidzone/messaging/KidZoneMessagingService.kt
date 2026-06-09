@@ -45,8 +45,15 @@ class KidZoneMessagingService : FirebaseMessagingService() {
         val channelId = CHANNEL_GENERAL
         ensureNotificationChannel(channelId)
 
+        // Deep link URI na podstawie typu powiadomienia — klik w notyfikację
+        // otwiera odpowiedni ekran (Navigation Compose obsługuje te URI).
+        val deepLinkUri = buildDeepLinkUri(data)
+
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            if (deepLinkUri != null) {
+                this.data = android.net.Uri.parse(deepLinkUri)
+            }
             data.forEach { (key, value) -> putExtra(key, value) }
         }
         val pendingIntent = PendingIntent.getActivity(
@@ -92,6 +99,20 @@ class KidZoneMessagingService : FirebaseMessagingService() {
                 mapOf("fcmTokens" to FieldValue.arrayUnion(token)),
                 SetOptions.merge()
             )
+    }
+
+    /**
+     * Buduje deep link URI na podstawie pola `type` w data payload FCM.
+     */
+    private fun buildDeepLinkUri(data: Map<String, String>): String? {
+        return when (data["type"]) {
+            "new_review", "place_top_rank" -> {
+                val placeId = data["placeId"] ?: return null
+                "kidzone://place/$placeId"
+            }
+            "new_badge" -> "kidzone://profile"
+            else -> null
+        }
     }
 
     companion object {

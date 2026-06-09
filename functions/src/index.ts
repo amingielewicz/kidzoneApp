@@ -526,14 +526,14 @@ export const onUserDeleted = onDocumentDeleted(
     // Email do użytkownika
     if (userEmail) {
       const farewellHtml = wrapInTemplate(`Żegnaj, ${userName}!`, `
-        <p>Twoje konto w kidZone zostało pomyślnie usunięte.</p>
-        <p>Usunięto również:</p>
+        <p>Twoje konto w kidZone zosta\u0142o pomy\u015Blnie usuni\u0119te.</p>
+        <p>Co si\u0119 sta\u0142o z Twoimi danymi:</p>
         <ul>
-          <li>Wszystkie Twoje miejsca</li>
-          <li>Wszystkie Twoje opinie</li>
-          <li>Twoje zdjęcie profilowe</li>
+          <li>Twoje dane osobowe (profil, email, avatar) \u2014 <strong>usuni\u0119te</strong></li>
+          <li>Twoje opinie \u2014 zanonimizowane (autor: \u201ENieaktywny u\u017Cytkownik\u201D)</li>
+          <li>Twoje miejsca \u2014 pozostaj\u0105 widoczne dla spo\u0142eczno\u015Bci, bez powi\u0105zania z Tob\u0105</li>
         </ul>
-        <p>Jeśli zmienisz zdanie, zawsze możesz założyć nowe konto.</p>
+        <p>Je\u015Bli zmienisz zdanie, zawsze mo\u017Cesz za\u0142o\u017Cy\u0107 nowe konto.</p>
       `);
 
       await transporter.sendMail({
@@ -829,3 +829,183 @@ export const onReviewCreatedPush = onDocumentCreated(
     }
   }
 );
+
+
+
+// --- Trigger: nowa opinia podnosi miejsce do TOP 10 → push do właściciela ---
+export const onReviewCreatedTopRank = onDocumentCreated(
+  {
+    document: "reviews/{reviewId}",
+  },
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+
+    const placeId = data.placeId || "";
+    if (!placeId) return;
+
+    const topSnap = await db.collection("places")
+      .orderBy("averageRating", "desc")
+      .where("reviewsCount", ">", 0)
+      .limit(11)
+      .get();
+
+    const topPlaceIds = topSnap.docs.map((doc) => doc.id);
+    const rank = topPlaceIds.indexOf(placeId);
+    if (rank < 0 || rank >= 10) return;
+
+    const placeDoc = await db.collection("places").doc(placeId).get();
+    if (!placeDoc.exists) return;
+    const placeData = placeDoc.data();
+    const ownerUserId = placeData?.ownerUserId || "";
+    const placeName = placeData?.name || "Twoje miejsce";
+
+    if (!ownerUserId) return;
+    if (data.userId === ownerUserId) return;
+
+    const ownerDoc = await db.collection("users").doc(ownerUserId).get();
+    if (!ownerDoc.exists) return;
+    const ownerData = ownerDoc.data();
+    const fcmTokens: string[] = ownerData?.fcmTokens || [];
+    if (fcmTokens.length === 0) return;
+
+    const notifPrefs = ownerData?.notificationPreferences || {};
+    if (notifPrefs.placeInTopRanking === false) return;
+
+    // Rate limit: max 1 push per 24h per place
+    const lastNotified = placeData?.lastTopRankNotifiedAt || 0;
+    const now = Date.now();
+    if (now - lastNotified < 24 * 60 * 60 * 1000) return;
+
+    const position = rank + 1;
+
+    const message: admin.messaging.MulticastMessage = {
+      tokens: fcmTokens,
+      notification: {
+        title: `\u{1F3C6} \u201E${placeName}\u201D w TOP ${position}!`,
+        body: `Twoje miejsce jest na ${position}. pozycji w rankingu kidZone!`,
+      },
+      data: {
+        type: "place_top_rank",
+        placeId: placeId,
+      },
+      android: {
+        priority: "high",
+        notification: {channelId: "kidzone_general"},
+      },
+    };
+
+    try {
+      const response = await admin.messaging().sendEachForMulticast(message);
+      console.log(`TOP rank push for place ${placeId} (#${position}): ${response.successCount} ok`);
+      await db.collection("places").doc(placeId).update({lastTopRankNotifiedAt: now});
+      await cleanStaleTokens(response, fcmTokens, ownerUserId);
+    } catch (err) {
+      console.error("Top rank push error:", err);
+    }
+  }
+);
+
+
+// --- Trigger: nowa odznaka zdobyta → push do usera ---
+import {onDocumentUpdated} from "firebase-functions/v2/firestore";
+
+export const onBadgeEarned = onDocumentUpdated(
+  {
+    document: "users/{userId}",
+  },
+  async (event) => {
+    const beforeData = event.data?.before?.data();
+    const afterData = event.data?.after?.data();
+    if (!beforeData || !afterData) return;
+
+    const beforeBadges: Record<string, number> = beforeData.badgeEarnedAt || {};
+    const afterBadges: Record<string, number> = afterData.badgeEarnedAt || {};
+
+    const newBadgeNames = Object.keys(afterBadges).filter(
+      (badge) => !(badge in beforeBadges)
+    );
+    if (newBadgeNames.length === 0) return;
+
+    const userId = event.params.userId;
+    const fcmTokens: string[] = afterData.fcmTokens || [];
+    if (fcmTokens.length === 0) return;
+
+    const notifPrefs = afterData.notificationPreferences || {};
+    if (notifPrefs.newBadgeEarned === false) return;
+
+    const badgeLabels: Record<string, string> = {
+      "FIRST_PLACE": "Pierwszy \u015Blad",
+      "FIRST_REVIEW": "Pierwsza opinia",
+      "EXPLORER": "Odkrywca",
+      "CARTOGRAPHER": "Kartograf",
+      "TRACKER": "Tropiciel",
+      "REVIEWER": "Recenzent",
+      "CRITIC": "Krytyk",
+      "SEASONED_REVIEWER": "Wytrawny recenzent",
+      "COMMUNITY_PILLAR": "Filar spo\u0142eczno\u015Bci",
+      "FAMILY_EXPERT": "Ekspert rodzinny",
+      "BRONZE_LEADER": "Br\u0105zowy lider",
+      "SILVER_LEADER": "Srebrny lider",
+      "GOLD_LEADER": "Z\u0142oty lider",
+      "LOCAL_FAVORITE": "Lokalny faworyt",
+      "PLAY_ARCHITECT": "Architekt zabawy",
+    };
+
+    const badgeNamesHuman = newBadgeNames
+      .map((b) => badgeLabels[b] || b)
+      .join(", ");
+
+    const title = newBadgeNames.length === 1
+      ? `\u{1F3C5} Nowa odznaka: ${badgeNamesHuman}!`
+      : `\u{1F3C5} Nowe odznaki: ${badgeNamesHuman}!`;
+
+    const message: admin.messaging.MulticastMessage = {
+      tokens: fcmTokens,
+      notification: {title, body: "Otw\u00F3rz profil w kidZone, by zobaczy\u0107 swoje osi\u0105gni\u0119cia."},
+      data: {
+        type: "new_badge",
+        badges: newBadgeNames.join(","),
+      },
+      android: {
+        priority: "high",
+        notification: {channelId: "kidzone_general"},
+      },
+    };
+
+    try {
+      const response = await admin.messaging().sendEachForMulticast(message);
+      console.log(`Badge push for user ${userId} (${badgeNamesHuman}): ${response.successCount} ok`);
+      await cleanStaleTokens(response, fcmTokens, userId);
+    } catch (err) {
+      console.error("Badge push error:", err);
+    }
+  }
+);
+
+
+// --- Helper: usuwanie stale tokenów po wysyłce ---
+async function cleanStaleTokens(
+  response: admin.messaging.BatchResponse,
+  tokens: string[],
+  userId: string
+): Promise<void> {
+  const tokensToRemove: string[] = [];
+  response.responses.forEach((resp, idx) => {
+    if (resp.error) {
+      const code = resp.error.code;
+      if (
+        code === "messaging/invalid-registration-token" ||
+        code === "messaging/registration-token-not-registered"
+      ) {
+        tokensToRemove.push(tokens[idx]);
+      }
+    }
+  });
+  if (tokensToRemove.length > 0) {
+    await db.collection("users").doc(userId).update({
+      fcmTokens: admin.firestore.FieldValue.arrayRemove(...tokensToRemove),
+    });
+    console.log(`Removed ${tokensToRemove.length} stale tokens for user ${userId}`);
+  }
+}
