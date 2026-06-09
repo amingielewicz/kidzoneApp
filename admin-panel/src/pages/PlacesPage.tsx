@@ -33,6 +33,7 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import CancelIcon from '@mui/icons-material/Cancel';
 import {
   collection,
   query,
@@ -495,11 +496,14 @@ export function PlacesPage() {
       >
         {detailPlace && (
           <>
-            <DialogTitle>
-              {detailPlace.name}
-              <Typography variant="caption" display="block" color="text.secondary">
-                ID: {detailPlace.id}
-              </Typography>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <Box>
+                {detailPlace.name}
+                <Typography variant="caption" display="block" color="text.secondary">
+                  ID: {detailPlace.id}
+                </Typography>
+              </Box>
+              <IconButton size="small" onClick={() => setDetailPlace(null)}><CancelIcon /></IconButton>
             </DialogTitle>
             <DialogContent dividers>
               <Tabs value={detailTab} onChange={(_, v) => { setDetailTab(v); if (v === 2) fetchReviews(detailPlace.id); }} sx={{ mb: 2 }}>
@@ -716,7 +720,10 @@ export function PlacesPage() {
       >
         {editReview && (
           <>
-            <DialogTitle>Edytuj opinię</DialogTitle>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Edytuj opinię</span>
+              <IconButton size="small" onClick={() => setEditReview(null)}><CancelIcon /></IconButton>
+            </DialogTitle>
             <DialogContent>
               <Box display="flex" flexDirection="column" gap={2} mt={1}>
                 <Typography variant="body2">

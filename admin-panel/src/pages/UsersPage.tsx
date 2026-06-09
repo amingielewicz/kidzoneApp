@@ -37,6 +37,7 @@ import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import BlockIcon from '@mui/icons-material/Block';
 import EditIcon from '@mui/icons-material/Edit';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
+import CancelIcon from '@mui/icons-material/Cancel';
 import {
   collection,
   query,
@@ -311,7 +312,10 @@ export function UsersPage() {
       <Dialog open={!!editUser} onClose={() => setEditUser(null)} maxWidth="xs" fullWidth>
         {editUser && (
           <>
-            <DialogTitle>Edytuj użytkownika</DialogTitle>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Edytuj użytkownika</span>
+              <IconButton size="small" onClick={() => setEditUser(null)}><CancelIcon /></IconButton>
+            </DialogTitle>
             <DialogContent>
               <Box display="flex" flexDirection="column" gap={2} mt={1}>
                 <TextField label="Imię / Nazwa" value={editName} onChange={(e) => setEditName(e.target.value)} fullWidth size="small" />
@@ -341,7 +345,10 @@ export function UsersPage() {
       <Dialog open={banDialogOpen} onClose={() => setBanDialogOpen(false)} maxWidth="xs" fullWidth>
         {banTargetUser && (
           <>
-            <DialogTitle>Zablokuj: {banTargetUser.name || banTargetUser.email}</DialogTitle>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Zablokuj: {banTargetUser.name || banTargetUser.email}</span>
+              <IconButton size="small" onClick={() => setBanDialogOpen(false)}><CancelIcon /></IconButton>
+            </DialogTitle>
             <DialogContent>
               <Box display="flex" flexDirection="column" gap={2} mt={1}>
                 <Alert severity="warning" variant="outlined">Zablokowany użytkownik nie będzie mógł się zalogować do aplikacji.</Alert>

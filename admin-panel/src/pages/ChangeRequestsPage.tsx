@@ -27,6 +27,7 @@ import {
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import {
   collection,
   query,
@@ -286,8 +287,11 @@ export function ChangeRequestsPage() {
                     color={request.type === 'LOCATION' ? 'info' : 'secondary'}
                   />
                 </TableCell>
-                <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>
-                  {request.placeId.slice(0, 8)}...
+                <TableCell>
+                  <Box display="flex" alignItems="center" gap={0.5}>
+                    <Tooltip title={request.placeId}><Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12 }}>{request.placeId.slice(0, 8)}...</Typography></Tooltip>
+                    <Tooltip title="Kopiuj ID"><IconButton size="small" onClick={() => navigator.clipboard.writeText(request.placeId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
+                  </Box>
                 </TableCell>
                 <TableCell>
                   {Object.keys(request.changes || {}).map((key) => (
@@ -359,8 +363,9 @@ export function ChangeRequestsPage() {
       >
         {detailRequest && (
           <>
-            <DialogTitle>
-              {detailRequest.type === 'LOCATION' ? 'Korekta lokalizacji' : 'Propozycja zmian'}
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>{detailRequest.type === 'LOCATION' ? 'Korekta lokalizacji' : 'Propozycja zmian'}</span>
+              <IconButton size="small" onClick={() => setDetailRequest(null)}><CancelIcon /></IconButton>
             </DialogTitle>
             <DialogContent dividers>
               <Box display="flex" flexDirection="column" gap={1.5}>
