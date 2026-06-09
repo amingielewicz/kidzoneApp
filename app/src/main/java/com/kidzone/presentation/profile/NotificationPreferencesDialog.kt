@@ -67,7 +67,7 @@ fun NotificationPreferencesDialog(
                 )
                 NotificationToggle(
                     title = "Rankingi",
-                    description = "Twoje miejsce lub Ty wchodzisz do TOP 10 / TOP 3 / na podium",
+                    description = "Zdobywasz w rankingu TOP 10 / TOP 3 / podium",
                     checked = prefs.rankings,
                     onCheckedChange = { prefs = prefs.copy(rankings = it) }
                 )
