@@ -218,7 +218,7 @@ fun KidZoneNavGraph(
                 navArgument(Route.PlaceDetails.ARG_PLACE_ID) { type = NavType.StringType }
             ),
             deepLinks = listOf(
-                navDeepLink { uriPattern = "https://kidzone.app/place/{placeId}" },
+                navDeepLink { uriPattern = "https://kidzone.pl/place/{placeId}" },
                 navDeepLink { uriPattern = "kidzone://place/{placeId}" }
             )
         ) {

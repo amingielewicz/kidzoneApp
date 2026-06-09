@@ -280,7 +280,7 @@ fun PlaceDetailsScreen(
                                                 append("\n")
                                                 append(place.address)
                                             }
-                                            append("\n\nhttps://kidzone.app/place/${place.id}")
+                                            append("\n\nhttps://kidzone.pl/place/${place.id}")
                                         }
                                         val intent = Intent(Intent.ACTION_SEND).apply {
                                             type = "text/plain"
