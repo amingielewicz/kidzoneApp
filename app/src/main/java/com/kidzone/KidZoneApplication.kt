@@ -4,6 +4,7 @@ import android.app.Application
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
+import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import com.kidzone.data.local.PlaceDao
 import com.kidzone.logging.CrashlyticsTree
 import dagger.hilt.android.HiltAndroidApp
@@ -11,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -42,6 +44,7 @@ class KidZoneApplication : Application() {
         super.onCreate()
         initTimber()
         initAppCheck()
+        initRemoteConfig()
         cleanStaleCache()
         com.kidzone.messaging.KidZoneMessagingService.registerCurrentToken(this)
     }
@@ -83,6 +86,21 @@ class KidZoneApplication : Application() {
         appScope.launch {
             val threshold = System.currentTimeMillis() - CACHE_TTL_MS
             placeDao.deleteStale(threshold)
+        }
+    }
+
+    /**
+     * Fire-and-forget fetch Remote Config przy starcie aplikacji.
+     * Jeśli fetch się nie uda – używamy cached/default values.
+     */
+    private fun initRemoteConfig() {
+        appScope.launch {
+            try {
+                FirebaseRemoteConfig.getInstance().fetchAndActivate().await()
+                Timber.d("Remote Config activated")
+            } catch (e: Exception) {
+                Timber.w(e, "Remote Config fetch failed")
+            }
         }
     }
 }
