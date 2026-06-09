@@ -68,6 +68,13 @@
             line-height: 1.5;
         }
 
+        .buttons {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
         .btn {
             display: inline-block;
             padding: 16px 40px;
@@ -90,10 +97,7 @@
         }
 
         .btn-maps {
-            display: inline-block;
-            margin-top: 12px;
             background: #43A047;
-            color: white;
             padding: 14px 32px;
             font-size: 14px;
         }
@@ -119,9 +123,10 @@
             Otwórz w aplikacji kidZone, aby zobaczyć szczegóły, zdjęcia i opinie innych rodziców.
         </div>
 
-        <a class="btn" id="btn-open" href="#">Otwórz w kidZone</a>
-
-        <a class="btn btn-maps" id="btn-maps" href="#" style="display:none;">Otwórz w Google Maps</a>
+        <div class="buttons">
+            <a class="btn" id="btn-open" href="#">Otwórz w kidZone</a>
+            <a class="btn btn-maps" id="btn-maps" href="#" style="display:none;">Otwórz w Google Maps</a>
+        </div>
 
         <div class="footer">
             Jeśli nie masz aplikacji, zostaniesz przekierowany do Google Play.
@@ -130,7 +135,6 @@
 
     <script>
         (function() {
-            // Wyciągnij placeId z URL: /place/{placeId}
             var path = window.location.pathname;
             var segments = path.split('/').filter(Boolean);
             var placeId = '';
@@ -141,72 +145,66 @@
             }
 
             var params = new URLSearchParams(window.location.search);
-            if (!placeId) {
-                placeId = params.get('id') || '';
-            }
+            if (!placeId) placeId = params.get('id') || '';
 
-            // Współrzędne GPS z query params
             var lat = params.get('lat') || '';
             var lng = params.get('lng') || '';
 
-            // Deep link do apki
             var deepLink = 'kidzone://place/' + (placeId || '');
             var playStoreUrl = 'https://play.google.com/store/apps/details?id=com.kidzone';
-
-            // Intent URL (działa tylko w Chrome, nie w WebView)
-            var intentUrl = 'intent://place/' + (placeId || '')
-                + '#Intent;scheme=kidzone;package=com.kidzone;'
-                + 'S.browser_fallback_url=' + encodeURIComponent(playStoreUrl)
-                + ';end';
-
             var isAndroid = /android/i.test(navigator.userAgent);
-            var isChrome = /chrome/i.test(navigator.userAgent) && !/edg/i.test(navigator.userAgent);
 
-            // Próbuj otworzyć apkę, fallback na Play Store
-            function openApp() {
-                if (!isAndroid) {
-                    window.location.href = playStoreUrl;
-                    return;
-                }
-
-                if (isChrome && !(/messenger|fbav|fban|instagram|line|whatsapp/i.test(navigator.userAgent))) {
-                    // Prawdziwy Chrome (nie in-app browser) — intent:// działa
-                    window.location.href = intentUrl;
-                } else {
-                    // WebView (Messenger/FB/Insta/itp.) — timeout strategy:
-                    // Próbuj custom scheme, po 1.5s fallback na Play Store
-                    var start = Date.now();
-                    var timeout = setTimeout(function() {
-                        if (Date.now() - start < 2000) {
-                            window.location.href = playStoreUrl;
-                        }
-                    }, 1500);
-
-                    window.addEventListener('visibilitychange', function() {
-                        if (document.hidden) clearTimeout(timeout);
-                    });
-
-                    window.location.href = deepLink;
-                }
-            }
-
-            // Przycisk kidZone
-            var btnOpen = document.getElementById('btn-open');
-            btnOpen.addEventListener('click', function(e) {
-                e.preventDefault();
-                openApp();
-            });
-
-            // Przycisk Google Maps
+            // --- Przycisk Google Maps ---
             var btnMaps = document.getElementById('btn-maps');
             if (lat && lng) {
                 btnMaps.href = 'https://www.google.com/maps/search/?api=1&query=' + lat + ',' + lng;
                 btnMaps.style.display = 'inline-block';
             }
 
-            // Brak auto-redirect — user klika sam.
-            // Auto-redirect w WebView powoduje race condition:
-            // timeout odpala Play Store zanim system zdąży otworzyć apkę.
+            // --- Przycisk "Otwórz w kidZone" ---
+            // Kliknięcie = próba otwarcia apki, fallback Play Store
+            var btnOpen = document.getElementById('btn-open');
+            btnOpen.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (!isAndroid) {
+                    window.location.href = playStoreUrl;
+                    return;
+                }
+                // Spróbuj custom scheme — jeśli apka nie zainstalowana,
+                // po 2s przekieruj do Play Store
+                var hidden = false;
+                var timeout = setTimeout(function() {
+                    if (!hidden) window.location.href = playStoreUrl;
+                }, 2000);
+
+                document.addEventListener('visibilitychange', function() {
+                    if (document.hidden) {
+                        hidden = true;
+                        clearTimeout(timeout);
+                    }
+                });
+
+                window.location.href = deepLink;
+            });
+
+            // --- Auto-otwarcie apki (jeśli zainstalowana) ---
+            // Na Androidzie: od razu próbujemy deep link.
+            // Jeśli apka jest — strona zniknie (system ją otworzy).
+            // Jeśli apki nie ma — nic się nie stanie, user widzi stronę
+            // i może kliknąć przycisk (→ Play Store) lub Google Maps.
+            if (isAndroid && placeId) {
+                // Ukryty iframe próbuje otworzyć custom scheme
+                // bez przekierowania strony (nie traci kontekstu)
+                var iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = deepLink;
+                document.body.appendChild(iframe);
+
+                // Cleanup po 3s
+                setTimeout(function() {
+                    document.body.removeChild(iframe);
+                }, 3000);
+            }
         })();
     </script>
 </body>
