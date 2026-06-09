@@ -85,8 +85,9 @@ fun DeleteAccountDialog(
                 Spacer(Modifier.height(8.dp))
                 BulletLine(text = "Twoje dane osobowe (profil, email, avatar) zostaną usunięte")
                 BulletLine(
-                    text = "Twoje opinie ($reviewsCount) zostaną zanonimizowane — " +
-                        "treść pozostanie, autor zmieni się na „Nieaktywny użytkownik""
+                    text = "Twoje opinie ($reviewsCount) zostaną zanonimizowane - " +
+                            "treść pozostanie, autor zmieni się na \"Nieaktywny użytkownik\""
+
                 )
                 BulletLine(
                     text = "Twoje miejsca ($placesCount) pozostaną widoczne, " +
