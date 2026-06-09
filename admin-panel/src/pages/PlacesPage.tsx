@@ -27,6 +27,9 @@ import {
   TableSortLabel,
   Tabs,
   Tab,
+  FormControlLabel,
+  Checkbox,
+  Grid,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -45,6 +48,31 @@ import {
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../services/firebase';
 import { Place, PLACE_CATEGORY_LABELS, PlaceCategory } from '../types';
+
+const ALL_AMENITIES: Record<string, string> = {
+  CHANGING_TABLE: 'Przewijak',
+  TOILET: 'Czysta toaleta',
+  STROLLER_ACCESS: 'Dostęp dla wózka',
+  PARKING: 'Parking',
+  FENCING: 'Ogrodzenie',
+  SOFT_SURFACE: 'Miękka nawierzchnia',
+  SHADED_BENCHES: 'Ławki w cieniu',
+  TODDLER_ZONE: 'Strefa 0–3',
+  CAR_FREE_AREA: 'Brak ruchu samochodowego',
+  KIDS_MENU: 'Menu dziecięce',
+  HIGH_CHAIR: 'Krzesełka do karmienia',
+  KIDS_TABLEWARE: 'Naczynia dziecięce',
+  FAST_SERVICE: 'Szybka obsługa',
+  KIDS_ENTERTAINMENT: 'Kredki, zabawki',
+  KIDS_CORNER_VISIBLE: 'Kącik widoczny od stolika',
+  AGE_ZONES: 'Podział na strefy wiekowe',
+  ANIMATOR: 'Animator',
+  MONITORING: 'Monitoring',
+  TOY_SANITIZATION: 'Dezynfekcja zabawek',
+  PARENT_ZONE: 'Strefa dla rodziców',
+  LOCKERS: 'Szafki na rzeczy',
+  WIFI: 'WiFi',
+};
 
 function formatDate(millis: number): string {
   return new Date(millis).toLocaleDateString('pl-PL', {
@@ -72,6 +100,11 @@ export function PlacesPage() {
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editLat, setEditLat] = useState('');
+  const [editLng, setEditLng] = useState('');
+  const [editOwner, setEditOwner] = useState('');
+  const [editAmenities, setEditAmenities] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   // Reviews for place
@@ -150,6 +183,11 @@ export function PlacesPage() {
     setEditName(place.name);
     setEditAddress(place.address);
     setEditDescription(place.description || '');
+    setEditCategory(place.category || '');
+    setEditLat(String(place.latitude || ''));
+    setEditLng(String(place.longitude || ''));
+    setEditOwner(place.ownerUserId || '');
+    setEditAmenities(place.amenities || []);
     setPlaceReviews([]);
   }
 
@@ -157,15 +195,19 @@ export function PlacesPage() {
     if (!detailPlace) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'places', detailPlace.id), {
+      const updates: any = {
         name: editName,
         address: editAddress,
         description: editDescription,
-      });
+        category: editCategory,
+        latitude: parseFloat(editLat) || detailPlace.latitude,
+        longitude: parseFloat(editLng) || detailPlace.longitude,
+        ownerUserId: editOwner,
+        amenities: editAmenities,
+      };
+      await updateDoc(doc(db, 'places', detailPlace.id), updates);
+      setDetailPlace((prev) => prev ? { ...prev, ...updates } : null);
       await fetchPlaces();
-      setDetailPlace((prev) =>
-        prev ? { ...prev, name: editName, address: editAddress, description: editDescription } : null
-      );
     } catch (err) {
       console.error('Failed to save:', err);
     } finally {
@@ -177,9 +219,11 @@ export function PlacesPage() {
     setLoadingReviews(true);
     try {
       const snap = await getDocs(
-        query(collection(db, 'reviews'), where('placeId', '==', placeId), orderBy('createdAtMillis', 'desc'))
+        query(collection(db, 'reviews'), where('placeId', '==', placeId))
       );
-      setPlaceReviews(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      const reviews = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      reviews.sort((a: any, b: any) => (b.createdAtMillis || 0) - (a.createdAtMillis || 0));
+      setPlaceReviews(reviews);
     } catch (err) {
       console.error('Failed to fetch reviews:', err);
     } finally {
@@ -443,58 +487,62 @@ export function PlacesPage() {
               <Tabs value={detailTab} onChange={(_, v) => { setDetailTab(v); if (v === 2) fetchReviews(detailPlace.id); }} sx={{ mb: 2 }}>
                 <Tab label="Dane" />
                 <Tab label={`Zdjęcia (${detailPlace.photoUrls?.length || 0})`} />
-                <Tab label="Opinie" />
+                <Tab label={`Opinie (${detailPlace.reviewsCount || 0})`} />
               </Tabs>
 
               {/* Tab 0: Basic info */}
               {detailTab === 0 && (
                 <Box display="flex" flexDirection="column" gap={2}>
-                  <TextField
-                    label="Nazwa"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    fullWidth
-                    size="small"
-                  />
-                  <TextField
-                    label="Adres"
-                    value={editAddress}
-                    onChange={(e) => setEditAddress(e.target.value)}
-                    fullWidth
-                    size="small"
-                  />
-                  <TextField
-                    label="Opis"
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
-                    fullWidth
-                    size="small"
-                    multiline
-                    rows={3}
-                  />
-                  <Box display="flex" gap={2}>
-                    <Typography variant="body2">
-                      <strong>Kategoria:</strong> {PLACE_CATEGORY_LABELS[detailPlace.category as PlaceCategory] || detailPlace.category}
-                    </Typography>
+                  <TextField label="Nazwa" value={editName} onChange={(e) => setEditName(e.target.value)} fullWidth size="small" />
+                  <TextField label="Adres" value={editAddress} onChange={(e) => setEditAddress(e.target.value)} fullWidth size="small" />
+                  <TextField label="Opis" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} fullWidth size="small" multiline rows={3} />
+
+                  <FormControl size="small" fullWidth>
+                    <InputLabel>Kategoria</InputLabel>
+                    <Select value={editCategory} label="Kategoria" onChange={(e) => setEditCategory(e.target.value)}>
+                      {Object.entries(PLACE_CATEGORY_LABELS).map(([key, label]) => (
+                        <MenuItem key={key} value={key}>{label}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  <Grid container spacing={1}>
+                    <Grid item xs={6}>
+                      <TextField label="Szerokość (lat)" value={editLat} onChange={(e) => setEditLat(e.target.value)} fullWidth size="small" />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField label="Długość (lng)" value={editLng} onChange={(e) => setEditLng(e.target.value)} fullWidth size="small" />
+                    </Grid>
+                  </Grid>
+
+                  <TextField label="Właściciel (UID)" value={editOwner} onChange={(e) => setEditOwner(e.target.value)} fullWidth size="small" />
+
+                  <Typography variant="subtitle2" mt={1}>Udogodnienia:</Typography>
+                  <Box display="flex" flexWrap="wrap" gap={0}>
+                    {Object.entries(ALL_AMENITIES).map(([key, label]) => (
+                      <FormControlLabel
+                        key={key}
+                        control={
+                          <Checkbox
+                            size="small"
+                            checked={editAmenities.includes(key)}
+                            onChange={(e) => {
+                              if (e.target.checked) setEditAmenities((prev) => [...prev, key]);
+                              else setEditAmenities((prev) => prev.filter((a) => a !== key));
+                            }}
+                          />
+                        }
+                        label={<Typography variant="body2">{label}</Typography>}
+                        sx={{ width: '48%', m: 0 }}
+                      />
+                    ))}
                   </Box>
-                  <Typography variant="body2">
-                    <strong>Współrzędne:</strong> {detailPlace.latitude}, {detailPlace.longitude}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Właściciel (UID):</strong> {detailPlace.ownerUserId}
-                  </Typography>
-                  <Typography variant="body2">
+
+                  <Typography variant="body2" color="text.secondary">
                     <strong>Ocena:</strong> {detailPlace.averageRating?.toFixed(2)} ({detailPlace.reviewsCount} opinii)
                   </Typography>
-                  <Typography variant="body2">
-                    <strong>Udogodnienia:</strong> {detailPlace.amenities?.join(', ') || '(brak)'}
-                  </Typography>
-                  <Button
-                    variant="contained"
-                    onClick={saveBasicInfo}
-                    disabled={saving}
-                    sx={{ alignSelf: 'flex-start' }}
-                  >
+
+                  <Button variant="contained" onClick={saveBasicInfo} disabled={saving} sx={{ alignSelf: 'flex-start' }}>
                     {saving ? <CircularProgress size={20} /> : 'Zapisz zmiany'}
                   </Button>
                 </Box>

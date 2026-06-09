@@ -16,6 +16,21 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+    // ---------- /places/{placeId}/{file} ----------
+    //
+    // Zdjęcia miejsc — każdy zalogowany może dodawać (upload przez aplikację).
+    // Admin panel też uploaduje tu zdjęcia.
+    // Odczyt publiczny (zdjęcia wyświetlane wszystkim).
+    match /places/{placeId}/{fileName} {
+      allow read: if true;
+
+      allow write: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      allow delete: if request.auth != null;
+    }
+
     // ---------- /avatars/{userId}/{file} ----------
     //
     // Avatar użytkownika jest publiczny dla zalogowanych userów (pokazujemy
