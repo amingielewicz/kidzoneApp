@@ -52,5 +52,28 @@ data class User(
      * profilu nigdy nie otwarto w wersji z tym polem. Sort fallback w
      * UI ustawia takich userów na koniec (sortedBy z Long.MAX_VALUE).
      */
-    val badgeEarnedAt: Map<String, Long> = emptyMap()
-)
+    val badgeEarnedAt: Map<String, Long> = emptyMap(),
+    /**
+     * Timestamp do kiedy konto jest zablokowane (millis).
+     * -1 = blokada bezpowrotna (permanentna).
+     * 0 lub brak = brak blokady.
+     */
+    val bannedUntilMillis: Long = 0L,
+    /** Powód blokady ustawiony przez admina. */
+    val banReason: String = ""
+) {
+    /** Czy konto jest aktualnie zablokowane. */
+    val isBanned: Boolean
+        get() = bannedUntilMillis == -1L || (bannedUntilMillis > 0L && bannedUntilMillis > System.currentTimeMillis())
+
+    /** Czytelny komunikat o blokadzie. */
+    val banMessage: String
+        get() = when {
+            bannedUntilMillis == -1L -> "Twoje konto zostało zablokowane bezpowrotnie."
+            bannedUntilMillis > System.currentTimeMillis() -> {
+                val date = java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale("pl")).format(java.util.Date(bannedUntilMillis))
+                "Twoje konto jest zablokowane do $date."
+            }
+            else -> ""
+        }
+}
