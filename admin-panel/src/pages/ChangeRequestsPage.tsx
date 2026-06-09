@@ -18,6 +18,13 @@ import {
   DialogActions,
   Button,
   Tooltip,
+  ToggleButtonGroup,
+  ToggleButton,
+  TableSortLabel,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -32,7 +39,7 @@ import {
   getDoc,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { PlaceChangeRequest, PLACE_CATEGORY_LABELS, PlaceCategory } from '../types';
+import { PlaceChangeRequest, PLACE_CATEGORY_LABELS, PlaceCategory, ReportStatus } from '../types';
 
 function statusChip(status: string) {
   switch (status) {
@@ -77,9 +84,16 @@ function formatChangeValue(key: string, value: unknown): string {
   return String(value);
 }
 
+type SortField = 'createdAtMillis' | 'type';
+type SortDir = 'asc' | 'desc';
+
 export function ChangeRequestsPage() {
   const [requests, setRequests] = useState<PlaceChangeRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<ReportStatus | 'all'>('pending');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [sortField, setSortField] = useState<SortField>('createdAtMillis');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [detailRequest, setDetailRequest] = useState<PlaceChangeRequest | null>(null);
   const [placeName, setPlaceName] = useState<string>('');
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -106,6 +120,42 @@ export function ChangeRequestsPage() {
     }
   }
 
+  function getFilteredRequests(): PlaceChangeRequest[] {
+    let result = [...requests];
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      result = result.filter((r) => r.status === statusFilter);
+    }
+
+    // Type filter
+    if (typeFilter !== 'all') {
+      result = result.filter((r) => r.type === typeFilter);
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      let aVal: any = (a as any)[sortField] ?? '';
+      let bVal: any = (b as any)[sortField] ?? '';
+      if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+      if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }
+
+  function handleSort(field: SortField) {
+    if (sortField === field) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('desc');
+    }
+  }
+
   async function openDetail(request: PlaceChangeRequest) {
     setDetailRequest(request);
     try {
@@ -117,7 +167,6 @@ export function ChangeRequestsPage() {
   }
 
   async function approveRequest(request: PlaceChangeRequest) {
-    // Zastosuj zmiany do dokumentu places
     const placeRef = doc(db, 'places', request.placeId);
     const placeSnap = await getDoc(placeRef);
 
@@ -129,7 +178,6 @@ export function ChangeRequestsPage() {
       await updateDoc(placeRef, updates);
     }
 
-    // Oznacz request jako resolved
     await updateDoc(doc(db, 'place_change_requests', request.id), {
       status: 'resolved',
       resolvedAtMillis: Date.now(),
@@ -161,6 +209,7 @@ export function ChangeRequestsPage() {
   }
 
   const pendingCount = requests.filter((r) => r.status === 'pending').length;
+  const filteredRequests = getFilteredRequests();
 
   return (
     <Box>
@@ -171,18 +220,51 @@ export function ChangeRequestsPage() {
         Użytkownicy proponują korekty danych lub lokalizacji miejsc. Zatwierdź lub odrzuć.
       </Typography>
 
-      <Chip
-        label={`Oczekujące: ${pendingCount}`}
-        color={pendingCount > 0 ? 'warning' : 'default'}
-        sx={{ mb: 3 }}
-      />
+      <Box display="flex" gap={2} mb={3} flexWrap="wrap" alignItems="center">
+        <ToggleButtonGroup
+          value={statusFilter}
+          exclusive
+          onChange={(_, v) => v && setStatusFilter(v)}
+          size="small"
+        >
+          <ToggleButton value="pending">Oczekujące ({pendingCount})</ToggleButton>
+          <ToggleButton value="resolved">Zatwierdzone</ToggleButton>
+          <ToggleButton value="dismissed">Odrzucone</ToggleButton>
+          <ToggleButton value="all">Wszystkie</ToggleButton>
+        </ToggleButtonGroup>
+
+        <FormControl size="small" sx={{ minWidth: 140 }}>
+          <InputLabel>Typ</InputLabel>
+          <Select value={typeFilter} label="Typ" onChange={(e) => setTypeFilter(e.target.value)}>
+            <MenuItem value="all">Wszystkie</MenuItem>
+            <MenuItem value="EDIT">Dane</MenuItem>
+            <MenuItem value="LOCATION">Lokalizacja</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
 
       <TableContainer component={Paper}>
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Data</TableCell>
-              <TableCell>Typ</TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sortField === 'createdAtMillis'}
+                  direction={sortField === 'createdAtMillis' ? sortDir : 'desc'}
+                  onClick={() => handleSort('createdAtMillis')}
+                >
+                  Data
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sortField === 'type'}
+                  direction={sortField === 'type' ? sortDir : 'asc'}
+                  onClick={() => handleSort('type')}
+                >
+                  Typ
+                </TableSortLabel>
+              </TableCell>
               <TableCell>Place ID</TableCell>
               <TableCell>Zmiany</TableCell>
               <TableCell>Status</TableCell>
@@ -190,7 +272,7 @@ export function ChangeRequestsPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {requests.map((request) => (
+            {filteredRequests.map((request) => (
               <TableRow key={request.id} hover>
                 <TableCell>{formatDate(request.createdAtMillis)}</TableCell>
                 <TableCell>
@@ -254,7 +336,7 @@ export function ChangeRequestsPage() {
                 </TableCell>
               </TableRow>
             ))}
-            {requests.length === 0 && (
+            {filteredRequests.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} align="center">
                   Brak propozycji zmian

@@ -57,6 +57,8 @@ export interface AppUser {
   reviewsCount: number;
   createdAtMillis: number;
   role?: string;
+  bannedUntilMillis?: number; // -1 = permanent, timestamp = temporary
+  banReason?: string;
 }
 
 // --- Reports ---

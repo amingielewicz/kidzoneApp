@@ -261,13 +261,13 @@ export function ReportsPage() {
         Zgłoszenia
       </Typography>
 
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)}>
-          <Tab label={`Miejsca (${pendingPlaceCount})`} />
-          <Tab label={`Opinie (${pendingReviewCount})`} />
-          <Tab label={`Zdjęcia (${pendingPhotoCount})`} />
-        </Tabs>
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+        <Tab label={`Miejsca (${pendingPlaceCount})`} />
+        <Tab label={`Opinie (${pendingReviewCount})`} />
+        <Tab label={`Zdjęcia (${pendingPhotoCount})`} />
+      </Tabs>
 
+      <Box mb={3}>
         <ToggleButtonGroup
           value={statusFilter}
           exclusive
