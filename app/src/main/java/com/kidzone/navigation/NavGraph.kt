@@ -140,9 +140,9 @@ fun KidZoneNavGraph(
                 rankingTab = rankingTab,
                 onFocusConsumed = {
                     savedHandle[NEW_PLACE_LAT] = null
-                    savedHandle[NEW_PLACE_LNG] = null
                     savedHandle["focusTab"] = ""
                     savedHandle["rankingTab"] = ""
+                    savedHandle[NEW_PLACE_LNG] = null
                 },
                 onOpenPlaceDetails = { placeId ->
                     navController.navigate(Route.PlaceDetails.create(placeId))
