@@ -907,7 +907,9 @@ export const onReviewCreatedTopRank = onDocumentCreated(
 );
 
 
-// --- Trigger: nowa odznaka zdobyta → push do usera ---
+// --- Trigger: zmiana dokumentu usera → sprawdź odznaki server-side ---
+// Oblicza odznaki count-based z liczników i sam zapisuje/usuwa z badgeEarnedAt.
+// Dzięki temu push działa nawet gdy user nie jest na ekranie Profilu.
 import {onDocumentUpdated} from "firebase-functions/v2/firestore";
 
 export const onBadgeEarned = onDocumentUpdated(
@@ -919,19 +921,80 @@ export const onBadgeEarned = onDocumentUpdated(
     const afterData = event.data?.after?.data();
     if (!beforeData || !afterData) return;
 
-    const beforeBadges: Record<string, number> = beforeData.badgeEarnedAt || {};
-    const afterBadges: Record<string, number> = afterData.badgeEarnedAt || {};
-
-    const newBadgeNames = Object.keys(afterBadges).filter(
-      (badge) => !(badge in beforeBadges)
-    );
-    const revokedBadgeNames = Object.keys(beforeBadges).filter(
-      (badge) => !(badge in afterBadges)
-    );
-
-    if (newBadgeNames.length === 0 && revokedBadgeNames.length === 0) return;
-
     const userId = event.params.userId;
+
+    // Sprawdz czy zmienily sie liczniki (optymalizacja - nie licz odznak
+    // przy kazdym upadte np. zmiana avatara/name)
+    const beforePlaces = beforeData.placesAddedCount || 0;
+    const afterPlaces = afterData.placesAddedCount || 0;
+    const beforeReviews = beforeData.reviewsCount || 0;
+    const afterReviews = afterData.reviewsCount || 0;
+    const beforeBadges = beforeData.badgeEarnedAt || {};
+    const afterBadges = afterData.badgeEarnedAt || {};
+
+    const countersChanged = beforePlaces !== afterPlaces || beforeReviews !== afterReviews;
+    const badgesChanged = JSON.stringify(beforeBadges) !== JSON.stringify(afterBadges);
+
+    // Jesli ani liczniki ani badgeEarnedAt sie nie zmienily - ignoruj
+    if (!countersChanged && !badgesChanged) return;
+
+    // Jesli badgeEarnedAt sie zmienilo (klient lub my wczesniej zapisalismy)
+    // ale liczniki nie - to znaczy ze push juz wyslalismy, nie rob nic
+    if (badgesChanged && !countersChanged) return;
+
+    // Oblicz odznaki count-based na podstawie aktualnych licznikow
+    const deservedBadges = new Set<string>();
+    if (afterPlaces >= 1) deservedBadges.add("FIRST_PLACE");
+    if (afterReviews >= 1) deservedBadges.add("FIRST_REVIEW");
+    if (afterPlaces >= 5) deservedBadges.add("EXPLORER");
+    if (afterPlaces >= 15) deservedBadges.add("CARTOGRAPHER");
+    if (afterPlaces >= 30) deservedBadges.add("PATHFINDER");
+    if (afterReviews >= 10) deservedBadges.add("REVIEWER");
+    if (afterReviews >= 25) deservedBadges.add("CRITIC");
+    if (afterReviews >= 50) deservedBadges.add("SENIOR_REVIEWER");
+    if (afterPlaces >= 5 && afterReviews >= 5) deservedBadges.add("COMMUNITY_PILLAR");
+    if (afterPlaces >= 10 && afterReviews >= 20) deservedBadges.add("FAMILY_EXPERT");
+
+    const currentBadgeNames = new Set(Object.keys(afterBadges));
+
+    // Nowe do nadania
+    const toGrant: string[] = [];
+    for (const badge of deservedBadges) {
+      if (!currentBadgeNames.has(badge)) toGrant.push(badge);
+    }
+
+    // Do odebrania (tylko count-based)
+    const countBased = [
+      "FIRST_PLACE", "FIRST_REVIEW", "EXPLORER", "CARTOGRAPHER", "PATHFINDER",
+      "REVIEWER", "CRITIC", "SENIOR_REVIEWER", "COMMUNITY_PILLAR", "FAMILY_EXPERT"
+    ];
+    const toRevoke: string[] = [];
+    for (const badge of countBased) {
+      if (currentBadgeNames.has(badge) && !deservedBadges.has(badge)) {
+        toRevoke.push(badge);
+      }
+    }
+
+    if (toGrant.length === 0 && toRevoke.length === 0) return;
+
+    // Zapisz zmiany w badgeEarnedAt
+    const updates: Record<string, any> = {};
+    const now = Date.now();
+    for (const badge of toGrant) {
+      updates[`badgeEarnedAt.${badge}`] = now;
+    }
+    for (const badge of toRevoke) {
+      updates[`badgeEarnedAt.${badge}`] = admin.firestore.FieldValue.delete();
+    }
+
+    try {
+      await db.collection("users").doc(userId).update(updates);
+    } catch (err) {
+      console.error(`Badge update failed for ${userId}:`, err);
+      return;
+    }
+
+    // Wyslij push
     const fcmTokens: string[] = afterData.fcmTokens || [];
     if (fcmTokens.length === 0) return;
 
@@ -959,38 +1022,30 @@ export const onBadgeEarned = onDocumentUpdated(
     let title = "";
     let body = "";
 
-    if (newBadgeNames.length > 0) {
-      const names = newBadgeNames.map((b) => badgeLabels[b] || b).join(", ");
-      title = newBadgeNames.length === 1
+    if (toGrant.length > 0) {
+      const names = toGrant.map((b) => badgeLabels[b] || b).join(", ");
+      title = toGrant.length === 1
         ? `\u{1F3C5} Nowa odznaka: ${names}!`
         : `\u{1F3C5} Nowe odznaki: ${names}!`;
       body = "Otw\u00F3rz profil w kidZone, by zobaczy\u0107 swoje osi\u0105gni\u0119cia.";
-    } else if (revokedBadgeNames.length > 0) {
-      const names = revokedBadgeNames.map((b) => badgeLabels[b] || b).join(", ");
-      title = revokedBadgeNames.length === 1
+    } else {
+      const names = toRevoke.map((b) => badgeLabels[b] || b).join(", ");
+      title = toRevoke.length === 1
         ? `Utracona odznaka: ${names}`
         : `Utracone odznaki: ${names}`;
       body = "Spe\u0142nij ponownie wymagania, by j\u0105 odzyska\u0107.";
     }
 
-    if (!title) return;
-
     const message: admin.messaging.MulticastMessage = {
       tokens: fcmTokens,
       notification: {title, body},
-      data: {
-        type: "new_badge",
-        badges: (newBadgeNames.length > 0 ? newBadgeNames : revokedBadgeNames).join(","),
-      },
-      android: {
-        priority: "high",
-        notification: {channelId: "kidzone_general"},
-      },
+      data: {type: "new_badge", badges: (toGrant.length > 0 ? toGrant : toRevoke).join(",")},
+      android: {priority: "high", notification: {channelId: "kidzone_general"}},
     };
 
     try {
       const response = await admin.messaging().sendEachForMulticast(message);
-      console.log(`Badge push for user ${userId}: ${response.successCount} ok`);
+      console.log(`Badge push for ${userId}: ${response.successCount} ok`);
       await cleanStaleTokens(response, fcmTokens, userId);
     } catch (err) {
       console.error("Badge push error:", err);
