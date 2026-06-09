@@ -554,6 +554,11 @@ przy pierwszym wejściu, `AddPlaceScreen` przy kliknięciu "Pobierz lokalizację
 | FCM token registration po zalogowaniu (MainScreen)   | ✅     |
 | POST_NOTIFICATIONS permission request (Android 13+)  | ✅     |
 | Dev versioning: PR number / commit hash (nie "local") | ✅     |
+| Push: nowa opinia na Twoim miejscu (FCM)              | ✅     |
+| Push: Twoje miejsce w TOP 10 (FCM)                    | ✅     |
+| Push: nowe miejsce w okolicy (FCM)                    | ✅     |
+| Push: nowa odznaka zdobyta (FCM)                      | ✅     |
+| Preferencje powiadomień respektowane server-side       | ✅     |
 
 ## Cloud Functions (backend)
 
@@ -570,6 +575,10 @@ triggerowane przez zapis/usunięcie dokumentu w Firestore:
 | `onUserDeleted` | `users` (onDelete) | Email pożegnalny do usera + powiadomienie admina |
 | `adminDeletePhoto` | HTTP endpoint | Usuwa zdjęcie z Storage + czyści URL z reviews/places + oznacza report jako resolved |
 | `adminDismissPhotoReport` | HTTP endpoint | Oznacza zgłoszenie zdjęcia jako dismissed (zdjęcie zostaje) |
+| `onReviewCreatedPush` | `reviews` (onCreate) | FCM push do właściciela miejsca: "X ocenił/a Twoje miejsce" |
+| `onReviewCreatedTopRank` | `reviews` (onCreate) | FCM push gdy miejsce wchodzi do TOP 10 po nowej opinii |
+| `onPlaceCreatedNearby` | `places` (onCreate) | FCM push do wszystkich userów: "Nowe miejsce w kidZone" |
+| `onBadgeEarned` | `users` (onUpdate) | FCM push po zdobyciu nowej odznaki (badgeEarnedAt diff) |
 
 Email zawiera: nazwę miejsca, dane zgłaszającego (imię, email, UID),
 powód / proponowane zmiany (zmapowane na czytelne polskie etykiety) +

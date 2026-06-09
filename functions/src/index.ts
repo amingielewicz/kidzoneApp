@@ -829,3 +829,302 @@ export const onReviewCreatedPush = onDocumentCreated(
     }
   }
 );
+
+
+
+// --- Trigger: nowa opinia podnosi miejsce do TOP 10 → push do właściciela ---
+export const onReviewCreatedTopRank = onDocumentCreated(
+  {
+    document: "reviews/{reviewId}",
+  },
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+
+    const placeId = data.placeId || "";
+    if (!placeId) return;
+
+    // Po dodaniu opinii przeliczamy, czy miejsce właśnie weszło do TOP 10.
+    // Pobieramy TOP 11 (żeby wiedzieć, że nasze jest w 10, a nie 11).
+    const topSnap = await db.collection("places")
+      .orderBy("averageRating", "desc")
+      .where("reviewsCount", ">", 0)
+      .limit(11)
+      .get();
+
+    const topPlaceIds = topSnap.docs.map((doc) => doc.id);
+    const rank = topPlaceIds.indexOf(placeId);
+    if (rank < 0 || rank >= 10) return; // nie jest w TOP 10
+
+    // Pobierz miejsce i właściciela
+    const placeDoc = await db.collection("places").doc(placeId).get();
+    if (!placeDoc.exists) return;
+    const placeData = placeDoc.data();
+    const ownerUserId = placeData?.ownerUserId || "";
+    const placeName = placeData?.name || "Twoje miejsce";
+
+    if (!ownerUserId) return;
+
+    // Nie wysyłaj jeśli autor opinii = właściciel (edge case)
+    if (data.userId === ownerUserId) return;
+
+    const ownerDoc = await db.collection("users").doc(ownerUserId).get();
+    if (!ownerDoc.exists) return;
+    const ownerData = ownerDoc.data();
+    const fcmTokens: string[] = ownerData?.fcmTokens || [];
+
+    if (fcmTokens.length === 0) return;
+
+    // Sprawdź preferencje
+    const notifPrefs = ownerData?.notificationPreferences || {};
+    if (notifPrefs.placeInTopRanking === false) return;
+
+    // Sprawdź czy już wysyłaliśmy push o TOP 10 dla tego miejsca
+    // (żeby nie spamować przy każdej nowej opinii gdy miejsce jest w TOP).
+    // Prosta heurystyka: jeśli averageRating nie zmieniła się (opinia nie
+    // podniosła oceny) — pomijamy. Ale nie mamy starej wartości tu, więc
+    // korzystamy z pola w place: lastTopRankNotifiedAt.
+    const lastNotified = placeData?.lastTopRankNotifiedAt || 0;
+    const now = Date.now();
+    // Nie wysyłaj częściej niż raz na 24h dla tego samego miejsca
+    if (now - lastNotified < 24 * 60 * 60 * 1000) return;
+
+    const position = rank + 1; // 1-based
+
+    const message: admin.messaging.MulticastMessage = {
+      tokens: fcmTokens,
+      notification: {
+        title: `🏆 „${placeName}" w TOP ${position}!`,
+        body: `Twoje miejsce jest na ${position}. pozycji w rankingu najlepszych miejsc kidZone!`,
+      },
+      data: {
+        type: "place_top_rank",
+        placeId: placeId,
+        rank: String(position),
+      },
+      android: {
+        priority: "high",
+        notification: {channelId: "kidzone_general"},
+      },
+    };
+
+    try {
+      const response = await admin.messaging().sendEachForMulticast(message);
+      console.log(
+        `TOP rank push for place ${placeId} (rank #${position}): ` +
+        `${response.successCount} success, ${response.failureCount} failure`
+      );
+
+      // Zapisz timestamp żeby nie spamować
+      await db.collection("places").doc(placeId).update({
+        lastTopRankNotifiedAt: now,
+      });
+
+      // Wyczyść stale tokens
+      await cleanStaleTokens(response, fcmTokens, ownerUserId);
+    } catch (err) {
+      console.error("Top rank push error:", err);
+    }
+  }
+);
+
+
+// --- Trigger: nowe miejsce → push do userów w okolicy ---
+export const onPlaceCreatedNearby = onDocumentCreated(
+  {
+    document: "places/{placeId}",
+  },
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+
+    const placeId = event.params.placeId;
+    const placeName = data.name || "Nowe miejsce";
+    const placeLat = data.latitude || 0;
+    const placeLng = data.longitude || 0;
+    const ownerUserId = data.ownerUserId || "";
+    const categoryKey = data.category || "";
+
+    if (!placeLat || !placeLng) return;
+
+    // Geohash-based: nowe miejsce → szukamy userów którzy mają miejsce
+    // w promieniu 10km (po ich ostatnich znanych lokalizacjach).
+    //
+    // Problem: nie trzymamy lokalizacji userów w Firestore.
+    // Rozwiązanie: wysyłamy push do WSZYSTKICH userów z tokenami, którzy
+    // mają włączoną preferencję `newPlaceNearby`, a klient filtruje po GPS.
+    //
+    // Alternatywa (lepsza, ale droższa): topic-based z geohash prefix.
+    // Dla MVP: push do wszystkich z preferencją (userów nie będzie milion).
+    //
+    // UWAGA: To podejście działa dobrze do ~1000 userów. Powyżej
+    // potrzebna jest paginacja lub topics.
+
+    const usersSnap = await db.collection("users")
+      .where("fcmTokens", "!=", [])
+      .limit(500) // safety cap dla MVP
+      .get();
+
+    if (usersSnap.empty) return;
+
+    const categoryLabel = mapCategory(categoryKey).split(" [")[0]; // human-readable
+
+    let sentCount = 0;
+    for (const userDoc of usersSnap.docs) {
+      const userId = userDoc.id;
+      // Nie wysyłaj do właściciela (sam wie że dodał)
+      if (userId === ownerUserId) continue;
+
+      const userData = userDoc.data();
+      const tokens: string[] = userData.fcmTokens || [];
+      if (tokens.length === 0) continue;
+
+      // Sprawdź preferencje
+      const notifPrefs = userData.notificationPreferences || {};
+      if (notifPrefs.newPlaceNearby === false) continue;
+
+      const message: admin.messaging.MulticastMessage = {
+        tokens: tokens,
+        notification: {
+          title: `📍 Nowe miejsce: „${placeName}"`,
+          body: `${categoryLabel} zostało dodane w kidZone. Sprawdź czy jest blisko Ciebie!`,
+        },
+        data: {
+          type: "new_place_nearby",
+          placeId: placeId,
+          latitude: String(placeLat),
+          longitude: String(placeLng),
+        },
+        android: {
+          priority: "normal",
+          notification: {channelId: "kidzone_general"},
+        },
+      };
+
+      try {
+        const response = await admin.messaging().sendEachForMulticast(message);
+        sentCount += response.successCount;
+        await cleanStaleTokens(response, tokens, userId);
+      } catch (err) {
+        console.warn(`Push to user ${userId} failed:`, err);
+      }
+    }
+
+    console.log(`New place nearby push for ${placeId}: sent to ${sentCount} devices`);
+  }
+);
+
+
+// --- Trigger: nowa odznaka zdobyta → push do usera (gdy apka zamknięta) ---
+// Wykrywamy to po zapisie `badgeEarnedAt` na dokumencie usera.
+// Gdy klient zapisuje nowe odznaki (dot-notation merge), firebase triggeruje update.
+import {onDocumentUpdated} from "firebase-functions/v2/firestore";
+
+export const onBadgeEarned = onDocumentUpdated(
+  {
+    document: "users/{userId}",
+  },
+  async (event) => {
+    const beforeData = event.data?.before?.data();
+    const afterData = event.data?.after?.data();
+    if (!beforeData || !afterData) return;
+
+    const beforeBadges: Record<string, number> = beforeData.badgeEarnedAt || {};
+    const afterBadges: Record<string, number> = afterData.badgeEarnedAt || {};
+
+    // Wykryj nowo dodane odznaki
+    const newBadgeNames = Object.keys(afterBadges).filter(
+      (badge) => !(badge in beforeBadges)
+    );
+
+    if (newBadgeNames.length === 0) return;
+
+    const userId = event.params.userId;
+    const fcmTokens: string[] = afterData.fcmTokens || [];
+    if (fcmTokens.length === 0) return;
+
+    // Sprawdź preferencje
+    const notifPrefs = afterData.notificationPreferences || {};
+    if (notifPrefs.newBadgeEarned === false) return;
+
+    const badgeLabels: Record<string, string> = {
+      "FIRST_PLACE": "Pierwszy ślad",
+      "FIRST_REVIEW": "Pierwsza opinia",
+      "EXPLORER": "Odkrywca",
+      "CARTOGRAPHER": "Kartograf",
+      "TRACKER": "Tropiciel",
+      "REVIEWER": "Recenzent",
+      "CRITIC": "Krytyk",
+      "SEASONED_REVIEWER": "Wytrawny recenzent",
+      "COMMUNITY_PILLAR": "Filar społeczności",
+      "FAMILY_EXPERT": "Ekspert rodzinny",
+      "BRONZE_LEADER": "Brązowy lider",
+      "SILVER_LEADER": "Srebrny lider",
+      "GOLD_LEADER": "Złoty lider",
+      "LOCAL_FAVORITE": "Lokalny faworyt",
+      "PLAY_ARCHITECT": "Architekt zabawy",
+    };
+
+    const badgeNamesHuman = newBadgeNames
+      .map((b) => badgeLabels[b] || b)
+      .join(", ");
+
+    const title = newBadgeNames.length === 1
+      ? `🏅 Nowa odznaka: ${badgeNamesHuman}!`
+      : `🏅 Nowe odznaki: ${badgeNamesHuman}!`;
+
+    const body = "Otwórz profil w kidZone, by zobaczyć swoje osiągnięcia.";
+
+    const message: admin.messaging.MulticastMessage = {
+      tokens: fcmTokens,
+      notification: {title, body},
+      data: {
+        type: "new_badge",
+        badges: newBadgeNames.join(","),
+      },
+      android: {
+        priority: "high",
+        notification: {channelId: "kidzone_general"},
+      },
+    };
+
+    try {
+      const response = await admin.messaging().sendEachForMulticast(message);
+      console.log(
+        `Badge push for user ${userId} (${badgeNamesHuman}): ` +
+        `${response.successCount} success, ${response.failureCount} failure`
+      );
+      await cleanStaleTokens(response, fcmTokens, userId);
+    } catch (err) {
+      console.error("Badge push error:", err);
+    }
+  }
+);
+
+
+// --- Helper: usuwanie stale tokenów po wysyłce ---
+async function cleanStaleTokens(
+  response: admin.messaging.BatchResponse,
+  tokens: string[],
+  userId: string
+): Promise<void> {
+  const tokensToRemove: string[] = [];
+  response.responses.forEach((resp, idx) => {
+    if (resp.error) {
+      const code = resp.error.code;
+      if (
+        code === "messaging/invalid-registration-token" ||
+        code === "messaging/registration-token-not-registered"
+      ) {
+        tokensToRemove.push(tokens[idx]);
+      }
+    }
+  });
+
+  if (tokensToRemove.length > 0) {
+    await db.collection("users").doc(userId).update({
+      fcmTokens: admin.firestore.FieldValue.arrayRemove(...tokensToRemove),
+    });
+    console.log(`Removed ${tokensToRemove.length} stale tokens for user ${userId}`);
+  }
+}
