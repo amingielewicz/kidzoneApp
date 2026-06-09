@@ -119,16 +119,16 @@ export function DashboardPage() {
       const reviewsSnap = await getDocs(query(collection(db, 'reviews'), orderBy('createdAtMillis', 'desc'), limit(5)));
       setRecentReviews(reviewsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as RecentReview)));
 
-      // Recent reports (pending)
-      const [prSnap, rrSnap, phSnap] = await Promise.all([
-        getDocs(query(collection(db, 'place_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'), limit(5))),
-        getDocs(query(collection(db, 'review_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'), limit(5))),
-        getDocs(query(collection(db, 'photo_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'), limit(5))),
+      // Recent reports (pending) - no orderBy to avoid composite index requirement
+      const [prSnap2, rrSnap2, phSnap2] = await Promise.all([
+        getDocs(query(collection(db, 'place_reports'), where('status', '==', 'pending'))),
+        getDocs(query(collection(db, 'review_reports'), where('status', '==', 'pending'))),
+        getDocs(query(collection(db, 'photo_reports'), where('status', '==', 'pending'))),
       ]);
       const reports: RecentReport[] = [
-        ...prSnap.docs.map((d) => ({ id: d.id, type: 'place' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
-        ...rrSnap.docs.map((d) => ({ id: d.id, type: 'review' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
-        ...phSnap.docs.map((d) => ({ id: d.id, type: 'photo' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
+        ...prSnap2.docs.map((d) => ({ id: d.id, type: 'place' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
+        ...rrSnap2.docs.map((d) => ({ id: d.id, type: 'review' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
+        ...phSnap2.docs.map((d) => ({ id: d.id, type: 'photo' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
       ];
       reports.sort((a, b) => b.createdAtMillis - a.createdAtMillis);
       setRecentReports(reports.slice(0, 5));

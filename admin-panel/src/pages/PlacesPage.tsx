@@ -537,7 +537,8 @@ export function PlacesPage() {
                     </Grid>
                   </Grid>
 
-                  <TextField label="Właściciel (UID)" value={editOwner} onChange={(e) => setEditOwner(e.target.value)} fullWidth size="small" helperText={ownerEmail ? `Email: ${ownerEmail}` : ''} />
+                  <TextField label="Właściciel (UID)" value={editOwner} onChange={(e) => setEditOwner(e.target.value)} fullWidth size="small" />
+                  {ownerEmail && <Typography variant="body2" color="text.secondary">Email właściciela: <strong>{ownerEmail}</strong></Typography>}
 
                   <Typography variant="subtitle2" mt={1}>Udogodnienia:</Typography>
                   <Box display="flex" flexWrap="wrap" gap={0}>
