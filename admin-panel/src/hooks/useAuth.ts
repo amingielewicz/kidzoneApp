@@ -2,11 +2,15 @@ import { useState, useEffect } from 'react';
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut as firebaseSignOut,
   User,
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
+
+const googleProvider = new GoogleAuthProvider();
 
 interface AuthState {
   user: User | null;
@@ -50,9 +54,20 @@ export function useAuth() {
     }
   };
 
+  const signInWithGoogle = async () => {
+    try {
+      setState((prev) => ({ ...prev, loading: true, error: null }));
+      await signInWithPopup(auth, googleProvider);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Nie udało się zalogować przez Google';
+      setState((prev) => ({ ...prev, loading: false, error: message }));
+    }
+  };
+
   const signOut = async () => {
     await firebaseSignOut(auth);
   };
 
-  return { ...state, signIn, signOut };
+  return { ...state, signIn, signInWithGoogle, signOut };
 }

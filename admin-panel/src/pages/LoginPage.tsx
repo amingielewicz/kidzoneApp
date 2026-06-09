@@ -8,14 +8,16 @@ import {
   Typography,
   Alert,
   CircularProgress,
+  Divider,
 } from '@mui/material';
 import LockIcon from '@mui/icons-material/Lock';
+import GoogleIcon from '@mui/icons-material/Google';
 import { useAuth } from '../hooks/useAuth';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { signIn, loading, error, user, isAdmin } = useAuth();
+  const { signIn, signInWithGoogle, loading, error, user, isAdmin } = useAuth();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -69,6 +71,35 @@ export function LoginPage() {
             </Alert>
           )}
 
+          {/* Google Sign-In */}
+          <Button
+            fullWidth
+            variant="outlined"
+            size="large"
+            startIcon={<GoogleIcon />}
+            disabled={loading}
+            onClick={signInWithGoogle}
+            sx={{
+              mb: 2,
+              borderColor: '#dadce0',
+              color: '#3c4043',
+              textTransform: 'none',
+              fontWeight: 500,
+              '&:hover': {
+                borderColor: '#d2e3fc',
+                bgcolor: '#f8faff',
+              },
+            }}
+          >
+            {loading ? <CircularProgress size={24} /> : 'Zaloguj się przez Google'}
+          </Button>
+
+          <Divider sx={{ my: 2 }}>
+            <Typography variant="caption" color="text.secondary">
+              lub email i hasło
+            </Typography>
+          </Divider>
+
           <form onSubmit={handleSubmit}>
             <TextField
               fullWidth
@@ -78,7 +109,6 @@ export function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               margin="normal"
               required
-              autoFocus
             />
             <TextField
               fullWidth
@@ -95,7 +125,7 @@ export function LoginPage() {
               variant="contained"
               size="large"
               disabled={loading}
-              sx={{ mt: 3 }}
+              sx={{ mt: 2 }}
             >
               {loading ? <CircularProgress size={24} /> : 'Zaloguj się'}
             </Button>
