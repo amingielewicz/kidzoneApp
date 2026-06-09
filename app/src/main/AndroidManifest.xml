@@ -41,14 +41,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Deep linking: https://kidzone.pl/place/{placeId} -->
+            <!-- Deep linking: https://playground-705e7162.web.app/place/{placeId} -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
-                    android:host="kidzone.pl"
+                    android:host="playground-705e7162.web.app"
                     android:pathPrefix="/place/" />
             </intent-filter>
 
