@@ -10,8 +10,9 @@
     <meta property="og:description" content="Najlepsze miejsca dla dzieci w Twojej okolicy. Place zabaw, parki, atrakcje.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://playground-705e7162.web.app">
+    <meta property="og:image" content="https://playground-705e7162.web.app/logo.png">
 
-    <!-- Android App Link: intent:// fallback -->
+    <!-- Android App Link -->
     <link rel="alternate" href="android-app://com.kidzone/kidzone/place/">
 
     <style>
@@ -47,13 +48,6 @@
             margin-bottom: 8px;
         }
 
-        .brand {
-            font-size: 28px;
-            font-weight: 700;
-            color: #1E88E5;
-            margin-bottom: 8px;
-        }
-
         .tagline {
             font-size: 14px;
             color: #666;
@@ -76,66 +70,29 @@
 
         .btn {
             display: inline-block;
-            padding: 14px 32px;
+            padding: 16px 40px;
             border-radius: 12px;
             text-decoration: none;
             font-size: 16px;
             font-weight: 600;
             transition: transform 0.2s, box-shadow 0.2s;
+            background: #1E88E5;
+            color: white;
         }
 
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 16px rgba(30, 136, 229, 0.4);
         }
 
-        .btn-primary {
-            background: #1E88E5;
-            color: white;
-            margin-bottom: 12px;
-        }
-
-        .btn-secondary {
-            background: #43A047;
-            color: white;
-        }
-
-        .btn-open {
-            background: #FFC93C;
-            color: #1A1A1A;
-            margin-bottom: 12px;
-        }
-
-        .buttons {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
+        .btn:active {
+            transform: translateY(0);
         }
 
         .footer {
             margin-top: 24px;
             font-size: 12px;
             color: #999;
-        }
-
-        .spinner {
-            display: none;
-            margin: 16px auto;
-            width: 32px;
-            height: 32px;
-            border: 3px solid #E3F2FD;
-            border-top-color: #1E88E5;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        .spinner.active {
-            display: block;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -149,75 +106,52 @@
             Otwórz w aplikacji kidZone, aby zobaczyć szczegóły, zdjęcia i opinie innych rodziców.
         </div>
 
-        <div class="spinner" id="spinner"></div>
-
-        <div class="buttons" id="buttons">
-            <a class="btn btn-open" id="btn-open" href="#">Otwórz w kidZone</a>
-            <a class="btn btn-primary" id="btn-store"
-               href="https://play.google.com/store/apps/details?id=com.kidzone">
-                Pobierz z Google Play
-            </a>
-        </div>
+        <a class="btn" id="btn-open" href="#">Otwórz w kidZone</a>
 
         <div class="footer">
-            Nie masz aplikacji? Pobierz ją za darmo z Google Play.
+            Jeśli nie masz aplikacji, zostaniesz przekierowany do Google Play.
         </div>
     </div>
 
     <script>
         (function() {
-            // Wyciągnij placeId z URL: /place/{placeId} lub /place/index.html?id={placeId}
+            // Wyciągnij placeId z URL: /place/{placeId}
             var path = window.location.pathname;
             var segments = path.split('/').filter(Boolean);
             var placeId = '';
 
-            // /place/{placeId} format
             if (segments.length >= 2 && segments[0] === 'place') {
                 placeId = segments[1];
-                // Nie bierz "index.html" jako placeId
                 if (placeId === 'index.html') placeId = '';
             }
 
-            // Fallback: ?id= query param
             if (!placeId) {
                 var params = new URLSearchParams(window.location.search);
                 placeId = params.get('id') || '';
             }
 
-            var deepLink = placeId
-                ? 'kidzone://place/' + placeId
-                : 'kidzone://';
-            var webLink = placeId
-                ? 'https://playground-705e7162.web.app/place/' + placeId
-                : 'https://playground-705e7162.web.app';
+            // Intent URL: próbuje otworzyć apkę, a jak nie ma — fallback do Play Store
+            var intentUrl = 'intent://place/' + (placeId || '')
+                + '#Intent;scheme=kidzone;package=com.kidzone;'
+                + 'S.browser_fallback_url=' + encodeURIComponent(
+                    'https://play.google.com/store/apps/details?id=com.kidzone'
+                ) + ';end';
 
-            // Ustaw link "Otwórz w kidZone"
+            // Ustaw link przycisku
             var btnOpen = document.getElementById('btn-open');
-            btnOpen.href = deepLink;
+            btnOpen.href = intentUrl;
 
-            // Próba automatycznego otwarcia w appce (intent-based)
-            // Jeśli nie zadziała w ciągu 2s, user kliknie ręcznie
+            // Na Androidzie: auto-redirect po 600ms (apka się otworzy lub Play Store)
             var isAndroid = /android/i.test(navigator.userAgent);
-            var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-
             if (isAndroid && placeId) {
-                // Spróbuj intent:// scheme (otworzy appkę bez pytania)
-                var intentUrl = 'intent://place/' + placeId
-                    + '#Intent;scheme=kidzone;package=com.kidzone;'
-                    + 'S.browser_fallback_url=' + encodeURIComponent(
-                        'https://play.google.com/store/apps/details?id=com.kidzone'
-                    ) + ';end';
-                btnOpen.href = intentUrl;
-
-                // Auto-redirect po krótkim opóźnieniu
-                var spinner = document.getElementById('spinner');
-                spinner.classList.add('active');
                 setTimeout(function() {
                     window.location.href = intentUrl;
-                }, 500);
-                setTimeout(function() {
-                    spinner.classList.remove('active');
-                }, 2500);
+                }, 600);
+            }
+
+            // Na iOS / desktop: fallback do Play Store (bo apki iOS nie ma)
+            if (!isAndroid) {
+                btnOpen.href = 'https://play.google.com/store/apps/details?id=com.kidzone';
             }
         })();
     </script>
