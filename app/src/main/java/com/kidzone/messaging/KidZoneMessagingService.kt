@@ -45,9 +45,16 @@ class KidZoneMessagingService : FirebaseMessagingService() {
         val channelId = CHANNEL_GENERAL
         ensureNotificationChannel(channelId)
 
-        // Deep link URI na podstawie typu powiadomienia — klik w notyfikację
-        // otwiera odpowiedni ekran (Navigation Compose obsługuje te URI).
         val deepLinkUri = buildDeepLinkUri(data)
+
+        // Zapisz deep link w SharedPreferences — przetrwa kill process.
+        // NavGraph odczyta go po starcie apki i nawiguje.
+        if (deepLinkUri != null) {
+            getSharedPreferences("push_deep_links", MODE_PRIVATE)
+                .edit()
+                .putString("pending_deep_link", deepLinkUri)
+                .apply()
+        }
 
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK

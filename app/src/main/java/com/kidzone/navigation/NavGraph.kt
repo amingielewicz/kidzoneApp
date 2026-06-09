@@ -38,12 +38,22 @@ fun KidZoneNavGraph(
     navController: NavHostController = rememberNavController(),
     intent: android.content.Intent? = null
 ) {
-    // Deep link z push notification — konsumujemy po zalogowaniu.
+    val context = androidx.compose.ui.platform.LocalContext.current
     val pendingDeepLink = androidx.compose.runtime.remember {
         val uriFromData = intent?.data
         val uriFromExtra = intent?.getStringExtra("deepLink")?.let { android.net.Uri.parse(it) }
-        mutableStateOf(uriFromData ?: uriFromExtra)
+        // Fallback: odczytaj z SharedPreferences (przetrwa kill process na MIUI)
+        val uriFromPrefs = context.getSharedPreferences("push_deep_links", android.content.Context.MODE_PRIVATE)
+            .getString("pending_deep_link", null)
+            ?.let { android.net.Uri.parse(it) }
+        // Wyczyść po odczytaniu
+        if (uriFromPrefs != null) {
+            context.getSharedPreferences("push_deep_links", android.content.Context.MODE_PRIVATE)
+                .edit().remove("pending_deep_link").apply()
+        }
+        mutableStateOf(uriFromData ?: uriFromExtra ?: uriFromPrefs)
     }
+
 
     NavHost(
         navController = navController,
