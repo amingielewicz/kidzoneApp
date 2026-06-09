@@ -568,7 +568,7 @@ export const onUserDeleted = onDocumentDeleted(
 
 // --- HTTP Endpoint: Admin usuwa zgłoszone zdjęcie ---
 export const adminDeletePhoto = onRequest(
-  {secrets: [gmailEmail, gmailPassword, adminEmail]},
+  {secrets: [gmailEmail, gmailPassword, adminEmail], cors: true},
   async (req, res) => {
     const reportId = req.query.reportId as string;
     if (!reportId) {
@@ -654,7 +654,7 @@ export const adminDeletePhoto = onRequest(
 
 // --- HTTP Endpoint: Admin odrzuca zgłoszenie zdjęcia ---
 export const adminDismissPhotoReport = onRequest(
-  {secrets: [gmailEmail, gmailPassword, adminEmail]},
+  {secrets: [gmailEmail, gmailPassword, adminEmail], cors: true},
   async (req, res) => {
     const reportId = req.query.reportId as string;
     if (!reportId) {
