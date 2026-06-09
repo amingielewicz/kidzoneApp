@@ -19,9 +19,9 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.RateReview
 import androidx.compose.material.icons.filled.ChildCare
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -80,7 +80,7 @@ private val onboardingPages = listOf(
         backgroundColor = Color(0xFFE8F5E9) // light green tint
     ),
     OnboardingPage(
-        icon = Icons.AutoMirrored.Filled.RateReview,
+        icon = Icons.Filled.RateReview,
         iconTint = BrandYellow,
         title = "Dziel sie opiniami",
         description = "Dodawaj miejsca, wystawiaj opinie i pomagaj innym rodzicom w wyborze. Zdobywaj odznaki za aktywnosc!",
