@@ -156,3 +156,39 @@ fun GpsAcquiringBanner(modifier: Modifier = Modifier) {
         }
     }
 }
+
+
+
+/**
+ * Banner "Brak uprawnienia lokalizacji" — wyświetlany gdy user nie nadał
+ * uprawnienia ACCESS_FINE_LOCATION, ale próbuje użyć funkcji wymagającej GPS
+ * (np. sortowanie "Najbliższe" na liście). Kieruje na zakładkę Mapa
+ * (gdzie jest pełny banner z przyciskami "Pozwól" / "Ustawienia").
+ */
+@Composable
+fun NoLocationPermissionBanner(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        tonalElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Filled.GpsOff,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "Brak uprawnienia lokalizacji. Nadaj je na zak\u0142adce Mapa.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}

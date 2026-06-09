@@ -199,10 +199,16 @@ fun PlaceListScreen(
             onSortOrderChange = viewModel::onSortOrderChange
         )
 
-        // Banner informujący o wyłączonej lokalizacji - standardowy GpsDisabledBanner
-        // (wystarczy "Lokalizacja wyłączona, Włącz GPS")
+        // Banner informujący o braku lokalizacji (sort=NEAREST ale brak fixu).
+        // Rozróżniamy: brak uprawnienia vs GPS wyłączony.
         if (state.nearestUnavailable) {
-            com.kidzone.presentation.common.GpsDisabledBanner()
+            if (!hasLocationPermission(context)) {
+                // Brak uprawnienia — nie pokazuj "GPS wyłączony"
+                // User zobaczy prośbę o uprawnienie na zakładce Mapa.
+                com.kidzone.presentation.common.NoLocationPermissionBanner()
+            } else if (!gpsEnabled) {
+                com.kidzone.presentation.common.GpsDisabledBanner()
+            }
         }
 
         // Banner GPS disabled - when permission granted, sort=NEAREST, but

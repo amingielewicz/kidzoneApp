@@ -94,26 +94,14 @@ fun MainScreen(
     val context = LocalContext.current
     val networkStatus by rememberNetworkStatus()
 
-    // --- Uprawnienia: POST_NOTIFICATIONS + ACCESS_FINE_LOCATION ---
-    // Wymuszamy oba uprawnienia po kolei przy pierwszym wejściu do MainScreen.
-    // Notification → Location (sekwencyjnie, żeby system dialogi nie walczyły).
-
-    val locationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
-    ) { /* granted or denied — MapScreen zareaguje sam */ }
-
+    // --- POST_NOTIFICATIONS permission (Android 13+) ---
+    // Tylko powiadomienia requestowane tu. Lokalizacja jest requestowana
+    // w MapScreen (naturalny moment — user wchodzi na mapę i widzi banner).
+    // Requestowanie lokalizacji tutaj powodowało na MIUI permanent deny
+    // (jeden odmów = koniec, MapScreen nie mógł już poprosić).
     val notificationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
-    ) { _ ->
-        // Po zakończeniu dialogu powiadomień → od razu prosimy o lokalizację
-        val locPermission = android.Manifest.permission.ACCESS_FINE_LOCATION
-        val locGranted = androidx.core.content.ContextCompat.checkSelfPermission(
-            context, locPermission
-        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        if (!locGranted) {
-            locationPermissionLauncher.launch(locPermission)
-        }
-    }
+    ) { /* granted or denied */ }
 
     LaunchedEffect(Unit) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -123,25 +111,6 @@ fun MainScreen(
             ) == android.content.pm.PackageManager.PERMISSION_GRANTED
             if (!notifGranted) {
                 notificationPermissionLauncher.launch(notifPermission)
-            } else {
-                // Powiadomienia już nadane → proś od razu o lokalizację
-                val locPermission = android.Manifest.permission.ACCESS_FINE_LOCATION
-                val locGranted = androidx.core.content.ContextCompat.checkSelfPermission(
-                    context, locPermission
-                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                if (!locGranted) {
-                    locationPermissionLauncher.launch(locPermission)
-                }
-            }
-        } else {
-            // Android < 13: powiadomienia nie wymagają runtime permission,
-            // ale lokalizacja dalej wymaga.
-            val locPermission = android.Manifest.permission.ACCESS_FINE_LOCATION
-            val locGranted = androidx.core.content.ContextCompat.checkSelfPermission(
-                context, locPermission
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            if (!locGranted) {
-                locationPermissionLauncher.launch(locPermission)
             }
         }
     }
