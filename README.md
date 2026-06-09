@@ -612,3 +612,73 @@ developera znającego projekt; w zespole 2-osobowym czas kalendarzowy
 - [x] Edycja zdjęć w opiniach (dodawanie nowych + usuwanie istniejących)
 - [x] Zgłoszenie zdjęcia (dialog + Firestore `photo_reports` + Cloud Function email z miniaturką + przyciski admin: Usuń/Odrzuć)
 
+
+
+## Monetyzacja — Rekomendacja modelu
+
+### Podsumowanie
+
+kidZone to społecznościowa aplikacja community-driven. Kluczowe jest utrzymanie
+niskiej bariery wejścia (darmowy dostęp do core) przy jednoczesnym generowaniu
+przychodu pokrywającego koszty infrastruktury (Firebase Blaze).
+
+### Rekomendowany model: Mieszany (Reklamy natywne + Subskrypcja Premium)
+
+| Model | Zalety | Wady | Potencjał (12 msc, 10k MAU) | Ocena |
+|-------|--------|------|------------------------------|-------|
+| Jednorazowy zakup | Prosty | Śmiertelna bariera wejścia dla community app | ~3 000 PLN | 2/10 |
+| Freemium (jednorazowe PRO) | Niska bariera | Brak recurring revenue | ~9 000 PLN | 5/10 |
+| Subskrypcja | Recurring, pokrywa koszty | Trudno uzasadnić ciągłą wartość | ~18 000 PLN | 6/10 |
+| Reklamy | Zero bariery | Niskie CPM w PL, irytuje rodziców | ~6 000 PLN | 4/10 |
+| **🏆 Mieszany (reklamy + sub)** | **Monetyzuje obie grupy, recurring + ad revenue** | Złożoność implementacji | **~22 000 PLN** | **8/10** |
+
+### Funkcje darmowe (zawsze)
+
+- Przeglądanie mapy i listy miejsc
+- Dodawanie miejsc (bez limitu) — content supply
+- Dodawanie opinii (bez limitu) — buduje społeczność
+- Filtry kategorii i podstawowe sortowanie
+- Profil, odznaki, ranking — gamifikacja retencji
+- GPS i "Blisko Ciebie"
+- Upload do 3 zdjęć na opinię/miejsce
+- Zgłaszanie naruszeń
+- Push notifications podstawowe (odznaki)
+
+### Funkcje Premium (za paywallem)
+
+- 🚫 Brak reklam
+- ⭐ Lista ulubionych / Zapisane miejsca
+- 🔔 Push premium (nowe miejsce w promieniu X km, zmiana oceny ulubionego)
+- 📸 Nieograniczone zdjęcia (free: 3, premium: ∞)
+- 📊 Zaawansowane filtry (min. ocena, promień km, wiele kategorii naraz)
+- 📱 Widget "Blisko Ciebie"
+- 🏅 Odznaka "Premium" w profilu + ranking
+- 🗺️ Eksport trasy (wybrane miejsca → nawigacja Google Maps)
+
+### Cennik
+
+| Plan | Polska (PLN) | Globalnie (USD) |
+|------|-------------|-----------------|
+| Miesięczny | 9.99 PLN/msc | 2.99 USD/msc |
+| Roczny (najpopularniejszy) | 49.99 PLN/rok (~4.17 PLN/msc) | 14.99 USD/rok |
+| Trial | 7 dni za darmo | 7 dni za darmo |
+
+### Fazowe wdrożenie
+
+| Faza | Okres | Działanie |
+|------|-------|-----------|
+| 1 | 0-3 msc | 100% darmowe, budowanie bazy 1000+ miejsc / 3000+ userów |
+| 2 | 3-6 msc | Reklamy natywne AdMob w listach (co 8. element) |
+| 3 | 6-9 msc | Subskrypcja Premium (Google Play Billing, trial 7 dni) |
+| 4 | 9-12 msc | A/B testy cen, paywall triggers, push premium |
+
+### Implementacja techniczna
+
+- Google Play Billing Library (zależność `play-billing` + `play-billing-ktx`)
+- `BillingClient` w warstwie `data/billing/`
+- `SubscriptionRepository` interfejs w `domain/repository/`
+- `PremiumStatus` flow w ViewModelach (gates na premium features)
+- AdMob SDK (`com.google.android.gms:play-services-ads`) dla reklam natywnych
+- Firestore pole `users/{uid}.isPremium` + Cloud Function webhook do weryfikacji
+- Ekran paywall: `presentation/premium/PaywallScreen.kt`
+

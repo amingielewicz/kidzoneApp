@@ -2,6 +2,7 @@ package com.kidzone.presentation.auth
 
 import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.util.Log
 import androidx.credentials.CredentialManager
@@ -36,16 +37,39 @@ sealed class GoogleSignInResult {
 }
 
 /**
+ * Wyciąga [Activity] z [Context] (nawet jeśli to [ContextWrapper]).
+ *
+ * Credential Manager wymaga Activity-based context do uruchomienia
+ * selectora kont. Compose `LocalContext.current` czasem zwraca
+ * ContextWrapper (np. w preview, testach, lub na niektórych OEM-ach
+ * jak Xiaomi/MIUI), co powoduje crash "Failed to launch the selector UI".
+ *
+ * @return Activity lub null jeśli kontekst nie jest powiązany z Activity.
+ */
+fun Context.findActivity(): Activity? {
+    var ctx = this
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return if (ctx is Activity) ctx else null
+}
+
+/**
  * Próbuje logowanie przez Credential Manager (nowe API, Android 14+).
  * Jeśli Credential Manager zwróci błąd (np. na Xiaomi/MIUI, starszych
  * urządzeniach, emulatorze bez Google Play) – zwraca [GoogleSignInResult.FallbackToLegacy],
  * sygnalizując UI że powinno użyć legacy Intent-based flow.
+ *
+ * **WAŻNE:** [activityContext] musi być Activity (nie application/service context).
+ * Credential Manager wymaga Activity do wyświetlenia selectora kont.
+ * Użyj [findActivity] do wyciągnięcia Activity z Compose `LocalContext.current`.
  */
 suspend fun launchGoogleSignIn(
-    context: Context,
+    activityContext: Activity,
     webClientId: String
 ): GoogleSignInResult {
-    val credentialManager = CredentialManager.create(context)
+    val credentialManager = CredentialManager.create(activityContext)
 
     val googleIdOption = GetSignInWithGoogleOption.Builder(webClientId)
         .build()
@@ -55,7 +79,7 @@ suspend fun launchGoogleSignIn(
         .build()
 
     return try {
-        val response = credentialManager.getCredential(context, request)
+        val response = credentialManager.getCredential(activityContext, request)
         val credential = response.credential
 
         if (credential is CustomCredential &&
