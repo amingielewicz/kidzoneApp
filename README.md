@@ -577,7 +577,10 @@ przy pierwszym wejściu, `AddPlaceScreen` przy kliknięciu "Pobierz lokalizację
 | FCM token registration po zalogowaniu (MainScreen)   | ✅     |
 | POST_NOTIFICATIONS permission request (Android 13+)  | ✅     |
 | Dev versioning: PR number / commit hash (nie "local") | ✅     |
-| Soft-delete konta: anonimizacja UGC zamiast usuwania   | ✅     |
+| Push: nowa opinia → deep link do szczegółów miejsca    | ✅     |
+| Push: Twoje miejsce w TOP 10 → deep link do miejsca   | ✅     |
+| Push: nowa odznaka → deep link do profilu              | ✅     |
+| Notification deep links (klik → odpowiedni ekran)      | ✅     |
 
 ## Cloud Functions (backend)
 

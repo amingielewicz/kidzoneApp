@@ -3,6 +3,7 @@ package com.kidzone.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -34,8 +35,15 @@ private const val NEW_PLACE_LNG = "newPlaceLng"
  */
 @Composable
 fun KidZoneNavGraph(
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    intent: android.content.Intent? = null
 ) {
+    // Obsługa deep linków z push notifications.
+    // Gdy user kliknie notyfikację, Activity restartuje z intentem zawierającym
+    // URI (kidzone://place/{id} lub kidzone://profile). Po zalogowaniu (Splash→Main)
+    // nawigujemy na odpowiedni ekran.
+    val pendingDeepLink = androidx.compose.runtime.remember { mutableStateOf(intent?.data) }
+
     NavHost(
         navController = navController,
         startDestination = Route.Splash.path
@@ -46,11 +54,31 @@ fun KidZoneNavGraph(
                     navController.navigate(Route.Main.path) {
                         popUpTo(Route.Splash.path) { inclusive = true }
                     }
+                    // Po nawigacji na Main → obsłuż deep link
+                    pendingDeepLink.value?.let { uri ->
+                        val path = uri.host.orEmpty() // "place" lub "profile"
+                        when (path) {
+                            "place" -> {
+                                val placeId = uri.pathSegments?.firstOrNull()
+                                if (!placeId.isNullOrBlank()) {
+                                    navController.navigate(Route.PlaceDetails.create(placeId))
+                                }
+                            }
+                            "profile" -> {
+                                // Profile jest zakładką w MainScreen — nie nawigujemy
+                                // stackowo, bo to wewnętrzna karta. User zobaczy
+                                // MainScreen i będzie miał profil do kliknięcia.
+                                // TODO: przełączenie na zakładkę Profile w MainScreen
+                            }
+                        }
+                        pendingDeepLink.value = null
+                    }
                 },
                 onSignedOut = {
                     navController.navigate(Route.Login.path) {
                         popUpTo(Route.Splash.path) { inclusive = true }
                     }
+                    pendingDeepLink.value = null // nie nawiguj na deep link gdy wylogowany
                 }
             )
         }
