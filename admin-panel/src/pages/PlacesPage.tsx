@@ -140,7 +140,7 @@ export function PlacesPage() {
 
   async function handleDelete(place: Place) {
     await deleteDoc(doc(db, 'places', place.id));
-    setConfirmDialog((p) => ({ ...p, open: false }));
+    setConfirmOpen(false);
     setDetailPlace(null);
     await fetchPlaces();
   }

@@ -241,10 +241,6 @@ export function ReportsPage() {
     setDetailDialog((prev) => ({ ...prev, info, loadingInfo: false }));
   }
 
-  function confirm(title: string, action: () => Promise<void>) {
-    setConfirmDialog({ open: true, title, action });
-  }
-
   function filterByStatus<T extends { status: string }>(items: T[]): T[] {
     if (statusFilter === 'all') return items;
     return items.filter((i) => i.status === statusFilter);

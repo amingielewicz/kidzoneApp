@@ -204,10 +204,6 @@ export function ChangeRequestsPage() {
     await fetchRequests();
   }
 
-  function confirm(title: string, action: () => Promise<void>) {
-    setConfirmDialog({ open: true, title, action });
-  }
-
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" py={6}>
