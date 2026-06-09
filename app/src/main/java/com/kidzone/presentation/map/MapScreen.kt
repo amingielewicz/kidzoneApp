@@ -291,14 +291,27 @@ fun MapScreen(
                 modifier = Modifier.fillMaxWidth()
             )
             if (!locationPermissionGranted) {
+                // shouldShowRequestPermissionRationale == false po odmowie
+                // oznacza "permanent deny" — system nie pokaze dialogu,
+                // wiec "Pozwol" musi isc do Ustawien.
+                val activity = (context as? android.app.Activity)
+                val canAskAgain = activity?.shouldShowRequestPermissionRationale(
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ) ?: true
+
                 LocationPermissionBanner(
                     onAllowClick = {
-                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                        if (canAskAgain) {
+                            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                        } else {
+                            // Permanent deny — jedyna opcja to ustawienia
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                            }
+                            context.startActivity(intent)
+                        }
                     },
                     onOpenSettingsClick = {
-                        // Fallback dla "permanently denied" – w tym stanie launcher.launch()
-                        // nic nie zrobi (callback wraca z false bez UI). Przerzucamy usera
-                        // do systemowych Ustawień appki, gdzie zawsze może włączyć Location.
                         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                             data = Uri.fromParts("package", context.packageName, null)
                         }
