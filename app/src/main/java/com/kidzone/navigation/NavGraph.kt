@@ -60,8 +60,12 @@ fun KidZoneNavGraph(
                                     navController.navigate(Route.PlaceDetails.create(placeId))
                                 }
                             }
-                            // "profile" → MainScreen startuje na Home, user musi kliknąć Profile.
-                            // Przyszły feature: automatyczne przełączenie na zakładkę Profile.
+                            "profile" -> {
+                                // Sygnał dla MainScreen żeby przełączyć na Profile tab
+                                navController.currentBackStackEntry
+                                    ?.savedStateHandle
+                                    ?.set("focusProfile", true)
+                            }
                         }
                         pendingDeepLink.value = null
                     }
@@ -111,13 +115,18 @@ fun KidZoneNavGraph(
             val focusLng by savedHandle
                 .getStateFlow<Double?>(NEW_PLACE_LNG, null)
                 .collectAsState()
+            val focusProfile by savedHandle
+                .getStateFlow("focusProfile", false)
+                .collectAsState()
 
             MainScreen(
                 focusLatitude = focusLat,
                 focusLongitude = focusLng,
+                focusProfileTab = focusProfile,
                 onFocusConsumed = {
                     savedHandle[NEW_PLACE_LAT] = null
                     savedHandle[NEW_PLACE_LNG] = null
+                    savedHandle["focusProfile"] = false
                 },
                 onOpenPlaceDetails = { placeId ->
                     navController.navigate(Route.PlaceDetails.create(placeId))

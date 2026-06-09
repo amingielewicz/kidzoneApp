@@ -257,7 +257,7 @@ class ProfileViewModel @Inject constructor(
                 "notificationPreferences" to mapOf(
                     "newReviewOnMyPlace" to prefs.newReviewOnMyPlace,
                     "newBadgeEarned" to prefs.newBadgeEarned,
-                    "weeklyDigest" to prefs.weeklyDigest
+                    "newPhotoOnMyPlace" to prefs.newPhotoOnMyPlace
                 )
             )
             try {
@@ -283,7 +283,7 @@ class ProfileViewModel @Inject constructor(
                         it.copy(notificationPrefs = NotificationPrefs(
                             newReviewOnMyPlace = prefsMap["newReviewOnMyPlace"] ?: true,
                             newBadgeEarned = prefsMap["newBadgeEarned"] ?: true,
-                            weeklyDigest = prefsMap["weeklyDigest"] ?: true
+                            newPhotoOnMyPlace = prefsMap["newPhotoOnMyPlace"] ?: true
                         ))
                     }
                 }
@@ -602,6 +602,13 @@ class ProfileViewModel @Inject constructor(
         }
 
         if (revoked.isNotEmpty()) {
+            // Usuń cofnięte odznaki z kolejki dialogów gratulacyjnych —
+            // żeby user nie zobaczył "Gratulacje: Odkrywca!" po stracie.
+            _uiState.update { state ->
+                state.copy(
+                    newlyEarnedBadges = state.newlyEarnedBadges.filter { it !in revoked }
+                )
+            }
             viewModelScope.launch {
                 authRepository.revokeBadges(revoked.map { it.name })
             }

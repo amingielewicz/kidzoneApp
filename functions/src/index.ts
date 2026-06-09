@@ -1079,3 +1079,75 @@ async function cleanStaleTokens(
     console.log(`Removed ${tokensToRemove.length} stale tokens for user ${userId}`);
   }
 }
+
+
+
+// --- Trigger: ktoś dodał zdjęcie do Twojego miejsca → push do właściciela ---
+export const onPhotoAddedToPlace = onDocumentUpdated(
+  {
+    document: "places/{placeId}",
+  },
+  async (event) => {
+    const beforeData = event.data?.before?.data();
+    const afterData = event.data?.after?.data();
+    if (!beforeData || !afterData) return;
+
+    const beforePhotos: string[] = beforeData.photoUrls || [];
+    const afterPhotos: string[] = afterData.photoUrls || [];
+
+    // Sprawdz czy dodano nowe zdjecie (nie usunieto)
+    if (afterPhotos.length <= beforePhotos.length) return;
+
+    const ownerUserId = afterData.ownerUserId || "";
+    if (!ownerUserId) return;
+
+    // Kto dodal zdjecie? Sprawdzamy photoUploadedBy diff
+    const beforeUploaders: Record<string, string> = beforeData.photoUploadedBy || {};
+    const afterUploaders: Record<string, string> = afterData.photoUploadedBy || {};
+    const newPhotos = afterPhotos.filter((url: string) => !beforePhotos.includes(url));
+    if (newPhotos.length === 0) return;
+
+    // Nie wysylaj jesli wlasciciel sam dodal zdjecie
+    const uploaderIds = newPhotos.map((url: string) => afterUploaders[url] || "");
+    if (uploaderIds.every((uid: string) => uid === ownerUserId)) return;
+
+    const placeName = afterData.name || "Twoje miejsce";
+
+    // Pobierz dane wlasciciela
+    const ownerDoc = await db.collection("users").doc(ownerUserId).get();
+    if (!ownerDoc.exists) return;
+    const ownerData = ownerDoc.data();
+    const fcmTokens: string[] = ownerData?.fcmTokens || [];
+    if (fcmTokens.length === 0) return;
+
+    // Sprawdz preferencje
+    const notifPrefs = ownerData?.notificationPreferences || {};
+    if (notifPrefs.newPhotoOnMyPlace === false) return;
+
+    const placeId = event.params.placeId;
+
+    const message: admin.messaging.MulticastMessage = {
+      tokens: fcmTokens,
+      notification: {
+        title: `\u{1F4F7} Nowe zdj\u0119cie do \u201E${placeName}\u201D`,
+        body: "Kto\u015B doda\u0142 zdj\u0119cie do Twojego miejsca. Sprawd\u017A!",
+      },
+      data: {
+        type: "new_review",
+        placeId: placeId,
+      },
+      android: {
+        priority: "high",
+        notification: {channelId: "kidzone_general"},
+      },
+    };
+
+    try {
+      const response = await admin.messaging().sendEachForMulticast(message);
+      console.log(`Photo push for place ${placeId}: ${response.successCount} ok`);
+      await cleanStaleTokens(response, fcmTokens, ownerUserId);
+    } catch (err) {
+      console.error("Photo push error:", err);
+    }
+  }
+);

@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 data class NotificationPrefs(
     val newReviewOnMyPlace: Boolean = true,
     val newBadgeEarned: Boolean = true,
-    val weeklyDigest: Boolean = true
+    val newPhotoOnMyPlace: Boolean = true
 )
 
 @Composable
@@ -59,10 +59,10 @@ fun NotificationPreferencesDialog(
                     onCheckedChange = { prefs = prefs.copy(newBadgeEarned = it) }
                 )
                 NotificationToggle(
-                    title = "Podsumowanie tygodniowe",
-                    description = "Co nowego w kidZone w Twojej okolicy",
-                    checked = prefs.weeklyDigest,
-                    onCheckedChange = { prefs = prefs.copy(weeklyDigest = it) }
+                    title = "Nowe zdj\u0119cie do mojego miejsca",
+                    description = "Kto\u015B doda\u0142 zdj\u0119cie do miejsca, kt\u00F3re doda\u0142e\u015B",
+                    checked = prefs.newPhotoOnMyPlace,
+                    onCheckedChange = { prefs = prefs.copy(newPhotoOnMyPlace = it) }
                 )
             }
         },
