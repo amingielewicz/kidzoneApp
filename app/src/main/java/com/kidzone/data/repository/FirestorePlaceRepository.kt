@@ -291,6 +291,11 @@ class FirestorePlaceRepository @Inject constructor(
 
     override suspend fun deletePlace(placeId: String): OpResult<Unit> = try {
         require(placeId.isNotBlank()) { "placeId nie może być puste" }
+
+        // Pobierz ownerUserId PRZED usunięciem (potrzebny do dekrementu)
+        val placeDoc = placesCollection().document(placeId).get().await()
+        val ownerUserId = placeDoc.getString("ownerUserId").orEmpty()
+
         val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
             placesCollection().document(placeId).delete().await()
             true
@@ -302,6 +307,15 @@ class FirestorePlaceRepository @Inject constructor(
                 )
             )
         } else {
+            // Dekrementuj placesAddedCount na dokumencie autora
+            if (ownerUserId.isNotBlank()) {
+                try {
+                    firestore.collection(FirestoreCollections.USERS)
+                        .document(ownerUserId)
+                        .update("placesAddedCount", FieldValue.increment(-1))
+                        .await()
+                } catch (_: Exception) { /* best-effort */ }
+            }
             // Usuń z cache.
             placeDao.deleteById(placeId)
             OpResult.success(Unit)
