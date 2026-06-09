@@ -327,6 +327,16 @@ class FirestorePlaceRepository @Inject constructor(
         reason: String,
         comment: String
     ): OpResult<Unit> = try {
+        // Sprawdź czy użytkownik już zgłosił to miejsce (1 zgłoszenie na użytkownika na cel)
+        val existing = firestore.collection(FirestoreCollections.PLACE_REPORTS)
+            .whereEqualTo("reporterId", reporterId)
+            .whereEqualTo("placeId", placeId)
+            .get()
+            .await()
+        if (existing.documents.isNotEmpty()) {
+            throw IllegalStateException("Już zgłosiłeś to miejsce")
+        }
+
         val reportData = mapOf(
             "placeId" to placeId,
             "reporterId" to reporterId,
@@ -397,6 +407,16 @@ class FirestorePlaceRepository @Inject constructor(
     ): OpResult<Unit> = try {
         require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
         require(reporterId.isNotBlank()) { "reporterId nie może być puste" }
+
+        // Sprawdź czy użytkownik już zgłosił to zdjęcie (1 zgłoszenie na użytkownika na cel)
+        val existing = firestore.collection(FirestoreCollections.PHOTO_REPORTS)
+            .whereEqualTo("reporterId", reporterId)
+            .whereEqualTo("photoUrl", photoUrl)
+            .get()
+            .await()
+        if (existing.documents.isNotEmpty()) {
+            throw IllegalStateException("Już zgłosiłeś to zdjęcie")
+        }
 
         val reportData = mapOf(
             "photoUrl" to photoUrl,

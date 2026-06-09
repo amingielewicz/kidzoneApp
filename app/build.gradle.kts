@@ -152,6 +152,8 @@ dependencies {
     implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.analytics)
+    implementation("com.google.firebase:firebase-appcheck-playintegrity")
+    implementation("com.google.firebase:firebase-appcheck-debug")
 
     // Credential Manager (Google Sign-In przez nowoczesne API)
     implementation(libs.androidx.credentials)
