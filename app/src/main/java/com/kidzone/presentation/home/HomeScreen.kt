@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -66,6 +65,7 @@ import com.kidzone.domain.model.Place
 import com.kidzone.presentation.common.GpsAcquiringBanner
 import com.kidzone.presentation.common.GpsDisabledBanner
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
+import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.style
 
 private val PLACE_ROW_HEIGHT = 148.dp
@@ -384,11 +384,11 @@ private fun SectionHeader(
 
 /**
  * Horyzontalna lista [PlaceCard]ów. Obsługuje 3 stany:
- *  - loading – spinner pośrodku rzędu,
+ *  - loading – skeleton loader,
  *  - puste – komunikat [emptyMessage],
  *  - dane – LazyRow z kartami.
  *
- * Wysokość rzędu jest stała ([ROW_HEIGHT]) niezależnie od stanu, żeby
+ * Wysokość rzędu jest stała ([PLACE_ROW_HEIGHT]) niezależnie od stanu, żeby
  * zawartość listy nie skakała przy odświeżeniu.
  */
 @Composable
@@ -401,13 +401,15 @@ private fun HorizontalPlacesRow(
     val rowHeight = PLACE_ROW_HEIGHT
     when {
         isLoading -> {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(rowHeight),
-                contentAlignment = Alignment.Center
+            LazyRow(
+                modifier = Modifier.height(rowHeight),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                userScrollEnabled = false
             ) {
-                CircularProgressIndicator()
+                items(5) {
+                    PlaceCardSkeleton()
+                }
             }
         }
         places.isEmpty() -> {
@@ -443,10 +445,6 @@ private fun HorizontalPlacesRow(
  * Karta pojedynczego miejsca w sekcji – kafelek z kolorowym headerem
  * (kolor i ikona z [com.kidzone.presentation.common.style] dla danej
  * kategorii), nazwą, kategorią i oceną.
- *
- * Świadomie nie pokazujemy zdjęcia (nawet jeśli `photoUrls` jest niepuste),
- * żeby strona Start ładowała się szybko bez sieciowego refetcha. Zdjęcia
- * są w PlaceDetails.
  */
 @Composable
 private fun PlaceCard(
@@ -519,6 +517,63 @@ private fun PlaceCard(
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Skeleton loader for PlaceCard.
+ */
+@Composable
+private fun PlaceCardSkeleton() {
+    Card(
+        modifier = Modifier
+            .width(PLACE_CARD_WIDTH)
+            .height(PLACE_ROW_HEIGHT),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(PLACE_CARD_HEADER_HEIGHT)
+                    .shimmerEffect()
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(PLACE_CARD_CONTENT_PADDING),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Box(
+                        modifier = Modifier
+                            .width(100.dp)
+                            .height(16.dp)
+                            .clip(MaterialTheme.shapes.small)
+                            .shimmerEffect()
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(60.dp)
+                            .height(12.dp)
+                            .clip(MaterialTheme.shapes.small)
+                            .shimmerEffect()
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .width(40.dp)
+                        .height(12.dp)
+                        .clip(MaterialTheme.shapes.small)
+                        .shimmerEffect()
+                )
             }
         }
     }
