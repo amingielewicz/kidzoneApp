@@ -25,15 +25,41 @@ async function verifyAdminRequest(
   try {
     const decoded = await admin.auth().verifyIdToken(idToken);
     const uid = decoded.uid;
-    const userDoc = await db.collection('users').doc(uid).get();
-    if (!userDoc.exists || userDoc.data()?.role !== 'admin') {
-      res.status(403).send(renderAdminResponse('Brak uprawnień', 'Tylko administrator może wykonać tę akcję.'));
-      return null;
+
+    // Sprawdzamy custom claim 'admin'
+    if (decoded.admin === true) {
+      return uid;
     }
-    return uid;
+
+    // Fallback do Firestore (dla nowo nadanych uprawnień przed odświeżeniem tokena)
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (userDoc.exists && userDoc.data()?.role === 'admin') {
+      // Przy okazji ustawiamy brakujący claim
+      await admin.auth().setCustomUserClaims(uid, {admin: true});
+      return uid;
+    }
+
+    res.status(403).send(renderAdminResponse('Brak uprawnień', 'Tylko administrator może wykonać tę akcję.'));
+    return null;
   } catch (err) {
     res.status(401).send(renderAdminResponse('Nieprawidłowy token', 'Token wygasł lub jest nieprawidłowy.'));
     return null;
+  }
+}
+
+/**
+ * Loguje akcje administracyjne do kolekcji audit_logs.
+ */
+async function logAudit(adminUid: string, action: string, details: any) {
+  try {
+    await db.collection("audit_logs").add({
+      adminUid,
+      action,
+      details,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.error("Failed to log audit:", err);
   }
 }
 
@@ -602,6 +628,130 @@ export const onUserDeleted = onDocumentDeleted(
   }
 );
 
+// --- Trigger: zmiana roli użytkownika → Custom Claims ---
+export const onUserRoleChanged = onDocumentUpdated(
+  {document: "users/{userId}"},
+  async (event) => {
+    const afterData = event.data?.after?.data();
+    const beforeData = event.data?.before?.data();
+    if (!afterData || !beforeData) return;
+
+    if (afterData.role !== beforeData.role) {
+      const uid = event.params.userId;
+      if (afterData.role === "admin") {
+        await admin.auth().setCustomUserClaims(uid, {admin: true});
+        console.log(`Custom claim 'admin' set for user ${uid}`);
+      } else {
+        await admin.auth().setCustomUserClaims(uid, {admin: false});
+        console.log(`Custom claim 'admin' removed for user ${uid}`);
+      }
+    }
+  }
+);
+
+// --- Trigger: nowa opinia / usunięcie opinii → przelicz średnią ocen miejsca ---
+export const updatePlaceStatsOnReviewCreate = onDocumentCreated(
+  {document: "reviews/{reviewId}"},
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+    const placeId = data.placeId;
+    const rating = data.rating;
+    const userId = data.userId;
+    if (!placeId) return;
+
+    // 1. Aktualizacja statystyk miejsca
+    const placeRef = db.collection("places").doc(placeId);
+    await db.runTransaction(async (tx) => {
+      const placeSnap = await tx.get(placeRef);
+      if (!placeSnap.exists) return;
+      const placeData = placeSnap.data();
+      const count = (placeData?.reviewsCount || 0) + 1;
+      const oldAvg = placeData?.averageRating || 0;
+      const newAvg = (oldAvg * (count - 1) + rating) / count;
+      tx.update(placeRef, {
+        reviewsCount: count,
+        averageRating: Math.round(newAvg * 100) / 100,
+      });
+    });
+
+    // 2. Aktualizacja licznika opinii użytkownika
+    if (userId) {
+      await db.collection("users").doc(userId).update({
+        reviewsCount: admin.firestore.FieldValue.increment(1),
+      });
+    }
+
+    console.log(`Place ${placeId} and User ${userId} stats updated after new review.`);
+  }
+);
+
+export const updatePlaceStatsOnReviewDelete = onDocumentDeleted(
+  {document: "reviews/{reviewId}"},
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+    const placeId = data.placeId;
+    const rating = data.rating;
+    const userId = data.userId;
+    if (!placeId) return;
+
+    // 1. Aktualizacja statystyk miejsca
+    const placeRef = db.collection("places").doc(placeId);
+    await db.runTransaction(async (tx) => {
+      const placeSnap = await tx.get(placeRef);
+      if (!placeSnap.exists) return;
+      const placeData = placeSnap.data();
+      const count = Math.max(0, (placeData?.reviewsCount || 0) - 1);
+      const oldAvg = placeData?.averageRating || 0;
+      let newAvg = 0;
+      if (count > 0) {
+        newAvg = (oldAvg * (count + 1) - rating) / count;
+      }
+      tx.update(placeRef, {
+        reviewsCount: count,
+        averageRating: Math.round(newAvg * 100) / 100,
+      });
+    });
+
+    // 2. Aktualizacja licznika opinii użytkownika
+    if (userId) {
+      await db.collection("users").doc(userId).update({
+        reviewsCount: admin.firestore.FieldValue.increment(-1),
+      });
+    }
+
+    console.log(`Place ${placeId} and User ${userId} stats updated after review deletion.`);
+  }
+);
+
+// --- Trigger: nowe miejsce / usunięcie miejsca → licznik użytkownika ---
+export const updateUserStatsOnPlaceCreate = onDocumentCreated(
+  {document: "places/{placeId}"},
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+    const ownerUserId = data.ownerUserId;
+    if (!ownerUserId) return;
+    await db.collection("users").doc(ownerUserId).update({
+      placesAddedCount: admin.firestore.FieldValue.increment(1),
+    });
+  }
+);
+
+export const updateUserStatsOnPlaceDelete = onDocumentDeleted(
+  {document: "places/{placeId}"},
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+    const ownerUserId = data.ownerUserId;
+    if (!ownerUserId) return;
+    await db.collection("users").doc(ownerUserId).update({
+      placesAddedCount: admin.firestore.FieldValue.increment(-1),
+    });
+  }
+);
+
 
 
 // --- HTTP Endpoint: Admin usuwa opinię i wysyła email do autora ---
@@ -646,27 +796,14 @@ export const adminDeleteReview = onRequest(
       // 3. Delete the review
       await db.collection("reviews").doc(reviewId).delete();
 
-      // 4. Update the place's reviewsCount and averageRating
-      if (placeId) {
-        const placeDoc = await db.collection("places").doc(placeId).get();
-        if (placeDoc.exists) {
-          const placeData = placeDoc.data();
-          const currentCount = placeData?.reviewsCount || 0;
-          const currentAvg = placeData?.averageRating || 0;
-
-          const newCount = Math.max(0, currentCount - 1);
-          let newAvg = 0;
-          if (newCount > 0 && currentCount > 0) {
-            newAvg = (currentAvg * currentCount - reviewRating) / newCount;
-            newAvg = Math.round(newAvg * 100) / 100;
-          }
-
-          await db.collection("places").doc(placeId).update({
-            reviewsCount: newCount,
-            averageRating: newAvg,
-          });
-        }
-      }
+      // Log audit
+      await logAudit(adminUid, "DELETE_REVIEW", {
+        reviewId,
+        placeId,
+        authorName,
+        comment: reviewComment,
+        reason,
+      });
 
       // 5. Send email to the review author
       if (userEmail) {
@@ -758,6 +895,14 @@ export const adminDeletePlace = onRequest(
 
       // 3. Usuń dokument miejsca
       await db.collection("places").doc(placeId).delete();
+
+      // Log audit
+      await logAudit(adminUid, "DELETE_PLACE", {
+        placeId,
+        placeName,
+        ownerUserId,
+        reason,
+      });
 
       // 4. Wyślij email do właściciela
       let emailSent = false;
@@ -892,6 +1037,13 @@ export const adminDeletePhoto = onRequest(
         status: "resolved",
         resolvedAtMillis: Date.now(),
         action: "deleted",
+      });
+
+      // Log audit
+      await logAudit(adminUid, "DELETE_PHOTO", {
+        reportId,
+        photoUrl,
+        reason,
       });
 
       // 4. Wyślij email do osoby, która uploadowała zdjęcie
@@ -1723,6 +1875,14 @@ export const adminDeleteUser = onRequest(
       // Usuń dokument użytkownika
       await db.collection("users").doc(userId).delete();
 
+      // Log audit
+      await logAudit(adminUid, "DELETE_USER", {
+        userId,
+        userName,
+        userEmail,
+        reason,
+      });
+
       // Wyślij email z powodem usunięcia
       if (userEmail) {
         // Check email opt-in
@@ -1807,6 +1967,14 @@ export const adminDeletePhotoFromPlace = onRequest(
       } catch (storageErr) {
         console.warn(`Could not delete photo from storage: ${storageErr}`);
       }
+
+      // Log audit
+      await logAudit(adminUid, "DELETE_PHOTO_FROM_PLACE", {
+        placeId,
+        placeName,
+        photoUrl,
+        reason,
+      });
 
       // Wyślij email do uploadera
       if (uploaderId && uploaderId !== "admin") {
