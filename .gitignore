@@ -12,3 +12,17 @@ captures/
 *.keystore
 google-services.json
 !app/google-services.json.template
+
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+
+# Android build outputs
+app/debug/
+app/release/
+**/output-metadata.json
+
+# Node
+node_modules/
+npm-debug.log

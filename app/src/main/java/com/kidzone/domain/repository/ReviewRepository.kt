@@ -66,4 +66,9 @@ interface ReviewRepository {
         reason: String,
         comment: String = ""
     ): OpResult<Unit>
+
+    /**
+     * Pobiera listę ID opinii zgłoszonych przez danego użytkownika.
+     */
+    suspend fun getReportedReviews(userId: String): Set<String>
 }
