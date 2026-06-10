@@ -10,8 +10,14 @@ captures/
 *.apk
 *.aab
 *.keystore
+*.jks
+*.p12
 google-services.json
 !app/google-services.json.template
+
+# Environment variables
+.env
+.env.*
 
 # Firebase
 .firebase/
@@ -26,3 +32,12 @@ app/release/
 # Node
 node_modules/
 npm-debug.log
+
+# Local IDE / Compiler
+.kotlin/
+.agents/
+skills-lock.json
+*.log
+*.swp
+*.bak
+*.tmp
