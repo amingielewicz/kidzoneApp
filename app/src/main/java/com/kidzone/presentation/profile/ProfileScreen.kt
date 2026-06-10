@@ -66,6 +66,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.kidzone.domain.model.User
@@ -175,26 +177,6 @@ fun ProfileScreen(
                     onSignOut = { viewModel.signOut(onSignOut) }
                 )
             }
-        }
-
-        // Konfetti animation overlay
-        if (ui.newlyEarnedBadges.isNotEmpty()) {
-            KonfettiView(
-                modifier = Modifier.fillMaxSize(),
-                parties = remember {
-                    listOf(
-                        Party(
-                            speed = 0f,
-                            maxSpeed = 30f,
-                            damping = 0.9f,
-                            spread = 360,
-                            colors = listOf(0xFFFFC93C.toInt(), 0xFF1E88E5.toInt(), 0xFF43A047.toInt(), 0xFFFFFFFF.toInt()),
-                            emitter = Emitter(duration = 100, TimeUnit.MILLISECONDS).max(100),
-                            position = Position.Relative(0.5, 0.3)
-                        )
-                    )
-                }
-            )
         }
 
         SnackbarHost(
@@ -728,95 +710,167 @@ private fun BadgeEarnedDialog(
     badges: List<UserBadge>,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
+    // Używamy podstawowego Dialogu z wyłączoną domyślną szerokością,
+    // aby Box mógł zająć cały ekran i Konfetti nie było przycinane do okna dialogu.
+    Dialog(
         onDismissRequest = onDismiss,
-        icon = {
-            Box(
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            // Replikacja wyglądu AlertDialog (M3)
+            Card(
                 modifier = Modifier
-                    .size(56.dp)
-                    .clip(androidx.compose.foundation.shape.CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth(0.9f)
+                    .padding(24.dp),
+                shape = MaterialTheme.shapes.extraLarge,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Filled.EmojiEvents,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-        },
-        title = {
-            Text(
-                text = if (badges.size == 1) "Gratulacje!" else "Gratulacje! (${badges.size})",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 320.dp)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = if (badges.size == 1) "Zdoby\u0142a\u015B/e\u015B now\u0105 odznak\u0119:"
-                    else "Zdoby\u0142a\u015B/e\u015B nowe odznaki:",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(12.dp))
-                badges.forEach { badge ->
-                    Row(
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.EmojiEvents,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.height(20.dp))
+
+                    Text(
+                        text = if (badges.size == 1) "Gratulacje!" else "Gratulacje! (${badges.size})",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .heightIn(max = 320.dp)
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(badge.color.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = badge.icon,
-                                contentDescription = null,
-                                tint = badge.color,
-                                modifier = Modifier.size(22.dp)
-                            )
+                        Text(
+                            text = if (badges.size == 1) "Zdoby\u0142a\u015B/e\u015B now\u0105 odznak\u0119:"
+                            else "Zdoby\u0142a\u015B/e\u015B nowe odznaki:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        badges.forEach { badge ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(badge.color.copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = badge.icon,
+                                        contentDescription = null,
+                                        tint = badge.color,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                                Spacer(Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = badge.label,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = badge.color
+                                    )
+                                    Text(
+                                        text = badge.description,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = badge.label,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = badge.color
-                            )
-                            Text(
-                                text = badge.description,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    }
+
+                    Spacer(Modifier.height(24.dp))
+
+                    androidx.compose.material3.TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text(
+                            text = "Super!",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
-        },
-        confirmButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text("Super!")
-            }
+
+            // --- SPEKTAKULARNE KONFETTI NA WIERZCHU ---
+            KonfettiView(
+                modifier = Modifier.fillMaxSize(),
+                parties = listOf(
+                    // Burst from left
+                    Party(
+                        speed = 10f,
+                        maxSpeed = 35f,
+                        damping = 0.9f,
+                        angle = 330,
+                        spread = 60,
+                        colors = listOf(0xFFFFC93C.toInt(), 0xFF1E88E5.toInt(), 0xFF43A047.toInt(), 0xFFFFFFFF.toInt()),
+                        emitter = Emitter(duration = 2, TimeUnit.SECONDS).perSecond(40),
+                        position = Position.Relative(0.0, 0.4)
+                    ),
+                    // Burst from right
+                    Party(
+                        speed = 10f,
+                        maxSpeed = 35f,
+                        damping = 0.9f,
+                        angle = 210,
+                        spread = 60,
+                        colors = listOf(0xFFFFC93C.toInt(), 0xFF1E88E5.toInt(), 0xFF43A047.toInt(), 0xFFFFFFFF.toInt()),
+                        emitter = Emitter(duration = 2, TimeUnit.SECONDS).perSecond(40),
+                        position = Position.Relative(1.0, 0.4)
+                    ),
+                    // Rain from top
+                    Party(
+                        speed = 0f,
+                        maxSpeed = 20f,
+                        damping = 0.9f,
+                        angle = 90,
+                        spread = 360,
+                        colors = listOf(0xFFFFC93C.toInt(), 0xFFFFFFFF.toInt()),
+                        emitter = Emitter(duration = 3, TimeUnit.SECONDS).perSecond(25),
+                        position = Position.Relative(0.5, -0.1)
+                    )
+                )
+            )
         }
-    )
+    }
 }
 
 // --- Konto i bezpieczeństwo ---------------------------------------------
