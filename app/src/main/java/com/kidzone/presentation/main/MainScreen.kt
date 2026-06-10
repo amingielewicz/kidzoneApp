@@ -54,6 +54,7 @@ import com.kidzone.R
 import com.kidzone.navigation.Route
 import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.NoInternetBanner
+import com.kidzone.presentation.common.RequestNotificationPermission
 import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.home.HomeScreen
 import com.kidzone.presentation.map.MapScreen
@@ -159,6 +160,9 @@ fun MainScreen(
     LaunchedEffect(Unit) {
         com.kidzone.messaging.KidZoneMessagingService.registerCurrentToken(context)
     }
+
+    // Uprawnienie POST_NOTIFICATIONS (Android 13+) — reusable composable utility.
+    RequestNotificationPermission()
 
     // Deep link: przełączenie na konkretną zakładkę (profile, ranking, map)
     LaunchedEffect(focusTab) {
