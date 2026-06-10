@@ -39,7 +39,8 @@ data class UserDto(
      */
     val badgeEarnedAt: Map<String, Long> = emptyMap(),
     val bannedUntilMillis: Long = 0L,
-    val banReason: String = ""
+    val banReason: String = "",
+    val emailNotificationsEnabled: Boolean = true
 ) {
     fun toDomain(): User = User(
         id = id,
@@ -54,7 +55,8 @@ data class UserDto(
         nameLowercase = nameLowercase,
         badgeEarnedAt = badgeEarnedAt,
         bannedUntilMillis = bannedUntilMillis,
-        banReason = banReason
+        banReason = banReason,
+        emailNotificationsEnabled = emailNotificationsEnabled
     )
 
     companion object {
@@ -71,7 +73,8 @@ data class UserDto(
             nameLowercase = user.nameLowercase,
             badgeEarnedAt = user.badgeEarnedAt,
             bannedUntilMillis = user.bannedUntilMillis,
-            banReason = user.banReason
+            banReason = user.banReason,
+            emailNotificationsEnabled = user.emailNotificationsEnabled
         )
     }
 }

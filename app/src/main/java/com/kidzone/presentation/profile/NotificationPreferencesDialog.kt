@@ -25,7 +25,8 @@ data class NotificationPrefs(
     val newReviewOnMyPlace: Boolean = true,
     val newBadgeEarned: Boolean = true,
     val newPhotoOnMyPlace: Boolean = true,
-    val rankings: Boolean = true
+    val rankings: Boolean = true,
+    val emailNotificationsEnabled: Boolean = true
 )
 
 @Composable
@@ -38,9 +39,16 @@ fun NotificationPreferencesDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Powiadomienia push") },
+        title = { Text("Powiadomienia") },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Powiadomienia push",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(8.dp))
                 Text(
                     text = "Wybierz, o czym chcesz by\u0107 powiadamiany:",
                     style = MaterialTheme.typography.bodyMedium,
@@ -70,6 +78,20 @@ fun NotificationPreferencesDialog(
                     description = "Zdobywasz w rankingu TOP 10 / TOP 3 / podium",
                     checked = prefs.rankings,
                     onCheckedChange = { prefs = prefs.copy(rankings = it) }
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = "Powiadomienia email",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(8.dp))
+                NotificationToggle(
+                    title = "Powiadomienia email",
+                    description = "Otrzymuj emaile o blokadzie konta, usuni\u0119ciu opinii, miejsc i zdj\u0119\u0107",
+                    checked = prefs.emailNotificationsEnabled,
+                    onCheckedChange = { prefs = prefs.copy(emailNotificationsEnabled = it) }
                 )
             }
         },

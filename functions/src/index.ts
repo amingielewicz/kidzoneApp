@@ -670,28 +670,41 @@ export const adminDeleteReview = onRequest(
 
       // 5. Send email to the review author
       if (userEmail) {
-        const transporter = nodemailer.createTransport({
-          service: "gmail",
-          auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
-        });
+        // Check email opt-in
+        let emailEnabled = true;
+        if (userId) {
+          const userDoc2 = await db.collection("users").doc(userId).get();
+          if (userDoc2.exists) {
+            emailEnabled = userDoc2.data()?.emailNotificationsEnabled !== false;
+          }
+        }
 
-        const html = wrapInTemplate("Twoja opinia została usunięta", `
-          <p>Cześć, ${authorName}.</p>
-          <p>Twoja opinia w aplikacji kidZone została usunięta przez administratora.</p>
-          <table>
-            <tr><td>Treść opinii:</td><td>${reviewComment}</td></tr>
-            <tr><td>Ocena:</td><td>${"★".repeat(reviewRating)}${"☆".repeat(5 - reviewRating)} (${reviewRating}/5)</td></tr>
-            <tr><td>Powód usunięcia:</td><td>${escapeHtml(reason)}</td></tr>
-          </table>
-          <p>Jeśli uważasz, że to pomyłka, skontaktuj się z nami odpowiadając na ten email.</p>
-        `);
+        if (!emailEnabled) {
+          console.log(`Review deletion email skipped for ${userId} - opted out`);
+        } else {
+          const transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
+          });
 
-        await transporter.sendMail({
-          from: `kidZone <${gmailEmail.value()}>`,
-          to: userEmail,
-          subject: "[kidZone] Twoja opinia została usunięta",
-          html,
-        });
+          const html = wrapInTemplate("Twoja opinia została usunięta", `
+            <p>Cześć, ${authorName}.</p>
+            <p>Twoja opinia w aplikacji kidZone została usunięta przez administratora.</p>
+            <table>
+              <tr><td>Treść opinii:</td><td>${reviewComment}</td></tr>
+              <tr><td>Ocena:</td><td>${"★".repeat(reviewRating)}${"☆".repeat(5 - reviewRating)} (${reviewRating}/5)</td></tr>
+              <tr><td>Powód usunięcia:</td><td>${escapeHtml(reason)}</td></tr>
+            </table>
+            <p>Jeśli uważasz, że to pomyłka, skontaktuj się z nami odpowiadając na ten email.</p>
+          `);
+
+          await transporter.sendMail({
+            from: `kidZone <${gmailEmail.value()}>`,
+            to: userEmail,
+            subject: "[kidZone] Twoja opinia została usunięta",
+            html,
+          });
+        }
       }
 
       res.status(200).send(renderAdminResponse(
@@ -749,28 +762,41 @@ export const adminDeletePlace = onRequest(
       // 4. Wyślij email do właściciela
       let emailSent = false;
       if (ownerEmail) {
-        const transporter = nodemailer.createTransport({
-          service: "gmail",
-          auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
-        });
+        // Check email opt-in
+        let emailEnabled = true;
+        if (ownerUserId) {
+          const ownerDocCheck = await db.collection("users").doc(ownerUserId).get();
+          if (ownerDocCheck.exists) {
+            emailEnabled = ownerDocCheck.data()?.emailNotificationsEnabled !== false;
+          }
+        }
 
-        const html = wrapInTemplate("Twoje miejsce zostało usunięte", `
-          <p>Cześć, ${ownerName}.</p>
-          <p>Twoje miejsce <strong>${placeName}</strong> w aplikacji kidZone zostało usunięte przez administratora.</p>
-          <table>
-            <tr><td>Nazwa miejsca:</td><td>${placeName}</td></tr>
-            <tr><td>Powód usunięcia:</td><td>${escapeHtml(reason)}</td></tr>
-          </table>
-          <p>Jeśli uważasz, że to pomyłka, skontaktuj się z nami odpowiadając na ten email.</p>
-        `);
+        if (!emailEnabled) {
+          console.log(`Place deletion email skipped for ${ownerUserId} - opted out`);
+        } else {
+          const transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
+          });
 
-        await transporter.sendMail({
-          from: `kidZone <${gmailEmail.value()}>`,
-          to: ownerEmail,
-          subject: `[kidZone] Twoje miejsce "${placeName}" zostało usunięte`,
-          html,
-        });
-        emailSent = true;
+          const html = wrapInTemplate("Twoje miejsce zostało usunięte", `
+            <p>Cześć, ${ownerName}.</p>
+            <p>Twoje miejsce <strong>${placeName}</strong> w aplikacji kidZone zostało usunięte przez administratora.</p>
+            <table>
+              <tr><td>Nazwa miejsca:</td><td>${placeName}</td></tr>
+              <tr><td>Powód usunięcia:</td><td>${escapeHtml(reason)}</td></tr>
+            </table>
+            <p>Jeśli uważasz, że to pomyłka, skontaktuj się z nami odpowiadając na ten email.</p>
+          `);
+
+          await transporter.sendMail({
+            from: `kidZone <${gmailEmail.value()}>`,
+            to: ownerEmail,
+            subject: `[kidZone] Twoje miejsce "${placeName}" zostało usunięte`,
+            html,
+          });
+          emailSent = true;
+        }
       }
 
       res.status(200).send(renderAdminResponse(
@@ -875,7 +901,9 @@ export const adminDeletePhoto = onRequest(
         if (uploaderDoc.exists) {
           const uploaderEmail = uploaderDoc.data()?.email || "";
           const uploaderName = uploaderDoc.data()?.name || "Użytkowniku";
-          if (uploaderEmail) {
+          // Check email opt-in
+          const emailEnabled = uploaderDoc.data()?.emailNotificationsEnabled !== false; // default true
+          if (uploaderEmail && emailEnabled) {
             const transporter = nodemailer.createTransport({
               service: "gmail",
               auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
@@ -897,6 +925,8 @@ export const adminDeletePhoto = onRequest(
               html,
             });
             emailSent = true;
+          } else if (uploaderEmail && !emailEnabled) {
+            console.log(`Photo deletion email skipped for ${uploaderUserId} - opted out`);
           }
         }
       }
@@ -1628,6 +1658,13 @@ export const onUserBanned = onDocumentUpdated(
 
     // --- Email ---
     if (userEmail) {
+      // Check email opt-in (user can opt out of notification emails)
+      const emailEnabled = afterData.emailNotificationsEnabled !== false; // default true
+      if (!emailEnabled) {
+        console.log(`Ban email skipped for ${userId} - opted out of email notifications`);
+        return;
+      }
+
       const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
@@ -1688,26 +1725,32 @@ export const adminDeleteUser = onRequest(
 
       // Wyślij email z powodem usunięcia
       if (userEmail) {
-        const transporter = nodemailer.createTransport({
-          service: "gmail",
-          auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
-        });
+        // Check email opt-in
+        const emailEnabled = userData?.emailNotificationsEnabled !== false; // default true
+        if (!emailEnabled) {
+          console.log(`User deletion email skipped for ${userId} - opted out`);
+        } else {
+          const transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
+          });
 
-        const html = wrapInTemplate("Konto usunięte", `
-          <p>Cześć, ${userName}.</p>
-          <p>Twoje konto w kidZone zostało usunięte przez administratora.</p>
-          <table>
-            <tr><td>Powód:</td><td>${escapeHtml(reason)}</td></tr>
-          </table>
-          <p>Jeśli uważasz, że to pomyłka, skontaktuj się z nami odpowiadając na ten email.</p>
-        `);
+          const html = wrapInTemplate("Konto usunięte", `
+            <p>Cześć, ${userName}.</p>
+            <p>Twoje konto w kidZone zostało usunięte przez administratora.</p>
+            <table>
+              <tr><td>Powód:</td><td>${escapeHtml(reason)}</td></tr>
+            </table>
+            <p>Jeśli uważasz, że to pomyłka, skontaktuj się z nami odpowiadając na ten email.</p>
+          `);
 
-        await transporter.sendMail({
-          from: `kidZone <${gmailEmail.value()}>`,
-          to: userEmail,
-          subject: "[kidZone] Twoje konto zostało usunięte",
-          html,
-        });
+          await transporter.sendMail({
+            from: `kidZone <${gmailEmail.value()}>`,
+            to: userEmail,
+            subject: "[kidZone] Twoje konto zostało usunięte",
+            html,
+          });
+        }
       }
 
       res.status(200).send(renderAdminResponse("Użytkownik usunięty", `Konto ${userName} zostało usunięte. Email z powodem wysłany.`));
@@ -1771,7 +1814,9 @@ export const adminDeletePhotoFromPlace = onRequest(
         if (userDoc.exists) {
           const userEmail = userDoc.data()?.email;
           const userName = userDoc.data()?.name || "Użytkowniku";
-          if (userEmail) {
+          // Check email opt-in
+          const emailEnabled = userDoc.data()?.emailNotificationsEnabled !== false; // default true
+          if (userEmail && emailEnabled) {
             const transporter = nodemailer.createTransport({
               service: "gmail",
               auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
@@ -1790,6 +1835,8 @@ export const adminDeletePhotoFromPlace = onRequest(
               subject: `[kidZone] Twoje zdjęcie zostało usunięte z "${placeName}"`,
               html,
             });
+          } else if (userEmail && !emailEnabled) {
+            console.log(`Photo deletion email skipped for ${uploaderId} - opted out`);
           }
         }
       }
