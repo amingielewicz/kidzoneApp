@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +54,7 @@ import com.kidzone.domain.model.User
 import com.kidzone.presentation.common.BadgesIconRow
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.chronologicalOrder
+import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.style
 
 /**
@@ -120,7 +120,7 @@ fun RankingScreen(
 
         when {
             state.isLoading && state.topPlaces.isEmpty() && state.topUsers.isEmpty() -> {
-                FullScreenCentered { CircularProgressIndicator() }
+                RankingSkeleton()
             }
 
             state.errorMessage != null && state.topPlaces.isEmpty() && state.topUsers.isEmpty() -> {
@@ -383,6 +383,53 @@ private fun PositionMedal(position: Int) {
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
+    }
+}
+
+@Composable
+private fun RankingSkeleton() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        repeat(8) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .shimmerEffect()
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Box(
+                            modifier = Modifier
+                                .width(150.dp)
+                                .height(20.dp)
+                                .clip(MaterialTheme.shapes.small)
+                                .shimmerEffect()
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .width(100.dp)
+                                .height(14.dp)
+                                .clip(MaterialTheme.shapes.small)
+                                .shimmerEffect()
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
