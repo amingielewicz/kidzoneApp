@@ -60,7 +60,12 @@ data class User(
      */
     val bannedUntilMillis: Long = 0L,
     /** Powód blokady ustawiony przez admina. */
-    val banReason: String = ""
+    val banReason: String = "",
+    /**
+     * Czy użytkownik wyraził zgodę na powiadomienia email (welcome, ban,
+     * usunięcie opinii/miejsca/zdjęcia itp.). Domyślnie true – opt-out.
+     */
+    val emailNotificationsEnabled: Boolean = true
 ) {
     /** Czy konto jest aktualnie zablokowane. */
     val isBanned: Boolean

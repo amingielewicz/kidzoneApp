@@ -270,7 +270,8 @@ class ProfileViewModel @Inject constructor(
                     "newBadgeEarned" to prefs.newBadgeEarned,
                     "newPhotoOnMyPlace" to prefs.newPhotoOnMyPlace,
                     "rankings" to prefs.rankings
-                )
+                ),
+                "emailNotificationsEnabled" to prefs.emailNotificationsEnabled
             )
             try {
                 com.google.firebase.firestore.FirebaseFirestore.getInstance()
@@ -290,13 +291,21 @@ class ProfileViewModel @Inject constructor(
                     .collection("users").document(uid).get().await()
                 @Suppress("UNCHECKED_CAST")
                 val prefsMap = snap.get("notificationPreferences") as? Map<String, Boolean>
+                val emailEnabled = snap.getBoolean("emailNotificationsEnabled") ?: true
                 if (prefsMap != null) {
                     _uiState.update {
                         it.copy(notificationPrefs = NotificationPrefs(
                             newReviewOnMyPlace = prefsMap["newReviewOnMyPlace"] ?: true,
                             newBadgeEarned = prefsMap["newBadgeEarned"] ?: true,
                             newPhotoOnMyPlace = prefsMap["newPhotoOnMyPlace"] ?: true,
-                            rankings = prefsMap["rankings"] ?: true
+                            rankings = prefsMap["rankings"] ?: true,
+                            emailNotificationsEnabled = emailEnabled
+                        ))
+                    }
+                } else {
+                    _uiState.update {
+                        it.copy(notificationPrefs = NotificationPrefs(
+                            emailNotificationsEnabled = emailEnabled
                         ))
                     }
                 }
