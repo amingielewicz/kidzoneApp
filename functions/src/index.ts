@@ -1,4 +1,5 @@
-import {onDocumentCreated, onDocumentDeleted} from "firebase-functions/v2/firestore";
+import {onDocumentCreated, onDocumentDeleted, onDocumentUpdated} from "firebase-functions/v2/firestore";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 import {onRequest} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
@@ -1277,8 +1278,6 @@ export const onReviewCreatedPush = onDocumentCreated(
 
 
 // --- Trigger: zmiana dokumentu usera → server-side badge computation ---
-import {onDocumentUpdated} from "firebase-functions/v2/firestore";
-
 export const onBadgeEarned = onDocumentUpdated(
   {document: "users/{userId}"},
   async (event) => {
@@ -1480,8 +1479,6 @@ async function cleanStaleTokens(
 
 
 // --- Scheduled: daily ranking check → push for TOP 10/3/2/1 ---
-import {onSchedule} from "firebase-functions/v2/scheduler";
-
 export const dailyRankingCheck = onSchedule(
   {
     schedule: "every day 09:00",
