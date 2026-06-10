@@ -196,4 +196,7 @@ dependencies {
 
     // Logging
     implementation(libs.timber)
+
+    // Konfetti
+    implementation(libs.konfetti.compose)
 }

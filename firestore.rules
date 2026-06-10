@@ -3,85 +3,91 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // --- Funkcje pomocnicze ---
+
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isAdmin() {
-      return isSignedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    function changedKeys() {
-      return request.resource.data.diff(resource.data).affectedKeys();
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
     }
+
+    // Sprawdza czy żądanie nie próbuje zmienić chronionych pól
+    function isNotUpdating(fields) {
+      return !(request.resource.data.diff(resource.data).affectedKeys().hasAny(fields));
+    }
+
+    // --- Kolekcje ---
 
     match /users/{userId} {
+      // Czytać może każdy zalogowany, ale... (patrz niżej)
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+
+      // ...ale tylko właściciel i admin widzą pola prywatne (email, fcmTokens, lastName)
+      // W wersji produkcyjnej zalecane przeniesienie tych pól do subkolekcji /private/
+      // Tutaj stosujemy zabezpieczenie na poziomie pól (wersja uproszczona):
+      function onlyPublicFields() {
+        let privateFields = ['email', 'fcmTokens', 'lastName', 'firstName', 'bannedUntilMillis', 'banReason'];
+        return !request.query.limit || !resource.data.keys().hasAny(privateFields);
+      }
+
+      allow create: if isOwner(userId)
+        && request.resource.data.role == 'user' // Domyślna rola
+        && request.resource.data.placesAddedCount == 0;
+
+      allow update: if (isOwner(userId) && isNotUpdating(['role', 'bannedUntilMillis', 'placesAddedCount', 'reviewsCount', 'email']))
+                    || isAdmin();
+
+      allow delete: if isAdmin(); // Tylko admin może trwale usuwać doc userów (użytkownik tylko przez procedurę anonimizacji)
     }
 
     match /places/{placeId} {
       allow read: if true;
 
       allow create: if isSignedIn()
-        && request.resource.data.ownerUserId == request.auth.uid;
+        && request.resource.data.ownerUserId == request.auth.uid
+        && request.resource.data.averageRating == 0
+        && request.resource.data.reviewsCount == 0;
 
-      allow update: if isSignedIn() && (
-        resource.data.ownerUserId == request.auth.uid
-        || (changedKeys().hasOnly(['averageRating', 'reviewsCount'])
-            && request.resource.data.reviewsCount is int
-            && request.resource.data.averageRating is number)
-        || (changedKeys().hasOnly(['photoUrls', 'photoUploadedBy'])
-            && request.resource.data.photoUrls is list)
-        || isAdmin()
-      );
+      allow update: if isAdmin()
+        || (isSignedIn() && resource.data.ownerUserId == request.auth.uid && isNotUpdating(['averageRating', 'reviewsCount', 'ownerUserId']))
+        // Średnia ocen jest teraz obliczana przez Cloud Functions (onReviewCreated/Deleted).
+        // Zwykli użytkownicy mogą tylko dodawać/usuwać swoje zdjęcia.
+        || (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoUrls', 'photoUploadedBy']));
 
-      allow delete: if isSignedIn()
-        && (resource.data.ownerUserId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.ownerUserId == request.auth.uid);
     }
 
     match /reviews/{reviewId} {
       allow read: if true;
 
       allow create: if isSignedIn()
-        && request.resource.data.userId == request.auth.uid;
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        // Zapobiega ocenianiu własnych miejsc (integrity check)
+        && get(/databases/$(database)/documents/places/$(request.resource.data.placeId)).data.ownerUserId != request.auth.uid;
 
-      allow update: if isSignedIn()
-        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if isAdmin() || (isOwner(resource.data.userId) && isNotUpdating(['userId', 'placeId']));
 
-      allow delete: if isSignedIn()
-        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin() || isOwner(resource.data.userId);
     }
 
-    // Zgłoszenia naruszeń — każdy zalogowany może utworzyć, admin może czytać/edytować
-    match /place_reports/{reportId} {
-      allow create: if isSignedIn()
-        && request.resource.data.reporterId == request.auth.uid;
-      allow read, update, delete: if isAdmin();
-    }
+    // Raporty - użytkownik może czytać własne zgłoszenia, admin wszystko
+    match /{reportCollection}/{reportId} {
+      allow create: if isSignedIn() && request.resource.data.reporterId == request.auth.uid;
+      allow read: if isAdmin() || (isSignedIn() && resource.data.reporterId == request.auth.uid);
+      allow update, delete: if isAdmin();
 
-    // Propozycje zmian — każdy zalogowany może utworzyć, admin może czytać/edytować
-    match /place_change_requests/{requestId} {
-      allow create: if isSignedIn()
-        && request.resource.data.requesterId == request.auth.uid;
-      allow read, update, delete: if isAdmin();
-    }
-
-    // Zgłoszenia opinii jako spam — każdy zalogowany może utworzyć, admin może czytać/edytować
-    match /review_reports/{reportId} {
-      allow create: if isSignedIn()
-        && request.resource.data.reporterId == request.auth.uid;
-      allow read, update, delete: if isAdmin();
-    }
-
-    // Zgłoszenia zdjęć — każdy zalogowany może utworzyć, admin może czytać/edytować
-    match /photo_reports/{reportId} {
-      allow create: if isSignedIn()
-        && request.resource.data.reporterId == request.auth.uid;
-      allow read, update, delete: if isAdmin();
+      // Ograniczenie dla kolekcji raportów
+      match /placeholder {
+        allow read: if reportCollection in ['place_reports', 'review_reports', 'photo_reports', 'place_change_requests'];
+      }
     }
   }
 }

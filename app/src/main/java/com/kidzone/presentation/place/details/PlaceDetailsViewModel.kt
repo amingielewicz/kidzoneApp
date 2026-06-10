@@ -119,7 +119,10 @@ class PlaceDetailsViewModel @Inject constructor(
         val topRank: Int? = null,
         val isUploadingPlacePhoto: Boolean = false,
         val placePhotoDuplicateEvent: Boolean = false,
-        val reviewPhotoDuplicateEvent: Boolean = false
+        val reviewPhotoDuplicateEvent: Boolean = false,
+        val isPlaceReported: Boolean = false,
+        val reportedPhotoUrls: Set<String> = emptySet(),
+        val reportedReviewIds: Set<String> = emptySet()
     )
 
     /**
@@ -215,6 +218,7 @@ class PlaceDetailsViewModel @Inject constructor(
                     loadAuthor(result.data.ownerUserId)
                     loadTopRank()
                     seedPlacePhotoHashes(result.data.photoUrls)
+                    loadUserReports()
                 }
                 is OpResult.Failure -> _uiState.update {
                     it.copy(
@@ -614,40 +618,67 @@ class PlaceDetailsViewModel @Inject constructor(
 
     // --- Zgłaszanie spamu ---
 
+    /** Ładuje informacje o tym, co bieżący użytkownik już zgłosił w obrębie tego miejsca. */
+    private fun loadUserReports() {
+        val user = currentUser.value ?: return
+        viewModelScope.launch {
+            val hasReportedPlace = placeRepository.hasUserReportedPlace(placeId, user.id)
+            val reportedPhotos = placeRepository.getReportedPhotos(user.id)
+            val reportedReviews = reviewRepository.getReportedReviews(user.id)
+
+            _uiState.update {
+                it.copy(
+                    isPlaceReported = hasReportedPlace,
+                    reportedPhotoUrls = reportedPhotos,
+                    reportedReviewIds = reportedReviews
+                )
+            }
+        }
+    }
+
     fun reportPlace(reason: String, comment: String = "") {
         val place = _uiState.value.place ?: return
         val user = currentUser.value ?: return
         viewModelScope.launch {
-            placeRepository.reportPlace(
+            val result = placeRepository.reportPlace(
                 placeId = place.id,
                 reporterId = user.id,
                 reason = reason,
                 comment = comment
             )
+            if (result is OpResult.Success) {
+                _uiState.update { it.copy(isPlaceReported = true) }
+            }
         }
     }
 
     fun reportReview(reviewId: String, reason: String, comment: String = "") {
         val user = currentUser.value ?: return
         viewModelScope.launch {
-            reviewRepository.reportReviewAsSpam(
+            val result = reviewRepository.reportReviewAsSpam(
                 reviewId = reviewId,
                 reporterId = user.id,
                 reason = reason,
                 comment = comment
             )
+            if (result is OpResult.Success) {
+                _uiState.update { it.copy(reportedReviewIds = it.reportedReviewIds + reviewId) }
+            }
         }
     }
 
     fun reportPhoto(photoUrl: String, reason: String, comment: String = "") {
         val user = currentUser.value ?: return
         viewModelScope.launch {
-            placeRepository.reportPhoto(
+            val result = placeRepository.reportPhoto(
                 photoUrl = photoUrl,
                 reporterId = user.id,
                 reason = reason,
                 comment = comment
             )
+            if (result is OpResult.Success) {
+                _uiState.update { it.copy(reportedPhotoUrls = it.reportedPhotoUrls + photoUrl) }
+            }
         }
     }
 

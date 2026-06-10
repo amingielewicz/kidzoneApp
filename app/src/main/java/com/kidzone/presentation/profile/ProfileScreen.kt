@@ -75,9 +75,14 @@ import com.kidzone.presentation.common.BadgesRow
 import com.kidzone.presentation.common.RankBadge
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.rememberHapticFeedback
+import nl.dionsegijn.konfetti.compose.KonfettiView
+import nl.dionsegijn.konfetti.core.Party
+import nl.dionsegijn.konfetti.core.Position
+import nl.dionsegijn.konfetti.core.emitter.Emitter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 /**
  * Profil zalogowanego użytkownika.
@@ -170,6 +175,26 @@ fun ProfileScreen(
                     onSignOut = { viewModel.signOut(onSignOut) }
                 )
             }
+        }
+
+        // Konfetti animation overlay
+        if (ui.newlyEarnedBadges.isNotEmpty()) {
+            KonfettiView(
+                modifier = Modifier.fillMaxSize(),
+                parties = remember {
+                    listOf(
+                        Party(
+                            speed = 0f,
+                            maxSpeed = 30f,
+                            damping = 0.9f,
+                            spread = 360,
+                            colors = listOf(0xFFFFC93C.toInt(), 0xFF1E88E5.toInt(), 0xFF43A047.toInt(), 0xFFFFFFFF.toInt()),
+                            emitter = Emitter(duration = 100, TimeUnit.MILLISECONDS).max(100),
+                            position = Position.Relative(0.5, 0.3)
+                        )
+                    )
+                }
+            )
         }
 
         SnackbarHost(

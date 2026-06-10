@@ -47,6 +47,9 @@ timber = "5.0.1"
 # Coroutines
 coroutines = "1.9.0"
 
+# Konfetti
+konfetti = "2.0.5"
+
 [libraries]
 # AndroidX core
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -114,6 +117,9 @@ play-app-update-ktx = { module = "com.google.android.play:app-update-ktx", versi
 
 # Logging
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
+
+# Konfetti
+konfetti-compose = { module = "nl.dionsegijn:konfetti-compose", version.ref = "konfetti" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

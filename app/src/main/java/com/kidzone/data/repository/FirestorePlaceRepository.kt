@@ -2,7 +2,6 @@ package com.kidzone.data.repository
 
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
 import com.kidzone.data.local.PlaceDao
 import com.kidzone.data.local.PlaceEntity
 import com.kidzone.data.remote.FirestoreCollections
@@ -212,36 +211,13 @@ class FirestorePlaceRepository @Inject constructor(
         // pozniej moc czytac id z samego DTO bez polegania na nazwie dokumentu.
         val docRef = placesCollection().document()
         val placeWithId = place.copy(id = docRef.id)
-        val ownerUserId = placeWithId.ownerUserId
 
-        // Transakcja: zapis miejsca + atomowa inkrementacja licznika
-        // `placesAddedCount` na dokumencie autora. Dzieki transakcji albo oba
-        // zapisy sie powioda, albo zaden - nie zostawimy "osierodonego" miejsca
-        // bez zliczenia w rankingu, ani odwrotnie.
-        //
-        // Jezeli `ownerUserId` jest puste (nie powinno sie zdarzyc, ale lepiej
-        // sie zabezpieczyc), pomijamy update usera - zapis miejsca i tak
-        // sie odbedzie.
         val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
-            firestore.runTransaction<Unit> { tx ->
-                tx.set(docRef, PlaceDto.fromDomain(placeWithId))
-                if (ownerUserId.isNotBlank()) {
-                    val userRef = firestore
-                        .collection(FirestoreCollections.USERS)
-                        .document(ownerUserId)
-                    // set + merge zamiast update: jeśli doc istnieje, tylko
-                    // inkrementuje pole `placesAddedCount`; jeśli go brak
-                    // (legacy user / nieudana rejestracja), tworzy minimalny
-                    // doc z samym licznikiem, żeby user zaczął się pojawiać
-                    // w rankingu. Brakujące pola (name, email, avatar) zostaną
-                    // dopełnione przy najbliższym logowaniu przez ensureUserDoc().
-                    tx.set(
-                        userRef,
-                        mapOf("placesAddedCount" to FieldValue.increment(1)),
-                        SetOptions.merge()
-                    )
-                }
-            }.await()
+            // Cloud Function (updateUserStatsOnPlaceCreate) zajmie się licznikiem
+            // placesAddedCount na dokumencie autora.
+            placesCollection().document(placeWithId.id)
+                .set(PlaceDto.fromDomain(placeWithId))
+                .await()
             true
         }
         if (completed == null) {
@@ -292,28 +268,18 @@ class FirestorePlaceRepository @Inject constructor(
     override suspend fun deletePlace(placeId: String): OpResult<Unit> = try {
         require(placeId.isNotBlank()) { "placeId nie moze byc puste" }
 
-        val placeDoc = placesCollection().document(placeId).get().await()
-        val ownerUserId = placeDoc.getString("ownerUserId").orEmpty()
-
         val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+            // Cloud Function (updateUserStatsOnPlaceDelete) zajmie się licznikiem
             placesCollection().document(placeId).delete().await()
             true
         }
         if (completed == null) {
             OpResult.failure(
                 java.util.concurrent.TimeoutException(
-                    "Usuni\u0119cie trwa zbyt d\u0142ugo. Sprawd\u017A po\u0142\u0105czenie z Internetem."
+                    "Usunięcie trwa zbyt długo. Sprawdź połączenie z Internetem."
                 )
             )
         } else {
-            if (ownerUserId.isNotBlank()) {
-                try {
-                    firestore.collection(FirestoreCollections.USERS)
-                        .document(ownerUserId)
-                        .update("placesAddedCount", FieldValue.increment(-1))
-                        .await()
-                } catch (_: Exception) { /* best-effort */ }
-            }
             placeDao.deleteById(placeId)
             OpResult.success(Unit)
         }
@@ -516,5 +482,27 @@ class FirestorePlaceRepository @Inject constructor(
         }
     } catch (e: Exception) {
         OpResult.failure(e)
+    }
+
+    override suspend fun hasUserReportedPlace(placeId: String, userId: String): Boolean = try {
+        val snapshot = firestore.collection(FirestoreCollections.PLACE_REPORTS)
+            .whereEqualTo("reporterId", userId)
+            .whereEqualTo("placeId", placeId)
+            .limit(1)
+            .get()
+            .await()
+        !snapshot.isEmpty
+    } catch (_: Exception) {
+        false
+    }
+
+    override suspend fun getReportedPhotos(userId: String): Set<String> = try {
+        val snapshot = firestore.collection(FirestoreCollections.PHOTO_REPORTS)
+            .whereEqualTo("reporterId", userId)
+            .get()
+            .await()
+        snapshot.documents.mapNotNull { it.getString("photoUrl") }.toSet()
+    } catch (_: Exception) {
+        emptySet()
     }
 }

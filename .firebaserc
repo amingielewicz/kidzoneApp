@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "playground-705e7162"
-  }
+  },
+  "targets": {
+    "playground-705e7162": {
+      "hosting": {
+        "app": [
+          "playground-705e7162"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

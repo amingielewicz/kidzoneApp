@@ -1,6 +1,5 @@
 package com.kidzone.data.repository
 
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.kidzone.data.local.ReviewDao
@@ -143,40 +142,12 @@ class FirestoreReviewRepository @Inject constructor(
         }
 
         val reviewRef = reviewsCollection().document()
-        val placeRef = firestore.collection(FirestoreCollections.PLACES).document(review.placeId)
-        val userRef = review.userId
-            .takeIf { it.isNotBlank() }
-            ?.let { firestore.collection(FirestoreCollections.USERS).document(it) }
-
         val reviewWithId = review.copy(id = reviewRef.id)
 
         val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
-            firestore.runTransaction<Unit> { tx ->
-                val placeSnap = tx.get(placeRef)
-                if (!placeSnap.exists()) {
-                    throw NoSuchElementException("Brak miejsca o id=${review.placeId}")
-                }
-                val oldCount = placeSnap.getLong("reviewsCount")?.toInt() ?: 0
-                val oldAvg = placeSnap.getDouble("averageRating") ?: 0.0
-                val newCount = oldCount + 1
-                val newAvg = (oldAvg * oldCount + reviewWithId.rating) / newCount
-
-                tx.set(reviewRef, ReviewDto.fromDomain(reviewWithId))
-                tx.update(
-                    placeRef,
-                    mapOf(
-                        "reviewsCount" to newCount,
-                        "averageRating" to newAvg
-                    )
-                )
-                if (userRef != null) {
-                    tx.set(
-                        userRef,
-                        mapOf("reviewsCount" to FieldValue.increment(1)),
-                        SetOptions.merge()
-                    )
-                }
-            }.await()
+            reviewsCollection().document(reviewRef.id)
+                .set(ReviewDto.fromDomain(reviewWithId))
+                .await()
             true
         }
         if (completed == null) {
@@ -201,49 +172,14 @@ class FirestoreReviewRepository @Inject constructor(
             "Review.comment przekracza limit $REVIEW_COMMENT_MAX_LENGTH znaków"
         }
 
-        val reviewRef = reviewsCollection().document(review.id)
         val updatedReview = review.copy(updatedAtMillis = System.currentTimeMillis())
 
         val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
-            firestore.runTransaction<Unit> { tx ->
-                val reviewSnap = tx.get(reviewRef)
-                if (!reviewSnap.exists()) {
-                    throw NoSuchElementException("Brak opinii o id=${review.id}")
-                }
-                val existing = reviewSnap.toObject(ReviewDto::class.java)
-                    ?: throw IllegalStateException("Nieczytelny dokument opinii ${review.id}")
-                if (existing.userId != review.userId) {
-                    throw SecurityException("Można edytować tylko własne opinie")
-                }
-                val placeId = existing.placeId.ifBlank { review.placeId }
-                val placeRef = firestore
-                    .collection(FirestoreCollections.PLACES)
-                    .document(placeId)
-                val placeSnap = tx.get(placeRef)
-                if (!placeSnap.exists()) {
-                    throw NoSuchElementException("Brak miejsca o id=$placeId")
-                }
-                val count = placeSnap.getLong("reviewsCount")?.toInt() ?: 0
-                val oldAvg = placeSnap.getDouble("averageRating") ?: 0.0
-                val oldRating = existing.rating
-                val newRating = updatedReview.rating
-
-                val newAvg = if (count > 0) {
-                    (oldAvg * count - oldRating + newRating) / count
-                } else {
-                    newRating.toDouble()
-                }
-
-                val merged = existing.copy(
-                    rating = newRating,
-                    comment = updatedReview.comment,
-                    photoUrls = updatedReview.photoUrls,
-                    updatedAtMillis = updatedReview.updatedAtMillis
-                )
-                tx.set(reviewRef, merged)
-                tx.update(placeRef, mapOf("averageRating" to newAvg))
-                Unit
-            }.await()
+            // Cloud Function (updatePlaceStatsOnReviewUpdate) zajmie się ocenami
+            // jeżeli rating się zmienił. Klient po prostu zapisuje dokument.
+            reviewsCollection().document(updatedReview.id)
+                .set(ReviewDto.fromDomain(updatedReview))
+                .await()
             true
         }
         if (completed == null) {
@@ -307,57 +243,22 @@ class FirestoreReviewRepository @Inject constructor(
         OpResult.failure(e)
     }
 
+    override suspend fun getReportedReviews(userId: String): Set<String> = try {
+        val snapshot = firestore.collection(FirestoreCollections.REVIEW_REPORTS)
+            .whereEqualTo("reporterId", userId)
+            .get()
+            .await()
+        snapshot.documents.mapNotNull { it.getString("reviewId") }.toSet()
+    } catch (_: Exception) {
+        emptySet()
+    }
+
     override suspend fun deleteReview(reviewId: String): OpResult<Unit> = try {
         require(reviewId.isNotBlank()) { "reviewId nie może być puste" }
         val reviewRef = reviewsCollection().document(reviewId)
 
         val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
-            firestore.runTransaction<Unit> { tx ->
-                val reviewSnap = tx.get(reviewRef)
-                if (!reviewSnap.exists()) {
-                    return@runTransaction
-                }
-                val existing = reviewSnap.toObject(ReviewDto::class.java)
-                    ?: throw IllegalStateException("Nieczytelny dokument opinii $reviewId")
-
-                val placeRef = firestore
-                    .collection(FirestoreCollections.PLACES)
-                    .document(existing.placeId)
-                val placeSnap = tx.get(placeRef)
-                val placeExists = placeSnap.exists()
-
-                val authorRef = existing.userId
-                    .takeIf { it.isNotBlank() }
-                    ?.let { firestore.collection(FirestoreCollections.USERS).document(it) }
-
-                tx.delete(reviewRef)
-
-                if (placeExists) {
-                    val oldCount = placeSnap.getLong("reviewsCount")?.toInt() ?: 0
-                    val oldAvg = placeSnap.getDouble("averageRating") ?: 0.0
-                    val newCount = (oldCount - 1).coerceAtLeast(0)
-                    val newAvg = if (newCount > 0) {
-                        ((oldAvg * oldCount) - existing.rating) / newCount
-                    } else {
-                        0.0
-                    }
-                    tx.update(
-                        placeRef,
-                        mapOf(
-                            "reviewsCount" to newCount,
-                            "averageRating" to newAvg
-                        )
-                    )
-                }
-
-                if (authorRef != null) {
-                    tx.set(
-                        authorRef,
-                        mapOf("reviewsCount" to FieldValue.increment(-1)),
-                        SetOptions.merge()
-                    )
-                }
-            }.await()
+            reviewsCollection().document(reviewId).delete().await()
             true
         }
         if (completed == null) {

@@ -106,4 +106,14 @@ interface PlaceRepository {
      * przez każdego zalogowanego usera.
      */
     suspend fun removePhotoUrl(placeId: String, photoUrl: String): OpResult<Unit>
+
+    /**
+     * Sprawdza czy użytkownik już zgłosił dane miejsce.
+     */
+    suspend fun hasUserReportedPlace(placeId: String, userId: String): Boolean
+
+    /**
+     * Pobiera listę URL-i zdjęć zgłoszonych przez danego użytkownika.
+     */
+    suspend fun getReportedPhotos(userId: String): Set<String>
 }

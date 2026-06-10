@@ -791,8 +791,12 @@ class FirebaseAuthRepository @Inject constructor(
             }
         } catch (e: AuthException.AccountBanned) {
             throw e
-        } catch (_: Exception) {
-            // Nie blokuj logowania jeśli Firestore jest niedostępny
+        } catch (e: Exception) {
+            // Bezpieczeństwo: jeśli nie możemy sprawdzić statusu bana (np. timeout),
+            // lepiej zablokować dostęp niż ryzykować wpuszczenie zbanowanego usera.
+            // Wyjątek: pozwalamy tylko na błąd braku dokumentu (nowy user).
+            if (e.message?.contains("NOT_FOUND") == true) return
+            throw AuthException.Network(e)
         }
     }
 

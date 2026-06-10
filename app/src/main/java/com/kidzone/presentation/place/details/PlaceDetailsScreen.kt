@@ -312,20 +312,22 @@ fun PlaceDetailsScreen(
                                         showLocationCorrectionDialog = true
                                     }
                                 )
-                                DropdownMenuItem(
-                                    text = { Text("Zg\u0142o\u015B") },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Filled.Flag,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.error
-                                        )
-                                    },
-                                    onClick = {
-                                        showOverflow = false
-                                        showReportDialog = true
-                                    }
-                                )
+                                if (!state.isPlaceReported) {
+                                    DropdownMenuItem(
+                                        text = { Text("Zg\u0142o\u015B") },
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Filled.Flag,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.error
+                                            )
+                                        },
+                                        onClick = {
+                                            showOverflow = false
+                                            showReportDialog = true
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -379,6 +381,7 @@ fun PlaceDetailsScreen(
                         currentUserId = currentUser?.id,
                         topRank = state.topRank,
                         sortOrder = state.sortOrder,
+                        reportedReviewIds = state.reportedReviewIds,
                         onSortOrderChange = viewModel::setSortOrder,
                         onAddReview = viewModel::openAddReviewSheet,
                         onEditReview = viewModel::openEditReviewSheet,
@@ -527,13 +530,17 @@ fun PlaceDetailsScreen(
             initialIndex = fullscreenPhotoIndex,
             onDismiss = { fullscreenPhotos = emptyList() },
             onReportPhoto = if (fullscreenPhotosAreMine) null else { url ->
-                photoUrlToReport = url
-                showReportPhotoDialog = true
+                if (!state.reportedPhotoUrls.contains(url)) {
+                    photoUrlToReport = url
+                    showReportPhotoDialog = true
+                }
             },
             canReportPhoto = { url ->
-                // Ukryj flagę na zdjęciach dodanych przez bieżącego usera
+                // Ukryj flagę na zdjęciach dodanych przez bieżącego usera LUB już zgłoszonych
                 val uploaderId = fullscreenPhotoUploadedBy[url]
-                uploaderId == null || uploaderId != myUserId
+                val notMine = uploaderId == null || uploaderId != myUserId
+                val notReported = !state.reportedPhotoUrls.contains(url)
+                notMine && notReported
             },
             onDeletePhoto = { url ->
                 viewModel.deletePhotoFromPlace(url)
@@ -575,6 +582,7 @@ private fun PlaceDetailsContent(
     currentUserId: String?,
     topRank: Int?,
     sortOrder: PlaceDetailsViewModel.ReviewSortOrder,
+    reportedReviewIds: Set<String> = emptySet(),
     onSortOrderChange: (PlaceDetailsViewModel.ReviewSortOrder) -> Unit,
     onAddReview: () -> Unit,
     onEditReview: (Review) -> Unit,
@@ -758,7 +766,7 @@ private fun PlaceDetailsContent(
                 onDelete = if (isMine) {
                     { onDeleteReview(review) }
                 } else null,
-                onReport = if (!isMine && currentUserId != null) {
+                onReport = if (!isMine && currentUserId != null && !reportedReviewIds.contains(review.id)) {
                     { onReportReview(review) }
                 } else null,
                 onPhotoClick = if (review.photoUrls.isNotEmpty()) {
