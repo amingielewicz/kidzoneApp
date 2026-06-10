@@ -74,6 +74,7 @@ import com.kidzone.presentation.common.BadgeRowItem
 import com.kidzone.presentation.common.BadgesRow
 import com.kidzone.presentation.common.RankBadge
 import com.kidzone.presentation.common.UserBadge
+import com.kidzone.presentation.common.rememberHapticFeedback
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -109,6 +110,12 @@ fun ProfileScreen(
 ) {
     val user by viewModel.user.collectAsState()
     val ui by viewModel.uiState.collectAsState()
+
+    // Haptic feedback for newly earned badges
+    val haptic = rememberHapticFeedback()
+    LaunchedEffect(ui.newlyEarnedBadges) {
+        if (ui.newlyEarnedBadges.isNotEmpty()) haptic.reward()
+    }
 
     // Auto-refresh po przywróceniu internetu
     val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()

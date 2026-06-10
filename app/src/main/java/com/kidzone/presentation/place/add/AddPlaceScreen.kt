@@ -83,6 +83,7 @@ import com.kidzone.R
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.presentation.common.style
+import com.kidzone.presentation.common.rememberHapticFeedback
 import kotlinx.coroutines.launch
 
 /**
@@ -105,12 +106,16 @@ fun AddPlaceScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val haptic = rememberHapticFeedback()
 
     // Po pomyślnym zapisie – wracamy poziom wyżej. W trybie create
     // dodatkowo przekazujemy współrzędne nowego pinu, żeby Main mógł
     // wycentrować na nim mapę.
     LaunchedEffect(state.isSaved) {
-        if (state.isSaved) onSaved(state.savedNewLatitude, state.savedNewLongitude)
+        if (state.isSaved) {
+            haptic.success()
+            onSaved(state.savedNewLatitude, state.savedNewLongitude)
+        }
     }
 
     // Komunikat o duplikatach zdjęć
