@@ -163,20 +163,13 @@ class FirestorePlaceRepository @Inject constructor(
                 .await()
             val places = snapshot.documents.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
 
-            // Fallback: jeśli geohash query zwrócił 0 wyników (np. stare
-            // miejsca bez geohash), pobierz wszystko (legacy behavior).
-            val result = if (places.isEmpty()) {
-                val allSnapshot = placesCollection().get().await()
-                allSnapshot.documents.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
-            } else {
-                places
+            // Persystuj do cache (nawet jeśli 0 wyników — to ważna informacja).
+            if (places.isNotEmpty()) {
+                placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
             }
-
-            // Persystuj do cache.
-            placeDao.upsertAll(result.map(PlaceEntity::fromDomain))
-            OpResult.success(result)
+            OpResult.success(places)
         } catch (e: Exception) {
-            // Fallback: zwróć wszystko z cache (klient filtruje po odległości).
+            // Offline fallback: zwróć z Room cache, klient filtruje haversinem.
             val cached = placeDao.getTopPlaces(Int.MAX_VALUE)
             if (cached.isNotEmpty()) {
                 OpResult.success(cached.map { it.toDomain() })
