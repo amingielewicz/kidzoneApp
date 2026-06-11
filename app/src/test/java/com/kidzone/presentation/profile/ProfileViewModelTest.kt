@@ -1,12 +1,12 @@
 package com.kidzone.presentation.profile
 
-import android.content.Context
-import android.content.SharedPreferences
 import android.net.Uri
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
-import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.repository.SignInProvider
+import com.kidzone.domain.service.BadgePreferences
+import com.kidzone.domain.usecase.ComputeBadgesUseCase
+import com.kidzone.domain.usecase.NotificationPrefsUseCase
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.AuthException
@@ -34,11 +34,9 @@ class ProfileViewModelTest {
     }
 
     private lateinit var authRepository: AuthRepository
-    private lateinit var placeRepository: PlaceRepository
-    private lateinit var firestore: com.google.firebase.firestore.FirebaseFirestore
-    private lateinit var appContext: Context
-    private lateinit var sharedPrefs: SharedPreferences
-    private lateinit var prefsEditor: SharedPreferences.Editor
+    private lateinit var computeBadgesUseCase: ComputeBadgesUseCase
+    private lateinit var notificationPrefsUseCase: NotificationPrefsUseCase
+    private lateinit var badgePreferences: BadgePreferences
     private lateinit var viewModel: ProfileViewModel
 
     private val currentUserFlow = MutableStateFlow<User?>(null)
@@ -46,26 +44,19 @@ class ProfileViewModelTest {
     @BeforeEach
     fun setUp() {
         authRepository = mockk(relaxed = true)
-        placeRepository = mockk(relaxed = true)
-        firestore = mockk(relaxed = true)
-        appContext = mockk(relaxed = true)
-        sharedPrefs = mockk(relaxed = true)
-        prefsEditor = mockk(relaxed = true)
+        computeBadgesUseCase = mockk(relaxed = true)
+        notificationPrefsUseCase = mockk(relaxed = true)
+        badgePreferences = mockk(relaxed = true)
 
-        every { appContext.getSharedPreferences(any(), any()) } returns sharedPrefs
-        every { sharedPrefs.getStringSet(any(), any()) } returns emptySet()
-        every { sharedPrefs.edit() } returns prefsEditor
-        every { prefsEditor.putStringSet(any(), any()) } returns prefsEditor
+        every { badgePreferences.getSeenBadges(any()) } returns emptySet()
 
         every { authRepository.currentUser } returns currentUserFlow
         coEvery { authRepository.getCurrentSignInProvider() } returns SignInProvider.EMAIL_PASSWORD
         coEvery { authRepository.observeUser(any()) } returns flowOf(null)
-        coEvery { authRepository.getTopUsers(any()) } returns OpResult.success(emptyList())
-        coEvery { placeRepository.getTopPlaces(any()) } returns OpResult.success(emptyList())
     }
 
     private fun createViewModel(): ProfileViewModel {
-        return ProfileViewModel(authRepository, placeRepository, firestore, appContext)
+        return ProfileViewModel(authRepository, computeBadgesUseCase, notificationPrefsUseCase, badgePreferences)
     }
 
     // =========================================================================

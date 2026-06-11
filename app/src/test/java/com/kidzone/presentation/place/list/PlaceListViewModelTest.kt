@@ -1,10 +1,10 @@
 package com.kidzone.presentation.place.list
 
-import android.content.Context
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
+import com.kidzone.domain.service.LocationProvider
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import io.mockk.*
@@ -34,7 +34,7 @@ class PlaceListViewModelTest {
 
     private lateinit var placeRepository: PlaceRepository
     private lateinit var authRepository: AuthRepository
-    private lateinit var appContext: Context
+    private lateinit var locationProvider: LocationProvider
     private lateinit var viewModel: PlaceListViewModel
 
     private val currentUserFlow = MutableStateFlow(TestFixtures.user(id = "user-1"))
@@ -58,7 +58,7 @@ class PlaceListViewModelTest {
     fun setUp() {
         placeRepository = mockk(relaxed = true)
         authRepository = mockk(relaxed = true)
-        appContext = mockk(relaxed = true)
+        locationProvider = mockk(relaxed = true)
 
         every { authRepository.currentUser } returns currentUserFlow
         every { placeRepository.observePlaces(any(), any()) } returns flowOf(samplePlaces)
@@ -70,7 +70,7 @@ class PlaceListViewModelTest {
      * never emits beyond its initial value.
      */
     private fun kotlinx.coroutines.test.TestScope.createAndObserve(): PlaceListViewModel {
-        val vm = PlaceListViewModel(placeRepository, authRepository, appContext)
+        val vm = PlaceListViewModel(placeRepository, authRepository, locationProvider)
         backgroundScope.launch { vm.uiState.collect {} }
         return vm
     }

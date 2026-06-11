@@ -1,12 +1,12 @@
 package com.kidzone.presentation.place.add
 
-import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
+import com.kidzone.domain.service.ImageCompressorPort
 import com.kidzone.navigation.Route
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
@@ -38,7 +38,7 @@ class AddPlaceViewModelTest {
     private lateinit var placeRepository: PlaceRepository
     private lateinit var authRepository: AuthRepository
     private lateinit var photoUploader: PhotoUploader
-    private lateinit var appContext: Context
+    private lateinit var imageCompressor: ImageCompressorPort
 
     private val currentUserFlow = MutableStateFlow(TestFixtures.user())
 
@@ -48,7 +48,7 @@ class AddPlaceViewModelTest {
         placeRepository = mockk(relaxed = true)
         authRepository = mockk(relaxed = true)
         photoUploader = mockk(relaxed = true)
-        appContext = mockk(relaxed = true)
+        imageCompressor = mockk(relaxed = true)
 
         every { authRepository.currentUser } returns currentUserFlow
         // observePlaces(category, query) - 2 params
@@ -59,7 +59,7 @@ class AddPlaceViewModelTest {
         if (placeId != null) {
             savedStateHandle[Route.AddPlace.ARG_PLACE_ID] = placeId
         }
-        return AddPlaceViewModel(savedStateHandle, placeRepository, authRepository, photoUploader, appContext)
+        return AddPlaceViewModel(savedStateHandle, placeRepository, authRepository, photoUploader, imageCompressor)
     }
 
     // =========================================================================
