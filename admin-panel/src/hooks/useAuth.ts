@@ -62,8 +62,7 @@ export function useAuth() {
       setState((prev) => ({ ...prev, loading: true, error: null }));
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Nie udało się zalogować';
+      const message = err instanceof Error ? err.message : 'Nie udało się zalogować';
       setState((prev) => ({ ...prev, loading: false, error: message }));
     }
   };
@@ -73,8 +72,7 @@ export function useAuth() {
       setState((prev) => ({ ...prev, loading: true, error: null }));
       await signInWithPopup(auth, googleProvider);
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Nie udało się zalogować przez Google';
+      const message = err instanceof Error ? err.message : 'Nie udało się zalogować przez Google';
       setState((prev) => ({ ...prev, loading: false, error: message }));
     }
   };

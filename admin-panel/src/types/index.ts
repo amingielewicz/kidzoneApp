@@ -99,12 +99,7 @@ export interface ReviewReport {
   resolvedAtMillis?: number;
 }
 
-export type ReviewReportReason =
-  | 'SPAM'
-  | 'OFFENSIVE'
-  | 'FALSE_INFO'
-  | 'NOT_RELEVANT'
-  | 'OTHER';
+export type ReviewReportReason = 'SPAM' | 'OFFENSIVE' | 'FALSE_INFO' | 'NOT_RELEVANT' | 'OTHER';
 
 export const REVIEW_REPORT_REASON_LABELS: Record<ReviewReportReason, string> = {
   SPAM: 'Spam / reklama',

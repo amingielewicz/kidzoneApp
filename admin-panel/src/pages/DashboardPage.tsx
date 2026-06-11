@@ -112,37 +112,88 @@ export function DashboardPage() {
       ]);
 
       // Recent users
-      const usersSnap = await getDocs(query(collection(db, 'users'), orderBy('createdAtMillis', 'desc'), limit(5)));
-      setRecentUsers(usersSnap.docs.map((d) => ({ id: d.id, ...d.data() } as RecentUser)));
+      const usersSnap = await getDocs(
+        query(collection(db, 'users'), orderBy('createdAtMillis', 'desc'), limit(5)),
+      );
+      setRecentUsers(usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as RecentUser));
 
       // Recent places
-      const placesSnap = await getDocs(query(collection(db, 'places'), orderBy('createdAtMillis', 'desc'), limit(5)));
-      setRecentPlaces(placesSnap.docs.map((d) => ({ id: d.id, ...d.data() } as RecentPlace)));
+      const placesSnap = await getDocs(
+        query(collection(db, 'places'), orderBy('createdAtMillis', 'desc'), limit(5)),
+      );
+      setRecentPlaces(placesSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as RecentPlace));
 
       // Recent reviews
-      const reviewsSnap = await getDocs(query(collection(db, 'reviews'), orderBy('createdAtMillis', 'desc'), limit(5)));
-      setRecentReviews(reviewsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as RecentReview)));
+      const reviewsSnap = await getDocs(
+        query(collection(db, 'reviews'), orderBy('createdAtMillis', 'desc'), limit(5)),
+      );
+      setRecentReviews(reviewsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as RecentReview));
 
       // Reports - count only pending using getCountFromServer (efficient)
       let pendingReportsCount = 0;
       try {
         const [prCount, rrCount, phCount] = await Promise.all([
-          getCountFromServer(query(collection(db, 'place_reports'), where('status', '==', 'pending'))),
-          getCountFromServer(query(collection(db, 'review_reports'), where('status', '==', 'pending'))),
-          getCountFromServer(query(collection(db, 'photo_reports'), where('status', '==', 'pending'))),
+          getCountFromServer(
+            query(collection(db, 'place_reports'), where('status', '==', 'pending')),
+          ),
+          getCountFromServer(
+            query(collection(db, 'review_reports'), where('status', '==', 'pending')),
+          ),
+          getCountFromServer(
+            query(collection(db, 'photo_reports'), where('status', '==', 'pending')),
+          ),
         ]);
         pendingReportsCount = prCount.data().count + rrCount.data().count + phCount.data().count;
 
         // Fetch only recent pending reports for the list (limit 5)
         const [prSnap2, rrSnap2, phSnap2] = await Promise.all([
-          getDocs(query(collection(db, 'place_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'), limit(5))),
-          getDocs(query(collection(db, 'review_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'), limit(5))),
-          getDocs(query(collection(db, 'photo_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'), limit(5))),
+          getDocs(
+            query(
+              collection(db, 'place_reports'),
+              where('status', '==', 'pending'),
+              orderBy('createdAtMillis', 'desc'),
+              limit(5),
+            ),
+          ),
+          getDocs(
+            query(
+              collection(db, 'review_reports'),
+              where('status', '==', 'pending'),
+              orderBy('createdAtMillis', 'desc'),
+              limit(5),
+            ),
+          ),
+          getDocs(
+            query(
+              collection(db, 'photo_reports'),
+              where('status', '==', 'pending'),
+              orderBy('createdAtMillis', 'desc'),
+              limit(5),
+            ),
+          ),
         ]);
         const reports: RecentReport[] = [
-          ...prSnap2.docs.map((d) => ({ id: d.id, type: 'place' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
-          ...rrSnap2.docs.map((d) => ({ id: d.id, type: 'review' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
-          ...phSnap2.docs.map((d) => ({ id: d.id, type: 'photo' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
+          ...prSnap2.docs.map((d) => ({
+            id: d.id,
+            type: 'place' as const,
+            reason: d.data().reason || '',
+            comment: d.data().comment || '',
+            createdAtMillis: d.data().createdAtMillis || 0,
+          })),
+          ...rrSnap2.docs.map((d) => ({
+            id: d.id,
+            type: 'review' as const,
+            reason: d.data().reason || '',
+            comment: d.data().comment || '',
+            createdAtMillis: d.data().createdAtMillis || 0,
+          })),
+          ...phSnap2.docs.map((d) => ({
+            id: d.id,
+            type: 'photo' as const,
+            reason: d.data().reason || '',
+            comment: d.data().comment || '',
+            createdAtMillis: d.data().createdAtMillis || 0,
+          })),
         ];
         reports.sort((a, b) => b.createdAtMillis - a.createdAtMillis);
         setRecentReports(reports.slice(0, 5));
@@ -188,8 +239,12 @@ export function DashboardPage() {
             <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, height: '100%' }}>
               <PlaceIcon sx={{ fontSize: 36, color: '#1976D2' }} />
               <Box>
-                <Typography variant="h5" fontWeight={700}>{stats.places}</Typography>
-                <Typography variant="body2" color="text.secondary">Miejsca</Typography>
+                <Typography variant="h5" fontWeight={700}>
+                  {stats.places}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Miejsca
+                </Typography>
               </Box>
             </CardContent>
           </Card>
@@ -199,8 +254,12 @@ export function DashboardPage() {
             <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, height: '100%' }}>
               <ReviewsIcon sx={{ fontSize: 36, color: '#388E3C' }} />
               <Box>
-                <Typography variant="h5" fontWeight={700}>{stats.reviews}</Typography>
-                <Typography variant="body2" color="text.secondary">Opinie</Typography>
+                <Typography variant="h5" fontWeight={700}>
+                  {stats.reviews}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Opinie
+                </Typography>
               </Box>
             </CardContent>
           </Card>
@@ -210,8 +269,12 @@ export function DashboardPage() {
             <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, height: '100%' }}>
               <PeopleIcon sx={{ fontSize: 36, color: '#7B1FA2' }} />
               <Box>
-                <Typography variant="h5" fontWeight={700}>{stats.users}</Typography>
-                <Typography variant="body2" color="text.secondary">Użytkownicy</Typography>
+                <Typography variant="h5" fontWeight={700}>
+                  {stats.users}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Użytkownicy
+                </Typography>
               </Box>
             </CardContent>
           </Card>
@@ -221,8 +284,12 @@ export function DashboardPage() {
             <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, height: '100%' }}>
               <ReportIcon sx={{ fontSize: 36, color: '#D32F2F' }} />
               <Box>
-                <Typography variant="h5" fontWeight={700}>{stats.pendingReports}</Typography>
-                <Typography variant="body2" color="text.secondary">Zgłoszenia oczekujące</Typography>
+                <Typography variant="h5" fontWeight={700}>
+                  {stats.pendingReports}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Zgłoszenia oczekujące
+                </Typography>
               </Box>
             </CardContent>
           </Card>
@@ -236,7 +303,9 @@ export function DashboardPage() {
           <Paper sx={{ p: 2 }}>
             <Box display="flex" alignItems="center" gap={1} mb={2}>
               <PersonAddIcon color="primary" />
-              <Typography variant="h6" fontWeight={600}>Nowi użytkownicy</Typography>
+              <Typography variant="h6" fontWeight={600}>
+                Nowi użytkownicy
+              </Typography>
             </Box>
             <List dense disablePadding>
               {recentUsers.map((u) => (
@@ -255,7 +324,9 @@ export function DashboardPage() {
                 </ListItem>
               ))}
               {recentUsers.length === 0 && (
-                <Typography variant="body2" color="text.secondary">Brak</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Brak
+                </Typography>
               )}
             </List>
           </Paper>
@@ -266,7 +337,9 @@ export function DashboardPage() {
           <Paper sx={{ p: 2 }}>
             <Box display="flex" alignItems="center" gap={1} mb={2}>
               <NewReleasesIcon color="primary" />
-              <Typography variant="h6" fontWeight={600}>Nowe miejsca</Typography>
+              <Typography variant="h6" fontWeight={600}>
+                Nowe miejsca
+              </Typography>
             </Box>
             <List dense disablePadding>
               {recentPlaces.map((p) => (
@@ -282,13 +355,13 @@ export function DashboardPage() {
                     primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }}
                     secondaryTypographyProps={{ variant: 'caption' }}
                   />
-                  {p.averageRating > 0 && (
-                    <Chip label={p.averageRating.toFixed(1)} size="small" />
-                  )}
+                  {p.averageRating > 0 && <Chip label={p.averageRating.toFixed(1)} size="small" />}
                 </ListItem>
               ))}
               {recentPlaces.length === 0 && (
-                <Typography variant="body2" color="text.secondary">Brak</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Brak
+                </Typography>
               )}
             </List>
           </Paper>
@@ -299,7 +372,9 @@ export function DashboardPage() {
           <Paper sx={{ p: 2 }}>
             <Box display="flex" alignItems="center" gap={1} mb={2}>
               <ReviewsIcon color="primary" />
-              <Typography variant="h6" fontWeight={600}>Nowe opinie</Typography>
+              <Typography variant="h6" fontWeight={600}>
+                Nowe opinie
+              </Typography>
             </Box>
             <List dense disablePadding>
               {recentReviews.map((r) => (
@@ -307,17 +382,27 @@ export function DashboardPage() {
                   <ListItemText
                     primary={
                       <Box display="flex" alignItems="center" gap={1}>
-                        <Typography variant="body2" fontWeight={500}>{r.authorName || 'Anonim'}</Typography>
+                        <Typography variant="body2" fontWeight={500}>
+                          {r.authorName || 'Anonim'}
+                        </Typography>
                         <Rating value={r.rating} size="small" readOnly />
                       </Box>
                     }
-                    secondary={r.comment ? (r.comment.length > 60 ? r.comment.slice(0, 60) + '...' : r.comment) : '(bez komentarza)'}
+                    secondary={
+                      r.comment
+                        ? r.comment.length > 60
+                          ? r.comment.slice(0, 60) + '...'
+                          : r.comment
+                        : '(bez komentarza)'
+                    }
                     secondaryTypographyProps={{ variant: 'caption' }}
                   />
                 </ListItem>
               ))}
               {recentReviews.length === 0 && (
-                <Typography variant="body2" color="text.secondary">Brak</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Brak
+                </Typography>
               )}
             </List>
           </Paper>
@@ -328,11 +413,15 @@ export function DashboardPage() {
       <Paper sx={{ p: 2, mt: 3 }}>
         <Box display="flex" alignItems="center" gap={1} mb={2}>
           <ReportIcon color="error" />
-          <Typography variant="h6" fontWeight={600}>Nowe zgłoszenia</Typography>
+          <Typography variant="h6" fontWeight={600}>
+            Nowe zgłoszenia
+          </Typography>
           <Chip label={recentReports.length} size="small" color="error" />
         </Box>
         {recentReports.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">Brak oczekujących zgłoszeń</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Brak oczekujących zgłoszeń
+          </Typography>
         ) : (
           <List dense disablePadding>
             {recentReports.map((r) => (
@@ -346,7 +435,18 @@ export function DashboardPage() {
                 sx={{ borderRadius: 1, mb: 0.5 }}
               >
                 <ListItemAvatar>
-                  <Avatar sx={{ width: 32, height: 32, bgcolor: r.type === 'place' ? '#ffebee' : r.type === 'review' ? '#fff3e0' : '#fce4ec' }}>
+                  <Avatar
+                    sx={{
+                      width: 32,
+                      height: 32,
+                      bgcolor:
+                        r.type === 'place'
+                          ? '#ffebee'
+                          : r.type === 'review'
+                            ? '#fff3e0'
+                            : '#fce4ec',
+                    }}
+                  >
                     {r.type === 'place' && <PlaceIcon sx={{ fontSize: 18, color: '#D32F2F' }} />}
                     {r.type === 'review' && <WarningIcon sx={{ fontSize: 18, color: '#F57C00' }} />}
                     {r.type === 'photo' && <PhotoIcon sx={{ fontSize: 18, color: '#C2185B' }} />}
@@ -356,10 +456,22 @@ export function DashboardPage() {
                   primary={
                     <Box display="flex" alignItems="center" gap={1}>
                       <Chip
-                        label={r.type === 'place' ? 'Miejsce' : r.type === 'review' ? 'Opinia' : 'Zdjęcie'}
+                        label={
+                          r.type === 'place'
+                            ? 'Miejsce'
+                            : r.type === 'review'
+                              ? 'Opinia'
+                              : 'Zdjęcie'
+                        }
                         size="small"
                         variant="outlined"
-                        color={r.type === 'place' ? 'error' : r.type === 'review' ? 'warning' : 'secondary'}
+                        color={
+                          r.type === 'place'
+                            ? 'error'
+                            : r.type === 'review'
+                              ? 'warning'
+                              : 'secondary'
+                        }
                       />
                       <Typography variant="body2">{REASON_LABELS[r.reason] || r.reason}</Typography>
                     </Box>

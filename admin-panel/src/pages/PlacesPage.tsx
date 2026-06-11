@@ -116,7 +116,10 @@ export function PlacesPage() {
   const [loadingReviews, setLoadingReviews] = useState(false);
 
   // Delete review with reason
-  const [deleteReviewDialog, setDeleteReviewDialog] = useState<{ open: boolean; review: any | null }>({ open: false, review: null });
+  const [deleteReviewDialog, setDeleteReviewDialog] = useState<{
+    open: boolean;
+    review: any | null;
+  }>({ open: false, review: null });
   const [deleteReviewReason, setDeleteReviewReason] = useState('');
 
   // Confirm
@@ -143,7 +146,7 @@ export function PlacesPage() {
         (p) =>
           p.name.toLowerCase().includes(q) ||
           p.address.toLowerCase().includes(q) ||
-          p.id.toLowerCase().includes(q)
+          p.id.toLowerCase().includes(q),
       );
     }
 
@@ -165,9 +168,9 @@ export function PlacesPage() {
     setLoading(true);
     try {
       const snap = await getDocs(
-        query(collection(db, 'places'), orderBy('createdAtMillis', 'desc'), limit(500))
+        query(collection(db, 'places'), orderBy('createdAtMillis', 'desc'), limit(500)),
       );
-      setPlaces(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Place)));
+      setPlaces(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Place));
     } catch (err) {
       console.error('Failed to fetch places:', err);
     } finally {
@@ -215,9 +218,13 @@ export function PlacesPage() {
     setOwnerEmail('');
     // Fetch owner email
     if (place.ownerUserId) {
-      getDoc(doc(db, 'users', place.ownerUserId)).then((snap) => {
-        if (snap.exists()) setOwnerEmail(snap.data()?.email || '');
-      }).catch((e) => { console.warn('Failed to fetch owner email:', e); });
+      getDoc(doc(db, 'users', place.ownerUserId))
+        .then((snap) => {
+          if (snap.exists()) setOwnerEmail(snap.data()?.email || '');
+        })
+        .catch((e) => {
+          console.warn('Failed to fetch owner email:', e);
+        });
     }
   }
 
@@ -235,7 +242,7 @@ export function PlacesPage() {
         amenities: editAmenities,
       };
       await updateDoc(doc(db, 'places', detailPlace.id), updates);
-      setDetailPlace((prev) => prev ? { ...prev, ...updates } : null);
+      setDetailPlace((prev) => (prev ? { ...prev, ...updates } : null));
       await fetchPlaces();
     } catch (err) {
       console.error('Failed to save:', err);
@@ -247,9 +254,7 @@ export function PlacesPage() {
   async function fetchReviews(placeId: string) {
     setLoadingReviews(true);
     try {
-      const snap = await getDocs(
-        query(collection(db, 'reviews'), where('placeId', '==', placeId))
-      );
+      const snap = await getDocs(query(collection(db, 'reviews'), where('placeId', '==', placeId)));
       const reviews = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       reviews.sort((a: any, b: any) => (b.createdAtMillis || 0) - (a.createdAtMillis || 0));
       setPlaceReviews(reviews);
@@ -294,7 +299,7 @@ export function PlacesPage() {
         photoUploadedBy: currentMap,
       });
       const newUrls = [...(detailPlace.photoUrls || []), downloadUrl];
-      setDetailPlace((prev) => prev ? { ...prev, photoUrls: newUrls } : null);
+      setDetailPlace((prev) => (prev ? { ...prev, photoUrls: newUrls } : null));
       await fetchPlaces();
     } catch (err) {
       console.error('Upload failed:', err);
@@ -474,11 +479,7 @@ export function PlacesPage() {
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Usuń miejsce">
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => openDeleteDialog(place)}
-                    >
+                    <IconButton size="small" color="error" onClick={() => openDeleteDialog(place)}>
                       <DeleteIcon />
                     </IconButton>
                   </Tooltip>
@@ -497,25 +498,31 @@ export function PlacesPage() {
       </TableContainer>
 
       {/* Detail / Edit Dialog */}
-      <Dialog
-        open={!!detailPlace}
-        onClose={() => setDetailPlace(null)}
-        maxWidth="md"
-        fullWidth
-      >
+      <Dialog open={!!detailPlace} onClose={() => setDetailPlace(null)} maxWidth="md" fullWidth>
         {detailPlace && (
           <>
-            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <DialogTitle
+              sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}
+            >
               <Box>
                 {detailPlace.name}
                 <Typography variant="caption" display="block" color="text.secondary">
                   ID: {detailPlace.id}
                 </Typography>
               </Box>
-              <IconButton size="small" onClick={() => setDetailPlace(null)}><CancelIcon /></IconButton>
+              <IconButton size="small" onClick={() => setDetailPlace(null)}>
+                <CancelIcon />
+              </IconButton>
             </DialogTitle>
             <DialogContent dividers>
-              <Tabs value={detailTab} onChange={(_, v) => { setDetailTab(v); if (v === 2) fetchReviews(detailPlace.id); }} sx={{ mb: 2 }}>
+              <Tabs
+                value={detailTab}
+                onChange={(_, v) => {
+                  setDetailTab(v);
+                  if (v === 2) fetchReviews(detailPlace.id);
+                }}
+                sx={{ mb: 2 }}
+              >
                 <Tab label="Dane" />
                 <Tab label={`Zdjęcia (${detailPlace.photoUrls?.length || 0})`} />
                 <Tab label={`Opinie (${detailPlace.reviewsCount || 0})`} />
@@ -524,37 +531,92 @@ export function PlacesPage() {
               {/* Tab 0: Basic info */}
               {detailTab === 0 && (
                 <Box display="flex" flexDirection="column" gap={2}>
-                  <TextField label="Nazwa" value={editName} onChange={(e) => setEditName(e.target.value)} fullWidth size="small" />
-                  <TextField label="Adres" value={editAddress} onChange={(e) => setEditAddress(e.target.value)} fullWidth size="small" />
-                  <TextField label="Opis" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} fullWidth size="small" multiline rows={3} />
+                  <TextField
+                    label="Nazwa"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    fullWidth
+                    size="small"
+                  />
+                  <TextField
+                    label="Adres"
+                    value={editAddress}
+                    onChange={(e) => setEditAddress(e.target.value)}
+                    fullWidth
+                    size="small"
+                  />
+                  <TextField
+                    label="Opis"
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    fullWidth
+                    size="small"
+                    multiline
+                    rows={3}
+                  />
 
                   <FormControl size="small" fullWidth>
                     <InputLabel>Kategoria</InputLabel>
-                    <Select value={editCategory} label="Kategoria" onChange={(e) => setEditCategory(e.target.value)}>
+                    <Select
+                      value={editCategory}
+                      label="Kategoria"
+                      onChange={(e) => setEditCategory(e.target.value)}
+                    >
                       {Object.entries(PLACE_CATEGORY_LABELS).map(([key, label]) => (
-                        <MenuItem key={key} value={key}>{label}</MenuItem>
+                        <MenuItem key={key} value={key}>
+                          {label}
+                        </MenuItem>
                       ))}
                     </Select>
                   </FormControl>
 
                   <Grid container spacing={1}>
                     <Grid item xs={6}>
-                      <TextField label="Szerokość (lat)" value={editLat} onChange={(e) => setEditLat(e.target.value)} fullWidth size="small" />
+                      <TextField
+                        label="Szerokość (lat)"
+                        value={editLat}
+                        onChange={(e) => setEditLat(e.target.value)}
+                        fullWidth
+                        size="small"
+                      />
                     </Grid>
                     <Grid item xs={6}>
-                      <TextField label="Długość (lng)" value={editLng} onChange={(e) => setEditLng(e.target.value)} fullWidth size="small" />
+                      <TextField
+                        label="Długość (lng)"
+                        value={editLng}
+                        onChange={(e) => setEditLng(e.target.value)}
+                        fullWidth
+                        size="small"
+                      />
                     </Grid>
                   </Grid>
 
                   <Box sx={{ p: 1.5, bgcolor: '#f5f5f5', borderRadius: 1 }}>
                     <Box display="flex" alignItems="center" gap={0.5}>
-                      <Typography variant="body2" color="text.secondary"><strong>Właściciel UID:</strong> {detailPlace.ownerUserId || '(brak)'}</Typography>
-                      {detailPlace.ownerUserId && <Tooltip title="Kopiuj UID"><IconButton size="small" onClick={() => navigator.clipboard.writeText(detailPlace.ownerUserId || '')}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>}
+                      <Typography variant="body2" color="text.secondary">
+                        <strong>Właściciel UID:</strong> {detailPlace.ownerUserId || '(brak)'}
+                      </Typography>
+                      {detailPlace.ownerUserId && (
+                        <Tooltip title="Kopiuj UID">
+                          <IconButton
+                            size="small"
+                            onClick={() =>
+                              navigator.clipboard.writeText(detailPlace.ownerUserId || '')
+                            }
+                          >
+                            <ContentCopyIcon sx={{ fontSize: 14 }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </Box>
-                    <Typography variant="body2" color="text.secondary"><strong>Email:</strong> {ownerEmail || '(brak / nie pobrano)'}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Email:</strong> {ownerEmail || '(brak / nie pobrano)'}
+                    </Typography>
                   </Box>
 
-                  <Typography variant="subtitle2" mt={1}>Udogodnienia:</Typography>
+                  <Typography variant="subtitle2" mt={1}>
+                    Udogodnienia:
+                  </Typography>
                   <Box display="flex" flexWrap="wrap" gap={0}>
                     {Object.entries(ALL_AMENITIES).map(([key, label]) => (
                       <FormControlLabel
@@ -576,10 +638,16 @@ export function PlacesPage() {
                   </Box>
 
                   <Typography variant="body2" color="text.secondary">
-                    <strong>Ocena:</strong> {detailPlace.averageRating?.toFixed(2)} ({detailPlace.reviewsCount} opinii)
+                    <strong>Ocena:</strong> {detailPlace.averageRating?.toFixed(2)} (
+                    {detailPlace.reviewsCount} opinii)
                   </Typography>
 
-                  <Button variant="contained" onClick={saveBasicInfo} disabled={saving} sx={{ alignSelf: 'flex-start' }}>
+                  <Button
+                    variant="contained"
+                    onClick={saveBasicInfo}
+                    disabled={saving}
+                    sx={{ alignSelf: 'flex-start' }}
+                  >
                     {saving ? <CircularProgress size={20} /> : 'Zapisz zmiany'}
                   </Button>
                 </Box>
@@ -589,11 +657,7 @@ export function PlacesPage() {
               {detailTab === 1 && (
                 <Box>
                   <Box mb={2}>
-                    <Button
-                      variant="outlined"
-                      component="label"
-                      disabled={uploading}
-                    >
+                    <Button variant="outlined" component="label" disabled={uploading}>
                       {uploading ? <CircularProgress size={20} /> : 'Dodaj zdjęcie'}
                       <input
                         type="file"
@@ -607,7 +671,7 @@ export function PlacesPage() {
                       />
                     </Button>
                   </Box>
-                  {(!detailPlace.photoUrls || detailPlace.photoUrls.length === 0) ? (
+                  {!detailPlace.photoUrls || detailPlace.photoUrls.length === 0 ? (
                     <Typography color="text.secondary">Brak zdjęć</Typography>
                   ) : (
                     <Box display="flex" gap={2} flexWrap="wrap">
@@ -674,7 +738,9 @@ export function PlacesPage() {
                             <TableCell>
                               <Rating value={review.rating} size="small" readOnly />
                             </TableCell>
-                            <TableCell sx={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <TableCell
+                              sx={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis' }}
+                            >
                               {review.comment || '—'}
                             </TableCell>
                             <TableCell>{formatDate(review.createdAtMillis)}</TableCell>
@@ -701,10 +767,7 @@ export function PlacesPage() {
               )}
             </DialogContent>
             <DialogActions>
-              <Button
-                color="error"
-                onClick={() => openDeleteDialog(detailPlace)}
-              >
+              <Button color="error" onClick={() => openDeleteDialog(detailPlace)}>
                 Usuń miejsce
               </Button>
               <Button onClick={() => setDetailPlace(null)}>Zamknij</Button>
@@ -722,9 +785,16 @@ export function PlacesPage() {
       >
         {deleteReviewDialog.review && (
           <>
-            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <DialogTitle
+              sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
               <span>Usuń opinię</span>
-              <IconButton size="small" onClick={() => setDeleteReviewDialog({ open: false, review: null })}><CancelIcon /></IconButton>
+              <IconButton
+                size="small"
+                onClick={() => setDeleteReviewDialog({ open: false, review: null })}
+              >
+                <CancelIcon />
+              </IconButton>
             </DialogTitle>
             <DialogContent>
               <Box display="flex" flexDirection="column" gap={2} mt={1}>
@@ -746,7 +816,9 @@ export function PlacesPage() {
               </Box>
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => setDeleteReviewDialog({ open: false, review: null })}>Anuluj</Button>
+              <Button onClick={() => setDeleteReviewDialog({ open: false, review: null })}>
+                Anuluj
+              </Button>
               <Button
                 variant="contained"
                 color="error"
@@ -766,7 +838,12 @@ export function PlacesPage() {
       </Dialog>
 
       {/* Delete Photo Dialog */}
-      <Dialog open={deletePhotoDialogOpen} onClose={() => setDeletePhotoDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={deletePhotoDialogOpen}
+        onClose={() => setDeletePhotoDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Usuń zdjęcie</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" mb={2}>
@@ -785,14 +862,28 @@ export function PlacesPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeletePhotoDialogOpen(false)}>Anuluj</Button>
-          <Button variant="contained" color="error" disabled={!deletePhotoReason.trim() || saving} onClick={async () => { setSaving(true); await handleDeletePhoto(); setSaving(false); }}>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={!deletePhotoReason.trim() || saving}
+            onClick={async () => {
+              setSaving(true);
+              await handleDeletePhoto();
+              setSaving(false);
+            }}
+          >
             {saving ? <CircularProgress size={20} color="inherit" /> : 'Usuń'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Delete Place Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Usuń miejsce: {deleteTarget?.name}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" mb={2}>
@@ -811,7 +902,16 @@ export function PlacesPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)}>Anuluj</Button>
-          <Button variant="contained" color="error" disabled={!deleteReason.trim() || saving} onClick={async () => { setSaving(true); await handleDelete(); setSaving(false); }}>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={!deleteReason.trim() || saving}
+            onClick={async () => {
+              setSaving(true);
+              await handleDelete();
+              setSaving(false);
+            }}
+          >
             {saving ? <CircularProgress size={20} color="inherit" /> : 'Usuń'}
           </Button>
         </DialogActions>
@@ -820,10 +920,14 @@ export function PlacesPage() {
       {/* Confirm Dialog */}
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <DialogTitle>Potwierdzenie</DialogTitle>
-        <DialogContent><Typography>{confirmTitle}</Typography></DialogContent>
+        <DialogContent>
+          <Typography>{confirmTitle}</Typography>
+        </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmOpen(false)}>Anuluj</Button>
-          <Button variant="contained" color="error" onClick={handleConfirm}>Potwierdź</Button>
+          <Button variant="contained" color="error" onClick={handleConfirm}>
+            Potwierdź
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
