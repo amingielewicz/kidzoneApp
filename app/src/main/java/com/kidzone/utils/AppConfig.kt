@@ -18,6 +18,30 @@ package com.kidzone.utils
  */
 object AppConfig {
 
+    // ========== Networking & Timeouts ==========
+
+    /**
+     * Maksymalny czas oczekiwania na zapis do Firestore (w ms).
+     *
+     * Bez timeoutu Firebase retryuje w nieskończoność przy problemach
+     * z Google Play Services. Po tym czasie zwracamy TimeoutException,
+     * żeby UI mogło pokazać sensowny komunikat zamiast wieczystego spinnera.
+     */
+    const val WRITE_TIMEOUT_MS: Long = 30_000L
+
+    // ========== Review limits ==========
+
+    /**
+     * Maksymalna długość komentarza w opinii.
+     *
+     * Egzekwowana w UI (AddReviewSheet counter) i warstwie data
+     * (FirestoreReviewRepository). Zsynchronizowana z Remote Config
+     * default `max_review_length`.
+     */
+    const val REVIEW_COMMENT_MAX_LENGTH: Int = 500
+
+    // ========== Admin & Privacy ==========
+
     /**
      * Pełna nazwa administratora danych osobowych w rozumieniu RODO.
      *

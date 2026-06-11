@@ -372,25 +372,25 @@ class AddPlaceViewModel @Inject constructor(
     // --- Zarządzanie zdjęciami ---
 
     /** Zbiór hashów (MD5 skompresowanych bajtów) istniejących zdjęć. */
-    private val photoContentHashes = mutableSetOf<String>()
+    private val photoContentHashes: MutableSet<String> =
+        (savedStateHandle.get<List<String>>("photoHashes") ?: emptyList()).toMutableSet()
 
-    /** Seeduje hash set z remote URLs (background IO). */
+    private fun persistHashes() {
+        savedStateHandle["photoHashes"] = photoContentHashes.toList()
+    }
+
+    /** Seeduje hash set z Firestore (pole `photoContentHashes` na dokumencie miejsca). */
     private fun seedPhotoHashes(urls: List<String>) {
+        // Hashe są teraz trzymane w Firestore na dokumencie miejsca (pole photoHashes).
+        // Przy edycji pobieramy je stamtąd — zero downloadu obrazów po sieci.
         viewModelScope.launch {
-            for (url in urls) {
-                try {
-                    val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        val conn = java.net.URL(url).openConnection()
-                        conn.connectTimeout = 10_000
-                        conn.readTimeout = 10_000
-                        conn.getInputStream().readBytes()
-                    }
-                    val hash = java.security.MessageDigest.getInstance("MD5")
-                        .digest(bytes)
-                        .joinToString("") { "%02x".format(it) }
-                    photoContentHashes.add(hash)
-                } catch (_: Exception) { /* best-effort */ }
-            }
+            val placeId = _uiState.value.editingPlaceId ?: return@launch
+            try {
+                val place = (placeRepository.getPlace(placeId) as? OpResult.Success)?.data
+                val storedHashes = place?.photoHashes.orEmpty()
+                photoContentHashes.addAll(storedHashes)
+                persistHashes()
+            } catch (_: Exception) { /* best-effort */ }
         }
     }
 
@@ -412,13 +412,19 @@ class AddPlaceViewModel @Inject constructor(
     }
 
     /** URL-e zdjęć usuniętych przez usera (do skasowania z Storage przy save). */
-    private val removedPhotoUrls = mutableListOf<String>()
+    private val removedPhotoUrls: MutableList<String> =
+        (savedStateHandle.get<List<String>>("removedPhotos") ?: emptyList()).toMutableList()
+
+    private fun persistRemovedPhotos() {
+        savedStateHandle["removedPhotos"] = removedPhotoUrls.toList()
+    }
 
     /** Usuwa istniejące (już uploadowane) zdjęcie po indeksie. */
     fun removeExistingPhoto(index: Int) {
         _uiState.update { state ->
             val removed = state.existingPhotoUrls[index]
             removedPhotoUrls.add(removed)
+            persistRemovedPhotos()
             state.copy(
                 existingPhotoUrls = state.existingPhotoUrls.toMutableList().apply { removeAt(index) }
             )
@@ -459,6 +465,7 @@ class AddPlaceViewModel @Inject constructor(
                             continue
                         }
                         photoContentHashes.add(hash)
+                        persistHashes()
 
                         try {
                             val tempId = state.editingPlaceId ?: "pending_${System.currentTimeMillis()}"
@@ -507,6 +514,9 @@ class AddPlaceViewModel @Inject constructor(
             val newUploadedBy = uploadedUrls.associateWith { currentUser.id }
             val allPhotoUploadedBy = existingUploadedBy + newUploadedBy
 
+            // Persist all known hashes for future dedup (no more downloading images)
+            val allPhotoHashes = photoContentHashes.toList()
+
             val result = if (state.isEditMode && editingOriginal != null) {
                 val original = editingOriginal!!
                 val updated = original.copy(
@@ -518,7 +528,8 @@ class AddPlaceViewModel @Inject constructor(
                     longitude = state.longitude!!,
                     amenities = state.amenities,
                     photoUrls = allPhotoUrls,
-                    photoUploadedBy = allPhotoUploadedBy
+                    photoUploadedBy = allPhotoUploadedBy,
+                    photoHashes = allPhotoHashes
                 )
                 placeRepository.updatePlace(updated)
             } else {
@@ -534,6 +545,7 @@ class AddPlaceViewModel @Inject constructor(
                     amenities = state.amenities,
                     photoUrls = allPhotoUrls,
                     photoUploadedBy = allPhotoUploadedBy,
+                    photoHashes = allPhotoHashes,
                     createdAtMillis = System.currentTimeMillis()
                 )
                 placeRepository.addPlace(newPlace)

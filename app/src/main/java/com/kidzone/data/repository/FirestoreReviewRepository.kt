@@ -8,6 +8,7 @@ import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.ReviewDto
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.repository.ReviewRepository
+import com.kidzone.utils.AppConfig
 import com.kidzone.utils.OpResult
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -19,18 +20,6 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
-
-/**
- * Maks. czas na zapis do Firestore (w ms) – patrz komentarz w [FirestorePlaceRepository].
- */
-private const val WRITE_TIMEOUT_MS = 30_000L
-
-/**
- * Maksymalna długość komentarza w opinii. Trzymane jako stała w warstwie
- * data, bo to ostateczny strażnik – UI również cappuje (AddReviewSheet),
- * ale walidacja po stronie repo gwarantuje kontrakt domeny.
- */
-private const val REVIEW_COMMENT_MAX_LENGTH = 1000
 
 /**
  * Implementacja [ReviewRepository] oparta o Firestore + Room cache.
@@ -137,14 +126,14 @@ class FirestoreReviewRepository @Inject constructor(
     override suspend fun addReview(review: Review): OpResult<Review> = try {
         require(review.placeId.isNotBlank()) { "Review.placeId nie może być puste" }
         require(review.rating in 1..5) { "Review.rating musi być w zakresie 1..5" }
-        require(review.comment.length <= REVIEW_COMMENT_MAX_LENGTH) {
-            "Review.comment przekracza limit $REVIEW_COMMENT_MAX_LENGTH znaków"
+        require(review.comment.length <= AppConfig.REVIEW_COMMENT_MAX_LENGTH) {
+            "Review.comment przekracza limit $AppConfig.REVIEW_COMMENT_MAX_LENGTH znaków"
         }
 
         val reviewRef = reviewsCollection().document()
         val reviewWithId = review.copy(id = reviewRef.id)
 
-        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             reviewsCollection().document(reviewRef.id)
                 .set(ReviewDto.fromDomain(reviewWithId))
                 .await()
@@ -168,13 +157,13 @@ class FirestoreReviewRepository @Inject constructor(
     override suspend fun updateReview(review: Review): OpResult<Review> = try {
         require(review.id.isNotBlank()) { "Review.id musi być znane przy update" }
         require(review.rating in 1..5) { "Review.rating musi być w zakresie 1..5" }
-        require(review.comment.length <= REVIEW_COMMENT_MAX_LENGTH) {
-            "Review.comment przekracza limit $REVIEW_COMMENT_MAX_LENGTH znaków"
+        require(review.comment.length <= AppConfig.REVIEW_COMMENT_MAX_LENGTH) {
+            "Review.comment przekracza limit $AppConfig.REVIEW_COMMENT_MAX_LENGTH znaków"
         }
 
         val updatedReview = review.copy(updatedAtMillis = System.currentTimeMillis())
 
-        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             // Cloud Function (updatePlaceStatsOnReviewUpdate) zajmie się ocenami
             // jeżeli rating się zmienił. Klient po prostu zapisuje dokument.
             reviewsCollection().document(updatedReview.id)
@@ -224,7 +213,7 @@ class FirestoreReviewRepository @Inject constructor(
             "createdAtMillis" to System.currentTimeMillis(),
             "status" to "pending"
         )
-        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             firestore.collection(FirestoreCollections.REVIEW_REPORTS)
                 .add(reportData)
                 .await()
@@ -257,7 +246,7 @@ class FirestoreReviewRepository @Inject constructor(
         require(reviewId.isNotBlank()) { "reviewId nie może być puste" }
         val reviewRef = reviewsCollection().document(reviewId)
 
-        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             reviewsCollection().document(reviewId).delete().await()
             true
         }
