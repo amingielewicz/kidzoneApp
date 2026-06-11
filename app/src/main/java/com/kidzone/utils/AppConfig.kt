@@ -100,9 +100,9 @@ object AppConfig {
  * }
  * ```
  */
-suspend inline fun withFirestoreTimeout(
+suspend fun withFirestoreTimeout(
     timeoutMs: Long = AppConfig.WRITE_TIMEOUT_MS,
-    crossinline block: suspend () -> Unit
+    block: suspend () -> Unit
 ): OpResult<Unit> {
     val completed = kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
         block()
