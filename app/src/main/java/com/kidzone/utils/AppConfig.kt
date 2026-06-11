@@ -35,7 +35,6 @@ object AppConfig {
     const val TIMEOUT_MESSAGE: String =
         "Zapis trwa zbyt długo. Sprawdź połączenie z Internetem, " +
             "a jeśli używasz emulatora – wykonaj Cold Boot."
-}
 
     // ========== Review limits ==========
 
@@ -77,7 +76,7 @@ object AppConfig {
     const val PRIVACY_POLICY_EFFECTIVE_DATE: String = "29.05.2026"
 
 /**
- * Inline helper eliminating repetitive timeout + error-wrapping boilerplate
+ * Helper eliminating repetitive timeout + error-wrapping boilerplate
  * for Firestore writes.
  *
  * Usage:
@@ -90,14 +89,6 @@ object AppConfig {
  * Returns [OpResult.Success] with [Unit] if [block] completes within
  * [AppConfig.WRITE_TIMEOUT_MS], or [OpResult.Failure] with
  * [java.util.concurrent.TimeoutException] otherwise.
- *
- * The caller can map the success branch to any type it needs:
- * ```kotlin
- * withFirestoreTimeout { ... }.let { result ->
- *     if (result is OpResult.Success) OpResult.success(myValue)
- *     else result as OpResult.Failure
- * }
- * ```
  */
 suspend fun withFirestoreTimeout(
     timeoutMs: Long = AppConfig.WRITE_TIMEOUT_MS,
