@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -30,7 +30,6 @@ import {
   TableSortLabel,
   Alert,
   Snackbar,
-  TablePagination,
 } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
@@ -49,21 +48,16 @@ import {
   getDocs,
   doc,
   updateDoc,
+  deleteDoc,
   deleteField,
   limit,
-  startAfter,
-  getCountFromServer,
-  QueryDocumentSnapshot,
-  DocumentData,
-  where,
 } from 'firebase/firestore';
 import { db, auth } from '../services/firebase';
 import { adminFetch } from '../services/api';
+import { callFunction } from '../services/cloudFunctions';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { useAuth } from '../hooks/useAuth';
 import { AppUser } from '../types';
-
-const PAGE_SIZE = 25;
 
 function formatDate(millis: number): string {
   return new Date(millis).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -79,9 +73,7 @@ type SortDir = 'asc' | 'desc';
 export function UsersPage() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<AppUser[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(PAGE_SIZE);
+  const [filteredUsers, setFilteredUsers] = useState<AppUser[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [banFilter, setBanFilter] = useState<string>('all');
@@ -90,9 +82,6 @@ export function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [menuUser, setMenuUser] = useState<AppUser | null>(null);
-
-  // Pagination cursors: store last doc per page for forward/backward nav
-  const cursorStackRef = useRef<QueryDocumentSnapshot<DocumentData>[]>([]);
 
   // Edit dialog
   const [editUser, setEditUser] = useState<AppUser | null>(null);
@@ -118,83 +107,29 @@ export function UsersPage() {
   // Snackbar for password reset
   const [snackbarMsg, setSnackbarMsg] = useState('');
 
-  // ─── Data fetching (server-side pagination) ────────────────────────────────
+  useEffect(() => { fetchUsers(); }, []);
 
-  const fetchUsers = useCallback(async (pageNum: number, perPage: number) => {
-    setLoading(true);
-    try {
-      // Build base query constraints
-      const constraints: any[] = [orderBy(sortField, sortDir)];
-
-      // Role filter via server-side where clause
-      if (roleFilter === 'admin') {
-        constraints.unshift(where('role', '==', 'admin'));
-      }
-
-      // Get total count for pagination (with filter applied)
-      const countQuery = query(collection(db, 'users'), ...constraints);
-      const countSnap = await getCountFromServer(countQuery);
-      setTotalCount(countSnap.data().count);
-
-      // Add pagination
-      constraints.push(limit(perPage));
-      if (pageNum > 0 && cursorStackRef.current[pageNum - 1]) {
-        constraints.push(startAfter(cursorStackRef.current[pageNum - 1]));
-      }
-
-      const q = query(collection(db, 'users'), ...constraints);
-      const snap = await getDocs(q);
-
-      // Store last doc as cursor for next page
-      if (snap.docs.length > 0) {
-        cursorStackRef.current[pageNum] = snap.docs[snap.docs.length - 1];
-      }
-
-      const fetchedUsers = snap.docs.map((d) => ({ id: d.id, ...d.data() } as AppUser));
-
-      // Client-side filters that can't easily go to Firestore
-      let result = fetchedUsers;
-      if (banFilter === 'banned') result = result.filter((u) => isUserBanned(u));
-      else if (banFilter === 'active') result = result.filter((u) => !isUserBanned(u));
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        result = result.filter(
-          (u) =>
-            (u.name || '').toLowerCase().includes(q) ||
-            (u.email || '').toLowerCase().includes(q) ||
-            u.id.toLowerCase().includes(q),
-        );
-      }
-
-      setUsers(result);
-    } catch (err) {
-      console.error('Failed to fetch users:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [sortField, sortDir, roleFilter, banFilter, searchQuery]);
-
-  // Reset page and cursors when filters/sort change
   useEffect(() => {
-    cursorStackRef.current = [];
-    setPage(0);
-    fetchUsers(0, rowsPerPage);
-  }, [sortField, sortDir, roleFilter, banFilter, searchQuery, rowsPerPage]);
-
-  function handleChangePage(_: unknown, newPage: number) {
-    setPage(newPage);
-    fetchUsers(newPage, rowsPerPage);
-  }
-
-  function handleChangeRowsPerPage(event: React.ChangeEvent<HTMLInputElement>) {
-    const newSize = parseInt(event.target.value, 10);
-    setRowsPerPage(newSize);
-    cursorStackRef.current = [];
-    setPage(0);
-    fetchUsers(0, newSize);
-  }
-
-  // ─── Helpers ───────────────────────────────────────────────────────────────
+    let result = [...users];
+    if (roleFilter === 'admin') result = result.filter((u) => u.role === 'admin');
+    else if (roleFilter === 'user') result = result.filter((u) => u.role !== 'admin');
+    if (banFilter === 'banned') result = result.filter((u) => isUserBanned(u));
+    else if (banFilter === 'active') result = result.filter((u) => !isUserBanned(u));
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((u) => (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q) || u.id.toLowerCase().includes(q));
+    }
+    result.sort((a, b) => {
+      let aVal: any = (a as any)[sortField] ?? '';
+      let bVal: any = (b as any)[sortField] ?? '';
+      if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+      if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    setFilteredUsers(result);
+  }, [searchQuery, users, roleFilter, banFilter, sortField, sortDir]);
 
   function isUserBanned(user: any): boolean {
     const b = user.bannedUntilMillis;
@@ -211,24 +146,19 @@ export function UsersPage() {
     return '';
   }
 
-  function openMenu(event: React.MouseEvent<HTMLElement>, user: AppUser) {
-    setMenuAnchor(event.currentTarget);
-    setMenuUser(user);
-  }
-  function closeMenu() {
-    setMenuAnchor(null);
-    setMenuUser(null);
-  }
-  function isCurrentUser(user: AppUser): boolean {
-    return currentUser?.uid === user.id;
+  async function fetchUsers() {
+    setLoading(true);
+    try {
+      const snap = await getDocs(query(collection(db, 'users'), orderBy('createdAtMillis', 'desc'), limit(500)));
+      setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() } as AppUser)));
+    } catch (err) { console.error(err); } finally { setLoading(false); }
   }
 
-  function openConfirm(
-    title: string,
-    desc: string,
-    color: 'error' | 'primary' | 'success',
-    action: () => Promise<void>,
-  ) {
+  function openMenu(event: React.MouseEvent<HTMLElement>, user: AppUser) { setMenuAnchor(event.currentTarget); setMenuUser(user); }
+  function closeMenu() { setMenuAnchor(null); setMenuUser(null); }
+  function isCurrentUser(user: AppUser): boolean { return currentUser?.uid === user.id; }
+
+  function openConfirm(title: string, desc: string, color: 'error' | 'primary' | 'success', action: () => Promise<void>) {
     confirmActionRef.current = action;
     setConfirmTitle(title);
     setConfirmDesc(desc);
@@ -244,16 +174,6 @@ export function UsersPage() {
     confirmActionRef.current = null;
   }
 
-  function handleSort(field: SortField) {
-    if (sortField === field) setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
-    else {
-      setSortField(field);
-      setSortDir('asc');
-    }
-  }
-
-  // ─── Actions ───────────────────────────────────────────────────────────────
-
   function openEditDialog(user: AppUser) {
     closeMenu();
     setEditUser(user);
@@ -266,6 +186,7 @@ export function UsersPage() {
     if (!editUser) return;
     setSaving(true);
     try {
+      // Aktualizacja nazwy i roli w Firestore
       const updates: any = { name: editName };
       if (!isCurrentUser(editUser)) {
         if (editRole === 'admin') updates.role = 'admin';
@@ -273,19 +194,17 @@ export function UsersPage() {
       }
       await updateDoc(doc(db, 'users', editUser.id), updates);
 
+      // Aktualizacja emaila przez Cloud Function (sync Auth + Firestore)
       if (editEmail !== editUser.email && editEmail.trim()) {
-        const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
-        const url = `https://us-central1-${projectId}.cloudfunctions.net/adminUpdateUserEmail?userId=${editUser.id}&email=${encodeURIComponent(editEmail.trim())}`;
-        await adminFetch(url);
+        await callFunction('adminUpdateUserEmail', {
+          userId: editUser.id,
+          email: editEmail.trim(),
+        });
       }
 
       setEditUser(null);
-      await fetchUsers(page, rowsPerPage);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSaving(false);
-    }
+      await fetchUsers();
+    } catch (err) { console.error(err); } finally { setSaving(false); }
   }
 
   function openBanDialog(user: AppUser) {
@@ -301,30 +220,18 @@ export function UsersPage() {
     if (!banTargetUser) return;
     setSaving(true);
     try {
-      const bannedUntilMillis = banPermanent
-        ? -1
-        : Date.now() + parseInt(banDays) * 24 * 60 * 60 * 1000;
-      await updateDoc(doc(db, 'users', banTargetUser.id), {
-        bannedUntilMillis,
-        banReason: banReason || 'Naruszenie regulaminu',
-      });
+      const bannedUntilMillis = banPermanent ? -1 : Date.now() + parseInt(banDays) * 24 * 60 * 60 * 1000;
+      await updateDoc(doc(db, 'users', banTargetUser.id), { bannedUntilMillis, banReason: banReason || 'Naruszenie regulaminu' });
       setBanDialogOpen(false);
       setBanTargetUser(null);
-      await fetchUsers(page, rowsPerPage);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSaving(false);
-    }
+      await fetchUsers();
+    } catch (err) { console.error(err); } finally { setSaving(false); }
   }
 
   async function unbanUser(user: AppUser) {
     closeMenu();
-    await updateDoc(doc(db, 'users', user.id), {
-      bannedUntilMillis: deleteField(),
-      banReason: deleteField(),
-    });
-    await fetchUsers(page, rowsPerPage);
+    await updateDoc(doc(db, 'users', user.id), { bannedUntilMillis: deleteField(), banReason: deleteField() });
+    await fetchUsers();
   }
 
   // Delete user with reason
@@ -340,15 +247,16 @@ export function UsersPage() {
 
   async function handleDeleteUser() {
     if (!deleteUserTarget || !deleteUserReason.trim()) return;
-    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
-    const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeleteUser?userId=${deleteUserTarget.id}&reason=${encodeURIComponent(deleteUserReason)}`;
     try {
-      await adminFetch(url);
+      await callFunction('adminDeleteUser', {
+        userId: deleteUserTarget.id,
+        reason: deleteUserReason,
+      });
     } catch (e) {
       console.error('Failed to delete user:', e);
     }
     setDeleteUserDialogOpen(false);
-    await fetchUsers(page, rowsPerPage);
+    await fetchUsers();
   }
 
   async function resetPassword(user: AppUser) {
@@ -363,33 +271,22 @@ export function UsersPage() {
     }
   }
 
-  // ─── Render ────────────────────────────────────────────────────────────────
-
-  if (loading && users.length === 0) {
-    return (
-      <Box display="flex" justifyContent="center" py={6}>
-        <CircularProgress />
-      </Box>
-    );
+  function handleSort(field: SortField) {
+    if (sortField === field) setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDir('asc'); }
   }
+
+  if (loading) return <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>;
 
   return (
     <Box>
-      <Typography variant="h4" fontWeight={700} mb={1}>
-        Użytkownicy ({totalCount})
-      </Typography>
+      <Typography variant="h4" fontWeight={700} mb={1}>Użytkownicy ({users.length})</Typography>
       <Typography variant="body2" color="text.secondary" mb={3}>
         Zarządzaj kontami użytkowników. Edytuj dane, nadawaj role, blokuj konta.
       </Typography>
 
       <Box display="flex" gap={2} mb={3} flexWrap="wrap">
-        <TextField
-          placeholder="Szukaj po nazwie, emailu lub ID..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          size="small"
-          sx={{ flexGrow: 1, minWidth: 200 }}
-        />
+        <TextField placeholder="Szukaj po nazwie, emailu lub ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} size="small" sx={{ flexGrow: 1, minWidth: 200 }} />
         <FormControl size="small" sx={{ minWidth: 120 }}>
           <InputLabel>Rola</InputLabel>
           <Select value={roleFilter} label="Rola" onChange={(e) => setRoleFilter(e.target.value)}>
@@ -412,298 +309,85 @@ export function UsersPage() {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>
-                <TableSortLabel
-                  active={sortField === 'name'}
-                  direction={sortField === 'name' ? sortDir : 'asc'}
-                  onClick={() => handleSort('name')}
-                >
-                  Użytkownik
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>
-                <TableSortLabel
-                  active={sortField === 'email'}
-                  direction={sortField === 'email' ? sortDir : 'asc'}
-                  onClick={() => handleSort('email')}
-                >
-                  Email
-                </TableSortLabel>
-              </TableCell>
+              <TableCell><TableSortLabel active={sortField === 'name'} direction={sortField === 'name' ? sortDir : 'asc'} onClick={() => handleSort('name')}>Użytkownik</TableSortLabel></TableCell>
+              <TableCell><TableSortLabel active={sortField === 'email'} direction={sortField === 'email' ? sortDir : 'asc'} onClick={() => handleSort('email')}>Email</TableSortLabel></TableCell>
               <TableCell sx={{ width: 100 }}>Rola</TableCell>
               <TableCell sx={{ width: 150 }}>Status</TableCell>
-              <TableCell sx={{ width: 80 }}>
-                <TableSortLabel
-                  active={sortField === 'placesAddedCount'}
-                  direction={sortField === 'placesAddedCount' ? sortDir : 'asc'}
-                  onClick={() => handleSort('placesAddedCount')}
-                >
-                  Miejsca
-                </TableSortLabel>
-              </TableCell>
-              <TableCell sx={{ width: 80 }}>
-                <TableSortLabel
-                  active={sortField === 'reviewsCount'}
-                  direction={sortField === 'reviewsCount' ? sortDir : 'asc'}
-                  onClick={() => handleSort('reviewsCount')}
-                >
-                  Opinie
-                </TableSortLabel>
-              </TableCell>
-              <TableCell sx={{ width: 120 }}>
-                <TableSortLabel
-                  active={sortField === 'createdAtMillis'}
-                  direction={sortField === 'createdAtMillis' ? sortDir : 'asc'}
-                  onClick={() => handleSort('createdAtMillis')}
-                >
-                  Rejestracja
-                </TableSortLabel>
-              </TableCell>
+              <TableCell sx={{ width: 80 }}><TableSortLabel active={sortField === 'placesAddedCount'} direction={sortField === 'placesAddedCount' ? sortDir : 'asc'} onClick={() => handleSort('placesAddedCount')}>Miejsca</TableSortLabel></TableCell>
+              <TableCell sx={{ width: 80 }}><TableSortLabel active={sortField === 'reviewsCount'} direction={sortField === 'reviewsCount' ? sortDir : 'asc'} onClick={() => handleSort('reviewsCount')}>Opinie</TableSortLabel></TableCell>
+              <TableCell sx={{ width: 120 }}><TableSortLabel active={sortField === 'createdAtMillis'} direction={sortField === 'createdAtMillis' ? sortDir : 'asc'} onClick={() => handleSort('createdAtMillis')}>Rejestracja</TableSortLabel></TableCell>
               <TableCell sx={{ width: 80 }}>Akcje</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {users.map((user) => (
-              <TableRow
-                key={user.id}
-                hover
-                sx={isUserBanned(user) ? { bgcolor: '#fff3e0' } : undefined}
-              >
+            {filteredUsers.map((user) => (
+              <TableRow key={user.id} hover sx={isUserBanned(user) ? { bgcolor: '#fff3e0' } : undefined}>
                 <TableCell>
                   <Box display="flex" alignItems="center" gap={1}>
-                    <Avatar
-                      src={(user as any).avatarUrl}
-                      sx={{ width: 32, height: 32, fontSize: 14 }}
-                    >
-                      {user.name?.charAt(0) || '?'}
-                    </Avatar>
+                    <Avatar src={(user as any).avatarUrl} sx={{ width: 32, height: 32, fontSize: 14 }}>{user.name?.charAt(0) || '?'}</Avatar>
                     <Box>
-                      <Typography variant="body2" component="span" fontWeight={500}>
-                        {user.name || '(bez nazwy)'}
-                      </Typography>
-                      {isCurrentUser(user) && (
-                        <Chip label="Ty" size="small" color="info" sx={{ ml: 1 }} />
-                      )}
+                      <Typography variant="body2" component="span" fontWeight={500}>{user.name || '(bez nazwy)'}</Typography>{isCurrentUser(user) && <Chip label="Ty" size="small" color="info" sx={{ ml: 1 }} />}
                       <Box display="flex" alignItems="center" gap={0.5}>
-                        <Tooltip title={user.id}>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ fontFamily: 'monospace', fontSize: 11 }}
-                          >
-                            {user.id.slice(0, 12)}...
-                          </Typography>
-                        </Tooltip>
-                        <Tooltip title="Kopiuj UID">
-                          <IconButton
-                            size="small"
-                            onClick={() => navigator.clipboard.writeText(user.id)}
-                          >
-                            <ContentCopyIcon sx={{ fontSize: 14 }} />
-                          </IconButton>
-                        </Tooltip>
+                        <Tooltip title={user.id}><Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: 11 }}>{user.id.slice(0, 12)}...</Typography></Tooltip>
+                        <Tooltip title="Kopiuj UID"><IconButton size="small" onClick={() => navigator.clipboard.writeText(user.id)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
                       </Box>
                     </Box>
                   </Box>
                 </TableCell>
                 <TableCell>{user.email}</TableCell>
-                <TableCell>
-                  {user.role === 'admin' ? (
-                    <Chip label="Admin" color="primary" size="small" />
-                  ) : (
-                    <Chip label="User" variant="outlined" size="small" />
-                  )}
-                </TableCell>
-                <TableCell>
-                  {isUserBanned(user) ? (
-                    <Tooltip title={(user as any).banReason || ''}>
-                      <Chip label={getBanLabel(user)} color="error" size="small" />
-                    </Tooltip>
-                  ) : (
-                    <Chip label="Aktywny" color="success" size="small" variant="outlined" />
-                  )}
-                </TableCell>
+                <TableCell>{user.role === 'admin' ? <Chip label="Admin" color="primary" size="small" /> : <Chip label="User" variant="outlined" size="small" />}</TableCell>
+                <TableCell>{isUserBanned(user) ? <Tooltip title={(user as any).banReason || ''}><Chip label={getBanLabel(user)} color="error" size="small" /></Tooltip> : <Chip label="Aktywny" color="success" size="small" variant="outlined" />}</TableCell>
                 <TableCell>{user.placesAddedCount || 0}</TableCell>
                 <TableCell>{user.reviewsCount || 0}</TableCell>
                 <TableCell>{formatDate(user.createdAtMillis)}</TableCell>
-                <TableCell>
-                  <Tooltip title="Akcje">
-                    <IconButton size="small" onClick={(e) => openMenu(e, user)}>
-                      <MoreVertIcon />
-                    </IconButton>
-                  </Tooltip>
-                </TableCell>
+                <TableCell><Tooltip title="Akcje"><IconButton size="small" onClick={(e) => openMenu(e, user)}><MoreVertIcon /></IconButton></Tooltip></TableCell>
               </TableRow>
             ))}
-            {users.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={8} align="center">
-                  {searchQuery ? 'Brak wyników' : 'Brak użytkowników'}
-                </TableCell>
-              </TableRow>
-            )}
+            {filteredUsers.length === 0 && <TableRow><TableCell colSpan={8} align="center">{searchQuery ? 'Brak wyników' : 'Brak użytkowników'}</TableCell></TableRow>}
           </TableBody>
         </Table>
-        <TablePagination
-          component="div"
-          count={totalCount}
-          page={page}
-          onPageChange={handleChangePage}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-          rowsPerPageOptions={[10, 25, 50, 100]}
-          labelRowsPerPage="Wierszy na stronę:"
-          labelDisplayedRows={({ from, to, count }) =>
-            `${from}–${to} z ${count !== -1 ? count : `więcej niż ${to}`}`
-          }
-        />
       </TableContainer>
 
       {/* Context Menu */}
       <Menu anchorEl={menuAnchor} open={!!menuAnchor} onClose={closeMenu}>
-        <MenuItem onClick={() => menuUser && openEditDialog(menuUser)}>
-          <ListItemIcon>
-            <EditIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Edytuj</ListItemText>
-        </MenuItem>
+        <MenuItem onClick={() => menuUser && openEditDialog(menuUser)}><ListItemIcon><EditIcon fontSize="small" /></ListItemIcon><ListItemText>Edytuj</ListItemText></MenuItem>
         {menuUser && !isCurrentUser(menuUser) && menuUser.email && (
-          <MenuItem onClick={() => menuUser && resetPassword(menuUser)}>
-            <ListItemIcon>
-              <VpnKeyIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Resetuj hasło</ListItemText>
-          </MenuItem>
+          <MenuItem onClick={() => menuUser && resetPassword(menuUser)}><ListItemIcon><VpnKeyIcon fontSize="small" /></ListItemIcon><ListItemText>Resetuj hasło</ListItemText></MenuItem>
         )}
-        {menuUser &&
-          !isCurrentUser(menuUser) && [
-            !isUserBanned(menuUser) ? (
-              <MenuItem key="ban" onClick={() => menuUser && openBanDialog(menuUser)}>
-                <ListItemIcon>
-                  <BlockIcon fontSize="small" color="warning" />
-                </ListItemIcon>
-                <ListItemText>Zablokuj</ListItemText>
-              </MenuItem>
-            ) : (
-              <MenuItem key="unban" onClick={() => menuUser && unbanUser(menuUser)}>
-                <ListItemIcon>
-                  <LockOpenIcon fontSize="small" color="success" />
-                </ListItemIcon>
-                <ListItemText>Odblokuj</ListItemText>
-              </MenuItem>
-            ),
-            menuUser.role === 'admin' ? (
-              <MenuItem
-                key="demote"
-                onClick={() => {
-                  if (!menuUser) return;
-                  const u = menuUser;
-                  closeMenu();
-                  openConfirm(
-                    'Odebrać rolę admina?',
-                    `${u.name || u.email} straci dostęp do panelu.`,
-                    'error',
-                    async () => {
-                      await updateDoc(doc(db, 'users', u.id), { role: deleteField() });
-                      await fetchUsers(page, rowsPerPage);
-                    },
-                  );
-                }}
-              >
-                <ListItemIcon>
-                  <PersonOffIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Odbierz admin</ListItemText>
-              </MenuItem>
-            ) : (
-              <MenuItem
-                key="promote"
-                onClick={() => {
-                  if (!menuUser) return;
-                  const u = menuUser;
-                  closeMenu();
-                  openConfirm(
-                    'Nadać rolę admina?',
-                    `${u.name || u.email} uzyska pełny dostęp do panelu.`,
-                    'success',
-                    async () => {
-                      await updateDoc(doc(db, 'users', u.id), { role: 'admin' });
-                      await fetchUsers(page, rowsPerPage);
-                    },
-                  );
-                }}
-              >
-                <ListItemIcon>
-                  <AdminPanelSettingsIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Nadaj admin</ListItemText>
-              </MenuItem>
-            ),
-            <MenuItem
-              key="delete"
-              onClick={() => {
-                if (!menuUser) return;
-                const u = menuUser;
-                closeMenu();
-                openDeleteUserDialog(u);
-              }}
-              sx={{ color: 'error.main' }}
-            >
-              <ListItemIcon>
-                <DeleteForeverIcon fontSize="small" color="error" />
-              </ListItemIcon>
-              <ListItemText>Usuń użytkownika</ListItemText>
-            </MenuItem>,
-          ]}
-        {menuUser && isCurrentUser(menuUser) && (
-          <MenuItem disabled>
-            <ListItemText sx={{ color: 'text.secondary' }}>
-              Nie możesz zmieniać własnej roli/blokady
-            </ListItemText>
-          </MenuItem>
-        )}
+        {menuUser && !isCurrentUser(menuUser) && [
+          !isUserBanned(menuUser) ? (
+            <MenuItem key="ban" onClick={() => menuUser && openBanDialog(menuUser)}><ListItemIcon><BlockIcon fontSize="small" color="warning" /></ListItemIcon><ListItemText>Zablokuj</ListItemText></MenuItem>
+          ) : (
+            <MenuItem key="unban" onClick={() => menuUser && unbanUser(menuUser)}><ListItemIcon><LockOpenIcon fontSize="small" color="success" /></ListItemIcon><ListItemText>Odblokuj</ListItemText></MenuItem>
+          ),
+          menuUser.role === 'admin' ? (
+            <MenuItem key="demote" onClick={() => { if (!menuUser) return; const u = menuUser; closeMenu(); openConfirm('Odebrać rolę admina?', `${u.name || u.email} straci dostęp do panelu.`, 'error', async () => { await updateDoc(doc(db, 'users', u.id), { role: deleteField() }); await fetchUsers(); }); }}><ListItemIcon><PersonOffIcon fontSize="small" /></ListItemIcon><ListItemText>Odbierz admin</ListItemText></MenuItem>
+          ) : (
+            <MenuItem key="promote" onClick={() => { if (!menuUser) return; const u = menuUser; closeMenu(); openConfirm('Nadać rolę admina?', `${u.name || u.email} uzyska pełny dostęp do panelu.`, 'success', async () => { await updateDoc(doc(db, 'users', u.id), { role: 'admin' }); await fetchUsers(); }); }}><ListItemIcon><AdminPanelSettingsIcon fontSize="small" /></ListItemIcon><ListItemText>Nadaj admin</ListItemText></MenuItem>
+          ),
+          <MenuItem key="delete" onClick={() => { if (!menuUser) return; const u = menuUser; closeMenu(); openDeleteUserDialog(u); }} sx={{ color: 'error.main' }}><ListItemIcon><DeleteForeverIcon fontSize="small" color="error" /></ListItemIcon><ListItemText>Usuń użytkownika</ListItemText></MenuItem>,
+        ]}
+        {menuUser && isCurrentUser(menuUser) && <MenuItem disabled><ListItemText sx={{ color: 'text.secondary' }}>Nie możesz zmieniać własnej roli/blokady</ListItemText></MenuItem>}
       </Menu>
 
       {/* Edit User Dialog */}
       <Dialog open={!!editUser} onClose={() => setEditUser(null)} maxWidth="xs" fullWidth>
         {editUser && (
           <>
-            <DialogTitle
-              sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-            >
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Edytuj użytkownika</span>
-              <IconButton size="small" onClick={() => setEditUser(null)}>
-                <CancelIcon />
-              </IconButton>
+              <IconButton size="small" onClick={() => setEditUser(null)}><CancelIcon /></IconButton>
             </DialogTitle>
             <DialogContent>
               <Box display="flex" flexDirection="column" gap={2} mt={1}>
-                <TextField
-                  label="Imię / Nazwa"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  fullWidth
-                  size="small"
-                />
-                <TextField
-                  label="Email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  fullWidth
-                  size="small"
-                />
+                <TextField label="Imię / Nazwa" value={editName} onChange={(e) => setEditName(e.target.value)} fullWidth size="small" />
+                <TextField label="Email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} fullWidth size="small" />
                 {isCurrentUser(editUser) ? (
-                  <Alert severity="info" variant="outlined">
-                    Nie możesz zmienić własnej roli.
-                  </Alert>
+                  <Alert severity="info" variant="outlined">Nie możesz zmienić własnej roli.</Alert>
                 ) : (
                   <FormControl size="small" fullWidth>
                     <InputLabel>Rola</InputLabel>
-                    <Select
-                      value={editRole}
-                      label="Rola"
-                      onChange={(e) => setEditRole(e.target.value)}
-                    >
+                    <Select value={editRole} label="Rola" onChange={(e) => setEditRole(e.target.value)}>
                       <MenuItem value="user">User</MenuItem>
                       <MenuItem value="admin">Admin</MenuItem>
                     </Select>
@@ -713,9 +397,7 @@ export function UsersPage() {
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setEditUser(null)}>Anuluj</Button>
-              <Button variant="contained" onClick={saveUserEdit} disabled={saving}>
-                {saving ? <CircularProgress size={20} /> : 'Zapisz'}
-              </Button>
+              <Button variant="contained" onClick={saveUserEdit} disabled={saving}>{saving ? <CircularProgress size={20} /> : 'Zapisz'}</Button>
             </DialogActions>
           </>
         )}
@@ -725,33 +407,16 @@ export function UsersPage() {
       <Dialog open={banDialogOpen} onClose={() => setBanDialogOpen(false)} maxWidth="xs" fullWidth>
         {banTargetUser && (
           <>
-            <DialogTitle
-              sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-            >
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Zablokuj: {banTargetUser.name || banTargetUser.email}</span>
-              <IconButton size="small" onClick={() => setBanDialogOpen(false)}>
-                <CancelIcon />
-              </IconButton>
+              <IconButton size="small" onClick={() => setBanDialogOpen(false)}><CancelIcon /></IconButton>
             </DialogTitle>
             <DialogContent>
               <Box display="flex" flexDirection="column" gap={2} mt={1}>
-                <Alert severity="warning" variant="outlined">
-                  Zablokowany użytkownik nie będzie mógł się zalogować do aplikacji.
-                </Alert>
+                <Alert severity="warning" variant="outlined">Zablokowany użytkownik nie będzie mógł się zalogować do aplikacji.</Alert>
                 <FormControl size="small" fullWidth>
                   <InputLabel>Czas trwania</InputLabel>
-                  <Select
-                    value={banPermanent ? 'permanent' : banDays}
-                    label="Czas trwania"
-                    onChange={(e) => {
-                      if (e.target.value === 'permanent') {
-                        setBanPermanent(true);
-                      } else {
-                        setBanPermanent(false);
-                        setBanDays(e.target.value);
-                      }
-                    }}
-                  >
+                  <Select value={banPermanent ? 'permanent' : banDays} label="Czas trwania" onChange={(e) => { if (e.target.value === 'permanent') { setBanPermanent(true); } else { setBanPermanent(false); setBanDays(e.target.value); } }}>
                     <MenuItem value="1">1 dzień</MenuItem>
                     <MenuItem value="3">3 dni</MenuItem>
                     <MenuItem value="7">7 dni</MenuItem>
@@ -762,47 +427,22 @@ export function UsersPage() {
                     <MenuItem value="permanent">Bezpowrotnie (permanentny)</MenuItem>
                   </Select>
                 </FormControl>
-                <TextField
-                  label="Powód blokady"
-                  value={banReason}
-                  onChange={(e) => setBanReason(e.target.value)}
-                  fullWidth
-                  size="small"
-                  placeholder="Naruszenie regulaminu"
-                />
-                {!banPermanent && (
-                  <Typography variant="body2" color="text.secondary">
-                    Blokada wygaśnie:{' '}
-                    {formatBanDate(Date.now() + parseInt(banDays) * 24 * 60 * 60 * 1000)}
-                  </Typography>
-                )}
-                {banPermanent && (
-                  <Typography variant="body2" color="error">
-                    Blokada bezpowrotna — użytkownik nigdy nie będzie mógł się zalogować.
-                  </Typography>
-                )}
+                <TextField label="Powód blokady" value={banReason} onChange={(e) => setBanReason(e.target.value)} fullWidth size="small" placeholder="Naruszenie regulaminu" />
+                {!banPermanent && <Typography variant="body2" color="text.secondary">Blokada wygaśnie: {formatBanDate(Date.now() + parseInt(banDays) * 24 * 60 * 60 * 1000)}</Typography>}
+                {banPermanent && <Typography variant="body2" color="error">Blokada bezpowrotna — użytkownik nigdy nie będzie mógł się zalogować.</Typography>}
               </Box>
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setBanDialogOpen(false)}>Anuluj</Button>
-              <Button variant="contained" color="error" onClick={applyBan} disabled={saving}>
-                {saving ? <CircularProgress size={20} /> : 'Zablokuj'}
-              </Button>
+              <Button variant="contained" color="error" onClick={applyBan} disabled={saving}>{saving ? <CircularProgress size={20} /> : 'Zablokuj'}</Button>
             </DialogActions>
           </>
         )}
       </Dialog>
 
       {/* Delete User Dialog */}
-      <Dialog
-        open={deleteUserDialogOpen}
-        onClose={() => setDeleteUserDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          Usuń użytkownika: {deleteUserTarget?.name || deleteUserTarget?.email}
-        </DialogTitle>
+      <Dialog open={deleteUserDialogOpen} onClose={() => setDeleteUserDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Usuń użytkownika: {deleteUserTarget?.name || deleteUserTarget?.email}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" mb={2}>
             Podaj powód usunięcia konta. Zostanie wysłany do użytkownika emailem.
@@ -820,16 +460,7 @@ export function UsersPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteUserDialogOpen(false)}>Anuluj</Button>
-          <Button
-            variant="contained"
-            color="error"
-            disabled={!deleteUserReason.trim() || saving}
-            onClick={async () => {
-              setSaving(true);
-              await handleDeleteUser();
-              setSaving(false);
-            }}
-          >
+          <Button variant="contained" color="error" disabled={!deleteUserReason.trim() || saving} onClick={async () => { setSaving(true); await handleDeleteUser(); setSaving(false); }}>
             {saving ? <CircularProgress size={20} color="inherit" /> : 'Usuń'}
           </Button>
         </DialogActions>
@@ -838,27 +469,16 @@ export function UsersPage() {
       {/* Confirm Dialog */}
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <DialogTitle>{confirmTitle}</DialogTitle>
-        <DialogContent>
-          <Typography>{confirmDesc}</Typography>
-        </DialogContent>
+        <DialogContent><Typography>{confirmDesc}</Typography></DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmOpen(false)}>Anuluj</Button>
-          <Button variant="contained" color={confirmColor} onClick={handleConfirm}>
-            Potwierdź
-          </Button>
+          <Button variant="contained" color={confirmColor} onClick={handleConfirm}>Potwierdź</Button>
         </DialogActions>
       </Dialog>
 
       {/* Snackbar */}
-      <Snackbar
-        open={!!snackbarMsg}
-        autoHideDuration={4000}
-        onClose={() => setSnackbarMsg('')}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert onClose={() => setSnackbarMsg('')} severity="success" variant="filled">
-          {snackbarMsg}
-        </Alert>
+      <Snackbar open={!!snackbarMsg} autoHideDuration={4000} onClose={() => setSnackbarMsg('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert onClose={() => setSnackbarMsg('')} severity="success" variant="filled">{snackbarMsg}</Alert>
       </Snackbar>
     </Box>
   );

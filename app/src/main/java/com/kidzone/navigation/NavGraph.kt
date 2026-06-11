@@ -16,12 +16,14 @@ import androidx.navigation.navDeepLink
 import com.kidzone.presentation.auth.LoginScreen
 import com.kidzone.presentation.auth.RegisterScreen
 import com.kidzone.presentation.main.MainScreen
+import com.kidzone.presentation.maintenance.MaintenanceScreen
 import com.kidzone.presentation.onboarding.OnboardingScreen
 import com.kidzone.presentation.place.add.AddPlaceScreen
 import com.kidzone.presentation.place.details.PlaceDetailsScreen
 import com.kidzone.presentation.place.myplaces.MyPlacesScreen
 import com.kidzone.presentation.review.myreviews.MyReviewsScreen
 import com.kidzone.presentation.splash.SplashScreen
+import com.kidzone.data.remote.RemoteConfigService
 
 /**
  * Klucze sygnalizujące "po dodaniu miejsca skacz na Map i wycentruj kamerę".
@@ -75,6 +77,19 @@ fun KidZoneNavGraph(
             composable(Route.Splash.path) {
                 SplashScreen(
                     onSignedIn = {
+                        // Gate: maintenance mode check (Remote Config)
+                        val remoteConfig = dagger.hilt.android.EntryPointAccessors
+                            .fromApplication(
+                                context.applicationContext,
+                                RemoteConfigEntryPoint::class.java
+                            ).remoteConfigService()
+                        if (remoteConfig.isMaintenanceMode) {
+                            navController.navigate(Route.Maintenance.path) {
+                                popUpTo(Route.Splash.path) { inclusive = true }
+                            }
+                            return@SplashScreen
+                        }
+
                         val onboardingDone = onboardingPrefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
                         val destination = if (onboardingDone) Route.Main.path else Route.Onboarding.path
                         navController.navigate(destination) {
@@ -117,6 +132,15 @@ fun KidZoneNavGraph(
                         pendingDeepLink.value = null
                     }
                 )
+            }
+
+            composable(Route.Maintenance.path) {
+                val remoteConfig = dagger.hilt.android.EntryPointAccessors
+                    .fromApplication(
+                        context.applicationContext,
+                        RemoteConfigEntryPoint::class.java
+                    ).remoteConfigService()
+                MaintenanceScreen(message = remoteConfig.maintenanceMessage)
             }
 
             composable(Route.Login.path) {

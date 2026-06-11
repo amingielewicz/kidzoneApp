@@ -9,27 +9,27 @@
 -renamesourcefileattribute SourceFile
 
 # --- Firebase ---
-# Firebase Firestore DTO classes – need no-arg constructor + field names
+# Firestore DTO classes need no-arg constructor + field names for reflection
 -keep class com.kidzone.data.remote.dto.** { *; }
-# Firebase Auth internal
--keep class com.google.firebase.** { *; }
+# Firebase App Check provider reflection
+-keep class com.google.firebase.appcheck.** { *; }
 -dontwarn com.google.firebase.**
 
 # --- Hilt / Dagger ---
 -dontwarn dagger.**
--keep class dagger.** { *; }
 -keep class javax.inject.** { *; }
 -keep class * extends dagger.hilt.android.internal.managers.ViewComponentManager$FragmentContextWrapper { *; }
 
 # --- Gson (used by Retrofit converter) ---
--keep class com.google.gson.** { *; }
 -keepclassmembers class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+-keep,allowobfuscation class * {
     @com.google.gson.annotations.SerializedName <fields>;
 }
 
 # --- Retrofit ---
 -dontwarn retrofit2.**
--keep class retrofit2.** { *; }
 -keepclasseswithmembers class * {
     @retrofit2.http.* <methods>;
 }
@@ -38,33 +38,24 @@
 -dontwarn okhttp3.**
 -dontwarn okio.**
 
-# --- Coil ---
--dontwarn coil.**
-
 # --- Room ---
 -keep class * extends androidx.room.RoomDatabase { *; }
--keep class * implements androidx.room.RoomDatabase$Callback { *; }
 -dontwarn androidx.room.**
-
-# --- Compose ---
-# Compose uses reflection for state management; R8 handles most of it
-# automatically with AGP 8+, but we keep stability annotations.
--keep class androidx.compose.** { *; }
--dontwarn androidx.compose.**
 
 # --- Google Maps ---
 -keep class com.google.android.gms.maps.** { *; }
--dontwarn com.google.android.gms.**
+-dontwarn com.google.android.gms.maps.**
 
 # --- Google Play Services Auth / Credential Manager ---
--keep class com.google.android.gms.auth.** { *; }
--keep class com.google.android.libraries.identity.** { *; }
+-keep class com.google.android.gms.auth.api.credentials.** { *; }
+-keep class com.google.android.libraries.identity.googleid.** { *; }
 -keep class androidx.credentials.** { *; }
+-dontwarn com.google.android.libraries.identity.**
 
 # --- Kotlin Coroutines ---
 -dontwarn kotlinx.coroutines.**
 
-# --- Domain models (parcelize / serialization future-proofing) ---
+# --- Domain models (serialization / Parcelable future-proofing) ---
 -keep class com.kidzone.domain.model.** { *; }
 
 # --- Enums ---

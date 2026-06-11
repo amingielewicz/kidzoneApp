@@ -13,6 +13,7 @@ sealed class Route(val path: String) {
     data object Login : Route("login")
     data object Register : Route("register")
     data object Onboarding : Route("onboarding")
+    data object Maintenance : Route("maintenance")
 
     // --- Main shell (zawiera bottom navigation) ---
     data object Main : Route("main")

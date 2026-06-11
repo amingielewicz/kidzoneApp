@@ -51,6 +51,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../services/firebase';
 import { adminFetch } from '../services/api';
+import { callFunction } from '../services/cloudFunctions';
 import { Place, PLACE_CATEGORY_LABELS, PlaceCategory } from '../types';
 
 const ALL_AMENITIES: Record<string, string> = {
@@ -187,9 +188,11 @@ export function PlacesPage() {
 
   async function handleDelete() {
     if (!deleteTarget || !deleteReason.trim()) return;
-    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
-    const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeletePlace?placeId=${deleteTarget.id}&reason=${encodeURIComponent(deleteReason)}`;
-    try { await adminFetch(url); } catch (e) { console.error('Failed to delete place:', e); }
+    try {
+      await callFunction('adminDeletePlace', { placeId: deleteTarget.id, reason: deleteReason });
+    } catch (e) {
+      console.error('Failed to delete place:', e);
+    }
     setDeleteDialogOpen(false);
     setDetailPlace(null);
     await fetchPlaces();
@@ -214,7 +217,7 @@ export function PlacesPage() {
     if (place.ownerUserId) {
       getDoc(doc(db, 'users', place.ownerUserId)).then((snap) => {
         if (snap.exists()) setOwnerEmail(snap.data()?.email || '');
-      }).catch(() => {});
+      }).catch((e) => { console.warn('Failed to fetch owner email:', e); });
     }
   }
 
@@ -258,13 +261,8 @@ export function PlacesPage() {
   }
 
   async function deleteReview(reviewId: string, reason: string) {
-    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
-    const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeleteReview?reviewId=${encodeURIComponent(reviewId)}&reason=${encodeURIComponent(reason)}`;
     try {
-      const resp = await adminFetch(url);
-      if (!resp.ok) {
-        console.error('Cloud Function error:', resp.status);
-      }
+      await callFunction('adminDeleteReview', { reviewId, reason });
     } catch (err) {
       console.error('Failed to delete review via Cloud Function:', err);
     }
@@ -318,9 +316,15 @@ export function PlacesPage() {
 
   async function handleDeletePhoto() {
     if (!detailPlace || !deletePhotoReason.trim()) return;
-    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
-    const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeletePhotoFromPlace?placeId=${detailPlace.id}&photoUrl=${encodeURIComponent(deletePhotoUrl)}&reason=${encodeURIComponent(deletePhotoReason)}`;
-    try { await adminFetch(url); } catch (e) { console.error('Failed to delete photo:', e); }
+    try {
+      await callFunction('adminDeletePhotoFromPlace', {
+        placeId: detailPlace.id,
+        photoUrl: deletePhotoUrl,
+        reason: deletePhotoReason,
+      });
+    } catch (e) {
+      console.error('Failed to delete photo:', e);
+    }
     const updatedUrls = (detailPlace.photoUrls || []).filter((u) => u !== deletePhotoUrl);
     setDetailPlace((prev) => (prev ? { ...prev, photoUrls: updatedUrls } : null));
     setDeletePhotoDialogOpen(false);
