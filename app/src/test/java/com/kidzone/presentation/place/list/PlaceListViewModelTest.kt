@@ -4,6 +4,7 @@ import android.content.Context
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.testutil.MainDispatcherRule
@@ -35,7 +36,7 @@ class PlaceListViewModelTest {
     private lateinit var appContext: Context
     private lateinit var viewModel: PlaceListViewModel
 
-    private val currentUserFlow = MutableStateFlow(TestFixtures.user(id = "user-1"))
+    private val currentUserFlow = MutableStateFlow<User?>(TestFixtures.user(id = "user-1"))
 
     private val samplePlaces = listOf(
         TestFixtures.place(id = "p1", name = "Plac Zabaw A", category = PlaceCategory.PLAYGROUND,
