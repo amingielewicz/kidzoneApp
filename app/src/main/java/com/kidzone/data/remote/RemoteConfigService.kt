@@ -27,7 +27,11 @@ class RemoteConfigService @Inject constructor() {
             "max_photos_per_place" to 10L,
             "max_review_length" to 500L,
             "enable_subscriptions" to false,
-            "min_app_version" to "0.1.0"
+            "min_app_version" to "0.1.0",
+            // A/B Testing experiment defaults
+            "exp_home_layout" to "control",
+            "exp_review_photos_limit" to "3",
+            "exp_add_place_cta" to "control"
         ))
     }
 

@@ -5,6 +5,7 @@ import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
 import com.kidzone.data.local.PlaceDao
 import com.kidzone.data.remote.RemoteConfigService
+import com.kidzone.experiment.ExperimentManager
 import com.kidzone.logging.CrashlyticsTree
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -38,6 +39,9 @@ class KidZoneApplication : Application() {
 
     @Inject
     lateinit var remoteConfigService: RemoteConfigService
+
+    @Inject
+    lateinit var experimentManager: ExperimentManager
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -108,6 +112,7 @@ class KidZoneApplication : Application() {
     private fun initRemoteConfig() {
         appScope.launch {
             remoteConfigService.fetchAndActivate()
+            experimentManager.syncAssignments()
         }
     }
 }
