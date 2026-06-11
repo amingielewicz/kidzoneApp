@@ -351,9 +351,9 @@ class AddPlaceViewModelTest {
 
         @Test
         fun `shows error when user not logged in`() = runTest {
-            // Override the mock to return a flow emitting null (no logged in user)
-            val noUser: User? = null
-            every { authRepository.currentUser } returns flowOf(noUser)
+            // Override the mock to return a flow that emits null user
+            @Suppress("UNCHECKED_CAST")
+            every { authRepository.currentUser } returns (kotlinx.coroutines.flow.MutableStateFlow(null) as kotlinx.coroutines.flow.Flow<com.kidzone.domain.model.User?>)
             val viewModel = createViewModel()
             advanceUntilIdle()
 

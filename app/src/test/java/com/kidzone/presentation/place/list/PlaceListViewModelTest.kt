@@ -297,8 +297,9 @@ class PlaceListViewModelTest {
 
         @Test
         fun `ADDED_BY_ME shows empty list when no user`() = runTest {
-            val noUser: User? = null
-            every { authRepository.currentUser } returns flowOf(noUser)
+            // Override the mock to return a flow that emits null user
+            @Suppress("UNCHECKED_CAST")
+            every { authRepository.currentUser } returns (kotlinx.coroutines.flow.MutableStateFlow(null) as kotlinx.coroutines.flow.Flow<com.kidzone.domain.model.User?>)
             viewModel = createAndCollect()
             advanceUntilIdle()
 
