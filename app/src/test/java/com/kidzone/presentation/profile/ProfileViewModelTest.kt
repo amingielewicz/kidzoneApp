@@ -35,6 +35,7 @@ class ProfileViewModelTest {
 
     private lateinit var authRepository: AuthRepository
     private lateinit var placeRepository: PlaceRepository
+    private lateinit var firestore: com.google.firebase.firestore.FirebaseFirestore
     private lateinit var appContext: Context
     private lateinit var sharedPrefs: SharedPreferences
     private lateinit var prefsEditor: SharedPreferences.Editor
@@ -46,6 +47,7 @@ class ProfileViewModelTest {
     fun setUp() {
         authRepository = mockk(relaxed = true)
         placeRepository = mockk(relaxed = true)
+        firestore = mockk(relaxed = true)
         appContext = mockk(relaxed = true)
         sharedPrefs = mockk(relaxed = true)
         prefsEditor = mockk(relaxed = true)
@@ -63,7 +65,7 @@ class ProfileViewModelTest {
     }
 
     private fun createViewModel(): ProfileViewModel {
-        return ProfileViewModel(authRepository, placeRepository, appContext)
+        return ProfileViewModel(authRepository, placeRepository, firestore, appContext)
     }
 
     // =========================================================================
