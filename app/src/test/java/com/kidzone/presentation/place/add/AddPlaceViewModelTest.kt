@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.navigation.Route
@@ -40,7 +41,7 @@ class AddPlaceViewModelTest {
     private lateinit var photoUploader: PhotoUploader
     private lateinit var appContext: Context
 
-    private val currentUserFlow = MutableStateFlow(TestFixtures.user())
+    private val currentUserFlow = MutableStateFlow<User?>(TestFixtures.user())
 
     @BeforeEach
     fun setUp() {
