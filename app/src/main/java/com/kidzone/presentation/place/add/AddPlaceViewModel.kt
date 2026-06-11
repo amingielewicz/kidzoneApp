@@ -37,7 +37,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class AddPlaceViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     private val placeRepository: PlaceRepository,
     private val authRepository: AuthRepository,
     private val photoUploader: PhotoUploader,
