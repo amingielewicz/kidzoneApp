@@ -14,6 +14,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
@@ -31,15 +34,13 @@ import javax.inject.Inject
  *  - **kategoria** – po stronie Firestore (`whereEqualTo("category", ...)`).
  *    Zmiana kategorii rebinduje strumień przez `flatMapLatest`, stary
  *    listener jest unsubscribowany.
+ *  - **wyszukiwanie** – debounced (300ms) po nazwie.
  *  - **najlepiej oceniane** – po stronie klienta, próg [TOP_RATED_THRESHOLD].
- *    Trzymamy lokalnie, bo Firestore w jednym query nie umie
- *    `whereEqualTo(category) AND whereGreaterThan(averageRating)` bez
- *    composite indexa, a dla MVP nie chcemy go zmuszać tworzyć.
  *
  * Filter "darmowe" jest wzmiankowany w docs ekranu, ale `Place` nie ma na
  * dziś pola ceny – świadomie pomijamy do czasu rozszerzenia modelu.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
 class MapViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
@@ -49,22 +50,19 @@ class MapViewModel @Inject constructor(
     /**
      * @property places aktualnie pokazywane miejsca (po filtrach)
      * @property selectedCategory filtr kategorii; null = wszystkie
+     * @property searchQuery fraza wyszukiwania
      * @property topRatedOnly true = pokaż tylko `averageRating >= 4.0`
      * @property addedByMeOnly true = pokaż tylko miejsca dodane przez
      *   zalogowanego usera (`Place.ownerUserId == currentUser.id`).
-     *   Gdy user jest wylogowany, filtr jest "no-op" - zawsze zwraca pustą
-     *   listę, a UI normalnie chowa chip (chowanie ChIP'a robi się w
-     *   ekranie, nie tutaj).
      * @property selectedPlaceId id pinezki, na której pokazujemy bottom sheet
      * @property currentUserId id zalogowanego usera; null = wylogowany.
-     *   Wystawiamy w state, żeby UI wiedział czy w ogóle pokazywać chip
-     *   "Dodane przez Ciebie".
      * @property isLoading true do pierwszego emita ze strumienia
      * @property errorMessage komunikat błędu z snapshot listenera
      */
     data class UiState(
         val places: List<Place> = emptyList(),
         val selectedCategory: PlaceCategory? = null,
+        val searchQuery: String = "",
         val topRatedOnly: Boolean = false,
         val addedByMeOnly: Boolean = false,
         val selectedPlaceId: String? = null,
@@ -74,6 +72,7 @@ class MapViewModel @Inject constructor(
     )
 
     private val selectedCategory = MutableStateFlow<PlaceCategory?>(null)
+    private val searchQuery = MutableStateFlow("")
     private val topRatedOnly = MutableStateFlow(false)
     private val addedByMeOnly = MutableStateFlow(false)
     private val selectedPlaceId = MutableStateFlow<String?>(null)
@@ -85,9 +84,12 @@ class MapViewModel @Inject constructor(
         data class Error(val message: String) : PlacesLoad
     }
 
-    private val placesLoad: Flow<PlacesLoad> = selectedCategory
-        .flatMapLatest { category ->
-            placeRepository.observePlaces(category)
+    private val placesLoad: Flow<PlacesLoad> = combine(
+        selectedCategory,
+        searchQuery.debounce { if (it.isEmpty()) 0L else 300L }.distinctUntilChanged()
+    ) { category, query -> category to query }
+        .flatMapLatest { (category, query) ->
+            placeRepository.observePlaces(category, query)
                 .map<List<Place>, PlacesLoad> { PlacesLoad.Success(it) }
                 .onStart { emit(PlacesLoad.Loading) }
                 .catch { e ->
@@ -103,23 +105,19 @@ class MapViewModel @Inject constructor(
     private val currentUserIdFlow: Flow<String?> = authRepository.currentUser
         .map { it?.id }
 
-    /**
-     * Wszystkie boolean/string filtry zwijamy w jednego Triple-a, żeby zmieścić
-     * się w 4-argumentowej wersji `combine` razem z [placesLoad],
-     * [selectedCategory] i [selectedPlaceId]. Bez tego musielibyśmy iść w
-     * vararg-ową wersję `combine`, która gubi typowanie.
-     */
     private data class Filters(
+        val searchQuery: String,
         val topRatedOnly: Boolean,
         val addedByMeOnly: Boolean,
         val currentUserId: String?
     )
 
     private val filtersFlow: Flow<Filters> = combine(
+        searchQuery,
         topRatedOnly,
         addedByMeOnly,
         currentUserIdFlow
-    ) { top, mine, uid -> Filters(top, mine, uid) }
+    ) { query, top, mine, uid -> Filters(query, top, mine, uid) }
 
     val uiState: StateFlow<UiState> = combine(
         placesLoad,
@@ -130,6 +128,7 @@ class MapViewModel @Inject constructor(
         when (load) {
             PlacesLoad.Loading -> UiState(
                 selectedCategory = category,
+                searchQuery = filters.searchQuery,
                 topRatedOnly = filters.topRatedOnly,
                 addedByMeOnly = filters.addedByMeOnly,
                 currentUserId = filters.currentUserId,
@@ -137,11 +136,6 @@ class MapViewModel @Inject constructor(
                 isLoading = true
             )
             is PlacesLoad.Success -> {
-                // Filtrowanie: najpierw kategoria (już zaaplikowana w
-                // observePlaces po stronie Firestore), potem topRated,
-                // potem addedByMe. addedByMe to "no-op" gdy user jest
-                // wylogowany - filtrujemy do pustej listy zamiast
-                // potencjalnie pokazać cudze miejsca.
                 val afterTopRated = if (filters.topRatedOnly) {
                     load.list.filter { it.averageRating >= TOP_RATED_THRESHOLD }
                 } else {
@@ -157,11 +151,10 @@ class MapViewModel @Inject constructor(
                 UiState(
                     places = filtered,
                     selectedCategory = category,
+                    searchQuery = filters.searchQuery,
                     topRatedOnly = filters.topRatedOnly,
                     addedByMeOnly = filters.addedByMeOnly,
                     currentUserId = filters.currentUserId,
-                    // Jeśli wybrane miejsce wypadło z listy po zmianie filtra –
-                    // kasujemy zaznaczenie, żeby sheet się zamknął sam.
                     selectedPlaceId = sel?.takeIf { id -> filtered.any { it.id == id } },
                     isLoading = false,
                     errorMessage = null
@@ -169,6 +162,7 @@ class MapViewModel @Inject constructor(
             }
             is PlacesLoad.Error -> UiState(
                 selectedCategory = category,
+                searchQuery = filters.searchQuery,
                 topRatedOnly = filters.topRatedOnly,
                 addedByMeOnly = filters.addedByMeOnly,
                 currentUserId = filters.currentUserId,
@@ -185,6 +179,10 @@ class MapViewModel @Inject constructor(
 
     fun onCategorySelected(category: PlaceCategory?) {
         selectedCategory.value = category
+    }
+
+    fun onSearchQueryChange(query: String) {
+        searchQuery.value = query
     }
 
     fun toggleTopRated() {

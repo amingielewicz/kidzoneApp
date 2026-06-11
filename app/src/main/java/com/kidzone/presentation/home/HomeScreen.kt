@@ -5,6 +5,9 @@ import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -45,7 +48,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
@@ -62,6 +64,7 @@ import com.google.android.gms.location.Priority
 import kotlinx.coroutines.tasks.await
 import com.kidzone.R
 import com.kidzone.domain.model.Place
+import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.GpsAcquiringBanner
 import com.kidzone.presentation.common.GpsDisabledBanner
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
@@ -75,21 +78,16 @@ private val PLACE_CARD_ICON_SIZE = 28.dp
 private val PLACE_CARD_CONTENT_PADDING = 10.dp
 
 /**
- * Ekran "Start" \u2013 pierwsza zak\u0142adka po zalogowaniu.
- *
- * Sekcje (w kolejno\u015bci):
- *  1. Hero \u2013 kolorowe powitanie z taglinem.
- *  2. CTA do mapy \u2013 pe\u0142noszeroko\u015bciowa karta zach\u0119caj\u0105ca do otwarcia mapy.
- *  3. Systemowy dialog Androida o lokalizacj\u0119, je\u015bli permission nie jest jeszcze nadany.
- *  4. "Blisko Ciebie" \u2013 LazyRow z miejscami w okolicy.
- *  5. "Top miejsca" \u2013 LazyRow z najwy\u017cej ocenianymi miejscami w pobli\u017cu.
+ * Ekran "Start" – pierwsza zakładka po zalogowaniu.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun HomeScreen(
-    onOpenPlaceDetails: (placeId: String) -> Unit,
+    onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
     onOpenMap: () -> Unit,
-    viewModel: HomeViewModel = hiltViewModel()
+    viewModel: HomeViewModel = hiltViewModel(),
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
     val gpsEnabled = rememberLocationServiceEnabled()
@@ -106,9 +104,6 @@ fun HomeScreen(
         previousNetworkStatus = networkStatus
     }
 
-    // Refresh permission flag gdy ekran wraca na pierwszy plan \u2013 user m\u00f3g\u0142
-    // p\u00f3j\u015b\u0107 do Settings i w\u0142\u0105czy\u0107/wy\u0142\u0105czy\u0107 lokalizacj\u0119, a my chcemy mie\u0107
-    // aktualny stan w UI bez restartu.
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -123,27 +118,20 @@ fun HomeScreen(
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
-        // Wystarczy zgoda na coarse, \u017ceby pokaza\u0107 miejsca w pobli\u017cu \u2013
-        // dok\u0142adno\u015b\u0107 z grubsza jest tu OK (radius 10km).
         if (result.values.any { it }) {
             viewModel.onLocationPermissionGranted()
         }
     }
 
-    // --- SettingsClient: systemowy dialog "Włącz GPS" bez wychodzenia z apki ---
     val context = LocalContext.current
     val gpsSettingsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            // User włączył GPS w systemowym dialogu – odśwież dane
             viewModel.refresh()
         }
     }
 
-    // Automatycznie wyświetl dialog SettingsClient gdy GPS jest wyłączony
-    // a permission jest nadany. Używamy LaunchedEffect z kluczem gpsEnabled,
-    // żeby dialog pokazał się raz (nie w kółko).
     var hasRequestedGpsDialog by remember { mutableStateOf(false) }
     LaunchedEffect(state.locationGranted, gpsEnabled) {
         if (state.locationGranted && !gpsEnabled && !hasRequestedGpsDialog) {
@@ -155,14 +143,12 @@ fun HomeScreen(
                 ).build()
                 val settingsRequest = LocationSettingsRequest.Builder()
                     .addLocationRequest(locationRequest)
-                    .setAlwaysShow(true) // force show dialog even if previously dismissed
+                    .setAlwaysShow(true)
                     .build()
                 val settingsClient = LocationServices.getSettingsClient(context)
                 settingsClient.checkLocationSettings(settingsRequest).await()
-                // GPS jest już włączony (edge case – zmieniono w tle)
             } catch (e: Exception) {
                 if (e is ResolvableApiException) {
-                    // Pokazuje systemowy dialog "Włącz lokalizację"
                     val intentSender = e.resolution.intentSender
                     gpsSettingsLauncher.launch(
                         IntentSenderRequest.Builder(intentSender).build()
@@ -170,8 +156,6 @@ fun HomeScreen(
                 }
             }
         }
-        // Reset flagi gdy GPS zostanie włączony (żeby następne wyłączenie
-        // znów wyzwoliło dialog)
         if (gpsEnabled) {
             hasRequestedGpsDialog = false
         }
@@ -194,91 +178,87 @@ fun HomeScreen(
         onRefresh = { viewModel.refresh() },
         modifier = Modifier.fillMaxSize()
     ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
-            contentPadding = PaddingValues(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // GPS disabled banner \u2013 only when permission granted but service off
+        Column(modifier = Modifier.fillMaxSize()) {
+            // GPS banners - fixed at the top of the content
             if (state.locationGranted && !gpsEnabled) {
-                item { GpsDisabledBanner() }
+                GpsDisabledBanner()
             }
-
-            // GPS acquiring banner \u2013 GPS on, permission granted, but no fix yet (retrying)
             if (state.isAcquiringLocation) {
-                item { GpsAcquiringBanner() }
+                GpsAcquiringBanner()
             }
 
-            item { HeroSection() }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .background(MaterialTheme.colorScheme.background),
+                contentPadding = PaddingValues(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item { HeroSection() }
 
-            item {
-                OpenMapCta(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    onClick = onOpenMap
-                )
-            }
-
-            item {
-                SectionHeader(
-                    title = stringResource(R.string.home_nearby_places),
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-            }
-            if (state.locationGranted) {
                 item {
-                    HorizontalPlacesRow(
-                        places = state.nearbyPlaces,
-                        isLoading = state.isNearbyLoading,
-                        emptyMessage = stringResource(R.string.home_no_nearby_places),
-                        onPlaceClick = onOpenPlaceDetails
+                    OpenMapCta(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        onClick = onOpenMap
                     )
                 }
-            }
 
-            item {
-                SectionHeader(
-                    title = stringResource(R.string.home_top_places),
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-            }
-            if (state.locationGranted) {
                 item {
-                    HorizontalPlacesRow(
-                        places = state.topPlaces,
-                        isLoading = state.isTopLoading,
-                        emptyMessage = stringResource(R.string.home_no_top_places),
-                        onPlaceClick = onOpenPlaceDetails
-                    )
-                }
-            }
-
-            state.errorMessage?.let { msg ->
-                item {
-                    Text(
-                        text = msg,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
+                    SectionHeader(
+                        title = stringResource(R.string.home_nearby_places),
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
+                }
+                if (state.locationGranted) {
+                    item {
+                        HorizontalPlacesRow(
+                            places = state.nearbyPlaces,
+                            isLoading = state.isNearbyLoading,
+                            emptyMessage = stringResource(R.string.home_no_nearby_places),
+                            onPlaceClick = { onOpenPlaceDetails(it, "nearby") },
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedContentScope = animatedContentScope,
+                            keyPrefix = "nearby"
+                        )
+                    }
+                }
+
+                item {
+                    SectionHeader(
+                        title = stringResource(R.string.home_top_places),
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+                if (state.locationGranted) {
+                    item {
+                        HorizontalPlacesRow(
+                            places = state.topPlaces,
+                            isLoading = state.isTopLoading,
+                            emptyMessage = stringResource(R.string.home_no_top_places),
+                            onPlaceClick = { onOpenPlaceDetails(it, "top") },
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedContentScope = animatedContentScope,
+                            keyPrefix = "top"
+                        )
+                    }
+                }
+
+                state.errorMessage?.let { msg ->
+                    item {
+                        Text(
+                            text = msg,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-/**
- * Hero ekranu Start - powitanie + tagline na tle gradientu w brand-blue.
- *
- * Wizualnie celowo "uniesiony": nie pełnoszerokościowy bar przyklejony do
- * krawędzi ekranu, tylko karta z marginesami po bokach i zaokrąglonymi
- * rogami. Daje to "troszkę węższy" niebieski blok z tekstem, który
- * lepiej dialoguje z kartami "Top miejsca" / "Blisko Ciebie" pod spodem
- * (one też mają boczne paddingi 16 dp). Tekst wewnątrz dodatkowo nie
- * rozciąga się na 100% szerokości karty - ograniczamy go do ~88%, żeby
- * długie taglines nie dotykały prawej krawędzi gradientu.
- */
 @Composable
 private fun HeroSection() {
     Box(
@@ -299,8 +279,6 @@ private fun HeroSection() {
         contentAlignment = Alignment.CenterStart
     ) {
         Column(
-            // ~88% szerokości karty - tekst zostaje czytelny, a niebieski blok
-            // wygląda "troszkę węższy" niż gdyby napis biegł od krawędzi do krawędzi.
             modifier = Modifier.fillMaxWidth(0.88f)
         ) {
             Text(
@@ -319,10 +297,6 @@ private fun HeroSection() {
     }
 }
 
-/**
- * CTA do mapy – pełnoszerokościowa karta z ikoną Map i strzałką w prawo.
- * Kliknięcie woła [onClick] (= przełączenie taba na Map w MainScreen).
- */
 @Composable
 private fun OpenMapCta(
     modifier: Modifier = Modifier,
@@ -382,21 +356,16 @@ private fun SectionHeader(
     )
 }
 
-/**
- * Horyzontalna lista [PlaceCard]ów. Obsługuje 3 stany:
- *  - loading – skeleton loader,
- *  - puste – komunikat [emptyMessage],
- *  - dane – LazyRow z kartami.
- *
- * Wysokość rzędu jest stała ([PLACE_ROW_HEIGHT]) niezależnie od stanu, żeby
- * zawartość listy nie skakała przy odświeżeniu.
- */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun HorizontalPlacesRow(
     places: List<Place>,
     isLoading: Boolean,
     emptyMessage: String,
-    onPlaceClick: (placeId: String) -> Unit
+    onPlaceClick: (placeId: String) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null,
+    keyPrefix: String = ""
 ) {
     val rowHeight = PLACE_ROW_HEIGHT
     when {
@@ -433,25 +402,31 @@ private fun HorizontalPlacesRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(places, key = { it.id }) { place ->
-                    PlaceCard(place = place, onClick = { onPlaceClick(place.id) })
+                items(places, key = { "${keyPrefix}_${it.id}" }) { place ->
+                    PlaceCard(
+                        place = place,
+                        onClick = { onPlaceClick(place.id) },
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedContentScope = animatedContentScope,
+                        keyPrefix = keyPrefix
+                    )
                 }
             }
         }
     }
 }
 
-/**
- * Karta pojedynczego miejsca w sekcji – kafelek z kolorowym headerem
- * (kolor i ikona z [com.kidzone.presentation.common.style] dla danej
- * kategorii), nazwą, kategorią i oceną.
- */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun PlaceCard(
     place: Place,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null,
+    keyPrefix: String = ""
 ) {
-    val style = place.category.style
+    val animationKey = if (keyPrefix.isBlank()) "" else "${keyPrefix}_"
+
     Card(
         modifier = Modifier
             .width(PLACE_CARD_WIDTH)
@@ -464,21 +439,15 @@ private fun PlaceCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header z kolorem i ikoną kategorii – działa jak "okładka" karty.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(PLACE_CARD_HEADER_HEIGHT)
-                    .background(style.color),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = style.icon,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(PLACE_CARD_ICON_SIZE)
-                )
-            }
+            CategoryIcon(
+                category = place.category,
+                animationKey = "${animationKey}place_icon_${place.id}",
+                sharedTransitionScope = sharedTransitionScope,
+                animatedContentScope = animatedContentScope,
+                size = PLACE_CARD_HEADER_HEIGHT,
+                iconSize = PLACE_CARD_ICON_SIZE,
+                modifier = Modifier.fillMaxWidth()
+            )
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -522,9 +491,6 @@ private fun PlaceCard(
     }
 }
 
-/**
- * Skeleton loader for PlaceCard.
- */
 @Composable
 private fun PlaceCardSkeleton() {
     Card(

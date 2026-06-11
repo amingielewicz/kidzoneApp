@@ -1,5 +1,8 @@
 package com.kidzone.presentation.review.myreviews
 
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,30 +52,20 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.kidzone.presentation.common.CategoryIcon
+import com.kidzone.presentation.common.style
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * Lista opinii wystawionych przez aktualnie zalogowanego usera.
- *
- * Każda karta:
- *  - klikalna w całości – nawiguje do [PlaceDetailsScreen],
- *  - ma overflow menu (3 kropki) z opcją "Usuń",
- *  - pokazuje nazwę miejsca, gwiazdki, fragment komentarza, datę.
- *
- * Usuwanie wymaga potwierdzenia (`AlertDialog`) – delete jest nieodwracalny
- * i wpływa na średnią ocenę miejsca, więc lepiej zapytać.
- *
- * Świadomie nie wyciągamy karty do `presentation/common` – patrz analogiczna
- * decyzja w [MyPlacesScreen].
- */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun MyReviewsScreen(
     onBack: () -> Unit,
-    onOpenPlaceDetails: (placeId: String) -> Unit,
-    viewModel: MyReviewsViewModel = hiltViewModel()
+    onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
+    viewModel: MyReviewsViewModel = hiltViewModel(),
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val dialogState by viewModel.dialogState.collectAsState()
@@ -124,8 +117,10 @@ fun MyReviewsScreen(
                             items(items = s.items, key = { it.review.id }) { item ->
                                 MyReviewCard(
                                     item = item,
-                                    onClick = { onOpenPlaceDetails(item.review.placeId) },
-                                    onDelete = { viewModel.openDeleteDialog(item.review.id) }
+                                    onClick = { onOpenPlaceDetails(item.review.placeId, "my_reviews") },
+                                    onDelete = { viewModel.openDeleteDialog(item.review.id) },
+                                    sharedTransitionScope = sharedTransitionScope,
+                                    animatedContentScope = animatedContentScope
                                 )
                             }
                         }
@@ -162,24 +157,27 @@ private fun EmptyState() {
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "Nie napisałaś/eś jeszcze żadnej opinii",
+            text = "Nie napisa\u0142a\u015B/e\u015B jeszcze \u017cadnej opinii",
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "Otwórz dowolne miejsce na liście i dodaj swoją pierwszą opinię.",
+            text = "Otw\u00f3rz dowolne miejsce na li\u015Bcie i dodaj swoj\u0105 pierwsz\u0105 opini\u0119.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun MyReviewCard(
     item: MyReviewItem,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
     var menuExpanded by rememberSaveable { mutableStateOf(false) }
 
@@ -190,10 +188,20 @@ private fun MyReviewCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CategoryIcon(
+                    category = item.placeCategory ?: com.kidzone.domain.model.PlaceCategory.OTHER,
+                    animationKey = "my_reviews_place_icon_${item.review.placeId}",
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedContentScope = animatedContentScope,
+                    size = 28.dp,
+                    iconSize = 18.dp
+                )
+
+                Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = item.placeName ?: "Miejsce niedostępne",
+                        text = item.placeName ?: "Miejsce niedost\u0119pne",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         fontStyle = if (item.placeName == null) FontStyle.Italic else FontStyle.Normal,
@@ -203,14 +211,14 @@ private fun MyReviewCard(
                             MaterialTheme.colorScheme.onSurface
                         }
                     )
-                    Spacer(Modifier.height(4.dp))
                     StarRow(rating = item.review.rating)
                 }
+
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(
                             imageVector = Icons.Filled.MoreVert,
-                            contentDescription = "Więcej opcji"
+                            contentDescription = "Wi\u0119cej opcji"
                         )
                     }
                     DropdownMenu(
@@ -218,7 +226,7 @@ private fun MyReviewCard(
                         onDismissRequest = { menuExpanded = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Usuń") },
+                            text = { Text("Usu\u0144") },
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Filled.Delete,
@@ -272,11 +280,6 @@ private fun StarRow(rating: Int) {
     }
 }
 
-/**
- * "Dodano DD.MM.YYYY" lub "Edytowano DD.MM.YYYY" – ta druga gdy
- * `updatedAtMillis > createdAtMillis`. Spójne z konwencją w
- * PlaceDetailsScreen (label "edytowana").
- */
 private fun formatReviewDate(review: com.kidzone.domain.model.Review): String {
     val formatter = SimpleDateFormat("dd.MM.yyyy", Locale("pl", "PL"))
     return if (review.updatedAtMillis > review.createdAtMillis) {
@@ -295,12 +298,12 @@ private fun ConfirmDeleteReviewDialog(
 ) {
     AlertDialog(
         onDismissRequest = { if (!isDeleting) onDismiss() },
-        title = { Text("Usunąć opinię?") },
+        title = { Text("Usun\u0105\u0107 opini\u0119?") },
         text = {
             Column {
                 Text(
-                    "Twoja opinia zostanie trwale usunięta. Średnia ocena " +
-                        "miejsca przeliczy się na nowo."
+                    "Twoja opinia zostanie trwale usuni\u0119ta. \u015arednia ocena " +
+                        "miejsca przeliczy si\u0119 na nowo."
                 )
                 if (errorMessage != null) {
                     Spacer(Modifier.height(8.dp))
@@ -327,7 +330,7 @@ private fun ConfirmDeleteReviewDialog(
                         color = MaterialTheme.colorScheme.error
                     )
                 } else {
-                    Text("Usuń")
+                    Text("Usu\u0144")
                 }
             }
         },

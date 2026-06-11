@@ -1,5 +1,8 @@
 package com.kidzone.presentation.ranking
 
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,10 +34,12 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -52,34 +57,26 @@ import coil.compose.AsyncImage
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.User
 import com.kidzone.presentation.common.BadgesIconRow
+import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.chronologicalOrder
 import com.kidzone.presentation.common.shimmerEffect
-import com.kidzone.presentation.common.style
 
-/**
- * Ranking miejsc i użytkowników.
- *
- * Dwie zakładki w [PrimaryTabRow]:
- *  - **Miejsca** – top miejsc wg [Place.averageRating] (do 100 pozycji),
- *  - **Użytkownicy** – top najbardziej aktywnych użytkowników (do 100 pozycji).
- *
- * Odświeżanie:
- *  - Automatycznie przy każdym wejściu na zakładkę (ON_RESUME).
- *  - Pull-to-refresh (swipe w dół).
- */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun RankingScreen(
-    onOpenPlaceDetails: (placeId: String) -> Unit,
-    viewModel: RankingViewModel = hiltViewModel()
+    onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
+    onOpenUserProfile: (userId: String) -> Unit,
+    initialTab: String = "",
+    viewModel: RankingViewModel = hiltViewModel(),
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    // Auto-refresh po przywróceniu internetu
     val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
-    var previousNetworkStatus by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(networkStatus) }
-    androidx.compose.runtime.LaunchedEffect(networkStatus) {
+    var previousNetworkStatus by remember { mutableStateOf(networkStatus) }
+    LaunchedEffect(networkStatus) {
         if (previousNetworkStatus == com.kidzone.presentation.common.NetworkStatus.UNAVAILABLE
             && networkStatus == com.kidzone.presentation.common.NetworkStatus.AVAILABLE
         ) {
@@ -88,18 +85,18 @@ fun RankingScreen(
         previousNetworkStatus = networkStatus
     }
 
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var selectedTab by rememberSaveable { 
+        mutableIntStateOf(if (initialTab == "users") 1 else 0) 
+    }
 
-    // Auto-refresh przy każdym wejściu na zakładkę (ON_RESUME)
     val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
+    LaunchedEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.refresh()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -142,11 +139,16 @@ fun RankingScreen(
                     when (selectedTab) {
                         0 -> TopPlacesList(
                             places = state.topPlaces,
-                            onOpenPlaceDetails = onOpenPlaceDetails
+                            onOpenPlaceDetails = { onOpenPlaceDetails(it, "ranking") },
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedContentScope = animatedContentScope
                         )
                         else -> TopUsersList(
                             users = state.topUsers,
-                            badgesByUserId = state.userBadges
+                            badgesByUserId = state.userBadges,
+                            onOpenUserProfile = onOpenUserProfile,
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedContentScope = animatedContentScope
                         )
                     }
                 }
@@ -155,15 +157,18 @@ fun RankingScreen(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun TopPlacesList(
     places: List<Place>,
-    onOpenPlaceDetails: (placeId: String) -> Unit
+    onOpenPlaceDetails: (placeId: String) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
     if (places.isEmpty()) {
         FullScreenCentered {
             Text(
-                text = "\u017Badne miejsce nie ma jeszcze opinii. Wystaw pierwsz\u0105!",
+                text = "Żadne miejsce nie ma jeszcze opinii. Wystaw pierwszą!",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -181,21 +186,27 @@ private fun TopPlacesList(
             TopPlaceCard(
                 position = position,
                 place = place,
-                onClick = { onOpenPlaceDetails(place.id) }
+                onClick = { onOpenPlaceDetails(place.id) },
+                sharedTransitionScope = sharedTransitionScope,
+                animatedContentScope = animatedContentScope
             )
         }
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun TopUsersList(
     users: List<User>,
-    badgesByUserId: Map<String, List<UserBadge>>
+    badgesByUserId: Map<String, List<UserBadge>>,
+    onOpenUserProfile: (userId: String) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
     if (users.isEmpty()) {
         FullScreenCentered {
             Text(
-                text = "Brak aktywnych u\u017Cytkownik\u00F3w. B\u0105d\u017A pierwszy - dodaj miejsce lub opini\u0119!",
+                text = "Brak aktywnych użytkowników. Bądź pierwszy - dodaj miejsce lub opinię!",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -210,8 +221,8 @@ private fun TopUsersList(
     ) {
         item {
             Text(
-                text = "Przytrzymaj ikon\u0119 odznaki, aby zobaczy\u0107 jej nazw\u0119. " +
-                    "Wszystkie odznaki do zdobycia znajdziesz w Profilu \u2192 Odznaki \u2192 \u201E?\u201D",
+                text = "Przytrzymaj ikonę odznaki, aby zobaczyć jej nazwę. " +
+                    "Wszystkie odznaki do zdobycia znajdziesz w Profilu \u2192 Odznaki \u2192 „?”",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 4.dp)
@@ -220,18 +231,27 @@ private fun TopUsersList(
         items(items = users, key = { it.id }) { user ->
             val position = users.indexOf(user) + 1
             val badges = badgesByUserId[user.id].orEmpty()
-            TopUserCard(position = position, user = user, badges = badges)
+            TopUserCard(
+                position = position,
+                user = user,
+                badges = badges,
+                onClick = { onOpenUserProfile(user.id) },
+                sharedTransitionScope = sharedTransitionScope,
+                animatedContentScope = animatedContentScope
+            )
         }
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun TopPlaceCard(
     position: Int,
     place: Place,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
-    val style = place.category.style
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -244,12 +264,16 @@ private fun TopPlaceCard(
         ) {
             PositionMedal(position = position)
             Spacer(Modifier.width(12.dp))
-            Icon(
-                imageVector = style.icon,
-                contentDescription = null,
-                tint = style.color,
-                modifier = Modifier.size(28.dp)
+
+            CategoryIcon(
+                category = place.category,
+                animationKey = "ranking_place_icon_${place.id}",
+                sharedTransitionScope = sharedTransitionScope,
+                animatedContentScope = animatedContentScope,
+                size = 28.dp,
+                iconSize = 18.dp
             )
+
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -293,25 +317,35 @@ private fun TopPlaceCard(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun TopUserCard(
     position: Int,
     user: User,
-    badges: List<UserBadge>
+    badges: List<UserBadge>,
+    onClick: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PositionMedal(position = position)
                 Spacer(Modifier.width(12.dp))
-                UserAvatar(user = user)
+                UserAvatar(
+                    user = user,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedContentScope = animatedContentScope
+                )
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = user.name.ifBlank { "U\u017Cytkownik" },
+                        text = user.name.ifBlank { "Użytkownik" },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1
@@ -333,15 +367,31 @@ private fun TopUserCard(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun UserAvatar(user: User) {
+private fun UserAvatar(
+    user: User,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
+) {
     val avatarSize = 44.dp
+
+    val avatarModifier = Modifier
+        .size(avatarSize)
+        .clip(CircleShape)
+
+    val finalModifier = if (sharedTransitionScope != null && animatedContentScope != null) {
+        with(sharedTransitionScope) {
+            avatarModifier.sharedElement(
+                rememberSharedContentState(key = "user_avatar_${user.id}"),
+                animatedVisibilityScope = animatedContentScope
+            )
+        }
+    } else avatarModifier
+
     if (user.avatarUrl.isNullOrBlank()) {
         Box(
-            modifier = Modifier
-                .size(avatarSize)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
+            modifier = finalModifier.background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -354,9 +404,7 @@ private fun UserAvatar(user: User) {
         AsyncImage(
             model = user.avatarUrl,
             contentDescription = null,
-            modifier = Modifier
-                .size(avatarSize)
-                .clip(CircleShape),
+            modifier = finalModifier,
             contentScale = ContentScale.Crop
         )
     }

@@ -157,7 +157,7 @@ class AddPlaceViewModel @Inject constructor(
     private fun loadAmenityFrequency() {
         viewModelScope.launch {
             val frequency = runCatching {
-                val places = placeRepository.observePlaces(category = null).first()
+                val places = placeRepository.observePlaces(category = null, query = null).first()
                 val counts = mutableMapOf<Amenity, Int>()
                 for (place in places) {
                     for (amenity in place.amenities) {

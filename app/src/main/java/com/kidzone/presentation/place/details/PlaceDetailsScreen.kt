@@ -2,6 +2,9 @@ package com.kidzone.presentation.place.details
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -75,10 +78,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
 import com.kidzone.domain.model.Amenity
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.model.User
+import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.RankBadge
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.style
@@ -86,29 +91,17 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * Szczegóły miejsca.
- *
- * Wszystko o samym miejscu zebrane w jedną kartę (header → opis →
- * lokalizacja → mały przycisk „Nawiguj" → autor + data); poniżej osobne
- * sekcje Udogodnienia i Opinie.
- *
- * Klik „Nawiguj" wystrzeliwuje intent z URL-em `https://www.google.com/maps/dir/`
- * – Android resolver otwiera Google Maps w trybie nawigacji turn-by-turn
- * (jeśli aplikacja jest zainstalowana, w przeciwnym razie spada na przeglądarkę).
- *
- * Dla **właściciela miejsca** w TopAppBar pojawia się overflow menu z akcjami
- * "Edytuj" i "Usuń" (z dialog potwierdzeniem).
- *
- * Dodawania opinii tu jeszcze nie ma – `addReview` w repo jest TODO.
- */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun PlaceDetailsScreen(
     onBack: () -> Unit,
     onEditPlace: (placeId: String) -> Unit,
     onDeleted: () -> Unit,
-    viewModel: PlaceDetailsViewModel = hiltViewModel()
+    placeId: String = "",
+    viewModel: PlaceDetailsViewModel = hiltViewModel(),
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null,
+    animationSource: String? = null
 ) {
     val state by viewModel.uiState.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
@@ -126,7 +119,6 @@ fun PlaceDetailsScreen(
     var reviewToReport by remember { mutableStateOf<Review?>(null) }
     var showSuggestEditSheet by remember { mutableStateOf(false) }
     var showLocationCorrectionDialog by remember { mutableStateOf(false) }
-    // Fullscreen photo viewer state
     var fullscreenPhotos by remember { mutableStateOf<List<String>>(emptyList()) }
     var fullscreenPhotoIndex by remember { mutableStateOf(0) }
     var fullscreenPhotosAreMine by remember { mutableStateOf(false) }
@@ -137,7 +129,6 @@ fun PlaceDetailsScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    // Photo picker for adding photos to place (any logged-in user)
     val placePhotoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
     ) { uri ->
@@ -146,8 +137,7 @@ fun PlaceDetailsScreen(
         }
     }
 
-    // Camera for adding photos to place
-    val placeCameraUri = remember { androidx.compose.runtime.mutableStateOf<android.net.Uri?>(null) }
+    val placeCameraUri = remember { mutableStateOf<android.net.Uri?>(null) }
     val placeCameraLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.TakePicture()
     ) { success ->
@@ -177,12 +167,10 @@ fun PlaceDetailsScreen(
         }
     }
 
-    // Po pomyślnym usunięciu – wracamy do listy.
     LaunchedEffect(state.isDeleted) {
         if (state.isDeleted) onDeleted()
     }
 
-    // Błąd usuwania – pokazujemy w snackbarze i czyścimy w VM.
     LaunchedEffect(state.deleteErrorMessage) {
         val msg = state.deleteErrorMessage
         if (msg != null) {
@@ -191,31 +179,26 @@ fun PlaceDetailsScreen(
         }
     }
 
-    // Snackbar po pomyślnym dodaniu / aktualizacji opinii. Event z VM
-    // (jednorazowy) – po pokazaniu konsumujemy, żeby rotacja / re-kompozycja
-    // nie pokazały go drugi raz.
     LaunchedEffect(state.reviewActionEvent) {
         val event = state.reviewActionEvent ?: return@LaunchedEffect
         val message = when (event) {
-            PlaceDetailsViewModel.ReviewActionEvent.ADDED -> "Dziękujemy za opinię!"
+            PlaceDetailsViewModel.ReviewActionEvent.ADDED -> "Dzi\u0119kujemy za opini\u0119!"
             PlaceDetailsViewModel.ReviewActionEvent.UPDATED -> "Opinia zaktualizowana"
         }
         snackbarHostState.showSnackbar(message)
         viewModel.consumeReviewActionEvent()
     }
 
-    // Snackbar: duplikat zdjęcia na ekranie szczegółów miejsca
     LaunchedEffect(state.placePhotoDuplicateEvent) {
         if (state.placePhotoDuplicateEvent) {
-            snackbarHostState.showSnackbar("To zdjęcie zostało już dodane. Nie można dodać duplikatu.")
+            snackbarHostState.showSnackbar("To zdj\u0119cie zosta\u0142o ju\u017c dodane. Nie mo\u017cna doda\u0107 duplikatu.")
             viewModel.consumePlacePhotoDuplicateEvent()
         }
     }
 
-    // Snackbar: duplikat zdjęcia w edycji opinii
     LaunchedEffect(state.reviewPhotoDuplicateEvent) {
         if (state.reviewPhotoDuplicateEvent) {
-            snackbarHostState.showSnackbar("To zdjęcie zostało już dodane. Nie można dodać duplikatu.")
+            snackbarHostState.showSnackbar("To zdj\u0119cie zosta\u0142o ju\u017c dodane. Nie mo\u017cna doda\u0107 duplikatu.")
             viewModel.consumeReviewPhotoDuplicateEvent()
         }
     }
@@ -243,7 +226,6 @@ fun PlaceDetailsScreen(
                             expanded = showOverflow,
                             onDismissRequest = { showOverflow = false }
                         ) {
-                            // --- Opcje właściciela ---
                             if (isOwner) {
                                 DropdownMenuItem(
                                     text = { Text("Edytuj") },
@@ -268,7 +250,6 @@ fun PlaceDetailsScreen(
                                     }
                                 )
                             }
-                            // --- Udostępnij (dla wszystkich) ---
                             DropdownMenuItem(
                                 text = { Text("Udost\u0119pnij") },
                                 leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
@@ -295,7 +276,6 @@ fun PlaceDetailsScreen(
                                     }
                                 }
                             )
-                            // --- Opcje nie-w\u0142a\u015Bciciela ---
                             if (!isOwner) {
                                 DropdownMenuItem(
                                     text = { Text("Zaproponuj zmian\u0119") },
@@ -344,7 +324,19 @@ fun PlaceDetailsScreen(
         ) {
             when {
                 state.isLoading && state.place == null -> {
-                    PlaceDetailsSkeleton()
+                    var showSkeleton by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) {
+                        delay(100)
+                        showSkeleton = true
+                    }
+                    if (showSkeleton) {
+                        PlaceDetailsSkeleton(
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedContentScope = animatedContentScope,
+                            animationSource = animationSource,
+                            placeId = placeId
+                        )
+                    }
                 }
                 state.place == null -> {
                     Column(
@@ -355,13 +347,13 @@ fun PlaceDetailsScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = state.errorMessage ?: "Nie udało się wczytać miejsca",
+                            text = state.errorMessage ?: "Nie uda\u0142o si\u0119 wczyta\u0107 miejsca",
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(Modifier.height(12.dp))
                         TextButton(onClick = viewModel::retry) {
-                            Text("Spróbuj ponownie")
+                            Text("Spr\u00F3buj ponownie")
                         }
                     }
                 }
@@ -413,9 +405,12 @@ fun PlaceDetailsScreen(
                                 }
                             }
                         } else null,
-                        isUploadingPlacePhoto = state.isUploadingPlacePhoto
+                        isUploadingPlacePhoto = state.isUploadingPlacePhoto,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedContentScope = animatedContentScope,
+                        animationSource = animationSource
                     )
-                    } // PullToRefreshBox
+                    }
                 }
             }
         }
@@ -446,7 +441,6 @@ fun PlaceDetailsScreen(
         )
     }
 
-    // --- Zaproponuj zmianę ---
     if (showSuggestEditSheet && state.place != null) {
         SuggestEditSheet(
             place = state.place!!,
@@ -463,7 +457,6 @@ fun PlaceDetailsScreen(
         )
     }
 
-    // --- Koryguj lokalizację ---
     if (showLocationCorrectionDialog && state.place != null) {
         LocationCorrectionDialog(
             onSubmit = { lat, lng, address ->
@@ -479,9 +472,6 @@ fun PlaceDetailsScreen(
         )
     }
 
-    // Sheet dodawania opinii – sterowany przez VM (state.showAddReviewSheet),
-    // żeby błąd zapisu mógł go utrzymać otwartym (user widzi błąd, próbuje
-    // ponownie). Po sukcesie VM ustawia flagę na false → sheet znika.
     if (state.showAddReviewSheet) {
         val editing = state.editingReview
         AddReviewSheet(
@@ -499,7 +489,6 @@ fun PlaceDetailsScreen(
         )
     }
 
-    // Dialog zgłaszania opinii jako spam – analogiczny do ReportPlaceDialog.
     if (showReportReviewDialog && reviewToReport != null) {
         ReportReviewDialog(
             authorName = reviewToReport!!.authorName,
@@ -508,7 +497,7 @@ fun PlaceDetailsScreen(
                 showReportReviewDialog = false
                 reviewToReport = null
                 scope.launch {
-                    snackbarHostState.showSnackbar("Dziękujemy za zgłoszenie opinii!")
+                    snackbarHostState.showSnackbar("Dzi\u0119kujemy za zg\u0142oszenie opinii!")
                 }
             },
             onDismiss = {
@@ -518,7 +507,6 @@ fun PlaceDetailsScreen(
         )
     }
 
-    // Fullscreen photo viewer
     if (fullscreenPhotos.isNotEmpty()) {
         val myUserId = currentUser?.id
         com.kidzone.presentation.common.FullscreenPhotoViewer(
@@ -532,7 +520,6 @@ fun PlaceDetailsScreen(
                 }
             },
             canReportPhoto = { url ->
-                // Ukryj flagę na zdjęciach dodanych przez bieżącego usera LUB już zgłoszonych
                 val uploaderId = fullscreenPhotoUploadedBy[url]
                 val notMine = uploaderId == null || uploaderId != myUserId
                 val notReported = !state.reportedPhotoUrls.contains(url)
@@ -540,17 +527,14 @@ fun PlaceDetailsScreen(
             },
             onDeletePhoto = { url ->
                 viewModel.deletePhotoFromPlace(url)
-                // Viewer dismisses itself after deletion (onDismiss called inside)
             },
             canDeletePhoto = { url ->
-                // Pokaż kosz tylko na zdjęciach dodanych przez bieżącego usera
                 val uploaderId = fullscreenPhotoUploadedBy[url]
                 myUserId != null && uploaderId == myUserId
             }
         )
     }
 
-    // Report photo dialog
     if (showReportPhotoDialog && photoUrlToReport != null) {
         ReportPhotoDialog(
             onSubmit = { reason, comment ->
@@ -558,7 +542,7 @@ fun PlaceDetailsScreen(
                 showReportPhotoDialog = false
                 photoUrlToReport = null
                 scope.launch {
-                    snackbarHostState.showSnackbar("Dziękujemy za zgłoszenie zdjęcia!")
+                    snackbarHostState.showSnackbar("Dzi\u0119kujemy za zg\u0142oszenie zdj\u0119cia!")
                 }
             },
             onDismiss = {
@@ -569,7 +553,7 @@ fun PlaceDetailsScreen(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
 private fun PlaceDetailsContent(
     place: Place,
@@ -587,18 +571,15 @@ private fun PlaceDetailsContent(
     onOpenPhotoViewer: (photos: List<String>, startIndex: Int, areMine: Boolean) -> Unit = { _, _, _ -> },
     onAddPlacePhoto: (() -> Unit)? = null,
     onAddPlaceCamera: (() -> Unit)? = null,
-    isUploadingPlacePhoto: Boolean = false
+    isUploadingPlacePhoto: Boolean = false,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null,
+    animationSource: String? = null
 ) {
-    // Przycisk "Dodaj opinię" widoczny tylko gdy:
-    //  - user jest zalogowany,
-    //  - NIE jest właścicielem miejsca (nie oceniamy swoich miejsc),
-    //  - jeszcze nie wystawił opinii (1 opinia per user per miejsce).
     val isOwner = currentUserId != null && place.ownerUserId == currentUserId
     val alreadyReviewed = currentUserId != null && reviews.any { it.userId == currentUserId }
     val canAddReview = currentUserId != null && !isOwner && !alreadyReviewed
 
-    // Klient-side sort. `remember` z kluczami chroni przed niepotrzebnym
-    // re-sortowaniem – wykonuje się tylko gdy zmieni się lista albo sortOrder.
     val sortedReviews = remember(reviews, sortOrder) {
         reviews.sortedWith(sortOrder.comparator)
     }
@@ -608,33 +589,29 @@ private fun PlaceDetailsContent(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Sekcja 1: cale miejsce w jednej karcie
-        // (header + opis + lokalizacja + Nawiguj + autor)
         item {
             PlaceMainCard(
                 place = place,
                 author = author,
                 currentUserId = currentUserId,
-                topRank = topRank
+                topRank = topRank,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedContentScope = animatedContentScope,
+                animationSource = animationSource
             )
         }
 
-        // Sekcja 1b: Zdjęcia miejsca
         if (place.photoUrls.isNotEmpty()) {
             item {
                 PlacePhotoGallery(
                     photoUrls = place.photoUrls,
                     onPhotoClick = { index ->
-                        // Zdjęcia miejsca – właściciel MOŻE zgłaszać (bo inni usery
-                        // mogą dodawać zdjęcia do jego miejsca). Nie-właściciel też może.
-                        // Jedyny case "areMine" to zdjęcia opinii autora.
                         onOpenPhotoViewer(place.photoUrls, index, false)
                     }
                 )
             }
         }
 
-        // Przycisk "Dodaj zdjęcie" – widoczny gdy < 5 zdjęć i user zalogowany
         if (onAddPlacePhoto != null && place.photoUrls.size < 5) {
             item {
                 if (isUploadingPlacePhoto) {
@@ -645,7 +622,7 @@ private fun PlaceDetailsContent(
                         CircularProgressIndicator(modifier = Modifier.size(24.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = "Przesyłanie zdjęcia...",
+                            text = "Przesy\u0142anie zdj\u0119cia...",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -685,7 +662,6 @@ private fun PlaceDetailsContent(
             }
         }
 
-        // Sekcja 2: Udogodnienia
         if (place.amenities.isNotEmpty()) {
             item {
                 SectionCard(title = "Udogodnienia (${place.amenities.size})") {
@@ -694,13 +670,11 @@ private fun PlaceDetailsContent(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        // Stable order na podstawie kolejności w enumie Amenity
-                        // (czyli pogrupowanie z Amenity.kt: TL;DR -> plac -> jedzenie -> ...)
                         Amenity.entries
                             .filter { it in place.amenities }
                             .forEach { amenity ->
                                 AssistChip(
-                                    onClick = { /* read-only */ },
+                                    onClick = { },
                                     enabled = false,
                                     label = { Text(stringResource(amenity.labelRes)) }
                                 )
@@ -710,14 +684,13 @@ private fun PlaceDetailsContent(
             }
         }
 
-        // Sekcja 3: Opinie z przyciskiem "Dodaj opinię" w nagłówku.
         item {
             SectionCard(
                 title = "Opinie (${reviews.size})",
                 trailing = if (canAddReview) {
                     {
                         TextButton(onClick = onAddReview) {
-                            Text("Dodaj opinię")
+                            Text("Dodaj opini\u0119")
                         }
                     }
                 } else null
@@ -725,7 +698,7 @@ private fun PlaceDetailsContent(
                 if (reviews.isEmpty()) {
                     Text(
                         text = if (canAddReview) {
-                            "Brak opinii. Bądź pierwszy!"
+                            "Brak opinii. B\u0105d\u017A pierwszy!"
                         } else {
                             "Brak opinii."
                         },
@@ -733,9 +706,6 @@ private fun PlaceDetailsContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    // Wykres rozkładu ocen pokazujemy od 3 opinii w górę –
-                    // przy 1-2 wygląda jak prawie pusty placeholder i nie
-                    // niesie żadnej informacji.
                     if (reviews.size >= 3) {
                         ReviewDistributionChart(reviews = reviews)
                         Spacer(Modifier.height(12.dp))
@@ -750,7 +720,6 @@ private fun PlaceDetailsContent(
             }
         }
 
-        // Każda opinia jako osobny item, żeby LazyColumn dobrze recyklował przy długich listach
         items(items = sortedReviews, key = { it.id }) { review ->
             val isMine = currentUserId != null && review.userId == currentUserId
             ReviewCard(
@@ -776,45 +745,34 @@ private fun PlaceDetailsContent(
     }
 }
 
-/**
- * Główna karta szczegółów miejsca – "jedno okno" w którym po kolei są:
- *  1. nazwa + ikona kategorii + ocena (header) + (opc.) plakietka TOP 100,
- *  2. opis (jeśli niepusty),
- *  3. adres + współrzędne,
- *  4. mały przycisk „Nawiguj" wyrzucający do Google Maps w trybie
- *     turn-by-turn navigation (intent z `maps/dir/?api=1`),
- *  5. autor + data dodania (lub "Dodano przez Ciebie", gdy zalogowany user
- *     jest właścicielem - patrz [authorLine]).
- *
- * Bez sub-headerów typu "Opis"/"Lokalizacja" – wizualnie jeden spójny
- * blok, a delikatne dividery rozdzielają poszczególne kawałki.
- *
- * @param topRank pozycja w rankingu TOP 100 (1-based), tylko gdy <= 10.
- *   Null = nie pokazujemy plakietki.
- */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun PlaceMainCard(
     place: Place,
     author: User?,
     currentUserId: String?,
-    topRank: Int?
+    topRank: Int?,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null,
+    animationSource: String? = null
 ) {
-    val style = place.category.style
     val context = LocalContext.current
     val isOwnerLine = currentUserId != null && currentUserId == place.ownerUserId
+    val keyPrefix = animationSource?.let { "${it}_" } ?: ""
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // --- 1. Header: nazwa + kategoria + ocena + (opc.) plakietka TOP 100 ---
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = style.icon,
-                    contentDescription = null,
-                    tint = style.color,
-                    modifier = Modifier.size(36.dp)
+                CategoryIcon(
+                    category = place.category,
+                    animationKey = "${keyPrefix}place_icon_${place.id}",
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedContentScope = animatedContentScope,
+                    size = 36.dp,
+                    iconSize = 22.dp
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
@@ -829,9 +787,6 @@ private fun PlaceMainCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                // Plakietka rankingu - obok nazwy, jak gwiazdka jakości.
-                // Pokazujemy tylko dla pierwszej dziesiątki TOP 100;
-                // dla pozostałych miejsc nic nie renderujemy (brak Box-a).
                 if (topRank != null) {
                     Spacer(Modifier.width(8.dp))
                     RankBadge(
@@ -871,7 +826,6 @@ private fun PlaceMainCard(
                 }
             }
 
-            // --- 2. Opis ---
             if (place.description.isNotBlank()) {
                 SoftDivider()
                 Text(
@@ -880,7 +834,6 @@ private fun PlaceMainCard(
                 )
             }
 
-            // --- 3. Lokalizacja: adres + współrzędne + Nawiguj ---
             SoftDivider()
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
@@ -892,7 +845,7 @@ private fun PlaceMainCard(
                 Spacer(Modifier.width(6.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = place.address.ifBlank { "Adres niedostępny" },
+                        text = place.address.ifBlank { "Adres niedost\u0119pny" },
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
@@ -902,10 +855,6 @@ private fun PlaceMainCard(
                     )
                 }
                 Spacer(Modifier.width(8.dp))
-                // Mała ikona nawigacji – odpala Google Maps w trybie
-                // turn-by-turn nawigacji (driving). URL `maps/dir/?api=1` jest
-                // oficjalny Google'a i Android sam go resolwuje do aplikacji
-                // Maps; jak Maps brak, otwiera się w przeglądarce.
                 FilledTonalIconButton(
                     onClick = {
                         val uri = Uri.parse(
@@ -926,10 +875,6 @@ private fun PlaceMainCard(
                 }
             }
 
-            // Przycisk "Zobacz na Google Maps" – otwiera miejsce w Google Maps
-            // w trybie search (query=lat,lng), dzięki czemu user widzi oceny
-            // Google, godziny otwarcia, zdjęcia i inne szczegóły z ekosystemu
-            // Google Maps, których nie mamy w kidZone.
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
                 onClick = {
@@ -953,11 +898,6 @@ private fun PlaceMainCard(
                 Text(stringResource(R.string.view_on_google_maps))
             }
 
-            // --- 4. Dodano przez ---
-            // Dla zalogowanego usera-właściciela pokazujemy "Dodano przez Ciebie"
-            // (z datą), zamiast jego własnego nicka - taka konwencja jest
-            // czytelniejsza, bo użytkownik nie musi rozpoznawać samego siebie
-            // w nagłówku miejsca.
             SoftDivider()
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
@@ -969,14 +909,14 @@ private fun PlaceMainCard(
                 Spacer(Modifier.width(6.dp))
                 val datePart = place.createdAtMillis
                     .takeIf { it > 0L }
-                    ?.let { " · " + formatDate(it) }
+                    ?.let { " \u00B7 " + formatDate(it) }
                     .orEmpty()
                 val authorName = author?.name?.takeIf { it.isNotBlank() }
                 Text(
                     text = when {
                         isOwnerLine -> "Dodano przez Ciebie$datePart"
                         authorName != null -> "Dodano przez $authorName$datePart"
-                        else -> "Dodano przez nieznanego użytkownika$datePart"
+                        else -> "Dodano przez nieznanego u\u017cytkownika$datePart"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -986,7 +926,6 @@ private fun PlaceMainCard(
     }
 }
 
-/** Cienki divider z marginesem góra/dół, do separacji sekcji wewnątrz karty. */
 @Composable
 private fun SoftDivider() {
     Spacer(Modifier.height(12.dp))
@@ -998,31 +937,39 @@ private fun SoftDivider() {
 }
 
 private fun formatDate(millis: Long): String {
-    // dd.MM.yyyy zgodnie z polską normą.
     val formatter = SimpleDateFormat("dd.MM.yyyy", Locale("pl", "PL"))
     return formatter.format(Date(millis))
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun PlaceDetailsSkeleton() {
+private fun PlaceDetailsSkeleton(
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null,
+    animationSource: String? = null,
+    placeId: String = ""
+) {
+    val keyPrefix = animationSource?.let { "${it}_" } ?: ""
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Main Card Skeleton
         Card(
             modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .shimmerEffect()
+                    CategoryIcon(
+                        category = com.kidzone.domain.model.PlaceCategory.OTHER,
+                        animationKey = if (placeId.isNotBlank()) "${keyPrefix}place_icon_$placeId" else null,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedContentScope = animatedContentScope,
+                        size = 36.dp,
+                        iconSize = 22.dp
                     )
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
@@ -1062,7 +1009,6 @@ private fun PlaceDetailsSkeleton() {
             }
         }
 
-        // Gallery Skeleton
         Card(
             modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
@@ -1089,7 +1035,6 @@ private fun PlaceDetailsSkeleton() {
             }
         }
 
-        // Amenities Skeleton
         Card(
             modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
@@ -1163,8 +1108,6 @@ private fun ReviewCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        // Subtelny outline na opinii zalogowanego usera, żeby ją łatwo
-        // zlokalizował na dłuższej liście.
         border = if (isMine) {
             androidx.compose.foundation.BorderStroke(
                 1.dp,
@@ -1197,9 +1140,6 @@ private fun ReviewCard(
                             modifier = Modifier.size(16.dp)
                         )
                     }
-                    // Ołówek edycji – tylko dla własnej opinii. Klik otwiera
-                    // ten sam sheet co "Dodaj opinię", ale w trybie edit
-                    // (pre-filled aktualnymi wartościami).
                     if (onEdit != null) {
                         Spacer(Modifier.width(4.dp))
                         IconButton(
@@ -1208,7 +1148,7 @@ private fun ReviewCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Edit,
-                                contentDescription = "Edytuj swoją opinię",
+                                contentDescription = "Edytuj swoj\u0105 opini\u0119",
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -1221,13 +1161,12 @@ private fun ReviewCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Delete,
-                                contentDescription = "Usuń swoją opinię",
+                                contentDescription = "Usu\u0144 swoj\u0105 opini\u0119",
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
                     }
-                    // Flaga zgłoszenia – tylko dla cudzych opinii.
                     if (onReport != null) {
                         Spacer(Modifier.width(4.dp))
                         IconButton(
@@ -1236,7 +1175,7 @@ private fun ReviewCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Flag,
-                                contentDescription = "Zgłoś opinię",
+                                contentDescription = "Zg\u0142o\u015B opini\u0119",
                                 tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                                 modifier = Modifier.size(18.dp)
                             )
@@ -1255,7 +1194,6 @@ private fun ReviewCard(
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
-            // Zdjęcia opinii
             if (review.photoUrls.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 ReviewPhotoRow(
@@ -1267,11 +1205,6 @@ private fun ReviewCard(
     }
 }
 
-/**
- * Wiersz z datą utworzenia opinii i opcjonalnym znacznikiem "edytowana".
- * Pokazujemy obie informacje, żeby nikt nie podmienił 1★ -> 5★ po cichu –
- * data edycji jest widoczna i niezatajalna.
- */
 @Composable
 private fun ReviewTimestampRow(
     createdAtMillis: Long,
@@ -1286,10 +1219,10 @@ private fun ReviewTimestampRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        if (updatedAtMillis > createdAtMillis && updatedAtMillis > 0L) {
+        if (updatedAtMillis > createdAtMillis) {
             Spacer(Modifier.width(6.dp))
             Text(
-                text = "· edytowana ${formatDate(updatedAtMillis)}",
+                text = " \u00B7 edytowana ${formatDate(updatedAtMillis)}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
@@ -1298,20 +1231,11 @@ private fun ReviewTimestampRow(
     }
 }
 
-/**
- * Wykres rozkładu opinii (Google Maps style): średnia + 5 wierszy
- * 5★/4★/3★/2★/1★ z poziomym paskiem proporcjonalnym do najwyższej liczby
- * w grupie. Renderujemy gdy reviews.size >= 3 (próg czytelności).
- */
 @Composable
 private fun ReviewDistributionChart(reviews: List<Review>) {
     val total = reviews.size
     if (total <= 0) return
-    // Mapa rating(1..5) -> count. Nawet jeśli jakaś gwiazdka ma 0 wystąpień,
-    // chcemy ją pokazać w wierszu (czytelność).
     val counts = (1..5).associateWith { star -> reviews.count { it.rating == star } }
-    // Skalowanie pasków do najwyższej grupy (a nie totalu) – wizualnie
-    // lepiej porównuje proporcje, jak robi to Google Maps.
     val maxCount = counts.values.max().coerceAtLeast(1)
     val avg = reviews.map { it.rating }.average()
 
@@ -1337,7 +1261,6 @@ private fun ReviewDistributionChart(reviews: List<Review>) {
             )
         }
         Spacer(Modifier.height(8.dp))
-        // Wiersze 5★..1★ – top-down (najwyższa ocena na górze).
         (5 downTo 1).forEach { star ->
             val count = counts.getValue(star)
             DistributionRow(
@@ -1395,18 +1318,12 @@ private fun DistributionRow(
     }
 }
 
-/** Polska odmiana rzeczownika "opinia" w zależności od liczby. */
 private fun pluralOpinii(n: Int): String = when {
     n == 1 -> "opinia"
     n % 10 in 2..4 && n % 100 !in 12..14 -> "opinie"
     else -> "opinii"
 }
 
-/**
- * Mały selektor sortowania nad listą opinii (Najnowsze / Najstarsze /
- * Najwyżej / Najniżej oceniane). Renderowany jako TextButton z ikoną
- * sortowania + label aktualnego trybu + ArrowDropDown.
- */
 @Composable
 private fun ReviewSortDropdown(
     current: PlaceDetailsViewModel.ReviewSortOrder,
@@ -1444,7 +1361,6 @@ private fun ReviewSortDropdown(
     }
 }
 
-/** Mała plakietka pod nickiem, oznaczająca własną opinię na liście. */
 @Composable
 private fun MyReviewBadge() {
     androidx.compose.material3.Surface(
@@ -1477,13 +1393,13 @@ private fun DeleteConfirmationDialog(
                 tint = MaterialTheme.colorScheme.error
             )
         },
-        title = { Text("Usunąć miejsce?") },
+        title = { Text("Usun\u0105\u0107 miejsce?") },
         text = {
             Text(
                 text = if (placeName.isNotBlank()) {
-                    "\"$placeName\" zostanie nieodwracalnie usunięte z bazy. Czy na pewno chcesz kontynuować?"
+                    "\"$placeName\" zostanie nieodwracalnie usuni\u0119te z bazy. Czy na pewno chcesz kontynuowa\u0107?"
                 } else {
-                    "Miejsce zostanie nieodwracalnie usunięte z bazy. Czy na pewno chcesz kontynuować?"
+                    "Miejsce zostanie nieodwracalnie usuni\u0119te z bazy. Czy na pewno chcesz kontynuowa\u0107?"
                 }
             )
         },
@@ -1499,7 +1415,7 @@ private fun DeleteConfirmationDialog(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text("Usuń")
+                    Text("Usu\u0144")
                 }
             }
         },
@@ -1513,8 +1429,6 @@ private fun DeleteConfirmationDialog(
         }
     )
 }
-
-
 
 @Composable
 private fun ReportPlaceDialog(
@@ -1591,12 +1505,6 @@ private fun ReportPlaceDialog(
     )
 }
 
-
-
-/**
- * Dialog zgłaszania opinii – analogiczny do [ReportPlaceDialog], ale
- * z powodami dostosowanymi do opinii (spam, obraźliwa treść itp.).
- */
 @Composable
 private fun ReportReviewDialog(
     authorName: String,
@@ -1605,8 +1513,8 @@ private fun ReportReviewDialog(
 ) {
     val reasons = listOf(
         "SPAM" to "Spam / reklama",
-        "OFFENSIVE" to "Obraźliwa treść",
-        "FALSE_INFO" to "Fałszywe informacje",
+        "OFFENSIVE" to "Obra\u017Aliwa tre\u015B\u0107",
+        "FALSE_INFO" to "Fa\u0142szywe informacje",
         "NOT_RELEVANT" to "Nie dotyczy tego miejsca",
         "OTHER" to "Inne"
     )
@@ -1622,17 +1530,17 @@ private fun ReportReviewDialog(
                 tint = MaterialTheme.colorScheme.error
             )
         },
-        title = { Text("Zgłoś opinię") },
+        title = { Text("Zg\u0142o\u015B opini\u0119") },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Zgłaszasz opinię użytkownika ${authorName.ifBlank { "Anonim" }}.",
+                    text = "Zg\u0142aszasz opini\u0119 u\u017cytkownika ${authorName.ifBlank { "Anonim" }}.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "Wybierz powód zgłoszenia:",
+                    text = "Wybierz pow\u00F3d zg\u0142oszenia:",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1668,7 +1576,7 @@ private fun ReportReviewDialog(
         },
         confirmButton = {
             Button(onClick = { onSubmit(selectedReason, comment.trim()) }) {
-                Text("Wyślij zgłoszenie")
+                Text("Wy\u015Blij zg\u0142oszenie")
             }
         },
         dismissButton = {
@@ -1679,11 +1587,6 @@ private fun ReportReviewDialog(
     )
 }
 
-
-/**
- * Galeria zdjęć miejsca – pełnoszerokościowy LazyRow z miniaturami.
- * Klik na miniaturę otwiera powiększony podgląd fullscreen.
- */
 @Composable
 private fun PlacePhotoGallery(
     photoUrls: List<String>,
@@ -1695,7 +1598,7 @@ private fun PlacePhotoGallery(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "Zdjęcia (${photoUrls.size})",
+                text = "Zdj\u0119cia (${photoUrls.size})",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )
@@ -1706,7 +1609,7 @@ private fun PlacePhotoGallery(
                 items(photoUrls.size) { index ->
                     coil.compose.AsyncImage(
                         model = photoUrls[index],
-                        contentDescription = "Zdjęcie ${index + 1}",
+                        contentDescription = "Zdj\u0119cie ${index + 1}",
                         modifier = Modifier
                             .size(120.dp)
                             .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
@@ -1719,9 +1622,6 @@ private fun PlacePhotoGallery(
     }
 }
 
-/**
- * Wiersz miniaturek zdjęć w opinii – mniejsze niż w galerii miejsca.
- */
 @Composable
 private fun ReviewPhotoRow(
     photoUrls: List<String>,
@@ -1733,7 +1633,7 @@ private fun ReviewPhotoRow(
         items(photoUrls.size) { index ->
             coil.compose.AsyncImage(
                 model = photoUrls[index],
-                contentDescription = "Zdjęcie opinii ${index + 1}",
+                contentDescription = "Zdj\u0119cie opinii ${index + 1}",
                 modifier = Modifier
                     .size(72.dp)
                     .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
@@ -1744,21 +1644,16 @@ private fun ReviewPhotoRow(
     }
 }
 
-
-/**
- * Dialog zgłaszania zdjęcia – powody dostosowane do zdjęć
- * (nieodpowiednia treść, niezwiązane z miejscem, narusza prawa autorskie itp.).
- */
 @Composable
 private fun ReportPhotoDialog(
     onSubmit: (reason: String, comment: String) -> Unit,
     onDismiss: () -> Unit
 ) {
     val reasons = listOf(
-        "INAPPROPRIATE" to "Nieodpowiednia treść",
-        "NOT_RELEVANT" to "Niezwiązane z miejscem",
+        "INAPPROPRIATE" to "Nieodpowiednia tre\u015B\u0107",
+        "NOT_RELEVANT" to "Niezwi\u0105zane z miejscem",
         "COPYRIGHT" to "Narusza prawa autorskie",
-        "OFFENSIVE" to "Obraźliwe / wulgarne",
+        "OFFENSIVE" to "Obra\u017Aliwe / wulgarne",
         "OTHER" to "Inne"
     )
     var selectedReason by remember { mutableStateOf(reasons.first().first) }
@@ -1773,11 +1668,11 @@ private fun ReportPhotoDialog(
                 tint = MaterialTheme.colorScheme.error
             )
         },
-        title = { Text("Zgłoś zdjęcie") },
+        title = { Text("Zg\u0142o\u015B zdj\u0119cie") },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Wybierz powód zgłoszenia:",
+                    text = "Wybierz pow\u00F3d zg\u0142oszenia:",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1813,7 +1708,7 @@ private fun ReportPhotoDialog(
         },
         confirmButton = {
             Button(onClick = { onSubmit(selectedReason, comment.trim()) }) {
-                Text("Wyślij zgłoszenie")
+                Text("Wy\u015Blij zg\u0142oszenie")
             }
         },
         dismissButton = {

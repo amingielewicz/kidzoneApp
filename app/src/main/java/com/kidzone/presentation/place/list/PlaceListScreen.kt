@@ -1,8 +1,8 @@
 package com.kidzone.presentation.place.list
 
-import android.Manifest
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -28,7 +28,6 @@ import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
@@ -77,6 +76,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.GpsDisabledBanner
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.shimmerEffect
@@ -85,51 +85,26 @@ import com.kidzone.presentation.place.add.hasLocationPermission
 import kotlinx.coroutines.launch
 
 /**
- * Dawne 4 "quick" udogodnienia. Usunięte z UI listy – teraz wszystkie
- * udogodnienia są dostępne wyłącznie z bottom sheeta filtrów.
- * Stała zachowana, bo [PlaceListViewModel] nadal ich używa do logiki
- * (zachowanie kompatybilności wstecznej – brak wpływu na UX).
+ * Lista miejsc - LazyColumn kart z filtrami + sortowaniem.
  */
-@Suppress("unused")
-private val QUICK_AMENITIES = setOf(
-    Amenity.CHANGING_TABLE,
-    Amenity.TOILET,
-    Amenity.STROLLER_ACCESS,
-    Amenity.PARKING
-)
-
-/**
- * Lista miejsc - LazyColumn kart z filtrami + sortowaniem + twardym
- * cap-em [PlaceListViewModel] do 100 najistotniejszych pozycji.
- *
- * Subskrybuje Firestore przez [PlaceListViewModel] - snapshot listener
- * w repo automatycznie aktualizuje listę po dodaniu nowego miejsca z
- * [com.kidzone.presentation.place.add.AddPlaceScreen], bez potrzeby
- * pull-to-refresh.
- *
- * Filtry:
- *  - kategoria (single-select chipy w pierwszym rzędzie)
- *  - 4 uniwersalne udogodnienia (multi-select chipy w drugim rzędzie)
- *  - pełna lista udogodnień (multi-select w bottom sheecie pod "Filtry · N")
- *
- * Sortowanie - 5 trybów (zob. [PlaceListViewModel.SortOrder]) wybierane
- * przez "chip" z dropdownem na pasku filtrów. Domyślny: "Najbliższe"
- * (wymaga lokalizacji - jeżeli brak, banner zachęca do włączenia).
- */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun PlaceListScreen(
-    onOpenPlaceDetails: (placeId: String) -> Unit,
-    viewModel: PlaceListViewModel = hiltViewModel()
+    onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
+    viewModel: PlaceListViewModel = hiltViewModel(),
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
     val state by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val gpsEnabled = rememberLocationServiceEnabled()
 
-    // Auto-refresh po przywróceniu internetu
     val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
     var previousNetworkStatus by remember { mutableStateOf(networkStatus) }
     LaunchedEffect(networkStatus) {
-        if (previousNetworkStatus == com.kidzone.presentation.common.NetworkStatus.UNAVAILABLE
-            && networkStatus == com.kidzone.presentation.common.NetworkStatus.AVAILABLE
+        if (
+            (previousNetworkStatus == com.kidzone.presentation.common.NetworkStatus.UNAVAILABLE)
+            && (networkStatus == com.kidzone.presentation.common.NetworkStatus.AVAILABLE)
         ) {
             viewModel.refresh()
         }
@@ -139,44 +114,18 @@ fun PlaceListScreen(
     var showFilterSheet by rememberSaveable { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
-
-    val context = LocalContext.current
-
-    // Stan przewijania listy - dzielony przez wszystkie stany (loading,
-    // empty, content), żeby przy zmianie sortowania zawsze móc go
-    // animować do top-u (zob. LaunchedEffect poniżej).
     val lazyListState = rememberLazyListState()
 
-    // Po zmianie sortowania automatycznie przewijamy listę na górę.
-    // Bez tego user widziałby "tę samą pozycję pod palcem", ale w nowym
-    // porządku - co jest mylące (nie wiadomo, czy to jeszcze ten sam wynik
-    // czy nowy item w środku rankingu). animateScrollToItem(0) jest
-    // bezpieczny gdy lista jest pusta - po prostu nic nie robi.
     LaunchedEffect(state.sortOrder) {
         lazyListState.animateScrollToItem(0)
     }
 
-    // Launcher requestu uprawnienia. Po nadaniu odświeżamy lokalizację -
-    // sortowanie "Najbliższe" zaczyna działać bez restartu ekranu.
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { result ->
-        if (result.values.any { it }) {
-            viewModel.refreshLocation()
-        }
-    }
-
-    // Po wejściu na ekran - jeśli user już ma permission, ale fixu jeszcze
-    // nie pobraliśmy (np. ekran się zrekonstruował po deep-linku), próbujemy
-    // ponownie. To no-op gdy lokalizacja już jest w state.
     LaunchedEffect(Unit) {
         if (hasLocationPermission(context) && state.userLocation == null) {
             viewModel.refreshLocation()
         }
     }
 
-    // Gdy user wraca z ustawień Androida (gdzie ręcznie dał lokalizację),
-    // odświeżamy fix - banner sam zniknie.
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -187,12 +136,13 @@ fun PlaceListScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
     }
 
-    // Liczba aktywnych filtrów udogodnień w sheecie.
     val advancedAmenitiesCount = state.selectedAmenities.size
-    val gpsEnabled = rememberLocationServiceEnabled()
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Wyszukiwarka po nazwie miejsca
+        if (!gpsEnabled && hasLocationPermission(context)) {
+            GpsDisabledBanner()
+        }
+
         SearchBar(
             query = state.searchQuery,
             onQueryChange = viewModel::onSearchQueryChange,
@@ -214,20 +164,6 @@ fun PlaceListScreen(
             onSortOrderChange = viewModel::onSortOrderChange
         )
 
-        // Banner informujący o wyłączonej lokalizacji - standardowy GpsDisabledBanner
-        // (wystarczy "Lokalizacja wyłączona, Włącz GPS")
-        if (state.nearestUnavailable) {
-            com.kidzone.presentation.common.GpsDisabledBanner()
-        }
-
-        // Banner GPS disabled - when permission granted, sort=NEAREST, but
-        // GPS service is turned off in system settings.
-        if (state.sortOrder == PlaceListViewModel.SortOrder.NEAREST &&
-            hasLocationPermission(context) && !gpsEnabled
-        ) {
-            GpsDisabledBanner(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
-        }
-
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
             onRefresh = { viewModel.refresh() },
@@ -235,23 +171,28 @@ fun PlaceListScreen(
         ) {
         when {
             state.isLoading && state.places.isEmpty() -> {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    userScrollEnabled = false
-                ) {
-                    items(10) {
-                        PlaceRowSkeleton()
+                var showSkeleton by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) {
+                    kotlinx.coroutines.delay(150)
+                    showSkeleton = true
+                }
+                if (showSkeleton) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        userScrollEnabled = false
+                    ) {
+                        items(10) {
+                            PlaceRowSkeleton()
+                        }
                     }
                 }
             }
 
             state.errorMessage != null && state.places.isEmpty() -> {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -264,16 +205,24 @@ fun PlaceListScreen(
 
             state.places.isEmpty() -> {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = emptyMessageFor(state.sortOrder, state.currentUserId != null),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            text = emptyMessageFor(state.sortOrder, state.currentUserId != null),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
                 }
             }
 
@@ -290,18 +239,16 @@ fun PlaceListScreen(
                             distanceKm = state.userLocation?.let { (lat, lng) ->
                                 haversineKm(lat, lng, place.latitude, place.longitude)
                             },
-                            showDistance = state.sortOrder ==
-                                PlaceListViewModel.SortOrder.NEAREST &&
-                                state.userLocation != null,
-                            onClick = { onOpenPlaceDetails(place.id) }
+                            showDistance = state.sortOrder == PlaceListViewModel.SortOrder.NEAREST && state.userLocation != null,
+                            onClick = { onOpenPlaceDetails(place.id, "list") },
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedContentScope = animatedContentScope
                         )
                     }
                     if (state.hasMore) {
                         item {
                             Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 16.dp),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Box(
@@ -316,8 +263,6 @@ fun PlaceListScreen(
                     }
                 }
 
-                // Infinite scroll: doładuj następną stronę gdy user dojdzie
-                // blisko końca listy (ostatnie 3 elementy).
                 val shouldLoadMore = remember {
                     derivedStateOf {
                         val lastVisible = lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -359,17 +304,12 @@ private fun emptyMessageFor(
     isSignedIn: Boolean
 ): String = when {
     sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME && !isSignedIn ->
-        "Zaloguj się, by zobaczyć swoje miejsca"
+        "Zaloguj si\u0119, by zobaczy\u0107 swoje miejsca"
     sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME ->
-        "Nie dodałaś/eś jeszcze żadnego miejsca"
-    else -> "Brak miejsc pasujących do filtrów"
+        "Nie doda\u0142a\u015B/e\u015B jeszcze \u017cadnego miejsca"
+    else -> "Brak miejsc pasuj\u0105cych do filtr\u00f3w"
 }
 
-/**
- * Pole wyszukiwania po nazwie miejsca. Debouncing jest naturalny
- * (MutableStateFlow w VM pomija duplikaty), więc nie potrzebujemy
- * dodatkowego delay — lista filtruje się natychmiast.
- */
 @Composable
 private fun SearchBar(
     query: String,
@@ -399,7 +339,7 @@ private fun SearchBar(
             }
         },
         singleLine = true,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(12.dp),
         modifier = modifier.height(52.dp)
     )
 }
@@ -410,9 +350,6 @@ private fun CategoryFilterBar(
     selectedCategory: PlaceCategory?,
     onCategorySelected: (PlaceCategory?) -> Unit
 ) {
-    // Kolejność jak w enum PlaceCategory (świadomie nie alfabetycznie -
-    // logiczne grupowanie: place zabaw -> sale -> kawiarnia/restauracja ->
-    // park -> atrakcje -> inne). "Wszystkie" zostaje pierwsze jako reset.
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -443,13 +380,6 @@ private fun CategoryFilterBar(
     }
 }
 
-/**
- * Rząd z przyciskiem filtrów (ikona Tune) + chipem sortowania.
- *
- * Quick-amenity chipy usunięte – wszystkie udogodnienia dostępne wyłącznie
- * z bottom sheeta (po kliknięciu ikony Tune). Dzięki temu ekran listy jest
- * czystszy i mniej przytłaczający na mniejszych ekranach.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FilterAndSortBar(
@@ -467,7 +397,6 @@ private fun FilterAndSortBar(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 1. Button "Filtry" (ikona Tune z badge liczbą aktywnych filtrów)
         BadgedBox(
             badge = {
                 if (advancedFiltersCount > 0) {
@@ -493,7 +422,6 @@ private fun FilterAndSortBar(
             }
         }
 
-        // 2. Sortowanie
         SortChip(
             current = sortOrder,
             currentUserSignedIn = currentUserSignedIn,
@@ -502,16 +430,6 @@ private fun FilterAndSortBar(
     }
 }
 
-/**
- * Chip "Sortuj: <label>" z dropdownem 5 trybów. Implementacja przez
- * `AssistChip` (a nie FilterChip), bo wartość nie jest binarna - wybór
- * jednego z wielu, a kontrolka i tak otwiera natywny menu.
- *
- * `currentUserSignedIn` reguluje, czy "Dodane przez Ciebie" jest enabled
- * w menu - dla wylogowanego usera ten wybór nie ma sensu (zwróciłby
- * pustą listę), ale zostawiamy go widocznego, żeby user widział co go
- * czeka po zalogowaniu.
- */
 @Composable
 private fun SortChip(
     current: PlaceListViewModel.SortOrder,
@@ -546,8 +464,7 @@ private fun SortChip(
             onDismissRequest = { expanded = false }
         ) {
             PlaceListViewModel.SortOrder.entries.forEach { option ->
-                val enabled = !(option == PlaceListViewModel.SortOrder.ADDED_BY_ME &&
-                    !currentUserSignedIn)
+                val enabled = !(option == PlaceListViewModel.SortOrder.ADDED_BY_ME && !currentUserSignedIn)
                 DropdownMenuItem(
                     text = { Text(option.label) },
                     enabled = enabled,
@@ -561,55 +478,16 @@ private fun SortChip(
     }
 }
 
-/**
- * Banner pokazywany pod paskiem filtrów, gdy user wybrał "Najbliższe", a
- * lokalizacji nie mamy. Tłumaczy dlaczego sortowanie nie działa i daje
- * przycisk requesta uprawnienia.
- */
-@Composable
-private fun EnableLocationForSortingBanner(onAllowClick: () -> Unit) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        shape = MaterialTheme.shapes.medium,
-        tonalElevation = 1.dp
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Filled.MyLocation,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = "Włącz lokalizację, by sortować miejsca po odległości.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(Modifier.width(8.dp))
-            TextButton(onClick = onAllowClick) {
-                Text("Pozwól")
-            }
-        }
-    }
-}
-
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun PlaceCard(
     place: Place,
     distanceKm: Double?,
     showDistance: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
-    val categoryStyle = place.category.style
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -618,11 +496,13 @@ private fun PlaceCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = categoryStyle.icon,
-                    contentDescription = null,
-                    tint = categoryStyle.color,
-                    modifier = Modifier.size(28.dp)
+                CategoryIcon(
+                    category = place.category,
+                    animationKey = "list_place_icon_${place.id}",
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedContentScope = animatedContentScope,
+                    size = 28.dp,
+                    iconSize = 18.dp
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
@@ -670,9 +550,6 @@ private fun PlaceCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f)
                     )
-                    // Odległość pokazujemy tylko gdy aktywne sortowanie po
-                    // odległości - inaczej byłoby "głośno" przy sortach
-                    // niezwiązanych z lokalizacją.
                     if (showDistance && distanceKm != null) {
                         Spacer(Modifier.width(8.dp))
                         Text(
@@ -697,13 +574,6 @@ private fun PlaceCard(
     }
 }
 
-/**
- * Formatuje odległość w km do user-friendly stringu:
- *  - < 1 km: w metrach z zaokrągleniem do 50 m ("420 m"),
- *  - >= 1 km: z 1 miejscem po przecinku ("3.5 km"),
- *  - >= 100 km: bez ułamka ("125 km") - taka rozdzielczość nie ma znaczenia
- *    dla user experience na liście miejsc dla dzieci.
- */
 private fun formatDistance(km: Double): String = when {
     km < 1.0 -> {
         val meters = (km * 1000).toInt()
@@ -714,7 +584,6 @@ private fun formatDistance(km: Double): String = when {
     else -> "%d km".format(km.toInt())
 }
 
-/** Odległość w km między dwoma punktami (formuła haversine). */
 private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
     val r = 6371.0
     val dLat = Math.toRadians(lat2 - lat1)

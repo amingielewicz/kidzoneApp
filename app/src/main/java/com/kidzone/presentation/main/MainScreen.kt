@@ -1,47 +1,37 @@
 package com.kidzone.presentation.main
 
-import android.widget.Toast
-import androidx.annotation.StringRes
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -54,7 +44,6 @@ import com.kidzone.R
 import com.kidzone.navigation.Route
 import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.NoInternetBanner
-import com.kidzone.presentation.common.RequestNotificationPermission
 import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.home.HomeScreen
 import com.kidzone.presentation.map.MapScreen
@@ -62,25 +51,22 @@ import com.kidzone.presentation.place.list.PlaceListScreen
 import com.kidzone.presentation.profile.ProfileScreen
 import com.kidzone.presentation.ranking.RankingScreen
 
+private data class BottomNavItem(
+    val route: Route,
+    val titleRes: Int,
+    val icon: ImageVector,
+    val selectedIcon: ImageVector
+)
+
 /**
  * Główny shell aplikacji po zalogowaniu – zawiera własny [NavHost]
  * z kartami (home, map, list, ranking, profile) i [NavigationBar].
- *
- * Otwarcie ekranów stackowych (szczegóły, dodawanie miejsca) lub wylogowanie
- * jest delegowane do rodzica przez callbacki.
- *
- * @param focusLatitude / [focusLongitude] – jeśli niepuste, ekran przełączy
- *   się na zakładkę "Mapa" i wycentruje kamerę na tych współrzędnych.
- *   Wykorzystywane po pomyślnym dodaniu nowego miejsca przez [AddPlaceScreen]
- *   (parent NavGraph wstrzykuje wartości przez `savedStateHandle`).
- * @param onFocusConsumed wywołane raz po skonsumowaniu sygnału (czyści
- *   savedStateHandle, żeby kolejne wejście na ten ekran bez nowego dodawania
- *   nie odpalało powtórnie nawigacji).
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun MainScreen(
-    onOpenPlaceDetails: (placeId: String) -> Unit,
+    onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
+    onOpenUserProfile: (userId: String) -> Unit,
     onOpenAddPlace: () -> Unit,
     onOpenMyPlaces: () -> Unit,
     onOpenMyReviews: () -> Unit,
@@ -89,7 +75,9 @@ fun MainScreen(
     focusLongitude: Double? = null,
     focusTab: String = "",
     rankingTab: String = "",
-    onFocusConsumed: () -> Unit = {}
+    onFocusConsumed: () -> Unit = {},
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -97,161 +85,100 @@ fun MainScreen(
     val context = LocalContext.current
     val networkStatus by rememberNetworkStatus()
 
-    // --- Uprawnienia: POST_NOTIFICATIONS + ACCESS_FINE_LOCATION ---
-    // Wymuszamy oba uprawnienia po kolei przy pierwszym wejściu do MainScreen.
-    // Notification → Location (sekwencyjnie, żeby system dialogi nie walczyły).
-
     val locationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
-    ) { /* granted or denied — MapScreen zareaguje sam */ }
+    ) { }
 
     val notificationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
     ) { _ ->
-        // Po zakończeniu dialogu powiadomień → od razu prosimy o lokalizację
-        val locPermission = android.Manifest.permission.ACCESS_FINE_LOCATION
-        val locGranted = androidx.core.content.ContextCompat.checkSelfPermission(
-            context, locPermission
-        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        if (!locGranted) {
-            locationPermissionLauncher.launch(locPermission)
-        }
+        locationPermissionLauncher.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
     }
 
     LaunchedEffect(Unit) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            val notifPermission = android.Manifest.permission.POST_NOTIFICATIONS
-            val notifGranted = androidx.core.content.ContextCompat.checkSelfPermission(
-                context, notifPermission
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            if (!notifGranted) {
-                notificationPermissionLauncher.launch(notifPermission)
-            } else {
-                // Powiadomienia już nadane → proś od razu o lokalizację
-                val locPermission = android.Manifest.permission.ACCESS_FINE_LOCATION
-                val locGranted = androidx.core.content.ContextCompat.checkSelfPermission(
-                    context, locPermission
-                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                if (!locGranted) {
-                    locationPermissionLauncher.launch(locPermission)
-                }
-            }
+            notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            // Android < 13: powiadomienia nie wymagają runtime permission,
-            // ale lokalizacja dalej wymaga.
-            val locPermission = android.Manifest.permission.ACCESS_FINE_LOCATION
-            val locGranted = androidx.core.content.ContextCompat.checkSelfPermission(
-                context, locPermission
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            if (!locGranted) {
-                locationPermissionLauncher.launch(locPermission)
-            }
-        }
-    }
-
-    // Lokalny stan przekazywany dalej do MapScreen. Trzymamy go obok sygnału
-    // z parent NavGraph, bo `onFocusConsumed()` od razu wyczyści savedStateHandle,
-    // a my chcemy, by MapScreen otrzymał współrzędne i sam je skonsumował, gdy
-    // zakończy animację kamery.
-    var pendingMapFocus by remember { mutableStateOf<LatLng?>(null) }
-
-    // Rejestruj FCM token po zalogowaniu – Application.onCreate() może
-    // nie mieć uid (cold start bez sesji). Tu user jest na pewno zalogowany.
-    LaunchedEffect(Unit) {
-        com.kidzone.messaging.KidZoneMessagingService.registerCurrentToken(context)
-    }
-
-    // Uprawnienie POST_NOTIFICATIONS (Android 13+) — reusable composable utility.
-    RequestNotificationPermission()
-
-    // Deep link: przełączenie na konkretną zakładkę (profile, ranking, map)
-    LaunchedEffect(focusTab) {
-        if (focusTab.isNotBlank()) {
-            navController.navigate(focusTab) {
-                popUpTo(navController.graph.findStartDestination().id) {
-                    saveState = true
-                }
-                launchSingleTop = true
-                restoreState = true
-            }
-            onFocusConsumed()
+            locationPermissionLauncher.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
     LaunchedEffect(focusLatitude, focusLongitude) {
         if (focusLatitude != null && focusLongitude != null) {
-            pendingMapFocus = LatLng(focusLatitude, focusLongitude)
-            // Przełącz na zakładkę Map z pełną semantyką bottom-nav (saveState /
-            // restoreState), żeby zachowanie kart pozostało spójne z klikaniem
-            // ich ręcznie.
             navController.navigate(Route.Map.path) {
-                popUpTo(navController.graph.findStartDestination().id) {
-                    saveState = true
-                }
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
             }
-            Toast.makeText(context, "Dodano nowe miejsce", Toast.LENGTH_SHORT).show()
-            onFocusConsumed()
         }
     }
 
+    LaunchedEffect(focusTab) {
+        if (focusTab.isNotBlank()) {
+            navController.navigate(focusTab) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+
+    val navItems = listOf(
+        BottomNavItem(Route.Home, R.string.nav_home, Icons.Outlined.Home, Icons.Filled.Home),
+        BottomNavItem(Route.Map, R.string.nav_map, Icons.Outlined.Map, Icons.Filled.Map),
+        BottomNavItem(Route.PlaceList, R.string.nav_list, Icons.AutoMirrored.Filled.List, Icons.AutoMirrored.Filled.List),
+        BottomNavItem(Route.Ranking, R.string.nav_ranking, Icons.Outlined.EmojiEvents, Icons.Filled.EmojiEvents),
+        BottomNavItem(Route.Profile, R.string.nav_profile, Icons.Outlined.Person, Icons.Filled.Person)
+    )
+
     Scaffold(
-        topBar = {
-            TopAppBar(title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painter = painterResource(R.drawable.ic_launcher_foreground),
-                        contentDescription = null,
-                        modifier = Modifier.size(44.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = stringResource(R.string.app_name),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            })
-        },
         bottomBar = {
             NavigationBar {
-                BottomTab.entries.forEach { tab ->
-                    val selected = currentRoute == tab.route.path
+                navItems.forEach { item ->
+                    val selected = currentRoute?.let { r ->
+                        backStackEntry?.destination?.hierarchy?.any { it.route == item.route.path }
+                    } == true
                     NavigationBarItem(
                         selected = selected,
                         onClick = {
-                            if (!selected) {
-                                navController.navigate(tab.route.path) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
+                            navController.navigate(item.route.path) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
                                 }
+                                launchSingleTop = true
+                                restoreState = true
                             }
                         },
-                        icon = { Icon(tab.icon, contentDescription = null) },
-                        label = { Text(stringResource(tab.labelRes)) }
+                        icon = {
+                            Icon(
+                                imageVector = if (selected) item.selectedIcon else item.icon,
+                                contentDescription = null
+                            )
+                        },
+                        label = { Text(stringResource(item.titleRes)) }
                     )
                 }
-                // wskazówka by wykorzystać `hierarchy` (dla zagnieżdżonych grafów w przyszłości)
-                @Suppress("UNUSED_EXPRESSION")
-                backStackEntry?.destination?.hierarchy
             }
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onOpenAddPlace) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add_place))
+            if (currentRoute == Route.Home.path || currentRoute == Route.Map.path || currentRoute == Route.PlaceList.path) {
+                FloatingActionButton(
+                    onClick = onOpenAddPlace,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = stringResource(R.string.add_place),
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
-        }
+        },
+        floatingActionButtonPosition = FabPosition.End
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            AnimatedVisibility(
-                visible = networkStatus == NetworkStatus.UNAVAILABLE,
-                enter = expandVertically(),
-                exit = shrinkVertically()
-            ) {
+        androidx.compose.foundation.layout.Column(modifier = Modifier.padding(padding)) {
+            if (networkStatus == NetworkStatus.UNAVAILABLE) {
                 NoInternetBanner()
             }
             NavHost(
@@ -264,48 +191,50 @@ fun MainScreen(
                         onOpenPlaceDetails = onOpenPlaceDetails,
                         onOpenMap = {
                             navController.navigate(Route.Map.path) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
                             }
-                        }
+                        },
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedContentScope = this@composable
                     )
                 }
                 composable(Route.Map.path) {
                     MapScreen(
-                        onOpenPlaceDetails = onOpenPlaceDetails,
-                        focusOn = pendingMapFocus,
-                        onFocusConsumed = { pendingMapFocus = null }
+                        onOpenPlaceDetails = { pid -> onOpenPlaceDetails(pid, "map") },
+                        focusOn = if (focusLatitude != null && focusLongitude != null) {
+                            LatLng(focusLatitude, focusLongitude)
+                        } else null,
+                        onFocusConsumed = onFocusConsumed,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedContentScope = this@composable
                     )
                 }
                 composable(Route.PlaceList.path) {
-                    PlaceListScreen(onOpenPlaceDetails = onOpenPlaceDetails)
+                    PlaceListScreen(
+                        onOpenPlaceDetails = onOpenPlaceDetails,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedContentScope = this@composable
+                    )
                 }
                 composable(Route.Ranking.path) {
-                    RankingScreen(onOpenPlaceDetails = onOpenPlaceDetails)
+                    RankingScreen(
+                        onOpenPlaceDetails = onOpenPlaceDetails,
+                        onOpenUserProfile = onOpenUserProfile,
+                        initialTab = rankingTab,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedContentScope = this@composable
+                    )
                 }
                 composable(Route.Profile.path) {
                     ProfileScreen(
-                        onSignOut = onSignOut,
                         onOpenMyPlaces = onOpenMyPlaces,
-                        onOpenMyReviews = onOpenMyReviews
+                        onOpenMyReviews = onOpenMyReviews,
+                        onSignOut = onSignOut
                     )
                 }
             }
         }
     }
-}
-
-private enum class BottomTab(
-    val route: Route,
-    val icon: ImageVector,
-    @StringRes val labelRes: Int
-) {
-    Home(Route.Home, Icons.Filled.Home, R.string.nav_home),
-    Map(Route.Map, Icons.Filled.Place, R.string.nav_map),
-    List(Route.PlaceList, Icons.AutoMirrored.Filled.List, R.string.nav_list),
-    Ranking(Route.Ranking, Icons.Filled.EmojiEvents, R.string.nav_ranking),
-    Profile(Route.Profile, Icons.Filled.Person, R.string.nav_profile);
 }

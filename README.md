@@ -5,158 +5,60 @@ Społecznościowa aplikacja mobilna dla rodziców — odkrywaj, dodawaj i ocenia
 ## 📱 Funkcje
 
 ### Dla użytkowników:
-- 🗺️ Mapa miejsc przyjaznych dzieciom w okolicy (Google Maps)
-- 📍 Dodawanie nowych miejsc z kategoriami i udogodnieniami
-- ⭐ Opinie i oceny (1-5 gwiazdek + komentarz + zdjęcia)
-- 🏆 System odznak i rankingów (użytkownicy + miejsca)
-- 📷 Galeria zdjęć miejsc
-- 🔔 Powiadomienia push (nowa opinia, nowe zdjęcie, ranking)
-- 👤 Profil użytkownika z edycją danych
-- 🔍 Wyszukiwanie miejsc
-- 📊 Ranking TOP 10 użytkowników i miejsc
-- 🚨 Zgłaszanie naruszeń (miejsca, opinie, zdjęcia)
-- 💡 Propozycje zmian w danych miejsc
+- 🗺️ **Interaktywna Mapa**: Zaawansowany widok Google Maps z wyszukiwaniem po nazwie, filtrowaniem kategorii i autorskim systemem pinezek.
+- 🔍 **Globalne Wyszukiwanie**: Hybrydowe wyszukiwanie prefixowe (Firestore `startAt/endAt`) z fallbackiem offline (Room `LIKE`). Optymalizacja dzięki 300ms debounce i deduplikacji zapytań.
+- ✨ **Shared Element Transitions**: Płynne przechodzenie ikon kategorii oraz avatarów użytkowników (Ranking → Profil) między ekranami.
+- 👤 **Publiczne Profile**: Możliwość przeglądania osiągnięć, statystyk i odznak innych użytkowników.
+- 🏆 **System Grywalizacji**: Rankingi TOP 100 miejsc i użytkowników. Dynamicznie przyznawane odznaki z chronologicznym śledzeniem zdobycia.
+- ⚡ **Wydajne Ładowanie**: Skeleton Loaders (Shimmer) z backupem danych (`lastPlaces`) zapobiegającym migotaniu UI podczas przełączania filtrów.
+- 📍 **Dodawanie miejsc**: Formularz z inteligentnym Reverse Geocodingiem, wykrywaniem duplikatów w promieniu 100m i kategoryzacją udogodnień.
+- ⭐ **Opinie i Media**: System recenzji z wielokrotnym przesyłaniem zdjęć, kompresją WebP i detekcją duplikatów MD5 na poziomie bitowym.
+- 🚨 **Bezpieczeństwo**: System zgłaszania naruszeń i weryfikacji zmian przez społeczność.
 
 ### Panel administracyjny (React):
-- 📊 Dashboard ze statystykami
-- 🚨 Zarządzanie zgłoszeniami (miejsca, opinie, zdjęcia)
-- 📝 Zatwierdzanie/odrzucanie propozycji zmian
-- 🏠 Zarządzanie miejscami (edycja, usuwanie z powodem)
-- 👥 Zarządzanie użytkownikami (edycja, blokowanie, resetowanie hasła)
-- 🔒 Pełne zabezpieczenie — auth check na Cloud Functions
+- 📊 Dashboard ze statystykami i zarządzaniem zgłoszeniami.
+- 📝 Moderacja treści i zatwierdzanie propozycji zmian danych.
+- 👥 Zarządzanie użytkownikami (blokowanie, resetowanie danych).
 
 ## 🛠️ Tech Stack
 
 ### Android:
-- Kotlin + Jetpack Compose
-- Hilt (Dependency Injection)
-- Firebase Auth + Firestore + Storage + Crashlytics + FCM + App Check
-- Google Maps SDK
-- Room (cache)
-- Material Design 3
+- **Kotlin + Jetpack Compose**: Deklaratywne UI z wykorzystaniem Material 3.
+- **Shared Transition API**: Wykorzystanie eksperymentalnych API dla natywnych odczuć nawigacji.
+- **Hilt (Dependency Injection)**: Skalowalne zarządzanie zależnościami.
+- **Firebase**: Auth, Firestore, Storage, Cloud Functions, FCM.
+- **Room**: Lokalny cache dla strategii offline-first.
+- **Coil**: Optymalne ładowanie obrazów z pamięci i sieci.
 
-### Panel admina:
-- React 19 + TypeScript
-- Vite 6
-- Material UI 6
-- Firebase SDK 11
-- React Router 7
+### Backend (Cloud Functions):
+- **Node.js/TypeScript**: Triggery bazy danych (onWrite/onUpdate) do agregacji statystyk, przeliczania rankingów i czyszczenia osieroconych danych.
 
-### Backend:
-- Firebase Cloud Functions (Node.js/TypeScript)
-- Nodemailer (email notifications)
-- Firebase Hosting (SPA + static pages)
+## 📈 Rozwiązania Architektoniczne
 
-## 🚀 Setup
-
-### Android:
-1. Skopiuj `google-services.json.template` do `google-services.json` i uzupełnij
-2. W `local.properties` dodaj: `MAPS_API_KEY=AIza...`
-3. Build: `./gradlew assembleDebug`
-
-### Panel admina:
-```bash
-cd admin-panel
-npm install
-cp .env.example .env  # uzupełnij klucze Firebase
-npm run dev
-```
-
-### Cloud Functions:
-```bash
-cd functions
-npm install
-npm run build
-```
-
-### Deploy Firebase:
-```bash
-firebase target:apply hosting app playground-705e7162
-firebase deploy --only functions,firestore:rules,storage,hosting:app
-```
-
-## 🔒 Bezpieczeństwo
-
-- Firebase App Check (Play Integrity + reCAPTCHA Enterprise)
-- Auth verification na wszystkich admin Cloud Functions
-- Input sanitization (escapeHtml) w emailach
-- Firestore Security Rules z walidacją typów
-- Storage Rules z limitami rozmiaru i MIME
-- CSP headers na hostingu
-- ProGuard/R8 w release
-- allowBackup=false
-- Network Security Config (no cleartext)
-- 1 zgłoszenie per user per target (duplicate prevention)
+- **State Persistence**: ViewModels przechowują ostatnio wczytane listy podczas stanów `Loading`, co pozwala na "Instant Memory Rendering" przy zmianie filtrów.
+- **Debounced Flow**: Zastosowanie `flatMapLatest` w połączeniu z `debounce` drastycznie redukuje liczbę zapytań do Firestore przy szybkim pisaniu na klawiaturze.
+- **Unified Components**: Centralny `CategoryIcon` jako "Single Source of Truth" dla stylistyki kategorii w całej aplikacji, kluczowy dla stabilności animacji Shared Elements.
+- **Reliable Testing**: Zestaw ponad 210 testów jednostkowych (JUnit 5 + MockK) weryfikujących logikę biznesową, timingi Flow oraz stany UI.
 
 ## 📁 Struktura projektu
 
 ```
 ├── app/                    # Android app (Kotlin/Compose)
 │   ├── src/main/java/com/kidzone/
-│   │   ├── data/           # Repository implementations, DTOs
-│   │   ├── domain/         # Models, Repository interfaces
-│   │   ├── presentation/   # UI (Compose screens, ViewModels)
-│   │   ├── messaging/      # FCM service
-│   │   └── utils/          # Helpers, exceptions
-│   └── build.gradle.kts
-├── admin-panel/            # React admin panel
-│   ├── src/
-│   │   ├── pages/          # Dashboard, Reports, Places, Users
-│   │   ├── components/     # Layout, shared components
-│   │   ├── hooks/          # useAuth
-│   │   ├── services/       # Firebase config, API helpers
-│   │   └── types/          # TypeScript interfaces
-│   └── package.json
-├── functions/              # Cloud Functions
-│   └── src/index.ts        # Triggers + HTTP endpoints
-├── public/                 # Firebase Hosting (static)
-│   ├── privacy-policy.html
-│   └── terms-of-service.html
-├── firestore.rules
-├── firestore.indexes.json
-├── storage.rules
-└── firebase.json
+│   │   ├── data/           # Repozytoria, Room DAO, Firebase Logic
+│   │   ├── domain/         # Interfejsy i Modele biznesowe
+│   │   ├── presentation/   # UI (Screens, ViewModels, Components)
+│   │   └── utils/          # Normalizacja tekstu, MD5, Image Tools
+├── admin-panel/            # Panel administratora (React 19 + MUI 6)
+├── functions/              # Logika backendowa (TypeScript)
 ```
 
-## 📧 Cloud Functions
+## 🚀 Setup
 
-| Trigger | Opis |
-|---------|------|
-| onPlaceReport | Email do admina o nowym zgłoszeniu miejsca |
-| onPlaceChangeRequest | Email o propozycji zmiany |
-| onUserCreated | Email powitalny + powiadomienie admina |
-| onReviewReport | Email o zgłoszeniu opinii |
-| onPhotoReport | Email o zgłoszeniu zdjęcia + przyciski akcji |
-| onUserDeleted | Email pożegnalny + powiadomienie admina |
-| onReviewCreatedPush | Push do właściciela miejsca o nowej opinii |
-| onBadgeEarned | Push o nowej odznace |
-| onPhotoAddedToPlace | Push o nowym zdjęciu |
-| onUserBanned | Push + email o blokadzie konta |
-| dailyRankingCheck | Push o awansie w rankingu (scheduled) |
-| adminDeletePlace | HTTP: usuń miejsce + email z powodem |
-| adminDeleteReview | HTTP: usuń opinię + email z powodem |
-| adminDeletePhoto | HTTP: usuń zgłoszone zdjęcie + email |
-| adminDeletePhotoFromPlace | HTTP: usuń zdjęcie z miejsca + email |
-| adminDeleteUser | HTTP: usuń użytkownika + email z powodem |
-| adminDismissPhotoReport | HTTP: odrzuć zgłoszenie zdjęcia |
-
-## 📋 Regulamin i Polityka Prywatności
-
-- Regulamin: `/terms-of-service`
-- Polityka prywatności: `/privacy-policy`
-
-## 💰 Koszty
-
-| Usługa | Plan | Limit free |
-|--------|------|-----------|
-| Firebase Auth | Spark | 50k MAU |
-| Firestore | Spark | 50k reads/20k writes/day |
-| Cloud Functions | Spark | 2M invocations/month |
-| Firebase Storage | Spark | 5GB |
-| Firebase Hosting | Spark | 10GB storage, 360MB/day |
-| Google Maps SDK | — | $200/month credit (~28k loads) |
-| Play Integrity | — | 10k requests/day |
+1. Skopiuj `google-services.json.template` do `app/google-services.json` i uzupełnij klucze.
+2. W `local.properties` dodaj: `MAPS_API_KEY=twoj_klucz`.
+3. Build & Run: `./gradlew installDebug`.
 
 ## 📄 Licencja
 
-Projekt prywatny.
+Projekt prywatny - kidZone 🐻.

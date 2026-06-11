@@ -41,3 +41,4 @@ skills-lock.json
 *.swp
 *.bak
 *.tmp
+test-results.txt

@@ -8,6 +8,12 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -25,10 +31,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -37,12 +46,15 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -56,6 +68,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -82,6 +95,7 @@ import com.google.maps.android.compose.rememberCameraPositionState
 import com.kidzone.R
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.GpsDisabledBanner
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.style
@@ -136,13 +150,15 @@ private const val FOCUS_PLACE_ZOOM = 16f
  * pinezki.
  */
 @SuppressLint("MissingPermission")
-@OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class)
+@OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun MapScreen(
     onOpenPlaceDetails: (placeId: String) -> Unit,
     focusOn: LatLng? = null,
     onFocusConsumed: () -> Unit = {},
-    viewModel: MapViewModel = hiltViewModel()
+    viewModel: MapViewModel = hiltViewModel(),
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -272,33 +288,20 @@ fun MapScreen(
             }
         }
 
-        // --- Overlay z filtrami + (opcjonalnie) banner permission u góry ---
+        // --- Overlay z wyszukiwarką + filtrami + bannerami u góry ---
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .padding(8.dp),
+                .padding(horizontal = 8.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            FiltersOverlay(
-                selectedCategory = state.selectedCategory,
-                topRatedOnly = state.topRatedOnly,
-                addedByMeOnly = state.addedByMeOnly,
-                showAddedByMeChip = state.currentUserId != null,
-                onCategorySelected = viewModel::onCategorySelected,
-                onToggleTopRated = viewModel::toggleTopRated,
-                onToggleAddedByMe = viewModel::toggleAddedByMe,
-                modifier = Modifier.fillMaxWidth()
-            )
             if (!locationPermissionGranted) {
                 LocationPermissionBanner(
                     onAllowClick = {
                         locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                     },
                     onOpenSettingsClick = {
-                        // Fallback dla "permanently denied" – w tym stanie launcher.launch()
-                        // nic nie zrobi (callback wraca z false bez UI). Przerzucamy usera
-                        // do systemowych Ustawień appki, gdzie zawsze może włączyć Location.
                         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                             data = Uri.fromParts("package", context.packageName, null)
                         }
@@ -309,6 +312,57 @@ fun MapScreen(
             }
             if (locationPermissionGranted && !gpsEnabled) {
                 GpsDisabledBanner(modifier = Modifier.fillMaxWidth())
+            }
+
+            MapSearchBar(
+                query = state.searchQuery,
+                onQueryChange = viewModel::onSearchQueryChange,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            FiltersOverlay(
+                selectedCategory = state.selectedCategory,
+                topRatedOnly = state.topRatedOnly,
+                addedByMeOnly = state.addedByMeOnly,
+                showAddedByMeChip = state.currentUserId != null,
+                onCategorySelected = viewModel::onCategorySelected,
+                onToggleTopRated = viewModel::toggleTopRated,
+                onToggleAddedByMe = viewModel::toggleAddedByMe,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        // --- "Brak wyników" Feedback ---
+        AnimatedVisibility(
+            visible = !state.isLoading && state.places.isEmpty() && (state.searchQuery.isNotBlank() || state.selectedCategory != null || state.topRatedOnly || state.addedByMeOnly),
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.Center)
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                shape = RoundedCornerShape(24.dp),
+                tonalElevation = 4.dp,
+                shadowElevation = 8.dp,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = "Brak miejsc pasujących do filtrów",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
         }
 
@@ -368,13 +422,65 @@ fun MapScreen(
                 place = selectedPlace,
                 onOpenDetails = {
                     onOpenPlaceDetails(selectedPlace.id)
-                    // Zamykamy zaznaczenie tu, żeby po powrocie z details
-                    // sheet nie wyświetlił się ponownie (bo selectedPlaceId
-                    // jest trzymany w VM i przeżyje config change).
                     viewModel.onPlaceSelected(null)
-                }
+                },
+                sharedTransitionScope = sharedTransitionScope,
+                animatedContentScope = animatedContentScope
             )
         }
+    }
+}
+
+/**
+ * Stylizowana wyszukiwarka na mapie - biała, zaokrąglona, z delikatnym cieniem.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MapSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 4.dp,
+        shadowElevation = 8.dp
+    ) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            placeholder = { Text("Szukaj na mapie\u2026") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Filled.Search,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            trailingIcon = {
+                if (query.isNotBlank()) {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Wyczyść",
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                disabledContainerColor = Color.Transparent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+            )
+        )
     }
 }
 
@@ -591,12 +697,14 @@ private fun FiltersOverlay(
  *  - adres,
  *  - CTA "Zobacz szczegóły".
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun PlacePreviewContent(
     place: Place,
-    onOpenDetails: () -> Unit
+    onOpenDetails: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
-    val style = place.category.style
     val context = LocalContext.current
 
     Column(
@@ -605,8 +713,6 @@ private fun PlacePreviewContent(
             .padding(horizontal = 16.dp)
             .padding(bottom = 16.dp)
     ) {
-        // Miniaturka pojawia się tylko wtedy, gdy faktycznie jest – inaczej
-        // sheet się "kurczy" do samego tekstu i nie ma pustego prostokąta.
         if (place.photoUrls.isNotEmpty()) {
             AsyncImage(
                 model = place.photoUrls.first(),
@@ -621,13 +727,15 @@ private fun PlacePreviewContent(
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = style.icon,
-                contentDescription = null,
-                tint = style.color,
-                modifier = Modifier.size(28.dp)
+            CategoryIcon(
+                category = place.category,
+                animationKey = "map_preview_icon_${place.id}",
+                sharedTransitionScope = sharedTransitionScope,
+                animatedContentScope = animatedContentScope,
+                size = 36.dp,
+                iconSize = 22.dp
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = place.name,

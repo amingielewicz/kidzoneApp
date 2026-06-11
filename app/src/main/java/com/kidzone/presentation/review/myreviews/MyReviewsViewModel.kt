@@ -2,6 +2,7 @@ package com.kidzone.presentation.review.myreviews
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
@@ -28,37 +29,16 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Para review + nazwa miejsca, którego dotyczy.
- *
- * Trzymamy [placeName] zamiast pełnego [com.kidzone.domain.model.Place], żeby
- * UI nie pokazywało nieaktualnych danych miejsca (np. starego adresu).
- * Jeśli miejsce zostało usunięte, [placeName] = null – UI pokazuje wtedy
- * "Miejsce niedostępne".
+ * Para review + dane miejsca potrzebne do UI (nazwa + kategoria dla animacji).
  */
 data class MyReviewItem(
     val review: Review,
-    val placeName: String?
+    val placeName: String?,
+    val placeCategory: PlaceCategory?
 )
 
 /**
  * ViewModel ekranu "Moje opinie".
- *
- * Pipeline danych:
- *  1. [AuthRepository.currentUser] – uid (lub null gdy wylogowany).
- *  2. `flatMapLatest` na [ReviewRepository.observeReviewsByUser] – snapshot
- *     listener live aktualizuje listę po dodaniu / edycji / skasowaniu.
- *  3. `transformLatest` po zmianie listy: dla unikalnych `placeId`
- *     wykonujemy równoległe `getPlace(id)` (max N round-tripów Firestore,
- *     gdzie N = liczba unikalnych placów). Wynik składamy w [MyReviewItem].
- *
- * Nazwy miejsc są pobierane jednorazowo dla danej snapshot opinii. Gdy
- * place się zmieni (rzadko), kolejny emit listy opinii i tak wymusi nowe
- * fetche – akceptowalny trade-off (alternatywa: drugi snapshot listener
- * na każde miejsce – więcej połączeń, drożej).
- *
- * Akcja [deleteReview] wykonuje cascade-aware delete (przelicza
- * averageRating miejsca + decrement userReviewsCount – patrz
- * [ReviewRepository.deleteReview]).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -74,12 +54,6 @@ class MyReviewsViewModel @Inject constructor(
         data class Error(val message: String) : UiState
     }
 
-    /**
-     * @property pendingDeleteReviewId opinia, dla której user kliknął "Usuń" –
-     *   pokazujemy dialog potwierdzenia. null = brak otwartego dialogu.
-     * @property isDeleting spinner na przycisku potwierdzenia w dialogu
-     * @property deleteError błąd z ostatniej próby usunięcia
-     */
     data class DialogState(
         val pendingDeleteReviewId: String? = null,
         val isDeleting: Boolean = false,
@@ -96,19 +70,20 @@ class MyReviewsViewModel @Inject constructor(
             } else {
                 reviewRepository.observeReviewsByUser(current.id)
                     .transformLatest<List<Review>, UiState> { reviews ->
-                        emit(UiState.Loading)
-                        // Fetch nazw miejsc równolegle – dla 50 opinii z 30
-                        // unikalnymi miejscami to ~1-2 sekundy, akceptowalne
-                        // dla ekranu który user otwiera świadomie.
+                        val currentItems = (uiState.value as? UiState.Ready)?.items ?: emptyList()
+                        if (currentItems.isEmpty()) {
+                            emit(UiState.Loading)
+                        }
+                        
                         val placeIds = reviews.map { it.placeId }.distinct().filter { it.isNotBlank() }
-                        val placeNames = if (placeIds.isEmpty()) {
-                            emptyMap<String, String>()
+                        val placeData = if (placeIds.isEmpty()) {
+                            emptyMap<String, Pair<String, PlaceCategory>>()
                         } else {
                             coroutineScope {
                                 placeIds.map { id ->
                                     async {
                                         when (val r = placeRepository.getPlace(id)) {
-                                            is OpResult.Success -> id to r.data.name
+                                            is OpResult.Success -> id to (r.data.name to r.data.category)
                                             is OpResult.Failure -> id to null
                                         }
                                     }
@@ -119,16 +94,18 @@ class MyReviewsViewModel @Inject constructor(
                                 .mapValues { it.value!! }
                         }
                         val items = reviews.map { review ->
+                            val data = placeData[review.placeId]
                             MyReviewItem(
                                 review = review,
-                                placeName = placeNames[review.placeId]
+                                placeName = data?.first,
+                                placeCategory = data?.second
                             )
                         }
                         emit(UiState.Ready(items))
                     }
                     .onStart { emit(UiState.Loading) }
                     .catch { e ->
-                        emit(UiState.Error(e.message ?: "Nie udało się wczytać Twoich opinii"))
+                        emit(UiState.Error(e.message ?: "Nie uda\u0142o si\u0119 wczyta\u0107 Twoich opinii"))
                     }
             }
         }
@@ -166,7 +143,7 @@ class MyReviewsViewModel @Inject constructor(
                 is OpResult.Failure -> _dialogState.update {
                     it.copy(
                         isDeleting = false,
-                        deleteError = r.error.message ?: "Nie udało się usunąć opinii"
+                        deleteError = r.error.message ?: "Nie uda\u0142o si\u0119 usun\u0105\u0107 opinii"
                     )
                 }
             }

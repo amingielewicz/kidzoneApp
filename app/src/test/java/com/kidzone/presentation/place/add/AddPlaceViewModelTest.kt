@@ -53,7 +53,7 @@ class AddPlaceViewModelTest {
 
         every { authRepository.currentUser } returns currentUserFlow
         // observePlaces returns empty list for amenity frequency loading
-        coEvery { placeRepository.observePlaces(category = null) } returns flowOf(emptyList())
+        coEvery { placeRepository.observePlaces(category = null, query = null) } returns flowOf(emptyList())
     }
 
     private fun createViewModel(placeId: String? = null): AddPlaceViewModel {
@@ -635,7 +635,7 @@ class AddPlaceViewModelTest {
                 TestFixtures.place(id = "p2", amenities = setOf(Amenity.PARKING)),
                 TestFixtures.place(id = "p3", amenities = setOf(Amenity.TOILET, Amenity.PARKING))
             )
-            coEvery { placeRepository.observePlaces(category = null) } returns flowOf(places)
+            coEvery { placeRepository.observePlaces(category = null, query = null) } returns flowOf(places)
 
             val viewModel = createViewModel()
             advanceUntilIdle()
@@ -647,7 +647,7 @@ class AddPlaceViewModelTest {
 
         @Test
         fun `amenity frequency is empty map on error`() = runTest {
-            coEvery { placeRepository.observePlaces(category = null) } returns
+            coEvery { placeRepository.observePlaces(category = null, query = null) } returns
                 kotlinx.coroutines.flow.flow { throw RuntimeException("error") }
 
             val viewModel = createViewModel()
