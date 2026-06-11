@@ -75,7 +75,6 @@ object AppConfig {
      * przy każdej istotnej zmianie tekstu w [com.kidzone.presentation.profile.PrivacyPolicyDialog].
      */
     const val PRIVACY_POLICY_EFFECTIVE_DATE: String = "29.05.2026"
-}
 
 /**
  * Inline helper eliminating repetitive timeout + error-wrapping boilerplate
