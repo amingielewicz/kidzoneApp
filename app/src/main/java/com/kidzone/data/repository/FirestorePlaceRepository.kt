@@ -42,25 +42,37 @@ class FirestorePlaceRepository @Inject constructor(
     private val placeDao: PlaceDao
 ) : PlaceRepository {
 
-    override fun observePlaces(category: PlaceCategory?): Flow<List<Place>> = channelFlow {
+    override fun observePlaces(category: PlaceCategory?, query: String?): Flow<List<Place>> = channelFlow {
         // 1. Room jako local source – emitujemy z niego do kanału.
-        val localFlow = if (category != null) {
-            placeDao.observeByCategory(category.name)
-        } else {
-            placeDao.observeAll()
+        // Jeśli jest query, Room filtruje po 'contains', Firestore po prefixie.
+        val localFlow = when {
+            category != null && !query.isNullOrBlank() -> placeDao.observeByCategoryAndName(category.name, query)
+            category != null -> placeDao.observeByCategory(category.name)
+            !query.isNullOrBlank() -> placeDao.observeByName(query)
+            else -> placeDao.observeAll()
         }
 
         // 2. Firestore snapshot listener – aktualizuje Room w tle.
-        val syncJob = launch {
+        launch {
             val firestoreFlow = callbackFlow {
-                val query = if (category != null) {
-                    placesCollection().whereEqualTo("category", category.name)
-                } else {
-                    placesCollection()
+                var firestoreQuery = placesCollection().limit(100) // Zabezpieczenie przed pobraniem całej bazy
+
+                if (category != null) {
+                    firestoreQuery = firestoreQuery.whereEqualTo("category", category.name)
                 }
 
-                val registration = query.addSnapshotListener { snapshot, error ->
+                if (!query.isNullOrBlank()) {
+                    // Uwaga: Firestore prefix search wymaga orderBy("name").
+                    // Jeśli mamy też whereEqualTo("category"), Firestore może wymagać
+                    // indeksu złożonego (category ASC, name ASC).
+                    firestoreQuery = firestoreQuery.orderBy("name")
+                        .startAt(query)
+                        .endAt(query + "\uf8ff")
+                }
+
+                val registration = firestoreQuery.addSnapshotListener { snapshot, error ->
                     if (error != null) {
+                        // Jeśli brakuje indeksu, Firestore rzuci błędem z linkiem do konsoli.
                         close(error)
                         return@addSnapshotListener
                     }
@@ -80,8 +92,6 @@ class FirestorePlaceRepository @Inject constructor(
         localFlow.collectLatest { entities ->
             trySend(entities.map { it.toDomain() })
         }
-
-        syncJob.cancel()
     }
 
     override fun observePlacesByOwner(ownerUserId: String): Flow<List<Place>> = channelFlow {

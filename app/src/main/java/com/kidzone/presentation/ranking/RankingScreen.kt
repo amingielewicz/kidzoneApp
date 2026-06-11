@@ -1,5 +1,8 @@
 package com.kidzone.presentation.ranking
 
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,7 +18,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
@@ -52,6 +57,7 @@ import coil.compose.AsyncImage
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.User
 import com.kidzone.presentation.common.BadgesIconRow
+import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.chronologicalOrder
 import com.kidzone.presentation.common.shimmerEffect
@@ -68,13 +74,19 @@ import com.kidzone.presentation.common.style
  *  - Automatycznie przy każdym wejściu na zakładkę (ON_RESUME).
  *  - Pull-to-refresh (swipe w dół).
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun RankingScreen(
-    onOpenPlaceDetails: (placeId: String) -> Unit,
-    viewModel: RankingViewModel = hiltViewModel()
+    onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
+    viewModel: RankingViewModel = hiltViewModel(),
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
     val state by viewModel.uiState.collectAsState()
+
+    // Zachowujemy stan przewijania osobno dla każdej zakładki
+    val placesListState = rememberLazyListState()
+    val usersListState = rememberLazyListState()
 
     // Auto-refresh po przywróceniu internetu
     val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
@@ -89,18 +101,6 @@ fun RankingScreen(
     }
 
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-
-    // Auto-refresh przy każdym wejściu na zakładkę (ON_RESUME)
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refresh()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         PrimaryTabRow(selectedTabIndex = selectedTab) {
@@ -136,17 +136,21 @@ fun RankingScreen(
             else -> {
                 PullToRefreshBox(
                     isRefreshing = state.isLoading,
-                    onRefresh = viewModel::refresh,
+                    onRefresh = { viewModel.refresh(forceShowLoading = true) },
                     modifier = Modifier.fillMaxSize()
                 ) {
                     when (selectedTab) {
                         0 -> TopPlacesList(
                             places = state.topPlaces,
-                            onOpenPlaceDetails = onOpenPlaceDetails
+                            onOpenPlaceDetails = { onOpenPlaceDetails(it, "ranking") },
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedContentScope = animatedContentScope,
+                            lazyListState = placesListState
                         )
                         else -> TopUsersList(
                             users = state.topUsers,
-                            badgesByUserId = state.userBadges
+                            badgesByUserId = state.userBadges,
+                            lazyListState = usersListState
                         )
                     }
                 }
@@ -155,10 +159,14 @@ fun RankingScreen(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun TopPlacesList(
     places: List<Place>,
-    onOpenPlaceDetails: (placeId: String) -> Unit
+    onOpenPlaceDetails: (placeId: String) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null,
+    lazyListState: LazyListState = rememberLazyListState()
 ) {
     if (places.isEmpty()) {
         FullScreenCentered {
@@ -172,16 +180,19 @@ private fun TopPlacesList(
     }
 
     LazyColumn(
+        state = lazyListState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        items(items = places, key = { it.id }) { place ->
+        items(items = places, key = { "ranking_${it.id}" }) { place ->
             val position = places.indexOf(place) + 1
             TopPlaceCard(
                 position = position,
                 place = place,
-                onClick = { onOpenPlaceDetails(place.id) }
+                onClick = { onOpenPlaceDetails(place.id) },
+                sharedTransitionScope = sharedTransitionScope,
+                animatedContentScope = animatedContentScope
             )
         }
     }
@@ -190,7 +201,8 @@ private fun TopPlacesList(
 @Composable
 private fun TopUsersList(
     users: List<User>,
-    badgesByUserId: Map<String, List<UserBadge>>
+    badgesByUserId: Map<String, List<UserBadge>>,
+    lazyListState: LazyListState = rememberLazyListState()
 ) {
     if (users.isEmpty()) {
         FullScreenCentered {
@@ -204,6 +216,7 @@ private fun TopUsersList(
     }
 
     LazyColumn(
+        state = lazyListState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -225,13 +238,15 @@ private fun TopUsersList(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun TopPlaceCard(
     position: Int,
     place: Place,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
-    val style = place.category.style
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -244,12 +259,16 @@ private fun TopPlaceCard(
         ) {
             PositionMedal(position = position)
             Spacer(Modifier.width(12.dp))
-            Icon(
-                imageVector = style.icon,
-                contentDescription = null,
-                tint = style.color,
-                modifier = Modifier.size(28.dp)
+
+            CategoryIcon(
+                category = place.category,
+                animationKey = "ranking_place_icon_${place.id}",
+                sharedTransitionScope = sharedTransitionScope,
+                animatedContentScope = animatedContentScope,
+                size = 28.dp,
+                iconSize = 18.dp
             )
+
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(

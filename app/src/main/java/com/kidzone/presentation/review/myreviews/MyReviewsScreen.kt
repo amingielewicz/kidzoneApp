@@ -1,5 +1,9 @@
 package com.kidzone.presentation.review.myreviews
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,10 +49,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.kidzone.presentation.common.CategoryIcon
+import com.kidzone.presentation.common.style
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -67,12 +75,14 @@ import java.util.Locale
  * Świadomie nie wyciągamy karty do `presentation/common` – patrz analogiczna
  * decyzja w [MyPlacesScreen].
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun MyReviewsScreen(
     onBack: () -> Unit,
-    onOpenPlaceDetails: (placeId: String) -> Unit,
-    viewModel: MyReviewsViewModel = hiltViewModel()
+    onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
+    viewModel: MyReviewsViewModel = hiltViewModel(),
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedVisibilityScope? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val dialogState by viewModel.dialogState.collectAsState()
@@ -124,8 +134,10 @@ fun MyReviewsScreen(
                             items(items = s.items, key = { it.review.id }) { item ->
                                 MyReviewCard(
                                     item = item,
-                                    onClick = { onOpenPlaceDetails(item.review.placeId) },
-                                    onDelete = { viewModel.openDeleteDialog(item.review.id) }
+                                    onClick = { onOpenPlaceDetails(item.review.placeId, "my_reviews") },
+                                    onDelete = { viewModel.openDeleteDialog(item.review.id) },
+                                    sharedTransitionScope = sharedTransitionScope,
+                                    animatedContentScope = animatedContentScope
                                 )
                             }
                         }
@@ -175,11 +187,14 @@ private fun EmptyState() {
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun MyReviewCard(
     item: MyReviewItem,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedVisibilityScope? = null
 ) {
     var menuExpanded by rememberSaveable { mutableStateOf(false) }
 
@@ -190,7 +205,17 @@ private fun MyReviewCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CategoryIcon(
+                    category = item.placeCategory ?: com.kidzone.domain.model.PlaceCategory.OTHER,
+                    animationKey = "my_reviews_place_icon_${item.review.placeId}",
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedContentScope = animatedContentScope,
+                    size = 28.dp,
+                    iconSize = 18.dp
+                )
+
+                Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = item.placeName ?: "Miejsce niedostępne",
@@ -203,9 +228,9 @@ private fun MyReviewCard(
                             MaterialTheme.colorScheme.onSurface
                         }
                     )
-                    Spacer(Modifier.height(4.dp))
                     StarRow(rating = item.review.rating)
                 }
+
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(

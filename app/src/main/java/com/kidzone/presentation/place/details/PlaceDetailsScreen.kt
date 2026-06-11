@@ -2,6 +2,9 @@ package com.kidzone.presentation.place.details
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -67,6 +70,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -75,10 +79,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
 import com.kidzone.domain.model.Amenity
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.model.User
+import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.RankBadge
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.style
@@ -102,13 +108,17 @@ import java.util.Locale
  *
  * Dodawania opinii tu jeszcze nie ma – `addReview` w repo jest TODO.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun PlaceDetailsScreen(
     onBack: () -> Unit,
     onEditPlace: (placeId: String) -> Unit,
     onDeleted: () -> Unit,
-    viewModel: PlaceDetailsViewModel = hiltViewModel()
+    placeId: String = "", // Added placeId to ensure skeleton can use it for transitions
+    viewModel: PlaceDetailsViewModel = hiltViewModel(),
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null,
+    animationSource: String? = null
 ) {
     val state by viewModel.uiState.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
@@ -344,7 +354,20 @@ fun PlaceDetailsScreen(
         ) {
             when {
                 state.isLoading && state.place == null -> {
-                    PlaceDetailsSkeleton()
+                    // Smart Loading: don't show skeleton immediately to avoid flickering on fast cache hits
+                    var showSkeleton by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) {
+                        delay(100)
+                        showSkeleton = true
+                    }
+                    if (showSkeleton) {
+                        PlaceDetailsSkeleton(
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedContentScope = animatedContentScope,
+                            animationSource = animationSource,
+                            placeId = placeId
+                        )
+                    }
                 }
                 state.place == null -> {
                     Column(
@@ -413,7 +436,10 @@ fun PlaceDetailsScreen(
                                 }
                             }
                         } else null,
-                        isUploadingPlacePhoto = state.isUploadingPlacePhoto
+                        isUploadingPlacePhoto = state.isUploadingPlacePhoto,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedContentScope = animatedContentScope,
+                        animationSource = animationSource
                     )
                     } // PullToRefreshBox
                 }
@@ -569,7 +595,7 @@ fun PlaceDetailsScreen(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
 private fun PlaceDetailsContent(
     place: Place,
@@ -587,7 +613,10 @@ private fun PlaceDetailsContent(
     onOpenPhotoViewer: (photos: List<String>, startIndex: Int, areMine: Boolean) -> Unit = { _, _, _ -> },
     onAddPlacePhoto: (() -> Unit)? = null,
     onAddPlaceCamera: (() -> Unit)? = null,
-    isUploadingPlacePhoto: Boolean = false
+    isUploadingPlacePhoto: Boolean = false,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null,
+    animationSource: String? = null
 ) {
     // Przycisk "Dodaj opinię" widoczny tylko gdy:
     //  - user jest zalogowany,
@@ -615,7 +644,10 @@ private fun PlaceDetailsContent(
                 place = place,
                 author = author,
                 currentUserId = currentUserId,
-                topRank = topRank
+                topRank = topRank,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedContentScope = animatedContentScope,
+                animationSource = animationSource
             )
         }
 
@@ -792,16 +824,22 @@ private fun PlaceDetailsContent(
  * @param topRank pozycja w rankingu TOP 100 (1-based), tylko gdy <= 10.
  *   Null = nie pokazujemy plakietki.
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun PlaceMainCard(
     place: Place,
     author: User?,
     currentUserId: String?,
-    topRank: Int?
+    topRank: Int?,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null,
+    animationSource: String? = null
 ) {
-    val style = place.category.style
     val context = LocalContext.current
     val isOwnerLine = currentUserId != null && currentUserId == place.ownerUserId
+
+    // Prefix keys with animationSource if provided to match exactly with origin
+    val keyPrefix = animationSource?.let { "${it}_" } ?: ""
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -810,11 +848,13 @@ private fun PlaceMainCard(
         Column(modifier = Modifier.padding(16.dp)) {
             // --- 1. Header: nazwa + kategoria + ocena + (opc.) plakietka TOP 100 ---
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = style.icon,
-                    contentDescription = null,
-                    tint = style.color,
-                    modifier = Modifier.size(36.dp)
+                CategoryIcon(
+                    category = place.category,
+                    animationKey = "${keyPrefix}place_icon_${place.id}",
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedContentScope = animatedContentScope,
+                    size = 36.dp,
+                    iconSize = 22.dp
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
@@ -1003,8 +1043,16 @@ private fun formatDate(millis: Long): String {
     return formatter.format(Date(millis))
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun PlaceDetailsSkeleton() {
+private fun PlaceDetailsSkeleton(
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null,
+    animationSource: String? = null,
+    placeId: String = ""
+) {
+    val keyPrefix = animationSource?.let { "${it}_" } ?: ""
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1018,11 +1066,13 @@ private fun PlaceDetailsSkeleton() {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .shimmerEffect()
+                    CategoryIcon(
+                        category = com.kidzone.domain.model.PlaceCategory.OTHER, // Placeholder color
+                        animationKey = if (placeId.isNotBlank()) "${keyPrefix}place_icon_$placeId" else null,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedContentScope = animatedContentScope,
+                        size = 36.dp,
+                        iconSize = 22.dp
                     )
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {

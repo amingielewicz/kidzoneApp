@@ -2,7 +2,10 @@ package com.kidzone.presentation.main
 
 import android.widget.Toast
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
@@ -77,10 +80,10 @@ import com.kidzone.presentation.ranking.RankingScreen
  *   savedStateHandle, żeby kolejne wejście na ten ekran bez nowego dodawania
  *   nie odpalało powtórnie nawigacji).
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun MainScreen(
-    onOpenPlaceDetails: (placeId: String) -> Unit,
+    onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
     onOpenAddPlace: () -> Unit,
     onOpenMyPlaces: () -> Unit,
     onOpenMyReviews: () -> Unit,
@@ -89,7 +92,9 @@ fun MainScreen(
     focusLongitude: Double? = null,
     focusTab: String = "",
     rankingTab: String = "",
-    onFocusConsumed: () -> Unit = {}
+    onFocusConsumed: () -> Unit = {},
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -270,21 +275,31 @@ fun MainScreen(
                                 launchSingleTop = true
                                 restoreState = true
                             }
-                        }
+                        },
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedContentScope = animatedContentScope
                     )
                 }
                 composable(Route.Map.path) {
                     MapScreen(
-                        onOpenPlaceDetails = onOpenPlaceDetails,
+                        onOpenPlaceDetails = { onOpenPlaceDetails(it, null) },
                         focusOn = pendingMapFocus,
                         onFocusConsumed = { pendingMapFocus = null }
                     )
                 }
                 composable(Route.PlaceList.path) {
-                    PlaceListScreen(onOpenPlaceDetails = onOpenPlaceDetails)
+                    PlaceListScreen(
+                        onOpenPlaceDetails = onOpenPlaceDetails,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedContentScope = animatedContentScope
+                    )
                 }
                 composable(Route.Ranking.path) {
-                    RankingScreen(onOpenPlaceDetails = onOpenPlaceDetails)
+                    RankingScreen(
+                        onOpenPlaceDetails = onOpenPlaceDetails,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedContentScope = animatedContentScope
+                    )
                 }
                 composable(Route.Profile.path) {
                     ProfileScreen(

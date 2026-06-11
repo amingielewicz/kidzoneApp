@@ -1,5 +1,8 @@
 package com.kidzone.presentation.place.myplaces
 
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.domain.model.Place
+import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.style
 
 /**
@@ -57,12 +61,14 @@ import com.kidzone.presentation.common.style
  * dokąd nawigujemy po kliknięciu karty. Nie duplikujemy DropdownMenu
  * "Edytuj/Usuń" tutaj.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun MyPlacesScreen(
     onBack: () -> Unit,
-    onOpenPlaceDetails: (placeId: String) -> Unit,
-    viewModel: MyPlacesViewModel = hiltViewModel()
+    onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
+    viewModel: MyPlacesViewModel = hiltViewModel(),
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -113,7 +119,9 @@ fun MyPlacesScreen(
                             items(items = s.places, key = { it.id }) { place ->
                                 MyPlaceCard(
                                     place = place,
-                                    onClick = { onOpenPlaceDetails(place.id) }
+                                    onClick = { onOpenPlaceDetails(place.id, "my_places") },
+                                    sharedTransitionScope = sharedTransitionScope,
+                                    animatedContentScope = animatedContentScope
                                 )
                             }
                         }
@@ -154,10 +162,13 @@ private fun EmptyState() {
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun MyPlaceCard(
     place: Place,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
     val categoryStyle = place.category.style
 
@@ -169,11 +180,13 @@ private fun MyPlaceCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = categoryStyle.icon,
-                    contentDescription = null,
-                    tint = categoryStyle.color,
-                    modifier = Modifier.size(28.dp)
+                CategoryIcon(
+                    category = place.category,
+                    animationKey = "my_places_place_icon_${place.id}",
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedContentScope = animatedContentScope,
+                    size = 28.dp,
+                    iconSize = 18.dp
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
