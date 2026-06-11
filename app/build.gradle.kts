@@ -160,10 +160,10 @@ dependencies {
     implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.analytics)
-    implementation("com.google.firebase:firebase-appcheck-playintegrity")
-    debugImplementation("com.google.firebase:firebase-appcheck-debug")
-    implementation("com.google.firebase:firebase-perf")
-    implementation("com.google.firebase:firebase-config-ktx")
+    implementation(libs.firebase.appcheck.playintegrity)
+    debugImplementation(libs.firebase.appcheck.debug)
+    implementation(libs.firebase.perf)
+    implementation(libs.firebase.config.ktx)
 
     // Credential Manager (Google Sign-In przez nowoczesne API)
     implementation(libs.androidx.credentials)
@@ -176,7 +176,7 @@ dependencies {
     implementation(libs.play.services.location)
 
     // Legacy Google Sign-In (fallback for devices where Credential Manager fails)
-    implementation("com.google.android.gms:play-services-auth:21.3.0")
+    implementation(libs.play.services.auth)
 
     // Networking
     implementation(libs.retrofit)
@@ -187,7 +187,7 @@ dependencies {
     implementation(libs.coil.compose)
 
     // ExifInterface (auto-rotate photos before upload)
-    implementation("androidx.exifinterface:exifinterface:1.3.7")
+    implementation(libs.androidx.exifinterface)
 
     // Room
     implementation(libs.room.runtime)
@@ -210,19 +210,22 @@ dependencies {
 
     // ===== Testing =====
     // JUnit 5
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.2")
+    testImplementation(libs.junit5.api)
+    testImplementation(libs.junit5.params)
+    testRuntimeOnly(libs.junit5.engine)
 
     // MockK
-    testImplementation("io.mockk:mockk:1.13.10")
+    testImplementation(libs.mockk)
 
     // Coroutines Test
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation(libs.kotlinx.coroutines.test)
 
     // Turbine (Flow testing)
-    testImplementation("app.cash.turbine:turbine:1.1.0")
+    testImplementation(libs.turbine)
 
     // AndroidX Arch Core (InstantTaskExecutorRule equivalent)
-    testImplementation("androidx.arch.core:core-testing:2.2.0")
+    testImplementation(libs.androidx.arch.core.testing)
+
+    // LeakCanary (debug only — memory leak detection)
+    debugImplementation(libs.leakcanary)
 }

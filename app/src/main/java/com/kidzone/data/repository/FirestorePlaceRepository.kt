@@ -117,8 +117,6 @@ class FirestorePlaceRepository @Inject constructor(
         localFlow.collectLatest { entities ->
             trySend(entities.map { it.toDomain() })
         }
-
-        syncJob.cancel()
     }
 
     override suspend fun getPlace(placeId: String): OpResult<Place> = try {

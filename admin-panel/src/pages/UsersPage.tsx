@@ -54,6 +54,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../services/firebase';
 import { adminFetch } from '../services/api';
+import { callFunction } from '../services/cloudFunctions';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { useAuth } from '../hooks/useAuth';
 import { AppUser } from '../types';
@@ -195,9 +196,10 @@ export function UsersPage() {
 
       // Aktualizacja emaila przez Cloud Function (sync Auth + Firestore)
       if (editEmail !== editUser.email && editEmail.trim()) {
-        const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
-        const url = `https://us-central1-${projectId}.cloudfunctions.net/adminUpdateUserEmail?userId=${editUser.id}&email=${encodeURIComponent(editEmail.trim())}`;
-        await adminFetch(url);
+        await callFunction('adminUpdateUserEmail', {
+          userId: editUser.id,
+          email: editEmail.trim(),
+        });
       }
 
       setEditUser(null);
@@ -245,9 +247,14 @@ export function UsersPage() {
 
   async function handleDeleteUser() {
     if (!deleteUserTarget || !deleteUserReason.trim()) return;
-    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
-    const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeleteUser?userId=${deleteUserTarget.id}&reason=${encodeURIComponent(deleteUserReason)}`;
-    try { await adminFetch(url); } catch (e) { console.error('Failed to delete user:', e); }
+    try {
+      await callFunction('adminDeleteUser', {
+        userId: deleteUserTarget.id,
+        reason: deleteUserReason,
+      });
+    } catch (e) {
+      console.error('Failed to delete user:', e);
+    }
     setDeleteUserDialogOpen(false);
     await fetchUsers();
   }

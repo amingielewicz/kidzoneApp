@@ -45,6 +45,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { adminFetch } from '../services/api';
+import { callFunction } from '../services/cloudFunctions';
 import {
   PlaceReport,
   ReviewReport,
@@ -159,7 +160,7 @@ export function ReportsPage() {
         try {
           const pDoc = await getDoc(doc(db, 'places', pid));
           names[pid] = pDoc.exists() ? (pDoc.data()?.name || 'Bez nazwy') : 'Usunięte';
-        } catch { names[pid] = '—'; }
+        } catch (e) { console.warn('Failed to fetch place name:', pid, e); names[pid] = '—'; }
       }));
       setPlaceNames(names);
     } catch (err) {
@@ -186,24 +187,26 @@ export function ReportsPage() {
   }
 
   async function resolveAndDeletePlace(report: PlaceReport, reason: string) {
-    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
-    const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeletePlace?placeId=${report.placeId}&reason=${encodeURIComponent(reason)}`;
-    try { await adminFetch(url); } catch(e) { console.error(e); }
+    try {
+      await callFunction('adminDeletePlace', { placeId: report.placeId, reason });
+    } catch (e) {
+      console.error('Failed to delete place:', e);
+    }
     await resolveReport('place_reports', report.id);
   }
 
   async function resolveAndDeleteReview(report: ReviewReport, reason: string) {
-    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
-    const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeleteReview?reviewId=${report.reviewId}&reason=${encodeURIComponent(reason)}`;
-    try { await adminFetch(url); } catch (e) { console.error('Failed to delete review:', e); }
+    try {
+      await callFunction('adminDeleteReview', { reviewId: report.reviewId, reason });
+    } catch (e) {
+      console.error('Failed to delete review:', e);
+    }
     await resolveReport('review_reports', report.id);
   }
 
   async function deletePhotoViaCloudFunction(reportId: string, reason: string) {
-    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
-    const url = `https://us-central1-${projectId}.cloudfunctions.net/adminDeletePhoto?reportId=${reportId}&reason=${encodeURIComponent(reason)}`;
     try {
-      await adminFetch(url);
+      await callFunction('adminDeletePhoto', { reportId, reason });
       await fetchAll();
     } catch (err) {
       console.error('Failed to delete photo via Cloud Function:', err);
@@ -243,7 +246,7 @@ export function ReportsPage() {
         info.reporterName = reporterDoc.data()?.name || '';
         info.reporterEmail = reporterDoc.data()?.email || '';
       }
-    } catch { /* ignore */ }
+    } catch (e) { console.warn('Failed to load place report details:', e); }
     setDetailDialog((prev) => ({ ...prev, info, loadingInfo: false }));
   }
 
@@ -269,7 +272,7 @@ export function ReportsPage() {
         info.reporterName = reporterDoc.data()?.name || '';
         info.reporterEmail = reporterDoc.data()?.email || '';
       }
-    } catch { /* ignore */ }
+    } catch (e) { console.warn('Failed to load review report details:', e); }
     setDetailDialog((prev) => ({ ...prev, info, loadingInfo: false }));
   }
 
@@ -282,7 +285,7 @@ export function ReportsPage() {
         info.reporterName = reporterDoc.data()?.name || '';
         info.reporterEmail = reporterDoc.data()?.email || '';
       }
-    } catch { /* ignore */ }
+    } catch (e) { console.warn('Failed to load photo report details:', e); }
     setDetailDialog((prev) => ({ ...prev, info, loadingInfo: false }));
   }
 

@@ -55,10 +55,9 @@ object ImageCompressor {
         // Resize do max dimension (inSampleSize może dać trochę większy wynik)
         val resized = resizeIfNeeded(rotated, MAX_DIMENSION)
 
-        // Compress do WebP
+        // Compress do WebP (lossy)
         val output = ByteArrayOutputStream()
-        @Suppress("DEPRECATION")
-        resized.compress(Bitmap.CompressFormat.WEBP, WEBP_QUALITY, output)
+        resized.compress(Bitmap.CompressFormat.WEBP_LOSSY, WEBP_QUALITY, output)
 
         // Cleanup
         if (resized !== rotated) resized.recycle()
