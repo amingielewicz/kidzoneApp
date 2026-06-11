@@ -77,10 +77,7 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <Box sx={{ display: 'flex' }}>
-      <AppBar
-        position="fixed"
-        sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}
-      >
+      <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar>
           <IconButton
             color="inherit"
@@ -94,11 +91,7 @@ export function Layout({ children }: LayoutProps) {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             kidZone Admin Panel
           </Typography>
-          <Button
-            color="inherit"
-            startIcon={<LogoutIcon />}
-            onClick={signOut}
-          >
+          <Button color="inherit" startIcon={<LogoutIcon />} onClick={signOut}>
             Wyloguj
           </Button>
         </Toolbar>

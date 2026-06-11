@@ -17,7 +17,7 @@ export async function adminFetch(url: string, options?: RequestInit): Promise<Re
   const response = await fetch(url, {
     ...options,
     headers: {
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
       ...options?.headers,
     },
   });
@@ -25,7 +25,7 @@ export async function adminFetch(url: string, options?: RequestInit): Promise<Re
   if (!response.ok) {
     const body = await response.text().catch(() => '');
     throw new Error(
-      `Admin API error: ${response.status} ${response.statusText}${body ? ` — ${body}` : ''}`
+      `Admin API error: ${response.status} ${response.statusText}${body ? ` — ${body}` : ''}`,
     );
   }
 

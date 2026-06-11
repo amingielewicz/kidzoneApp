@@ -28,15 +28,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import {
-  collection,
-  query,
-  orderBy,
-  getDocs,
-  doc,
-  updateDoc,
-  getDoc,
-} from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { PlaceChangeRequest, PLACE_CATEGORY_LABELS, PlaceCategory, ReportStatus } from '../types';
 
@@ -144,9 +136,9 @@ export function ChangeRequestsPage() {
     setLoading(true);
     try {
       const snap = await getDocs(
-        query(collection(db, 'place_change_requests'), orderBy('createdAtMillis', 'desc'))
+        query(collection(db, 'place_change_requests'), orderBy('createdAtMillis', 'desc')),
       );
-      setRequests(snap.docs.map((d) => ({ id: d.id, ...d.data() } as PlaceChangeRequest)));
+      setRequests(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as PlaceChangeRequest));
     } catch (err) {
       console.error('Failed to fetch change requests:', err);
     } finally {
@@ -200,7 +192,7 @@ export function ChangeRequestsPage() {
         getDoc(doc(db, 'places', request.placeId)),
         getDoc(doc(db, 'users', request.requesterId)),
       ]);
-      setPlaceName(placeDoc.exists() ? (placeDoc.data()?.name || 'Bez nazwy') : 'Miejsce usunięte');
+      setPlaceName(placeDoc.exists() ? placeDoc.data()?.name || 'Bez nazwy' : 'Miejsce usunięte');
       if (userDoc.exists()) {
         setRequesterEmail(userDoc.data()?.email || '');
       }
@@ -275,7 +267,11 @@ export function ChangeRequestsPage() {
 
         <FormControl size="small" sx={{ minWidth: 150 }}>
           <InputLabel>Status</InputLabel>
-          <Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value as any)}>
+          <Select
+            value={statusFilter}
+            label="Status"
+            onChange={(e) => setStatusFilter(e.target.value as any)}
+          >
             <MenuItem value="pending">Oczekujące ({pendingCount})</MenuItem>
             <MenuItem value="resolved">Zatwierdzone</MenuItem>
             <MenuItem value="dismissed">Odrzucone</MenuItem>
@@ -335,8 +331,19 @@ export function ChangeRequestsPage() {
                 </TableCell>
                 <TableCell>
                   <Box display="flex" alignItems="center" gap={0.5}>
-                    <Tooltip title={request.placeId}><Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 11 }}>{request.placeId.slice(0, 12)}...</Typography></Tooltip>
-                    <Tooltip title="Kopiuj ID"><IconButton size="small" onClick={() => navigator.clipboard.writeText(request.placeId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
+                    <Tooltip title={request.placeId}>
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 11 }}>
+                        {request.placeId.slice(0, 12)}...
+                      </Typography>
+                    </Tooltip>
+                    <Tooltip title="Kopiuj ID">
+                      <IconButton
+                        size="small"
+                        onClick={() => navigator.clipboard.writeText(request.placeId)}
+                      >
+                        <ContentCopyIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                    </Tooltip>
                   </Box>
                 </TableCell>
                 <TableCell>
@@ -365,7 +372,7 @@ export function ChangeRequestsPage() {
                             size="small"
                             onClick={() =>
                               confirm('Zatwierdzić i zastosować zmiany do miejsca?', () =>
-                                approveRequest(request)
+                                approveRequest(request),
                               )
                             }
                           >
@@ -378,7 +385,7 @@ export function ChangeRequestsPage() {
                             sx={{ color: '#1976D2' }}
                             onClick={() =>
                               confirm('Odrzucić propozycję zmian?', () =>
-                                dismissRequest(request.id)
+                                dismissRequest(request.id),
                               )
                             }
                           >
@@ -403,17 +410,18 @@ export function ChangeRequestsPage() {
       </TableContainer>
 
       {/* Detail Dialog */}
-      <Dialog
-        open={!!detailRequest}
-        onClose={() => setDetailRequest(null)}
-        maxWidth="sm"
-        fullWidth
-      >
+      <Dialog open={!!detailRequest} onClose={() => setDetailRequest(null)} maxWidth="sm" fullWidth>
         {detailRequest && (
           <>
-            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>{detailRequest.type === 'LOCATION' ? 'Korekta lokalizacji' : 'Propozycja zmian'}</span>
-              <IconButton size="small" onClick={() => setDetailRequest(null)}><CancelIcon /></IconButton>
+            <DialogTitle
+              sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
+              <span>
+                {detailRequest.type === 'LOCATION' ? 'Korekta lokalizacji' : 'Propozycja zmian'}
+              </span>
+              <IconButton size="small" onClick={() => setDetailRequest(null)}>
+                <CancelIcon />
+              </IconButton>
             </DialogTitle>
             <DialogContent dividers>
               <Box display="flex" flexDirection="column" gap={1.5}>
@@ -421,14 +429,35 @@ export function ChangeRequestsPage() {
                   <strong>Miejsce:</strong> {placeName}
                 </Typography>
                 <Box display="flex" alignItems="center" gap={0.5}>
-                  <Typography variant="body2"><strong>Place ID:</strong> <code style={{ fontSize: 12 }}>{detailRequest.placeId}</code></Typography>
-                  <Tooltip title="Kopiuj Place ID"><IconButton size="small" onClick={() => navigator.clipboard.writeText(detailRequest.placeId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
+                  <Typography variant="body2">
+                    <strong>Place ID:</strong>{' '}
+                    <code style={{ fontSize: 12 }}>{detailRequest.placeId}</code>
+                  </Typography>
+                  <Tooltip title="Kopiuj Place ID">
+                    <IconButton
+                      size="small"
+                      onClick={() => navigator.clipboard.writeText(detailRequest.placeId)}
+                    >
+                      <ContentCopyIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Tooltip>
                 </Box>
                 <Box>
-                  <Typography variant="body2"><strong>Zgłaszający:</strong> {requesterEmail || '—'}</Typography>
+                  <Typography variant="body2">
+                    <strong>Zgłaszający:</strong> {requesterEmail || '—'}
+                  </Typography>
                   <Box display="flex" alignItems="center" gap={0.5}>
-                    <Typography variant="caption" color="text.secondary">UID: <code style={{ fontSize: 11 }}>{detailRequest.requesterId}</code></Typography>
-                    <Tooltip title="Kopiuj UID"><IconButton size="small" onClick={() => navigator.clipboard.writeText(detailRequest.requesterId)}><ContentCopyIcon sx={{ fontSize: 14 }} /></IconButton></Tooltip>
+                    <Typography variant="caption" color="text.secondary">
+                      UID: <code style={{ fontSize: 11 }}>{detailRequest.requesterId}</code>
+                    </Typography>
+                    <Tooltip title="Kopiuj UID">
+                      <IconButton
+                        size="small"
+                        onClick={() => navigator.clipboard.writeText(detailRequest.requesterId)}
+                      >
+                        <ContentCopyIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                    </Tooltip>
                   </Box>
                 </Box>
                 <Typography variant="body2">
@@ -452,29 +481,67 @@ export function ChangeRequestsPage() {
                 </Table>
               </Box>
             </DialogContent>
-            <DialogActions sx={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, px: 3, py: 2 }}>
+            <DialogActions
+              sx={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, px: 3, py: 2 }}
+            >
               <Box display="flex" gap={1} flexWrap="wrap">
                 {detailRequest.status === 'pending' && (
                   <>
-                    <Button size="small" color="success" variant="contained" onClick={() => confirm('Zatwierdzić i zastosować zmiany?', () => approveRequest(detailRequest))}>
+                    <Button
+                      size="small"
+                      color="success"
+                      variant="contained"
+                      onClick={() =>
+                        confirm('Zatwierdzić i zastosować zmiany?', () =>
+                          approveRequest(detailRequest),
+                        )
+                      }
+                    >
                       Zatwierdź
                     </Button>
-                    <Button size="small" variant="outlined" onClick={() => confirm('Odrzucić propozycję zmian?', () => dismissRequest(detailRequest.id))}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() =>
+                        confirm('Odrzucić propozycję zmian?', () =>
+                          dismissRequest(detailRequest.id),
+                        )
+                      }
+                    >
                       Odrzuć
                     </Button>
                   </>
                 )}
                 {detailRequest.status === 'resolved' && (
-                  <Button size="small" color="warning" variant="outlined" onClick={() => changeRequestStatus(detailRequest.id, 'pending')}>
+                  <Button
+                    size="small"
+                    color="warning"
+                    variant="outlined"
+                    onClick={() => changeRequestStatus(detailRequest.id, 'pending')}
+                  >
                     Przywróć do oczekujących
                   </Button>
                 )}
                 {detailRequest.status === 'dismissed' && (
                   <>
-                    <Button size="small" color="warning" variant="outlined" onClick={() => changeRequestStatus(detailRequest.id, 'pending')}>
+                    <Button
+                      size="small"
+                      color="warning"
+                      variant="outlined"
+                      onClick={() => changeRequestStatus(detailRequest.id, 'pending')}
+                    >
                       Przywróć do oczekujących
                     </Button>
-                    <Button size="small" color="success" variant="outlined" onClick={() => confirm('Zatwierdzić i zastosować zmiany?', () => approveRequest(detailRequest))}>
+                    <Button
+                      size="small"
+                      color="success"
+                      variant="outlined"
+                      onClick={() =>
+                        confirm('Zatwierdzić i zastosować zmiany?', () =>
+                          approveRequest(detailRequest),
+                        )
+                      }
+                    >
                       Zatwierdź
                     </Button>
                   </>
@@ -489,10 +556,14 @@ export function ChangeRequestsPage() {
       {/* Confirm Dialog */}
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <DialogTitle>Potwierdzenie</DialogTitle>
-        <DialogContent><Typography>{confirmTitle}</Typography></DialogContent>
+        <DialogContent>
+          <Typography>{confirmTitle}</Typography>
+        </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmOpen(false)}>Anuluj</Button>
-          <Button variant="contained" color="primary" onClick={handleConfirm}>Potwierdź</Button>
+          <Button variant="contained" color="primary" onClick={handleConfirm}>
+            Potwierdź
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
