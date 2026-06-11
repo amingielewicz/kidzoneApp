@@ -416,25 +416,21 @@ class FirestorePlaceRepository @Inject constructor(
         require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
 
         val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
-            // Nie używamy dot-notation ("photoUploadedBy.$photoUrl") bo URL-e
-            // zawierają kropki, które Firestore interpretuje jako separatory
-            // zagnieżdżonych pól. Zamiast tego robimy dwa osobne update'y:
-            // 1) arrayUnion na photoUrls
-            // 2) merge set na photoUploadedBy jako całej mapie
+            // Transakcja eliminuje race condition: dwa równoległe uploady
+            // nie nadpiszą sobie nawzajem wpisu w photoUploadedBy.
             val docRef = placesCollection().document(placeId)
 
-            // Pobierz aktualną mapę photoUploadedBy i dodaj nowy wpis
-            val snap = docRef.get().await()
-            @Suppress("UNCHECKED_CAST")
-            val currentMap = (snap.get("photoUploadedBy") as? Map<String, String>).orEmpty()
-            val updatedMap = currentMap + (photoUrl to uploadedByUserId)
+            firestore.runTransaction { transaction ->
+                val snap = transaction.get(docRef)
+                @Suppress("UNCHECKED_CAST")
+                val currentMap = (snap.get("photoUploadedBy") as? Map<String, String>).orEmpty()
+                val updatedMap = currentMap + (photoUrl to uploadedByUserId)
 
-            docRef.update(
-                mapOf(
+                transaction.update(docRef, mapOf(
                     "photoUrls" to FieldValue.arrayUnion(photoUrl),
                     "photoUploadedBy" to updatedMap
-                )
-            ).await()
+                ))
+            }.await()
             true
         }
         if (completed == null) {
