@@ -2,7 +2,6 @@ package com.kidzone
 
 import android.app.Application
 import com.google.firebase.appcheck.FirebaseAppCheck
-import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
 import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import com.kidzone.data.local.PlaceDao
@@ -57,9 +56,17 @@ class KidZoneApplication : Application() {
     private fun initAppCheck() {
         val firebaseAppCheck = FirebaseAppCheck.getInstance()
         if (BuildConfig.DEBUG) {
-            firebaseAppCheck.installAppCheckProviderFactory(
-                DebugAppCheckProviderFactory.getInstance()
-            )
+            try {
+                val clazz = Class.forName("com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory")
+                val factory = clazz.getMethod("getInstance").invoke(null)
+                firebaseAppCheck.installAppCheckProviderFactory(
+                    factory as com.google.firebase.appcheck.AppCheckProviderFactory
+                )
+            } catch (_: Exception) {
+                firebaseAppCheck.installAppCheckProviderFactory(
+                    PlayIntegrityAppCheckProviderFactory.getInstance()
+                )
+            }
         } else {
             firebaseAppCheck.installAppCheckProviderFactory(
                 PlayIntegrityAppCheckProviderFactory.getInstance()
@@ -67,6 +74,7 @@ class KidZoneApplication : Application() {
         }
         Timber.d("Firebase App Check initialized (debug=${BuildConfig.DEBUG})")
     }
+
 
     /**
      * Inicjalizacja Timber:
