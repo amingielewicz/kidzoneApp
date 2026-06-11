@@ -3,15 +3,14 @@ package com.kidzone
 import android.app.Application
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
-import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import com.kidzone.data.local.PlaceDao
+import com.kidzone.data.remote.RemoteConfigService
 import com.kidzone.logging.CrashlyticsTree
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -36,6 +35,9 @@ class KidZoneApplication : Application() {
 
     @Inject
     lateinit var placeDao: PlaceDao
+
+    @Inject
+    lateinit var remoteConfigService: RemoteConfigService
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -98,17 +100,14 @@ class KidZoneApplication : Application() {
     }
 
     /**
-     * Fire-and-forget fetch Remote Config przy starcie aplikacji.
-     * Jeśli fetch się nie uda – używamy cached/default values.
+     * Delegate Remote Config fetch to [RemoteConfigService] which already
+     * handles defaults, settings, and fetchAndActivate in its init/method.
+     * Previously this method duplicated the fetch call – now it's a single
+     * fire-and-forget delegation.
      */
     private fun initRemoteConfig() {
         appScope.launch {
-            try {
-                FirebaseRemoteConfig.getInstance().fetchAndActivate().await()
-                Timber.d("Remote Config activated")
-            } catch (e: Exception) {
-                Timber.w(e, "Remote Config fetch failed")
-            }
+            remoteConfigService.fetchAndActivate()
         }
     }
 }
