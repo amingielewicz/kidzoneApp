@@ -1,6 +1,5 @@
 package com.kidzone.presentation.place.list
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.domain.model.Amenity
@@ -8,10 +7,8 @@ import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
-import com.kidzone.presentation.place.add.fetchCurrentLocation
-import com.kidzone.presentation.place.add.hasLocationPermission
+import com.kidzone.domain.service.LocationProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -78,7 +75,7 @@ private const val PAGE_SIZE = 20
 class PlaceListViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
     private val authRepository: AuthRepository,
-    @ApplicationContext private val appContext: Context
+    private val locationProvider: LocationProvider
 ) : ViewModel() {
 
     /**
@@ -343,9 +340,9 @@ class PlaceListViewModel @Inject constructor(
      * `userLocation = null` - UI pokaże banner "Włącz lokalizację".
      */
     fun refreshLocation() {
-        if (!hasLocationPermission(appContext)) return
+        if (!locationProvider.hasPermission()) return
         viewModelScope.launch {
-            val coords = runCatching { fetchCurrentLocation(appContext) }.getOrNull()
+            val coords = runCatching { locationProvider.getCurrentLocation() }.getOrNull()
             if (coords != null) userLocation.value = coords
         }
     }
@@ -353,7 +350,7 @@ class PlaceListViewModel @Inject constructor(
     /** Pull-to-refresh: odświeża lokalizację i ustawia flagę isRefreshing. */
     fun refresh() {
         _isRefreshing.value = true
-        if (!hasLocationPermission(appContext)) {
+        if (!locationProvider.hasPermission()) {
             // Bez lokalizacji – dane i tak się odświeżą z Firestore listenera,
             // więc po krótkim opóźnieniu zdejmujemy spinner.
             viewModelScope.launch {
@@ -363,7 +360,7 @@ class PlaceListViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            val coords = runCatching { fetchCurrentLocation(appContext) }.getOrNull()
+            val coords = runCatching { locationProvider.getCurrentLocation() }.getOrNull()
             if (coords != null) userLocation.value = coords
             // Poczekaj chwilę żeby nowy emit z observePlaces + sort miał czas
             // dotrzeć do uiState, a spinner był widoczny dla usera.

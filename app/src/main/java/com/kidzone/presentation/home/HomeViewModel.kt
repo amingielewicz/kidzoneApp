@@ -1,16 +1,13 @@
 package com.kidzone.presentation.home
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.repository.PlaceRepository
+import com.kidzone.domain.service.LocationProvider
 import com.kidzone.presentation.place.add.LOCATION_TIMEOUT_USER_MESSAGE
-import com.kidzone.presentation.place.add.fetchCurrentLocation
-import com.kidzone.presentation.place.add.hasLocationPermission
 import com.kidzone.utils.OpResult
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -64,7 +61,7 @@ private const val HOME_PLACES_FETCH_RADIUS_KM = 50.0
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
-    @ApplicationContext private val appContext: Context
+    private val locationProvider: LocationProvider
 ) : ViewModel() {
 
     /**
@@ -102,7 +99,7 @@ class HomeViewModel @Inject constructor(
      * informacją.
      */
     fun refreshLocationGranted() {
-        val granted = hasLocationPermission(appContext)
+        val granted = locationProvider.hasPermission()
         val shouldLoad = granted && !_uiState.value.locationGranted
         _uiState.update {
             it.copy(
@@ -122,7 +119,7 @@ class HomeViewModel @Inject constructor(
 
     /** Pull-to-refresh – zawsze przeładowuje dane niezależnie od stanu permission. */
     fun refresh() {
-        if (!hasLocationPermission(appContext)) {
+        if (!locationProvider.hasPermission()) {
             viewModelScope.launch {
                 _uiState.update { it.copy(isRefreshing = true) }
                 kotlinx.coroutines.delay(300)
@@ -132,7 +129,7 @@ class HomeViewModel @Inject constructor(
         }
         _uiState.update { it.copy(isRefreshing = true) }
         viewModelScope.launch {
-            val location = runCatching { fetchCurrentLocation(appContext) }.getOrNull()
+            val location = runCatching { locationProvider.getCurrentLocation() }.getOrNull()
             if (location == null) {
                 // Minimalny delay żeby PullToRefreshBox zdążył zarejestrować
                 // przejście true→false (bez tego spinner może „zawisnąć" gdy
@@ -191,7 +188,7 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun loadLocationBasedPlaces() {
-        if (!hasLocationPermission(appContext)) {
+        if (!locationProvider.hasPermission()) {
             _uiState.update {
                 it.copy(
                     locationGranted = false,
@@ -212,7 +209,7 @@ class HomeViewModel @Inject constructor(
             var location: Pair<Double, Double>? = null
             val maxRetries = 3
             for (attempt in 1..maxRetries) {
-                location = runCatching { fetchCurrentLocation(appContext) }.getOrNull()
+                location = runCatching { locationProvider.getCurrentLocation() }.getOrNull()
                 if (location != null) break
                 if (attempt < maxRetries) {
                     _uiState.update { it.copy(isAcquiringLocation = true) }

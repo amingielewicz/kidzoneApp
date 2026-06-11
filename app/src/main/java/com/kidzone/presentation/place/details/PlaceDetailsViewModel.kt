@@ -9,13 +9,11 @@ import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.repository.ReviewRepository
+import com.kidzone.domain.service.ImageCompressorPort
 import com.kidzone.navigation.Route
-import com.kidzone.utils.ImageCompressor
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.PhotoUploader
-import android.content.Context
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -72,7 +70,7 @@ class PlaceDetailsViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val reviewRepository: ReviewRepository,
     private val photoUploader: PhotoUploader,
-    @ApplicationContext private val appContext: Context
+    private val imageCompressor: ImageCompressorPort
 ) : ViewModel() {
 
     /**
@@ -446,7 +444,7 @@ class PlaceDetailsViewModel @Inject constructor(
         val uploadedPhotoUrls = mutableListOf<String>()
         val newHashes = mutableSetOf<String>()
         for (uri in photoUris) {
-            val bytes = ImageCompressor.compressToWebp(appContext, uri)
+            val bytes = imageCompressor.compressToWebp(uri)
             if (bytes != null) {
                 val hash = java.security.MessageDigest.getInstance("MD5")
                     .digest(bytes)
@@ -535,7 +533,7 @@ class PlaceDetailsViewModel @Inject constructor(
         val newUploadedUrls = mutableListOf<String>()
         var reviewDuplicatesSkipped = 0
         for (uri in photoUris) {
-            val bytes = ImageCompressor.compressToWebp(appContext, uri)
+            val bytes = imageCompressor.compressToWebp(uri)
             if (bytes != null) {
                 val hash = java.security.MessageDigest.getInstance("MD5")
                     .digest(bytes)
@@ -704,7 +702,7 @@ class PlaceDetailsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isUploadingPlacePhoto = true) }
 
-            val newBytes = ImageCompressor.compressToWebp(appContext, photoUri)
+            val newBytes = imageCompressor.compressToWebp(photoUri)
             if (newBytes == null) {
                 _uiState.update { it.copy(isUploadingPlacePhoto = false) }
                 return@launch
