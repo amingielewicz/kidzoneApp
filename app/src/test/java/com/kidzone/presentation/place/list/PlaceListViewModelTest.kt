@@ -297,8 +297,7 @@ class PlaceListViewModelTest {
 
         @Test
         fun `ADDED_BY_ME shows empty list when no user`() = runTest {
-            val nullUserFlow: MutableStateFlow<User?> = MutableStateFlow(null)
-            every { authRepository.currentUser } returns nullUserFlow
+            every { authRepository.currentUser } returns flowOf(null)
             viewModel = createAndCollect()
             advanceUntilIdle()
 

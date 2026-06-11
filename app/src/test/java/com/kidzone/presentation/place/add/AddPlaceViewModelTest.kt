@@ -352,8 +352,7 @@ class AddPlaceViewModelTest {
         @Test
         fun `shows error when user not logged in`() = runTest {
             // Override the mock to return a flow emitting null (no logged in user)
-            val nullUserFlow: MutableStateFlow<User?> = MutableStateFlow(null)
-            every { authRepository.currentUser } returns nullUserFlow
+            every { authRepository.currentUser } returns flowOf(null)
             val viewModel = createViewModel()
             advanceUntilIdle()
 
