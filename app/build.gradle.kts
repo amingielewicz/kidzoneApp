@@ -117,6 +117,14 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    @Suppress("UnstableApiUsage")
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+        unitTests.all {
+            it.useJUnitPlatform()
+        }
+    }
 }
 
 dependencies {
@@ -199,4 +207,22 @@ dependencies {
 
     // Konfetti
     implementation(libs.konfetti.compose)
+
+    // ===== Testing =====
+    // JUnit 5
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+    testImplementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.2")
+
+    // MockK
+    testImplementation("io.mockk:mockk:1.13.10")
+
+    // Coroutines Test
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+
+    // Turbine (Flow testing)
+    testImplementation("app.cash.turbine:turbine:1.1.0")
+
+    // AndroidX Arch Core (InstantTaskExecutorRule equivalent)
+    testImplementation("androidx.arch.core:core-testing:2.2.0")
 }
