@@ -53,6 +53,7 @@ import javax.inject.Inject
 class ProfileViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val placeRepository: PlaceRepository,
+    private val firestore: com.google.firebase.firestore.FirebaseFirestore,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -274,7 +275,7 @@ class ProfileViewModel @Inject constructor(
                 "emailNotificationsEnabled" to prefs.emailNotificationsEnabled
             )
             try {
-                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                firestore
                     .collection("users").document(uid)
                     .set(data, com.google.firebase.firestore.SetOptions.merge())
                     .await()
@@ -287,7 +288,7 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             val uid = authRepository.currentUser.first()?.id ?: return@launch
             try {
-                val snap = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                val snap = firestore
                     .collection("users").document(uid).get().await()
                 @Suppress("UNCHECKED_CAST")
                 val prefsMap = snap.get("notificationPreferences") as? Map<String, Boolean>
