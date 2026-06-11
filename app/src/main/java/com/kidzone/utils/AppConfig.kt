@@ -29,6 +29,14 @@ object AppConfig {
      */
     const val WRITE_TIMEOUT_MS: Long = 30_000L
 
+    /**
+     * Domyślny komunikat po przekroczeniu timeout Firestore.
+     */
+    const val TIMEOUT_MESSAGE: String =
+        "Zapis trwa zbyt długo. Sprawdź połączenie z Internetem, " +
+            "a jeśli używasz emulatora – wykonaj Cold Boot."
+}
+
     // ========== Review limits ==========
 
     /**
@@ -67,4 +75,44 @@ object AppConfig {
      * przy każdej istotnej zmianie tekstu w [com.kidzone.presentation.profile.PrivacyPolicyDialog].
      */
     const val PRIVACY_POLICY_EFFECTIVE_DATE: String = "29.05.2026"
+}
+
+/**
+ * Inline helper eliminating repetitive timeout + error-wrapping boilerplate
+ * for Firestore writes.
+ *
+ * Usage:
+ * ```kotlin
+ * withFirestoreTimeout {
+ *     placesCollection().document(id).set(dto).await()
+ * }
+ * ```
+ *
+ * Returns [OpResult.Success] with [Unit] if [block] completes within
+ * [AppConfig.WRITE_TIMEOUT_MS], or [OpResult.Failure] with
+ * [java.util.concurrent.TimeoutException] otherwise.
+ *
+ * The caller can map the success branch to any type it needs:
+ * ```kotlin
+ * withFirestoreTimeout { ... }.let { result ->
+ *     if (result is OpResult.Success) OpResult.success(myValue)
+ *     else result as OpResult.Failure
+ * }
+ * ```
+ */
+suspend inline fun withFirestoreTimeout(
+    timeoutMs: Long = AppConfig.WRITE_TIMEOUT_MS,
+    crossinline block: suspend () -> Unit
+): OpResult<Unit> {
+    val completed = kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
+        block()
+        true
+    }
+    return if (completed == null) {
+        OpResult.failure(
+            java.util.concurrent.TimeoutException(AppConfig.TIMEOUT_MESSAGE)
+        )
+    } else {
+        OpResult.success(Unit)
+    }
 }

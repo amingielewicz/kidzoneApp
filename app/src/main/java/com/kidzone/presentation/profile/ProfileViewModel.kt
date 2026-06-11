@@ -6,18 +6,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
-import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.repository.SignInProvider
-import com.kidzone.presentation.common.BadgeContext
+import com.kidzone.domain.usecase.ComputeBadgesUseCase
+import com.kidzone.domain.usecase.NotificationPrefsUseCase
 import com.kidzone.presentation.common.UserBadge
-import com.kidzone.presentation.common.computeBadges
 import com.kidzone.utils.OpResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -52,8 +49,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val placeRepository: PlaceRepository,
-    private val firestore: com.google.firebase.firestore.FirebaseFirestore,
+    private val computeBadgesUseCase: ComputeBadgesUseCase,
+    private val notificationPrefsUseCase: NotificationPrefsUseCase,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -143,67 +140,15 @@ class ProfileViewModel @Inject constructor(
         // gratulacyjny na odznakę, kolejne czekają w `pendingNewBadges`.
         viewModelScope.launch {
             user.filterNotNull().collect { u ->
-                val context = computeBadgeContext(u)
-                val obtained = u.computeBadges(context)
+                val badgeResult = computeBadgesUseCase(u)
                 _uiState.update {
                     it.copy(
-                        obtainedBadges = obtained,
-                        // BadgeContext.userRank trzymane juz 1..100 z
-                        // computeBadgeContext (BADGE_RANK_POOL = 100); UI
-                        // pokazuje plakietke gdy != null.
-                        userRank = context.userRank
+                        obtainedBadges = badgeResult.obtainedBadges,
+                        userRank = badgeResult.userRank
                     )
                 }
-                checkForNewBadges(uid = u.id, current = obtained.toSet())
+                checkForNewBadges(uid = u.id, current = badgeResult.obtainedBadges.toSet())
             }
-        }
-    }
-
-    /**
-     * Jednorazowy fetch rankingów potrzebnych do wyliczenia odznak
-     * "rankingowych" ([UserBadge.LEADER_GOLD] / [UserBadge.PLACE_TOP1] itp.).
-     *
-     * Reguły są zgodne z tym, co [com.kidzone.presentation.ranking.RankingViewModel]
-     * pokazuje w UI:
-     *  - **userów** filtrujemy do tych, którzy mają choć 1 dodane miejsce
-     *    LUB 1 opinię (czyli "aktywnych"), i bierzemy ich pozycję 1-based
-     *    do [BadgeContext.userRank];
-     *  - **miejsca** filtrujemy do tych z >0 opiniami i >0.0 średnią ocen,
-     *    bierzemy najlepszą pozycję jakiegokolwiek miejsca tego usera
-     *    do [BadgeContext.bestPlaceRank].
-     *
-     * Spójność z RankingScreen jest celowa - jeśli user widzi siebie na
-     * #1 w rankingu, dostaje odznakę "Złoty lider". Inaczej "wiszące"
-     * pozycje (np. user #1 w surowym fetchu, ale poza filtrem aktywności)
-     * dostawałyby odznakę bez bycia widocznym w rankingu - mylące.
-     *
-     * Best-effort: przy błędzie fetcha zwracamy pusty kontekst, czyli
-     * po prostu nie przyznajemy odznak rankingowych. Pozostałe (count-based)
-     * lecą normalnie.
-     */
-    private suspend fun computeBadgeContext(user: User): BadgeContext {
-        return try {
-            val users = (authRepository.getTopUsers(BADGE_RANK_POOL) as? OpResult.Success)
-                ?.data
-                .orEmpty()
-                .filter { it.placesAddedCount > 0 || it.reviewsCount > 0 }
-            val userRank = users.indexOfFirst { it.id == user.id }
-                .takeIf { it >= 0 }
-                ?.plus(1)
-
-            val topPlaces = (placeRepository.getTopPlaces(BADGE_RANK_POOL) as? OpResult.Success)
-                ?.data
-                .orEmpty()
-                .filter { it.reviewsCount > 0 && it.averageRating > 0.0 }
-            val bestPlaceRank = topPlaces
-                .mapIndexedNotNull { idx, place ->
-                    if (place.ownerUserId == user.id) idx + 1 else null
-                }
-                .minOrNull()
-
-            BadgeContext(userRank = userRank, bestPlaceRank = bestPlaceRank)
-        } catch (_: Exception) {
-            BadgeContext()
         }
     }
 
@@ -214,12 +159,11 @@ class ProfileViewModel @Inject constructor(
         val u = user.value ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
-            val context = computeBadgeContext(u)
-            val obtained = u.computeBadges(context)
+            val badgeResult = computeBadgesUseCase(u)
             _uiState.update {
                 it.copy(
-                    obtainedBadges = obtained,
-                    userRank = context.userRank,
+                    obtainedBadges = badgeResult.obtainedBadges,
+                    userRank = badgeResult.userRank,
                     isRefreshing = false
                 )
             }
@@ -264,53 +208,15 @@ class ProfileViewModel @Inject constructor(
 
     fun saveNotificationPrefs(prefs: NotificationPrefs) {
         viewModelScope.launch {
-            val uid = authRepository.currentUser.first()?.id ?: return@launch
-            val data = mapOf(
-                "notificationPreferences" to mapOf(
-                    "newReviewOnMyPlace" to prefs.newReviewOnMyPlace,
-                    "newBadgeEarned" to prefs.newBadgeEarned,
-                    "newPhotoOnMyPlace" to prefs.newPhotoOnMyPlace,
-                    "rankings" to prefs.rankings
-                ),
-                "emailNotificationsEnabled" to prefs.emailNotificationsEnabled
-            )
-            try {
-                firestore
-                    .collection("users").document(uid)
-                    .set(data, com.google.firebase.firestore.SetOptions.merge())
-                    .await()
-            } catch (_: Exception) { }
+            notificationPrefsUseCase.save(prefs)
             _uiState.update { it.copy(isNotificationPrefsOpen = false, notificationPrefs = prefs) }
         }
     }
 
     private fun loadNotificationPrefs() {
         viewModelScope.launch {
-            val uid = authRepository.currentUser.first()?.id ?: return@launch
-            try {
-                val snap = firestore
-                    .collection("users").document(uid).get().await()
-                @Suppress("UNCHECKED_CAST")
-                val prefsMap = snap.get("notificationPreferences") as? Map<String, Boolean>
-                val emailEnabled = snap.getBoolean("emailNotificationsEnabled") ?: true
-                if (prefsMap != null) {
-                    _uiState.update {
-                        it.copy(notificationPrefs = NotificationPrefs(
-                            newReviewOnMyPlace = prefsMap["newReviewOnMyPlace"] ?: true,
-                            newBadgeEarned = prefsMap["newBadgeEarned"] ?: true,
-                            newPhotoOnMyPlace = prefsMap["newPhotoOnMyPlace"] ?: true,
-                            rankings = prefsMap["rankings"] ?: true,
-                            emailNotificationsEnabled = emailEnabled
-                        ))
-                    }
-                } else {
-                    _uiState.update {
-                        it.copy(notificationPrefs = NotificationPrefs(
-                            emailNotificationsEnabled = emailEnabled
-                        ))
-                    }
-                }
-            } catch (_: Exception) { }
+            val prefs = notificationPrefsUseCase.load()
+            _uiState.update { it.copy(notificationPrefs = prefs) }
         }
     }
 
@@ -650,15 +556,5 @@ class ProfileViewModel @Inject constructor(
     private companion object {
         const val BADGE_PREFS_NAME = "badge_notifications"
         const val BADGE_PREFS_KEY_PREFIX = "seen_badges_"
-
-        /**
-         * Pula rankingu używana do wyliczenia [BadgeContext]. 100 jest
-         * zgodne z [com.kidzone.presentation.ranking.RankingViewModel.TOP_LIMIT] -
-         * to gwarantuje, że "twoje miejsce w TOP 3" / "ty w TOP 3
-         * userów" odzwierciedla dokładnie to, co user widzi na zakładce
-         * Ranking. Większa pula nic by nie dała (i tak interesują nas
-         * tylko pozycje 1-3).
-         */
-        const val BADGE_RANK_POOL = 100
     }
 }

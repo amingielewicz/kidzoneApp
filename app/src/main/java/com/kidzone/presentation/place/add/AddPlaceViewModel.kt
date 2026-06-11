@@ -143,21 +143,32 @@ class AddPlaceViewModel @Inject constructor(
      * Liczy częstość występowania każdego udogodnienia we wszystkich
      * miejscach w bazie - jednorazowo, na początku ekranu.
      *
-     * Strategia: bierzemy 1 snapshot ze strumienia [PlaceRepository.observePlaces]
-     * (przez `.first()`), zliczamy `amenities`, wpychamy do state.
+     * Cache: wyniki trzymane w companion object z TTL ([FREQUENCY_CACHE_TTL_MS]).
+     * Dzięki temu wielokrotne wejścia na ekran "Dodaj / Edytuj" nie
+     * generują powtórnych full-scanów. Cache jest invalidowany po TTL
+     * (5 minut - wystarczające przy MVP; nowe miejsca nie pojawiają się
+     * co sekundę).
+     *
+     * Limit: pobieramy max [FREQUENCY_SAMPLE_LIMIT] miejsc (200). Przy
+     * większej bazie wynik dalej będzie statystycznie sensowny, a unikamy
+     * transferu tysięcy dokumentów na jednym snapshot.
      *
      * Best-effort - błąd / brak miejsc = pusta mapa, UI fallbackuje wtedy
-     * na kolejność z enuma. Świadomie nie blokujemy ekranu (`isLoading`),
-     * bo bez frequency formularz dalej działa, tylko mniej "smart".
-     *
-     * Uwaga skali: dla MVP (~100 miejsc) full-scan jest OK; przy rosnącej
-     * bazie warto przepisać na dedykowaną kolekcję `amenity_counts`
-     * utrzymywaną przez Cloud Functions.
+     * na kolejność z enuma.
      */
     private fun loadAmenityFrequency() {
+        // Fast path: use cached value if still fresh
+        val cached = cachedAmenityFrequency
+        val age = System.currentTimeMillis() - cachedAmenityFrequencyTimestamp
+        if (cached != null && age < FREQUENCY_CACHE_TTL_MS) {
+            _uiState.update { it.copy(amenityFrequency = cached) }
+            return
+        }
+
         viewModelScope.launch {
             val frequency = runCatching {
                 val places = placeRepository.observePlaces(category = null).first()
+                    .take(FREQUENCY_SAMPLE_LIMIT)
                 val counts = mutableMapOf<Amenity, Int>()
                 for (place in places) {
                     for (amenity in place.amenities) {
@@ -166,6 +177,10 @@ class AddPlaceViewModel @Inject constructor(
                 }
                 counts.toMap()
             }.getOrElse { emptyMap() }
+
+            // Persist to companion cache
+            cachedAmenityFrequency = frequency
+            cachedAmenityFrequencyTimestamp = System.currentTimeMillis()
 
             _uiState.update { it.copy(amenityFrequency = frequency) }
         }
@@ -577,6 +592,24 @@ class AddPlaceViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private companion object {
+        /** Max places to sample for amenity frequency calculation. */
+        const val FREQUENCY_SAMPLE_LIMIT = 200
+
+        /** Cache TTL for amenity frequency map (5 minutes). */
+        const val FREQUENCY_CACHE_TTL_MS = 5L * 60 * 1000
+
+        /**
+         * In-memory cache shared across VM instances (companion = class-level).
+         * Cleared when process dies - acceptable for non-critical UX hint.
+         */
+        @Volatile
+        var cachedAmenityFrequency: Map<Amenity, Int>? = null
+
+        @Volatile
+        var cachedAmenityFrequencyTimestamp: Long = 0L
     }
 }
 
