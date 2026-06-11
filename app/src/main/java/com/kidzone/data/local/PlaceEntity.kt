@@ -28,6 +28,7 @@ data class PlaceEntity(
     val reviewsCount: Int,
     val amenities: String, // pipe-separated amenity names
     val photoUrls: String, // pipe-separated URLs
+    val photoHashes: String = "", // pipe-separated MD5 hashes
     val createdAtMillis: Long,
     /** Czas ostatniego zapisu do cache – do ewentualnej polityki TTL. */
     val cachedAtMillis: Long = System.currentTimeMillis()
@@ -51,6 +52,9 @@ data class PlaceEntity(
         photoUrls = photoUrls
             .split("|")
             .filter { it.isNotBlank() },
+        photoHashes = photoHashes
+            .split("|")
+            .filter { it.isNotBlank() },
         createdAtMillis = createdAtMillis
     )
 
@@ -68,6 +72,7 @@ data class PlaceEntity(
             reviewsCount = place.reviewsCount,
             amenities = place.amenities.joinToString("|") { it.name },
             photoUrls = place.photoUrls.joinToString("|"),
+            photoHashes = place.photoHashes.joinToString("|"),
             createdAtMillis = place.createdAtMillis
         )
     }

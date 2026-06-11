@@ -9,6 +9,7 @@ import com.kidzone.data.remote.dto.PlaceDto
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.repository.PlaceRepository
+import com.kidzone.utils.AppConfig
 import com.kidzone.utils.GeoHash
 import com.kidzone.utils.OpResult
 import kotlinx.coroutines.channels.awaitClose
@@ -21,17 +22,6 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
-
-/**
- * Maks. czas na zapis do Firestore (w ms).
- *
- * Bez timeoutu Firebase retryuje w nieskończoność, gdy emulator ma popsute
- * Google Play Services (znany glitch z `SecurityException: Unknown calling
- * package name 'com.google.android.gms'`). Po tym czasie zwracamy
- * [java.util.concurrent.TimeoutException], żeby UI mogło pokazać użytkownikowi
- * sensowny komunikat zamiast wieczystego spinnera.
- */
-private const val WRITE_TIMEOUT_MS = 30_000L
 
 /**
  * Implementacja [PlaceRepository] oparta o Firestore.
@@ -222,7 +212,7 @@ class FirestorePlaceRepository @Inject constructor(
         val docRef = placesCollection().document()
         val placeWithId = place.copy(id = docRef.id)
 
-        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             // Cloud Function (updateUserStatsOnPlaceCreate) zajmie się licznikiem
             // placesAddedCount na dokumencie autora.
             placesCollection().document(placeWithId.id)
@@ -254,7 +244,7 @@ class FirestorePlaceRepository @Inject constructor(
         // ownerUserId, createdAtMillis, averageRating, reviewsCount itd.),
         // a nadpisanie zapewnia że Firestore nie zostawi nieużywanych pól
         // gdyby user np. usunął wszystkie udogodnienia.
-        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             placesCollection().document(place.id)
                 .set(PlaceDto.fromDomain(place))
                 .await()
@@ -278,7 +268,7 @@ class FirestorePlaceRepository @Inject constructor(
     override suspend fun deletePlace(placeId: String): OpResult<Unit> = try {
         require(placeId.isNotBlank()) { "placeId nie moze byc puste" }
 
-        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             // Cloud Function (updateUserStatsOnPlaceDelete) zajmie się licznikiem
             placesCollection().document(placeId).delete().await()
             true
@@ -321,7 +311,7 @@ class FirestorePlaceRepository @Inject constructor(
             "createdAtMillis" to System.currentTimeMillis(),
             "status" to "pending"
         )
-        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             firestore.collection(FirestoreCollections.PLACE_REPORTS)
                 .add(reportData)
                 .await()
@@ -354,7 +344,7 @@ class FirestorePlaceRepository @Inject constructor(
             "createdAtMillis" to System.currentTimeMillis(),
             "status" to "pending"
         )
-        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             firestore.collection(FirestoreCollections.PLACE_CHANGE_REQUESTS)
                 .add(requestData)
                 .await()
@@ -402,7 +392,7 @@ class FirestorePlaceRepository @Inject constructor(
             "createdAtMillis" to System.currentTimeMillis(),
             "status" to "pending"
         )
-        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             firestore.collection(FirestoreCollections.PHOTO_REPORTS)
                 .add(reportData)
                 .await()
@@ -425,7 +415,7 @@ class FirestorePlaceRepository @Inject constructor(
         require(placeId.isNotBlank()) { "placeId nie może być puste" }
         require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
 
-        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             // Transakcja eliminuje race condition: dwa równoległe uploady
             // nie nadpiszą sobie nawzajem wpisu w photoUploadedBy.
             val docRef = placesCollection().document(placeId)
@@ -460,7 +450,7 @@ class FirestorePlaceRepository @Inject constructor(
         require(placeId.isNotBlank()) { "placeId nie może być puste" }
         require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
 
-        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             val docRef = placesCollection().document(placeId)
 
             // Pobierz aktualną mapę i usuń wpis

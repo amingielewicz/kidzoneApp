@@ -32,6 +32,7 @@ import {
   getDocs,
   getCountFromServer,
   limit,
+  where,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 
@@ -122,28 +123,27 @@ export function DashboardPage() {
       const reviewsSnap = await getDocs(query(collection(db, 'reviews'), orderBy('createdAtMillis', 'desc'), limit(5)));
       setRecentReviews(reviewsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as RecentReview)));
 
-      // Reports - fetch ALL and filter client-side to avoid composite index requirement
+      // Reports - count only pending using getCountFromServer (efficient)
       let pendingReportsCount = 0;
       try {
-        const [prSnap2, rrSnap2, phSnap2] = await Promise.all([
-          getDocs(collection(db, 'place_reports')),
-          getDocs(collection(db, 'review_reports')),
-          getDocs(collection(db, 'photo_reports')),
+        const [prCount, rrCount, phCount] = await Promise.all([
+          getCountFromServer(query(collection(db, 'place_reports'), where('status', '==', 'pending'))),
+          getCountFromServer(query(collection(db, 'review_reports'), where('status', '==', 'pending'))),
+          getCountFromServer(query(collection(db, 'photo_reports'), where('status', '==', 'pending'))),
         ]);
-        const allReportDocs = [
-          ...prSnap2.docs.map((d) => ({ id: d.id, type: 'place' as const, ...d.data() })),
-          ...rrSnap2.docs.map((d) => ({ id: d.id, type: 'review' as const, ...d.data() })),
-          ...phSnap2.docs.map((d) => ({ id: d.id, type: 'photo' as const, ...d.data() })),
+        pendingReportsCount = prCount.data().count + rrCount.data().count + phCount.data().count;
+
+        // Fetch only recent pending reports for the list (limit 5)
+        const [prSnap2, rrSnap2, phSnap2] = await Promise.all([
+          getDocs(query(collection(db, 'place_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'), limit(5))),
+          getDocs(query(collection(db, 'review_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'), limit(5))),
+          getDocs(query(collection(db, 'photo_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'), limit(5))),
+        ]);
+        const reports: RecentReport[] = [
+          ...prSnap2.docs.map((d) => ({ id: d.id, type: 'place' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
+          ...rrSnap2.docs.map((d) => ({ id: d.id, type: 'review' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
+          ...phSnap2.docs.map((d) => ({ id: d.id, type: 'photo' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
         ];
-        const pendingDocs = allReportDocs.filter((d) => d.status === 'pending');
-        pendingReportsCount = pendingDocs.length;
-        const reports: RecentReport[] = pendingDocs.map((d) => ({
-          id: d.id,
-          type: d.type,
-          reason: d.reason || '',
-          comment: d.comment || '',
-          createdAtMillis: d.createdAtMillis || 0,
-        }));
         reports.sort((a, b) => b.createdAtMillis - a.createdAtMillis);
         setRecentReports(reports.slice(0, 5));
       } catch (reportErr) {

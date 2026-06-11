@@ -26,6 +26,7 @@ data class PlaceDto(
     val amenities: List<String> = emptyList(),
     val photoUrls: List<String> = emptyList(),
     val photoUploadedBy: Map<String, String> = emptyMap(),
+    val photoHashes: List<String> = emptyList(),
     val createdAtMillis: Long = 0L,
     val geohash: String = ""
 ) {
@@ -43,6 +44,7 @@ data class PlaceDto(
         amenities = amenities.mapNotNull(Amenity.Companion::fromKey).toSet(),
         photoUrls = photoUrls,
         photoUploadedBy = photoUploadedBy,
+        photoHashes = photoHashes,
         createdAtMillis = createdAtMillis
     )
 
@@ -61,6 +63,7 @@ data class PlaceDto(
             amenities = place.amenities.map { it.name },
             photoUrls = place.photoUrls,
             photoUploadedBy = place.photoUploadedBy,
+            photoHashes = place.photoHashes,
             createdAtMillis = place.createdAtMillis,
             geohash = GeoHash.encode(place.latitude, place.longitude)
         )
