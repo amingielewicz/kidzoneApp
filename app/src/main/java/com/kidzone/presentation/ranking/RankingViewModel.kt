@@ -62,9 +62,11 @@ class RankingViewModel @Inject constructor(
         refresh()
     }
 
-    fun refresh() {
+    fun refresh(forceShowLoading: Boolean = false) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            if (forceShowLoading || (_uiState.value.topPlaces.isEmpty() && _uiState.value.topUsers.isEmpty())) {
+                _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            }
 
             // Równoległy fetch obu list – ranking ładuje się tak szybko jak
             // wolniejsze z dwóch zapytań, a nie jako ich suma.

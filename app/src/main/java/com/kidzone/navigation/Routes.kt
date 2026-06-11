@@ -41,9 +41,12 @@ sealed class Route(val path: String) {
             if (placeId == null) "add_place" else "add_place?placeId=$placeId"
     }
 
-    data object PlaceDetails : Route("place_details/{placeId}") {
+    data object PlaceDetails : Route("place_details/{placeId}?source={source}") {
         const val ARG_PLACE_ID = "placeId"
-        fun create(placeId: String): String = "place_details/$placeId"
+        const val ARG_SOURCE = "source"
+        fun create(placeId: String, source: String? = null): String =
+            if (source == null) "place_details/$placeId"
+            else "place_details/$placeId?source=$source"
     }
 
     /**

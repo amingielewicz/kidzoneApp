@@ -15,8 +15,13 @@ import kotlinx.coroutines.flow.Flow
  */
 interface PlaceRepository {
 
-    /** Wszystkie miejsca, opcjonalnie filtrowane po kategorii. */
-    fun observePlaces(category: PlaceCategory? = null): Flow<List<Place>>
+    /**
+     * Wszystkie miejsca, opcjonalnie filtrowane po kategorii i nazwie (prefix).
+     *
+     * @param category kategoria miejsca
+     * @param query fraza wyszukiwania (prefix po stronie Firestore, contains po stronie Room)
+     */
+    fun observePlaces(category: PlaceCategory? = null, query: String? = null): Flow<List<Place>>
 
     /**
      * Strumień miejsc dodanych przez konkretnego usera (snapshot listener).

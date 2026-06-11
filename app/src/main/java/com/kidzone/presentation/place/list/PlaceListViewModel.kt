@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
@@ -71,7 +73,7 @@ private const val PAGE_SIZE = 20
  *
  * Po sortowaniu i filtrach lista jest twardo cięta do [LIST_LIMIT] elementów.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
 @HiltViewModel
 class PlaceListViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
@@ -152,15 +154,19 @@ class PlaceListViewModel @Inject constructor(
         data class Error(val message: String) : PlacesLoad
     }
 
-    private val placesLoad: Flow<PlacesLoad> = selectedCategory
-        .flatMapLatest { category ->
-            placeRepository.observePlaces(category)
-                .map<List<Place>, PlacesLoad> { PlacesLoad.Success(it) }
-                .onStart { emit(PlacesLoad.Loading) }
-                .catch { e ->
-                    emit(PlacesLoad.Error(e.message ?: "Nie udało się wczytać listy miejsc"))
-                }
-        }
+    private val placesLoad: Flow<PlacesLoad> = combine(
+        selectedCategory,
+        searchQuery.debounce(300).distinctUntilChanged()
+    ) { category, query ->
+        category to query
+    }.flatMapLatest { (category, query) ->
+        placeRepository.observePlaces(category, query)
+            .map<List<Place>, PlacesLoad> { PlacesLoad.Success(it) }
+            .onStart { emit(PlacesLoad.Loading) }
+            .catch { e ->
+                emit(PlacesLoad.Error(e.message ?: "Nie udało się wczytać listy miejsc"))
+            }
+    }
 
     /** Strumień zalogowanego usera - tylko id. */
     private val currentUserIdFlow: Flow<String?> = authRepository.currentUser
@@ -200,18 +206,32 @@ class PlaceListViewModel @Inject constructor(
         val visible = args[5] as Int
         val query = args[6] as String
 
+        // Szkielety pokazujemy TYLKO przy pierwszym wejściu na ekran (pusta lista + brak zapytania)
+        val isInitialLoading = load is PlacesLoad.Loading && 
+                               uiState.value.places.isEmpty() && 
+                               !refreshing && 
+                               query.isBlank()
+
         when (load) {
-            PlacesLoad.Loading -> UiState(
-                selectedCategory = category,
-                selectedAmenities = amenities,
-                sortOrder = sortCtx.sortOrder,
-                userLocation = sortCtx.userLocation,
-                currentUserId = sortCtx.currentUserId,
-                isLoading = true,
-                isRefreshing = refreshing,
-                errorMessage = null,
-                places = emptyList()
-            )
+            PlacesLoad.Loading -> {
+                // Stabilizacja listy: podczas ładowania dociągamy to co już mamy w pamięci
+                val currentPlaces = uiState.value.places
+                val instantFiltered = if (query.isBlank()) currentPlaces 
+                                     else currentPlaces.filter { it.name.contains(query, ignoreCase = true) }
+
+                UiState(
+                    selectedCategory = category,
+                    selectedAmenities = amenities,
+                    sortOrder = sortCtx.sortOrder,
+                    userLocation = sortCtx.userLocation,
+                    currentUserId = sortCtx.currentUserId,
+                    isLoading = isInitialLoading,
+                    isRefreshing = refreshing,
+                    errorMessage = null,
+                    places = instantFiltered,
+                    searchQuery = query
+                )
+            }
             is PlacesLoad.Success -> {
                 val filtered = load.list
                     .filter { place -> amenities.all { it in place.amenities } }

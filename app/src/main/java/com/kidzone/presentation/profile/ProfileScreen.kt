@@ -917,7 +917,7 @@ private fun SettingsCard(
     SectionCard(title = "Ustawienia") {
         NavRow(
             icon = Icons.Filled.Notifications,
-            label = "Powiadomienia push",
+            label = "Powiadomienia email i push",
             onClick = onNotificationPrefs
         )
         Spacer(Modifier.height(4.dp))

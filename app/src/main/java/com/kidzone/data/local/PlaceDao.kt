@@ -24,6 +24,14 @@ interface PlaceDao {
     @Query("SELECT * FROM places WHERE category = :category ORDER BY createdAtMillis DESC")
     fun observeByCategory(category: String): Flow<List<PlaceEntity>>
 
+    /** Miejsca filtrowane po nazwie (wyszukiwarka). */
+    @Query("SELECT * FROM places WHERE name LIKE '%' || :query || '%' ORDER BY createdAtMillis DESC")
+    fun observeByName(query: String): Flow<List<PlaceEntity>>
+
+    /** Miejsca filtrowane po kategorii i nazwie. */
+    @Query("SELECT * FROM places WHERE category = :category AND name LIKE '%' || :query || '%' ORDER BY createdAtMillis DESC")
+    fun observeByCategoryAndName(category: String, query: String): Flow<List<PlaceEntity>>
+
     /** Miejsca dodane przez konkretnego usera. */
     @Query("SELECT * FROM places WHERE ownerUserId = :userId ORDER BY createdAtMillis DESC")
     fun observeByOwner(userId: String): Flow<List<PlaceEntity>>

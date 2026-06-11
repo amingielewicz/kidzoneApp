@@ -11,17 +11,26 @@ service firebase.storage {
       return isSignedIn() && request.auth.token.admin == true;
     }
 
-    // Zdjęcia miejsc
-    match /places/{placeId}/{fileName} {
+    // Zdjęcia miejsc (wspiera dowolną głębokość podfolderów, np. /photos/...)
+    match /places/{placeId}/{allPaths=**} {
       allow read: if true;
 
       allow write: if isSignedIn()
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
 
-      // Usuwanie zdjęć miejsc zablokowane dla zwykłych userów (zapobiega wandalizmowi).
-      // Zdjęcia może usuwać tylko admin (przez konsolę Firebase) lub backend.
-      allow delete: if false;
+      allow delete: if isAdmin();
+    }
+
+    // Zdjęcia opinii
+    match /reviews/{reviewId}/{allPaths=**} {
+      allow read: if true;
+
+      allow write: if isSignedIn()
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      allow delete: if isAdmin();
     }
 
     // Avatary

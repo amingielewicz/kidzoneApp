@@ -3,6 +3,9 @@ package com.kidzone.presentation.place.list
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -66,6 +69,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
@@ -77,6 +81,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.GpsDisabledBanner
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.shimmerEffect
@@ -116,11 +121,13 @@ private val QUICK_AMENITIES = setOf(
  * przez "chip" z dropdownem na pasku filtrów. Domyślny: "Najbliższe"
  * (wymaga lokalizacji - jeżeli brak, banner zachęca do włączenia).
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun PlaceListScreen(
-    onOpenPlaceDetails: (placeId: String) -> Unit,
-    viewModel: PlaceListViewModel = hiltViewModel()
+    onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
+    viewModel: PlaceListViewModel = hiltViewModel(),
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
 ) {
     val state by viewModel.uiState.collectAsState()
 
@@ -192,6 +199,11 @@ fun PlaceListScreen(
     val gpsEnabled = rememberLocationServiceEnabled()
 
     Column(modifier = Modifier.fillMaxSize()) {
+        // Banner informujący o wyłączonej lokalizacji - na samej górze
+        if (!gpsEnabled && hasLocationPermission(context)) {
+            GpsDisabledBanner()
+        }
+
         // Wyszukiwarka po nazwie miejsca
         SearchBar(
             query = state.searchQuery,
@@ -214,20 +226,6 @@ fun PlaceListScreen(
             onSortOrderChange = viewModel::onSortOrderChange
         )
 
-        // Banner informujący o wyłączonej lokalizacji - standardowy GpsDisabledBanner
-        // (wystarczy "Lokalizacja wyłączona, Włącz GPS")
-        if (state.nearestUnavailable) {
-            com.kidzone.presentation.common.GpsDisabledBanner()
-        }
-
-        // Banner GPS disabled - when permission granted, sort=NEAREST, but
-        // GPS service is turned off in system settings.
-        if (state.sortOrder == PlaceListViewModel.SortOrder.NEAREST &&
-            hasLocationPermission(context) && !gpsEnabled
-        ) {
-            GpsDisabledBanner(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
-        }
-
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
             onRefresh = { viewModel.refresh() },
@@ -235,14 +233,22 @@ fun PlaceListScreen(
         ) {
         when {
             state.isLoading && state.places.isEmpty() -> {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    userScrollEnabled = false
-                ) {
-                    items(10) {
-                        PlaceRowSkeleton()
+                // Smart Loading: don't show skeleton immediately to avoid flickering on fast cache hits
+                var showSkeleton by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) {
+                    kotlinx.coroutines.delay(150)
+                    showSkeleton = true
+                }
+                if (showSkeleton) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        userScrollEnabled = false
+                    ) {
+                        items(10) {
+                            PlaceRowSkeleton()
+                        }
                     }
                 }
             }
@@ -284,7 +290,7 @@ fun PlaceListScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(items = state.places, key = { it.id }) { place ->
+                    items(items = state.places, key = { "list_${it.id}" }) { place ->
                         PlaceCard(
                             place = place,
                             distanceKm = state.userLocation?.let { (lat, lng) ->
@@ -293,7 +299,10 @@ fun PlaceListScreen(
                             showDistance = state.sortOrder ==
                                 PlaceListViewModel.SortOrder.NEAREST &&
                                 state.userLocation != null,
-                            onClick = { onOpenPlaceDetails(place.id) }
+                            onClick = { onOpenPlaceDetails(place.id, "list") },
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedContentScope = animatedContentScope,
+                            animationSource = "list"
                         )
                     }
                     if (state.hasMore) {
@@ -376,9 +385,22 @@ private fun SearchBar(
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Lokalny stan zapobiega "skakaniu" kursora przy aktualizacji stanu z VM
+    var localText by remember { mutableStateOf(query) }
+
+    // Synchronizacja, jeśli query zmieni się z zewnątrz (np. przycisk wyczyść)
+    LaunchedEffect(query) {
+        if (localText != query) {
+            localText = query
+        }
+    }
+
     OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
+        value = localText,
+        onValueChange = {
+            localText = it
+            onQueryChange(it)
+        },
         placeholder = { Text("Szukaj miejsca po nazwie\u2026") },
         leadingIcon = {
             Icon(
@@ -601,15 +623,17 @@ private fun EnableLocationForSortingBanner(onAllowClick: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun PlaceCard(
     place: Place,
     distanceKm: Double?,
     showDistance: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null,
+    animationSource: String? = "list"
 ) {
-    val categoryStyle = place.category.style
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -618,11 +642,13 @@ private fun PlaceCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = categoryStyle.icon,
-                    contentDescription = null,
-                    tint = categoryStyle.color,
-                    modifier = Modifier.size(28.dp)
+                CategoryIcon(
+                    category = place.category,
+                    animationKey = "list_place_icon_${place.id}",
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedContentScope = animatedContentScope,
+                    size = 28.dp,
+                    iconSize = 18.dp
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {

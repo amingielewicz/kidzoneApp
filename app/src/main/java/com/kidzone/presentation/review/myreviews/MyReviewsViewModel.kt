@@ -2,6 +2,7 @@ package com.kidzone.presentation.review.myreviews
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
@@ -37,7 +38,8 @@ import javax.inject.Inject
  */
 data class MyReviewItem(
     val review: Review,
-    val placeName: String?
+    val placeName: String?,
+    val placeCategory: PlaceCategory? = null
 )
 
 /**
@@ -96,19 +98,21 @@ class MyReviewsViewModel @Inject constructor(
             } else {
                 reviewRepository.observeReviewsByUser(current.id)
                     .transformLatest<List<Review>, UiState> { reviews ->
-                        emit(UiState.Loading)
-                        // Fetch nazw miejsc równolegle – dla 50 opinii z 30
-                        // unikalnymi miejscami to ~1-2 sekundy, akceptowalne
-                        // dla ekranu który user otwiera świadomie.
+                        // Zachowaj poprzednią listę, jeśli istnieje, aby uniknąć mignięcia
+                        val currentItems = (uiState.value as? UiState.Ready)?.items ?: emptyList()
+                        if (currentItems.isEmpty()) {
+                            emit(UiState.Loading)
+                        }
+
                         val placeIds = reviews.map { it.placeId }.distinct().filter { it.isNotBlank() }
-                        val placeNames = if (placeIds.isEmpty()) {
-                            emptyMap<String, String>()
+                        val placeData = if (placeIds.isEmpty()) {
+                            emptyMap<String, Pair<String, PlaceCategory>>()
                         } else {
                             coroutineScope {
                                 placeIds.map { id ->
                                     async {
                                         when (val r = placeRepository.getPlace(id)) {
-                                            is OpResult.Success -> id to r.data.name
+                                            is OpResult.Success -> id to (r.data.name to r.data.category)
                                             is OpResult.Failure -> id to null
                                         }
                                     }
@@ -119,9 +123,11 @@ class MyReviewsViewModel @Inject constructor(
                                 .mapValues { it.value!! }
                         }
                         val items = reviews.map { review ->
+                            val data = placeData[review.placeId]
                             MyReviewItem(
                                 review = review,
-                                placeName = placeNames[review.placeId]
+                                placeName = data?.first,
+                                placeCategory = data?.second
                             )
                         }
                         emit(UiState.Ready(items))

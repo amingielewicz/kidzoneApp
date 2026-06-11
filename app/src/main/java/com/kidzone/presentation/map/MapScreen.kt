@@ -8,6 +8,7 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -82,6 +83,7 @@ import com.google.maps.android.compose.rememberCameraPositionState
 import com.kidzone.R
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.GpsDisabledBanner
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.style
@@ -136,7 +138,7 @@ private const val FOCUS_PLACE_ZOOM = 16f
  * pinezki.
  */
 @SuppressLint("MissingPermission")
-@OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class)
+@OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun MapScreen(
     onOpenPlaceDetails: (placeId: String) -> Unit,
@@ -280,16 +282,6 @@ fun MapScreen(
                 .padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            FiltersOverlay(
-                selectedCategory = state.selectedCategory,
-                topRatedOnly = state.topRatedOnly,
-                addedByMeOnly = state.addedByMeOnly,
-                showAddedByMeChip = state.currentUserId != null,
-                onCategorySelected = viewModel::onCategorySelected,
-                onToggleTopRated = viewModel::toggleTopRated,
-                onToggleAddedByMe = viewModel::toggleAddedByMe,
-                modifier = Modifier.fillMaxWidth()
-            )
             if (!locationPermissionGranted) {
                 LocationPermissionBanner(
                     onAllowClick = {
@@ -310,6 +302,16 @@ fun MapScreen(
             if (locationPermissionGranted && !gpsEnabled) {
                 GpsDisabledBanner(modifier = Modifier.fillMaxWidth())
             }
+            FiltersOverlay(
+                selectedCategory = state.selectedCategory,
+                topRatedOnly = state.topRatedOnly,
+                addedByMeOnly = state.addedByMeOnly,
+                showAddedByMeChip = state.currentUserId != null,
+                onCategorySelected = viewModel::onCategorySelected,
+                onToggleTopRated = viewModel::toggleTopRated,
+                onToggleAddedByMe = viewModel::toggleAddedByMe,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
         // --- Stany pomocnicze: spinner przy pierwszym ładowaniu i błąd ---
@@ -591,12 +593,12 @@ private fun FiltersOverlay(
  *  - adres,
  *  - CTA "Zobacz szczegóły".
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun PlacePreviewContent(
     place: Place,
     onOpenDetails: () -> Unit
 ) {
-    val style = place.category.style
     val context = LocalContext.current
 
     Column(
@@ -621,11 +623,10 @@ private fun PlacePreviewContent(
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = style.icon,
-                contentDescription = null,
-                tint = style.color,
-                modifier = Modifier.size(28.dp)
+            CategoryIcon(
+                category = place.category,
+                size = 28.dp,
+                iconSize = 18.dp
             )
             Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
