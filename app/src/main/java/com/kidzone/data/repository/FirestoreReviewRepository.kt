@@ -77,8 +77,6 @@ class FirestoreReviewRepository @Inject constructor(
         localFlow.collectLatest { entities ->
             trySend(entities.map { it.toDomain() })
         }
-
-        syncJob.cancel()
     }
 
     override fun observeReviewsByUser(userId: String): Flow<List<Review>> = channelFlow {
@@ -119,8 +117,6 @@ class FirestoreReviewRepository @Inject constructor(
         localFlow.collectLatest { entities ->
             trySend(entities.map { it.toDomain() })
         }
-
-        syncJob.cancel()
     }
 
     override suspend fun addReview(review: Review): OpResult<Review> = try {
@@ -244,7 +240,6 @@ class FirestoreReviewRepository @Inject constructor(
 
     override suspend fun deleteReview(reviewId: String): OpResult<Unit> = try {
         require(reviewId.isNotBlank()) { "reviewId nie może być puste" }
-        val reviewRef = reviewsCollection().document(reviewId)
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             reviewsCollection().document(reviewId).delete().await()
