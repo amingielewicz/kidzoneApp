@@ -160,7 +160,7 @@ dependencies {
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.analytics)
     implementation("com.google.firebase:firebase-appcheck-playintegrity")
-    implementation("com.google.firebase:firebase-appcheck-debug")
+    debugImplementation("com.google.firebase:firebase-appcheck-debug")
     implementation("com.google.firebase:firebase-perf")
     implementation("com.google.firebase:firebase-config-ktx")
 

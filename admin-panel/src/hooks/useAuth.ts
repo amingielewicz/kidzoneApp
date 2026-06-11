@@ -30,11 +30,25 @@ export function useAuth() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Sprawdź czy user ma rolę admin w Firestore
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        const userData = userDoc.data();
-        const isAdmin = userData?.role === 'admin';
-        setState({ user, isAdmin, loading: false, error: null });
+        try {
+          // Sprawdź czy user ma rolę admin — najpierw z Custom Claims (token),
+          // fallback na Firestore doc jeśli claims jeszcze nie ustawione.
+          const tokenResult = await user.getIdTokenResult();
+          let isAdmin = tokenResult.claims.admin === true;
+
+          if (!isAdmin) {
+            // Fallback: sprawdź pole 'role' w dokumencie Firestore
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            const userData = userDoc.data();
+            isAdmin = userData?.role === 'admin';
+          }
+
+          setState({ user, isAdmin, loading: false, error: null });
+        } catch (err) {
+          // Firestore/network niedostępny — wpuść usera ale odmów admina
+          console.error('Failed to verify admin status:', err);
+          setState({ user, isAdmin: false, loading: false, error: null });
+        }
       } else {
         setState({ user: null, isAdmin: false, loading: false, error: null });
       }
