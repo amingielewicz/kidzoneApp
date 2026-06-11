@@ -185,12 +185,21 @@ export function UsersPage() {
     if (!editUser) return;
     setSaving(true);
     try {
-      const updates: any = { name: editName, email: editEmail };
+      // Aktualizacja nazwy i roli w Firestore
+      const updates: any = { name: editName };
       if (!isCurrentUser(editUser)) {
         if (editRole === 'admin') updates.role = 'admin';
         else updates.role = deleteField();
       }
       await updateDoc(doc(db, 'users', editUser.id), updates);
+
+      // Aktualizacja emaila przez Cloud Function (sync Auth + Firestore)
+      if (editEmail !== editUser.email && editEmail.trim()) {
+        const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'playground-705e7162';
+        const url = `https://us-central1-${projectId}.cloudfunctions.net/adminUpdateUserEmail?userId=${editUser.id}&email=${encodeURIComponent(editEmail.trim())}`;
+        await adminFetch(url);
+      }
+
       setEditUser(null);
       await fetchUsers();
     } catch (err) { console.error(err); } finally { setSaving(false); }

@@ -2013,3 +2013,112 @@ export const adminDeletePhotoFromPlace = onRequest(
     }
   }
 );
+
+
+
+// --- HTTP Endpoint: Admin aktualizuje email użytkownika (sync Firestore + Auth) ---
+export const adminUpdateUserEmail = onRequest(
+  {cors: true},
+  async (req, res) => {
+    const adminUid = await verifyAdminRequest(req, res);
+    if (!adminUid) return;
+
+    const userId = req.query.userId as string;
+    const newEmail = req.query.email as string;
+
+    if (!userId || !newEmail) {
+      res.status(400).send(renderAdminResponse("Błąd", "Wymagane parametry: userId, email."));
+      return;
+    }
+
+    if (!newEmail.includes('@') || !newEmail.includes('.')) {
+      res.status(400).send(renderAdminResponse("Błąd", "Nieprawidłowy format adresu email."));
+      return;
+    }
+
+    try {
+      // 1. Aktualizuj email w Firebase Auth
+      await admin.auth().updateUser(userId, { email: newEmail });
+
+      // 2. Aktualizuj email w Firestore (sync)
+      await db.collection("users").doc(userId).update({ email: newEmail });
+
+      // Log audit
+      await logAudit(adminUid, "UPDATE_USER_EMAIL", { userId, newEmail });
+
+      res.status(200).send(renderAdminResponse(
+        "Email zaktualizowany",
+        `Email użytkownika ${userId} zmieniony na ${newEmail} (Auth + Firestore).`
+      ));
+    } catch (err: any) {
+      console.error("adminUpdateUserEmail error:", err);
+      if (err.code === 'auth/email-already-exists') {
+        res.status(409).send(renderAdminResponse("Konflikt", "Ten adres email jest już używany przez inne konto."));
+      } else if (err.code === 'auth/invalid-email') {
+        res.status(400).send(renderAdminResponse("Błąd", "Nieprawidłowy format adresu email."));
+      } else if (err.code === 'auth/user-not-found') {
+        res.status(404).send(renderAdminResponse("Nie znaleziono", "Użytkownik nie istnieje w Firebase Auth."));
+      } else {
+        res.status(500).send(renderAdminResponse("Błąd serwera", `${err.message || err}`));
+      }
+    }
+  }
+);
+
+// --- HTTP Endpoint: Rate limit check ---
+export const checkRateLimit = onRequest(
+  {cors: true},
+  async (req, res) => {
+    const authHeader = req.headers.authorization || '';
+    if (!authHeader.startsWith('Bearer ')) {
+      res.status(401).json({allowed: false, reason: 'Unauthorized'});
+      return;
+    }
+    const idToken = authHeader.split('Bearer ')[1];
+
+    try {
+      const decoded = await admin.auth().verifyIdToken(idToken);
+      const uid = decoded.uid;
+      const action = req.query.action as string;
+
+      if (!action) {
+        res.status(400).json({allowed: false, reason: 'Missing action parameter'});
+        return;
+      }
+
+      const limits: Record<string, {maxPerHour: number; collection: string; userField: string}> = {
+        addPlace: {maxPerHour: 10, collection: 'places', userField: 'ownerUserId'},
+        addReview: {maxPerHour: 20, collection: 'reviews', userField: 'userId'},
+        reportPlace: {maxPerHour: 10, collection: 'place_reports', userField: 'reporterId'},
+        reportReview: {maxPerHour: 10, collection: 'review_reports', userField: 'reporterId'},
+        reportPhoto: {maxPerHour: 10, collection: 'photo_reports', userField: 'reporterId'},
+      };
+
+      const config = limits[action];
+      if (!config) {
+        res.status(200).json({allowed: true});
+        return;
+      }
+
+      const oneHourAgo = Date.now() - 60 * 60 * 1000;
+      const recentDocs = await db.collection(config.collection)
+        .where(config.userField, '==', uid)
+        .where('createdAtMillis', '>', oneHourAgo)
+        .limit(config.maxPerHour + 1)
+        .get();
+
+      if (recentDocs.size >= config.maxPerHour) {
+        res.status(429).json({
+          allowed: false,
+          reason: `Przekroczono limit ${config.maxPerHour} akcji na godzinę.`,
+          retryAfterMinutes: 60,
+        });
+      } else {
+        res.status(200).json({allowed: true, remaining: config.maxPerHour - recentDocs.size});
+      }
+    } catch (err) {
+      console.error("checkRateLimit error:", err);
+      res.status(200).json({allowed: true}); // fail-open
+    }
+  }
+);

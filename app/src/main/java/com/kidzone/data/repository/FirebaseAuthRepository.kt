@@ -441,45 +441,7 @@ class FirebaseAuthRepository @Inject constructor(
         val credential = EmailAuthProvider.getCredential(email, currentPassword)
         user.reauthenticate(credential).await()
 
-        val uid = user.uid
-        val anonymousName = "Nieaktywny użytkownik"
-
-        // 2) Anonimizacja opinii — treść zostaje, autor zanonimizowany.
-        val reviewsSnap = firestore.collection(FirestoreCollections.REVIEWS)
-            .whereEqualTo("userId", uid)
-            .get()
-            .await()
-        reviewsSnap.documents.forEach { doc ->
-            doc.reference.update(
-                mapOf("authorName" to anonymousName, "userId" to "")
-            ).await()
-        }
-
-        // 3) Anonimizacja miejsc — treść zostaje, ownerUserId czyszczony.
-        val placesSnap = firestore.collection(FirestoreCollections.PLACES)
-            .whereEqualTo("ownerUserId", uid)
-            .get()
-            .await()
-        placesSnap.documents.forEach { doc ->
-            doc.reference.update(mapOf("ownerUserId" to "")).await()
-        }
-
-        // 4) Doc /users/{uid} — dane osobowe, usuwamy.
-        firestore.collection(FirestoreCollections.USERS)
-            .document(uid)
-            .delete()
-            .await()
-
-        // 5) Avatar w Storage — dane osobowe, usuwamy. Best effort.
-        runCatching {
-            firebaseStorage.reference
-                .child("avatars/$uid/avatar.jpg")
-                .delete()
-                .await()
-        }
-
-        // 6) Konto Auth — ostatnie.
-        user.delete().await()
+        performAccountDeletion(user)
 
         OpResult.success(Unit)
     } catch (e: FirebaseAuthInvalidCredentialsException) {
@@ -496,10 +458,30 @@ class FirebaseAuthRepository @Inject constructor(
         val credential = GoogleAuthProvider.getCredential(idToken, null)
         user.reauthenticate(credential).await()
 
+        performAccountDeletion(user)
+
+        OpResult.success(Unit)
+    } catch (e: FirebaseAuthInvalidCredentialsException) {
+        OpResult.failure(AuthException.InvalidCredentials)
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
+    /**
+     * Wspólna logika usuwania konta po pomyślnym re-auth.
+     *
+     * Kolejność operacji:
+     *  1. Anonimizacja opinii (authorName → "Nieaktywny użytkownik", userId → "")
+     *  2. Anonimizacja miejsc (ownerUserId → "")
+     *  3. Usunięcie dokumentu users/{uid}
+     *  4. Usunięcie avatara z Storage (best-effort)
+     *  5. Usunięcie konta Auth (ostatnie — po tym user traci tożsamość)
+     */
+    private suspend fun performAccountDeletion(user: FirebaseUser) {
         val uid = user.uid
         val anonymousName = "Nieaktywny użytkownik"
 
-        // Anonimizacja (identycznie jak w deleteAccount):
+        // 1) Anonimizacja opinii
         val reviewsSnap = firestore.collection(FirestoreCollections.REVIEWS)
             .whereEqualTo("userId", uid)
             .get()
@@ -510,6 +492,7 @@ class FirebaseAuthRepository @Inject constructor(
             ).await()
         }
 
+        // 2) Anonimizacja miejsc
         val placesSnap = firestore.collection(FirestoreCollections.PLACES)
             .whereEqualTo("ownerUserId", uid)
             .get()
@@ -518,11 +501,13 @@ class FirebaseAuthRepository @Inject constructor(
             doc.reference.update(mapOf("ownerUserId" to "")).await()
         }
 
+        // 3) Doc /users/{uid}
         firestore.collection(FirestoreCollections.USERS)
             .document(uid)
             .delete()
             .await()
 
+        // 4) Avatar w Storage (best-effort)
         runCatching {
             firebaseStorage.reference
                 .child("avatars/$uid/avatar.jpg")
@@ -530,13 +515,8 @@ class FirebaseAuthRepository @Inject constructor(
                 .await()
         }
 
+        // 5) Konto Auth
         user.delete().await()
-
-        OpResult.success(Unit)
-    } catch (e: FirebaseAuthInvalidCredentialsException) {
-        OpResult.failure(AuthException.InvalidCredentials)
-    } catch (e: Exception) {
-        OpResult.failure(e)
     }
 
     // --- helpers ---
