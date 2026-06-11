@@ -8,15 +8,13 @@ import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
+import com.kidzone.domain.service.ImageCompressorPort
 import com.kidzone.navigation.Route
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.PhotoUploader
 import com.kidzone.utils.TextNormalization
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
-import android.content.Context
 import android.net.Uri
-import com.kidzone.utils.ImageCompressor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,7 +39,7 @@ class AddPlaceViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
     private val authRepository: AuthRepository,
     private val photoUploader: PhotoUploader,
-    @ApplicationContext private val appContext: Context
+    private val imageCompressor: ImageCompressorPort
 ) : ViewModel() {
 
     /**
@@ -469,7 +467,7 @@ class AddPlaceViewModel @Inject constructor(
             if (state.photoUris.isNotEmpty()) {
                 _uiState.update { it.copy(isUploadingPhotos = true) }
                 for (uri in state.photoUris) {
-                    val bytes = ImageCompressor.compressToWebp(appContext, uri)
+                    val bytes = imageCompressor.compressToWebp(uri)
                     if (bytes != null) {
                         // Dedup check na bazie hash skompresowanych bajtów
                         val hash = java.security.MessageDigest.getInstance("MD5")

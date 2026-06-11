@@ -1,18 +1,17 @@
 package com.kidzone.presentation.profile
 
-import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.SignInProvider
+import com.kidzone.domain.service.BadgePreferences
 import com.kidzone.domain.usecase.ComputeBadgesUseCase
 import com.kidzone.domain.usecase.NotificationPrefsUseCase
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.utils.OpResult
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -51,7 +50,7 @@ class ProfileViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val computeBadgesUseCase: ComputeBadgesUseCase,
     private val notificationPrefsUseCase: NotificationPrefsUseCase,
-    @ApplicationContext private val appContext: Context
+    private val badgePreferences: BadgePreferences
 ) : ViewModel() {
 
     /**
@@ -509,8 +508,7 @@ class ProfileViewModel @Inject constructor(
      * się z jednego telefonu).
      */
     private fun checkForNewBadges(uid: String, current: Set<UserBadge>) {
-        val key = "$BADGE_PREFS_KEY_PREFIX$uid"
-        val seenNames = prefs.getStringSet(key, emptySet()).orEmpty()
+        val seenNames = badgePreferences.getSeenBadges(uid)
         val seen = seenNames.mapNotNull { runCatching { UserBadge.valueOf(it) }.getOrNull() }
             .toSet()
 
@@ -542,19 +540,7 @@ class ProfileViewModel @Inject constructor(
         }
 
         if (seen != current) {
-            prefs.edit()
-                .putStringSet(key, current.map { it.name }.toSet())
-                .apply()
+            badgePreferences.setSeenBadges(uid, current.map { it.name }.toSet())
         }
-    }
-
-    /** Lazy-initialized SharedPreferences dla detekcji odznak. */
-    private val prefs by lazy {
-        appContext.getSharedPreferences(BADGE_PREFS_NAME, Context.MODE_PRIVATE)
-    }
-
-    private companion object {
-        const val BADGE_PREFS_NAME = "badge_notifications"
-        const val BADGE_PREFS_KEY_PREFIX = "seen_badges_"
     }
 }
