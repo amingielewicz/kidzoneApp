@@ -1,0 +1,14 @@
+{
+  "name": "kidzone-firestore-rules-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest --run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase-admin": "^13.0.0",
+    "vitest": "^3.0.0"
+  }
+}
