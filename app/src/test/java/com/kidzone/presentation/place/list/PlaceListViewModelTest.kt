@@ -3,7 +3,6 @@ package com.kidzone.presentation.place.list
 import android.content.Context
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.PlaceCategory
-import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.testutil.MainDispatcherRule
@@ -62,12 +61,17 @@ class PlaceListViewModelTest {
         appContext = mockk(relaxed = true)
 
         every { authRepository.currentUser } returns currentUserFlow
-        // observePlaces now takes (category, query) - mock both params
         every { placeRepository.observePlaces(any(), any()) } returns flowOf(samplePlaces)
     }
 
-    private fun createViewModel(): PlaceListViewModel {
+    /**
+     * Creates VM and starts a background collector to activate
+     * the WhileSubscribed(5000) StateFlow. Without this, uiState
+     * never emits beyond its initial value.
+     */
+    private fun kotlinx.coroutines.test.TestScope.createAndObserve(): PlaceListViewModel {
         val vm = PlaceListViewModel(placeRepository, authRepository, appContext)
+        backgroundScope.launch { vm.uiState.collect {} }
         return vm
     }
 
@@ -81,7 +85,7 @@ class PlaceListViewModelTest {
 
         @Test
         fun `loads all places after initialization`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
@@ -91,7 +95,7 @@ class PlaceListViewModelTest {
 
         @Test
         fun `default sort is NEAREST`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             assertEquals(PlaceListViewModel.SortOrder.NEAREST, viewModel.uiState.value.sortOrder)
@@ -108,15 +112,14 @@ class PlaceListViewModelTest {
 
         @Test
         fun `RECENTLY_ADDED sorts by createdAtMillis desc`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.RECENTLY_ADDED)
             advanceUntilIdle()
 
             val places = viewModel.uiState.value.places
-            assertTrue(places.size >= 2)
-            // Verify descending order
+            assertTrue(places.size >= 2, "Expected at least 2 places but got ${places.size}")
             for (i in 0 until places.size - 1) {
                 assertTrue(places[i].createdAtMillis >= places[i + 1].createdAtMillis,
                     "Places should be sorted by createdAtMillis desc")
@@ -125,7 +128,7 @@ class PlaceListViewModelTest {
 
         @Test
         fun `BEST_RATED sorts by averageRating desc`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.BEST_RATED)
@@ -133,6 +136,7 @@ class PlaceListViewModelTest {
 
             val places = viewModel.uiState.value.places
             val withRatings = places.filter { it.reviewsCount > 0 }
+            assertTrue(withRatings.isNotEmpty(), "Expected places with ratings")
             for (i in 0 until withRatings.size - 1) {
                 assertTrue(withRatings[i].averageRating >= withRatings[i + 1].averageRating,
                     "Places with reviews should be sorted by rating desc")
@@ -141,14 +145,15 @@ class PlaceListViewModelTest {
 
         @Test
         fun `ADDED_BY_ME shows only current user places`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.ADDED_BY_ME)
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertTrue(state.places.all { it.ownerUserId == "user-1" })
+            assertTrue(state.places.all { it.ownerUserId == "user-1" },
+                "Expected only user-1 places but got: ${state.places.map { it.id to it.ownerUserId }}")
         }
     }
 
@@ -162,18 +167,18 @@ class PlaceListViewModelTest {
 
         @Test
         fun `filtering by category calls repository with category`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.onCategorySelected(PlaceCategory.PLAYGROUND)
             advanceUntilIdle()
 
-            verify { placeRepository.observePlaces(PlaceCategory.PLAYGROUND, any()) }
+            verify { placeRepository.observePlaces(eq(PlaceCategory.PLAYGROUND), any()) }
         }
 
         @Test
-        fun `clearing category calls repository with null`() = runTest {
-            viewModel = createViewModel()
+        fun `clearing category calls repository with null category`() = runTest {
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.onCategorySelected(PlaceCategory.RESTAURANT)
@@ -195,7 +200,7 @@ class PlaceListViewModelTest {
 
         @Test
         fun `toggling amenity adds it to selectedAmenities`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.onAmenityToggled(Amenity.PARKING)
@@ -206,7 +211,7 @@ class PlaceListViewModelTest {
 
         @Test
         fun `toggling same amenity twice removes it`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.onAmenityToggled(Amenity.PARKING)
@@ -218,7 +223,7 @@ class PlaceListViewModelTest {
 
         @Test
         fun `onAmenitiesCleared removes all amenity filters`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.onAmenityToggled(Amenity.PARKING)
@@ -232,8 +237,8 @@ class PlaceListViewModelTest {
         }
 
         @Test
-        fun `amenity filter applies AND logic on places`() = runTest {
-            viewModel = createViewModel()
+        fun `amenity filter applies AND logic`() = runTest {
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.onAmenityToggled(Amenity.PARKING)
@@ -241,8 +246,8 @@ class PlaceListViewModelTest {
             advanceUntilIdle()
 
             val places = viewModel.uiState.value.places
-            // Only p3 has both PARKING and TOILET
-            assertTrue(places.all { Amenity.PARKING in it.amenities && Amenity.TOILET in it.amenities })
+            assertTrue(places.all { Amenity.PARKING in it.amenities && Amenity.TOILET in it.amenities },
+                "All places should have both PARKING and TOILET")
         }
     }
 
@@ -256,7 +261,7 @@ class PlaceListViewModelTest {
 
         @Test
         fun `onSearchQueryChange updates searchQuery in state`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.onSearchQueryChange("test")
@@ -267,7 +272,7 @@ class PlaceListViewModelTest {
 
         @Test
         fun `search triggers repository call with query after debounce`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.onSearchQueryChange("restauracja")
@@ -288,20 +293,20 @@ class PlaceListViewModelTest {
 
         @Test
         fun `loadMore increases visible items`() = runTest {
-            // Create 30 places to exceed PAGE_SIZE (20)
             val manyPlaces = (1..30).map {
                 TestFixtures.place(id = "p$it", createdAtMillis = it.toLong())
             }
             every { placeRepository.observePlaces(any(), any()) } returns flowOf(manyPlaces)
 
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             val initialCount = viewModel.uiState.value.places.size
             viewModel.loadMore()
             advanceUntilIdle()
 
-            assertTrue(viewModel.uiState.value.places.size > initialCount)
+            assertTrue(viewModel.uiState.value.places.size > initialCount,
+                "Expected more places after loadMore. Before: $initialCount, After: ${viewModel.uiState.value.places.size}")
         }
     }
 }
