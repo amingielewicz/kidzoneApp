@@ -17,12 +17,12 @@ async function verifyAdminRequest(
   req: any,
   res: any
 ): Promise<string | null> {
-  const authHeader = req.headers.authorization || '';
-  if (!authHeader.startsWith('Bearer ')) {
-    res.status(401).send(renderAdminResponse('Brak autoryzacji', 'Wymagany token w nagłówku Authorization.'));
+  const authHeader = req.headers.authorization || "";
+  if (!authHeader.startsWith("Bearer ")) {
+    res.status(401).send(renderAdminResponse("Brak autoryzacji", "Wymagany token w nagłówku Authorization."));
     return null;
   }
-  const idToken = authHeader.split('Bearer ')[1];
+  const idToken = authHeader.split("Bearer ")[1];
   try {
     const decoded = await admin.auth().verifyIdToken(idToken);
     const uid = decoded.uid;
@@ -33,17 +33,17 @@ async function verifyAdminRequest(
     }
 
     // Fallback do Firestore (dla nowo nadanych uprawnień przed odświeżeniem tokena)
-    const userDoc = await db.collection('users').doc(uid).get();
-    if (userDoc.exists && userDoc.data()?.role === 'admin') {
+    const userDoc = await db.collection("users").doc(uid).get();
+    if (userDoc.exists && userDoc.data()?.role === "admin") {
       // Przy okazji ustawiamy brakujący claim
       await admin.auth().setCustomUserClaims(uid, {admin: true});
       return uid;
     }
 
-    res.status(403).send(renderAdminResponse('Brak uprawnień', 'Tylko administrator może wykonać tę akcję.'));
+    res.status(403).send(renderAdminResponse("Brak uprawnień", "Tylko administrator może wykonać tę akcję."));
     return null;
   } catch (err) {
-    res.status(401).send(renderAdminResponse('Nieprawidłowy token', 'Token wygasł lub jest nieprawidłowy.'));
+    res.status(401).send(renderAdminResponse("Nieprawidłowy token", "Token wygasł lub jest nieprawidłowy."));
     return null;
   }
 }
@@ -66,11 +66,11 @@ async function logAudit(adminUid: string, action: string, details: any) {
 
 function escapeHtml(text: string): string {
   return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 const gmailEmail = defineSecret("GMAIL_EMAIL");
@@ -754,7 +754,6 @@ export const updateUserStatsOnPlaceDelete = onDocumentDeleted(
 );
 
 
-
 // --- HTTP Endpoint: Admin usuwa opinię i wysyła email do autora ---
 export const adminDeleteReview = onRequest(
   {secrets: [gmailEmail, gmailPassword], cors: true},
@@ -1182,7 +1181,6 @@ function renderAdminResponse(title: string, message: string): string {
 }
 
 
-
 // --- Trigger: nowa opinia → push do właściciela miejsca ---
 export const onReviewCreatedPush = onDocumentCreated(
   {
@@ -1270,7 +1268,6 @@ export const onReviewCreatedPush = onDocumentCreated(
 );
 
 
-
 // --- onReviewCreatedTopRank USUNIETY ---
 // Zastapiony przez dailyRankingCheck (scheduled, raz dziennie).
 // Powod: real-time trigger przy kazdej opinii jest zbyt kosztowny
@@ -1314,7 +1311,7 @@ export const onBadgeEarned = onDocumentUpdated(
     const currentBadgeNames = new Set(Object.keys(afterBadges));
     const countBased = [
       "FIRST_PLACE", "FIRST_REVIEW", "EXPLORER", "CARTOGRAPHER", "PATHFINDER",
-      "REVIEWER", "CRITIC", "SENIOR_REVIEWER", "COMMUNITY_PILLAR", "FAMILY_EXPERT"
+      "REVIEWER", "CRITIC", "SENIOR_REVIEWER", "COMMUNITY_PILLAR", "FAMILY_EXPERT",
     ];
 
     const toGrant: string[] = [];
@@ -1477,7 +1474,6 @@ async function cleanStaleTokens(
 }
 
 
-
 // --- Scheduled: daily ranking check → push for TOP 10/3/2/1 ---
 export const dailyRankingCheck = onSchedule(
   {
@@ -1637,7 +1633,6 @@ function getPlaceRankTitle(position: number, placeName: string): string {
 }
 
 
-
 // --- HTTP Endpoint: Jednorazowy backfill geohash na starych dokumentach places ---
 /**
  * Geohash backfill — przechodzi po wszystkich dokumentach w kolekcji `places`,
@@ -1741,8 +1736,6 @@ export const backfillGeohash = onRequest(async (req, res) => {
 });
 
 
-
-
 // --- Trigger: admin zablokował użytkownika → push + email ---
 export const onUserBanned = onDocumentUpdated(
   {
@@ -1841,8 +1834,6 @@ export const onUserBanned = onDocumentUpdated(
 );
 
 
-
-
 // --- HTTP Endpoint: Admin usuwa użytkownika z powodem ---
 export const adminDeleteUser = onRequest(
   {secrets: [gmailEmail, gmailPassword], cors: true},
@@ -1917,8 +1908,6 @@ export const adminDeleteUser = onRequest(
     }
   }
 );
-
-
 
 
 // --- HTTP Endpoint: Admin usuwa zdjęcie z miejsca (z panelu szczegółów) ---
@@ -2015,7 +2004,6 @@ export const adminDeletePhotoFromPlace = onRequest(
 );
 
 
-
 // --- HTTP Endpoint: Admin aktualizuje email użytkownika (sync Firestore + Auth) ---
 export const adminUpdateUserEmail = onRequest(
   {cors: true},
@@ -2031,20 +2019,20 @@ export const adminUpdateUserEmail = onRequest(
       return;
     }
 
-    if (!newEmail.includes('@') || !newEmail.includes('.')) {
+    if (!newEmail.includes("@") || !newEmail.includes(".")) {
       res.status(400).send(renderAdminResponse("Błąd", "Nieprawidłowy format adresu email."));
       return;
     }
 
     try {
       // 1. Aktualizuj email w Firebase Auth
-      await admin.auth().updateUser(userId, { email: newEmail });
+      await admin.auth().updateUser(userId, {email: newEmail});
 
       // 2. Aktualizuj email w Firestore (sync)
-      await db.collection("users").doc(userId).update({ email: newEmail });
+      await db.collection("users").doc(userId).update({email: newEmail});
 
       // Log audit
-      await logAudit(adminUid, "UPDATE_USER_EMAIL", { userId, newEmail });
+      await logAudit(adminUid, "UPDATE_USER_EMAIL", {userId, newEmail});
 
       res.status(200).send(renderAdminResponse(
         "Email zaktualizowany",
@@ -2052,11 +2040,11 @@ export const adminUpdateUserEmail = onRequest(
       ));
     } catch (err: any) {
       console.error("adminUpdateUserEmail error:", err);
-      if (err.code === 'auth/email-already-exists') {
+      if (err.code === "auth/email-already-exists") {
         res.status(409).send(renderAdminResponse("Konflikt", "Ten adres email jest już używany przez inne konto."));
-      } else if (err.code === 'auth/invalid-email') {
+      } else if (err.code === "auth/invalid-email") {
         res.status(400).send(renderAdminResponse("Błąd", "Nieprawidłowy format adresu email."));
-      } else if (err.code === 'auth/user-not-found') {
+      } else if (err.code === "auth/user-not-found") {
         res.status(404).send(renderAdminResponse("Nie znaleziono", "Użytkownik nie istnieje w Firebase Auth."));
       } else {
         res.status(500).send(renderAdminResponse("Błąd serwera", `${err.message || err}`));
@@ -2069,12 +2057,12 @@ export const adminUpdateUserEmail = onRequest(
 export const checkRateLimit = onRequest(
   {cors: true},
   async (req, res) => {
-    const authHeader = req.headers.authorization || '';
-    if (!authHeader.startsWith('Bearer ')) {
-      res.status(401).json({allowed: false, reason: 'Unauthorized'});
+    const authHeader = req.headers.authorization || "";
+    if (!authHeader.startsWith("Bearer ")) {
+      res.status(401).json({allowed: false, reason: "Unauthorized"});
       return;
     }
-    const idToken = authHeader.split('Bearer ')[1];
+    const idToken = authHeader.split("Bearer ")[1];
 
     try {
       const decoded = await admin.auth().verifyIdToken(idToken);
@@ -2082,16 +2070,16 @@ export const checkRateLimit = onRequest(
       const action = req.query.action as string;
 
       if (!action) {
-        res.status(400).json({allowed: false, reason: 'Missing action parameter'});
+        res.status(400).json({allowed: false, reason: "Missing action parameter"});
         return;
       }
 
       const limits: Record<string, {maxPerHour: number; collection: string; userField: string}> = {
-        addPlace: {maxPerHour: 10, collection: 'places', userField: 'ownerUserId'},
-        addReview: {maxPerHour: 20, collection: 'reviews', userField: 'userId'},
-        reportPlace: {maxPerHour: 10, collection: 'place_reports', userField: 'reporterId'},
-        reportReview: {maxPerHour: 10, collection: 'review_reports', userField: 'reporterId'},
-        reportPhoto: {maxPerHour: 10, collection: 'photo_reports', userField: 'reporterId'},
+        addPlace: {maxPerHour: 10, collection: "places", userField: "ownerUserId"},
+        addReview: {maxPerHour: 20, collection: "reviews", userField: "userId"},
+        reportPlace: {maxPerHour: 10, collection: "place_reports", userField: "reporterId"},
+        reportReview: {maxPerHour: 10, collection: "review_reports", userField: "reporterId"},
+        reportPhoto: {maxPerHour: 10, collection: "photo_reports", userField: "reporterId"},
       };
 
       const config = limits[action];
@@ -2102,8 +2090,8 @@ export const checkRateLimit = onRequest(
 
       const oneHourAgo = Date.now() - 60 * 60 * 1000;
       const recentDocs = await db.collection(config.collection)
-        .where(config.userField, '==', uid)
-        .where('createdAtMillis', '>', oneHourAgo)
+        .where(config.userField, "==", uid)
+        .where("createdAtMillis", ">", oneHourAgo)
         .limit(config.maxPerHour + 1)
         .get();
 
