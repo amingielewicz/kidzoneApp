@@ -29,8 +29,7 @@ object OfflinePayload {
         val longitude: Double,
         val address: String,
         val amenities: List<String>,
-        val photoUrls: List<String>,
-        val geohash: String
+        val photoUrls: List<String>
     )
 
     fun serializePlace(place: Place): String {
@@ -44,8 +43,7 @@ object OfflinePayload {
             longitude = place.longitude,
             address = place.address,
             amenities = place.amenities.map { it.name },
-            photoUrls = place.photoUrls,
-            geohash = place.geohash
+            photoUrls = place.photoUrls
         )
         return gson.toJson(payload)
     }
@@ -62,8 +60,7 @@ object OfflinePayload {
             longitude = payload.longitude,
             address = payload.address,
             amenities = payload.amenities.map { Amenity.valueOf(it) }.toSet(),
-            photoUrls = payload.photoUrls,
-            geohash = payload.geohash
+            photoUrls = payload.photoUrls
         )
     }
 
