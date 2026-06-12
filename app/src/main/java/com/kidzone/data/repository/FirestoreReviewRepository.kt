@@ -4,10 +4,14 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.kidzone.data.local.ReviewDao
 import com.kidzone.data.local.ReviewEntity
+import com.kidzone.data.local.sync.OperationType
 import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.ReviewDto
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.repository.ReviewRepository
+import com.kidzone.sync.NetworkUtils
+import com.kidzone.sync.OfflinePayload
+import com.kidzone.sync.SyncManager
 import com.kidzone.utils.AppConfig
 import com.kidzone.utils.OpResult
 import kotlinx.coroutines.channels.awaitClose
@@ -32,7 +36,8 @@ import javax.inject.Singleton
 @Singleton
 class FirestoreReviewRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
-    private val reviewDao: ReviewDao
+    private val reviewDao: ReviewDao,
+    private val syncManager: SyncManager
 ) : ReviewRepository {
 
     override fun observeReviewsForPlace(placeId: String): Flow<List<Review>> = channelFlow {
@@ -136,18 +141,24 @@ class FirestoreReviewRepository @Inject constructor(
             true
         }
         if (completed == null) {
-            OpResult.failure(
-                java.util.concurrent.TimeoutException(
-                    "Zapis trwa zbyt długo. Sprawdź połączenie z Internetem."
-                )
-            )
+            // Timeout — queue offline
+            reviewDao.upsert(ReviewEntity.fromDomain(reviewWithId))
+            syncManager.enqueue(OperationType.ADD_REVIEW, OfflinePayload.serializeReview(reviewWithId))
+            OpResult.success(reviewWithId)
         } else {
-            // Persystuj do cache.
             reviewDao.upsert(ReviewEntity.fromDomain(reviewWithId))
             OpResult.success(reviewWithId)
         }
     } catch (e: Exception) {
-        OpResult.failure(e)
+        if (NetworkUtils.isNetworkError(e)) {
+            val reviewId = reviewsCollection().document().id
+            val reviewWithId = review.copy(id = reviewId)
+            reviewDao.upsert(ReviewEntity.fromDomain(reviewWithId))
+            syncManager.enqueue(OperationType.ADD_REVIEW, OfflinePayload.serializeReview(reviewWithId))
+            OpResult.success(reviewWithId)
+        } else {
+            OpResult.failure(e)
+        }
     }
 
     override suspend fun updateReview(review: Review): OpResult<Review> = try {
@@ -160,26 +171,29 @@ class FirestoreReviewRepository @Inject constructor(
         val updatedReview = review.copy(updatedAtMillis = System.currentTimeMillis())
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
-            // Cloud Function (updatePlaceStatsOnReviewUpdate) zajmie się ocenami
-            // jeżeli rating się zmienił. Klient po prostu zapisuje dokument.
             reviewsCollection().document(updatedReview.id)
                 .set(ReviewDto.fromDomain(updatedReview))
                 .await()
             true
         }
         if (completed == null) {
-            OpResult.failure(
-                java.util.concurrent.TimeoutException(
-                    "Zapis trwa zbyt długo. Sprawdź połączenie z Internetem."
-                )
-            )
+            // Timeout — queue offline
+            reviewDao.upsert(ReviewEntity.fromDomain(updatedReview))
+            syncManager.enqueue(OperationType.UPDATE_REVIEW, OfflinePayload.serializeReview(updatedReview))
+            OpResult.success(updatedReview)
         } else {
-            // Zaktualizuj cache.
             reviewDao.upsert(ReviewEntity.fromDomain(updatedReview))
             OpResult.success(updatedReview)
         }
     } catch (e: Exception) {
-        OpResult.failure(e)
+        if (NetworkUtils.isNetworkError(e)) {
+            val updatedReview = review.copy(updatedAtMillis = System.currentTimeMillis())
+            reviewDao.upsert(ReviewEntity.fromDomain(updatedReview))
+            syncManager.enqueue(OperationType.UPDATE_REVIEW, OfflinePayload.serializeReview(updatedReview))
+            OpResult.success(updatedReview)
+        } else {
+            OpResult.failure(e)
+        }
     }
 
     override suspend fun reportReviewAsSpam(
@@ -246,18 +260,22 @@ class FirestoreReviewRepository @Inject constructor(
             true
         }
         if (completed == null) {
-            OpResult.failure(
-                java.util.concurrent.TimeoutException(
-                    "Usunięcie trwa zbyt długo. Sprawdź połączenie z Internetem."
-                )
-            )
+            // Timeout — queue offline
+            reviewDao.deleteById(reviewId)
+            syncManager.enqueue(OperationType.DELETE_REVIEW, OfflinePayload.serializeId(reviewId))
+            OpResult.success(Unit)
         } else {
-            // Usuń z cache.
             reviewDao.deleteById(reviewId)
             OpResult.success(Unit)
         }
     } catch (e: Exception) {
-        OpResult.failure(e)
+        if (NetworkUtils.isNetworkError(e)) {
+            reviewDao.deleteById(reviewId)
+            syncManager.enqueue(OperationType.DELETE_REVIEW, OfflinePayload.serializeId(reviewId))
+            OpResult.success(Unit)
+        } else {
+            OpResult.failure(e)
+        }
     }
 
     private fun reviewsCollection() = firestore.collection(FirestoreCollections.REVIEWS)
