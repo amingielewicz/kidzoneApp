@@ -91,6 +91,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Disable Firebase Performance in debug/CI builds to prevent crashes
+            // when google-services.json contains a placeholder API key.
+            manifestPlaceholders["firebasePerformanceInstrumentationEnabled"] = "false"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
