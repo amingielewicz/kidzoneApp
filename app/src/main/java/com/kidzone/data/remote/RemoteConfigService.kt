@@ -2,6 +2,7 @@ package com.kidzone.data.remote
 
 import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import com.google.firebase.remoteconfig.remoteConfigSettings
+import com.kidzone.analytics.PerformanceTraces
 import kotlinx.coroutines.tasks.await
 import timber.log.Timber
 import javax.inject.Inject
@@ -12,7 +13,9 @@ import javax.inject.Singleton
  * Feature flags i maintenance mode.
  */
 @Singleton
-class RemoteConfigService @Inject constructor() {
+class RemoteConfigService @Inject constructor(
+    private val performanceTraces: PerformanceTraces
+) {
 
     private val remoteConfig: FirebaseRemoteConfig = FirebaseRemoteConfig.getInstance()
 
@@ -36,11 +39,16 @@ class RemoteConfigService @Inject constructor() {
     }
 
     suspend fun fetchAndActivate() {
+        val trace = performanceTraces.startTrace(PerformanceTraces.REMOTE_CONFIG_FETCH)
         try {
             remoteConfig.fetchAndActivate().await()
+            trace.putAttribute("status", "success")
             Timber.d("Remote Config fetched and activated")
         } catch (e: Exception) {
+            trace.putAttribute("status", "failed")
             Timber.w(e, "Remote Config fetch failed, using cached/default values")
+        } finally {
+            performanceTraces.stopTrace(trace)
         }
     }
 

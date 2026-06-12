@@ -70,7 +70,7 @@ android {
             }
         }
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.kidzone.HiltTestRunner"
         vectorDrawables { useSupportLibrary = true }
 
         // Klucz Google Maps – ładowany przez resolveSecret() z chain:
@@ -228,4 +228,14 @@ dependencies {
 
     // LeakCanary (debug only — memory leak detection)
     debugImplementation(libs.leakcanary)
+
+    // ===== Instrumented / UI Tests (androidTest) =====
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
+    androidTestImplementation("androidx.navigation:navigation-testing:2.8.2")
+    androidTestImplementation("com.google.dagger:hilt-android-testing:2.52")
+    kspAndroidTest("com.google.dagger:hilt-android-compiler:2.52")
 }
