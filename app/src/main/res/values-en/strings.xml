@@ -1,0 +1,106 @@
+<resources>
+    <string name="app_name">kidZone</string>
+    <string name="app_tagline">Map of kid-friendly places</string>
+
+    <!-- Auth -->
+    <string name="login">Sign in</string>
+    <string name="register">Sign up</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="forgot_password">Forgot password</string>
+    <string name="login_with_google">Sign in with Google</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_map">Map</string>
+    <string name="nav_list">List</string>
+    <string name="nav_ranking">Ranking</string>
+    <string name="nav_profile">Profile</string>
+
+    <!-- Home -->
+    <string name="home_welcome">Hi!</string>
+    <string name="home_top_places">TOP near you</string>
+    <string name="home_nearby_places">Near you</string>
+    <string name="home_open_map">Open map</string>
+    <string name="home_open_map_subtitle">See all nearby places</string>
+    <string name="home_no_top_places">No rated places nearby</string>
+    <string name="home_no_nearby_places">No places found nearby</string>
+    <string name="home_enable_location">Enable location</string>
+    <string name="home_location_rationale">We\'ll show you kid-friendly places nearby when you allow location access.</string>
+
+    <!-- Map -->
+    <string name="map_my_location">My location</string>
+    <string name="view_on_google_maps">View on Google Maps</string>
+
+    <!-- Place -->
+    <string name="add_place">Add place</string>
+    <string name="place_details">Place details</string>
+    <string name="rating">Rating</string>
+    <string name="reviews">Reviews</string>
+
+    <!-- Categories -->
+    <string name="category_playground">Playground</string>
+    <string name="category_restaurant">Restaurant</string>
+    <string name="category_play_room">Play room</string>
+    <string name="category_cafe">Family cafe</string>
+    <string name="category_park">Park</string>
+    <string name="category_attraction">Attraction</string>
+    <string name="category_other">Other</string>
+
+    <!-- Amenities (universal) -->
+    <string name="amenity_changing_table">Changing table</string>
+    <string name="amenity_toilet">Clean toilet</string>
+    <string name="amenity_stroller_access">Stroller access</string>
+    <string name="amenity_parking">Parking</string>
+
+    <!-- Amenities – Playground -->
+    <string name="amenity_fencing">Fencing</string>
+    <string name="amenity_soft_surface">Soft surface</string>
+    <string name="amenity_shaded_benches">Shaded benches</string>
+    <string name="amenity_toddler_zone">Toddler zone (0–3)</string>
+    <string name="amenity_car_free_area">Car-free area</string>
+
+    <!-- Amenities – Restaurant -->
+    <string name="amenity_kids_menu">Kids menu</string>
+    <string name="amenity_high_chair">High chairs</string>
+    <string name="amenity_kids_tableware">Kids tableware</string>
+    <string name="amenity_fast_service">Fast service</string>
+    <string name="amenity_kids_entertainment">Crayons, toys</string>
+    <string name="amenity_kids_corner_visible">Play corner visible from table</string>
+
+    <!-- Amenities – Play room -->
+    <string name="amenity_age_zones">Age-separated zones</string>
+    <string name="amenity_animator">Animator/supervision</string>
+    <string name="amenity_monitoring">CCTV monitoring</string>
+    <string name="amenity_toy_sanitization">Toy sanitization</string>
+    <string name="amenity_parent_zone">Parent zone</string>
+    <string name="amenity_lockers">Lockers</string>
+    <string name="amenity_soft_protection">Soft protection</string>
+
+    <!-- Amenities – Cafe -->
+    <string name="amenity_quiet_feeding">Quiet feeding area</string>
+    <string name="amenity_microwave">Microwave</string>
+    <string name="amenity_no_loud_music">No loud music</string>
+    <string name="amenity_sensory_toys">Books / sensory toys</string>
+
+    <!-- Amenities – Park -->
+    <string name="amenity_picnic_area">Picnic area</string>
+    <string name="amenity_safe_paths">Safe paths (stroller + bike)</string>
+    <string name="amenity_drinking_water">Drinking water / fountain</string>
+    <string name="amenity_breastfeeding_area">Breastfeeding area</string>
+    <string name="amenity_good_lighting">Good evening lighting</string>
+
+    <!-- Amenities – Attraction -->
+    <string name="amenity_stroller_rental">Stroller rental</string>
+    <string name="amenity_rest_areas">Rest areas</string>
+    <string name="amenity_family_fast_track">Family fast track entry</string>
+    <string name="amenity_parent_child_room">Parent + child room</string>
+    <string name="amenity_lost_child_point">Lost child point</string>
+
+    <!-- Amenities – Other -->
+    <string name="amenity_wide_doors">Wide doors and passages</string>
+    <string name="amenity_family_parking">Family parking spots</string>
+    <string name="amenity_kid_friendly_signs">Kid-friendly signage</string>
+    <string name="amenity_wifi">WiFi</string>
+    <string name="amenity_quiet_areas">Quiet areas</string>
+</resources>
