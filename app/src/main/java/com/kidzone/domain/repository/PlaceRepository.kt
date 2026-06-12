@@ -1,5 +1,6 @@
 package com.kidzone.domain.repository
 
+import com.kidzone.domain.model.PagedResult
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.utils.OpResult
@@ -49,6 +50,26 @@ interface PlaceRepository {
 
     /** Top miejsc wg [Place.averageRating]. */
     suspend fun getTopPlaces(limit: Int = 10): OpResult<List<Place>>
+
+    /**
+     * Paginated place fetch with server-side cursor.
+     *
+     * Returns [pageSize] places ordered by [createdAtMillis] descending,
+     * optionally filtered by [category] and/or name prefix [query].
+     *
+     * @param pageSize number of items per page (default 20)
+     * @param cursor opaque cursor from a previous [PagedResult.nextCursor].
+     *   Pass null for the first page.
+     * @param category optional category filter
+     * @param query optional name prefix filter
+     * @return [PagedResult] with items and cursor for next page (null if last)
+     */
+    suspend fun getPlacesPage(
+        pageSize: Int = 20,
+        cursor: String? = null,
+        category: PlaceCategory? = null,
+        query: String? = null
+    ): OpResult<PagedResult<Place>>
 
     suspend fun addPlace(place: Place): OpResult<Place>
 

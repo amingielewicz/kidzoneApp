@@ -3,11 +3,13 @@ package com.kidzone.presentation.place.list
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.domain.model.Amenity
+import com.kidzone.domain.model.PagedResult
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.service.LocationProvider
+import com.kidzone.utils.OpResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -29,6 +31,7 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
+import timber.log.Timber
 
 /**
  * Rozmiar jednej strony (paginacja klient-side).
@@ -119,6 +122,8 @@ class PlaceListViewModel @Inject constructor(
         val errorMessage: String? = null,
         /** Czy są jeszcze miejsca do załadowania (infinite scroll). */
         val hasMore: Boolean = false,
+        /** True while fetching next server page. */
+        val isLoadingMore: Boolean = false,
         /** Łączna liczba miejsc po filtrach (przed paginacją). */
         val totalCount: Int = 0,
         /** Aktualna fraza wyszukiwania (filtr po nazwie). */
@@ -143,6 +148,19 @@ class PlaceListViewModel @Inject constructor(
 
     /** Ile elementów jest aktualnie widocznych (infinite scroll). */
     private val visibleCount = MutableStateFlow(PAGE_SIZE)
+
+    /**
+     * Server-side pagination cursor. Null = first page or all data loaded
+     * via snapshot listener (< PAGE_SIZE items). Non-null = there are more
+     * pages on the server that can be fetched via [loadMore].
+     */
+    private var serverCursor: String? = null
+
+    /** Extra places fetched via cursor pagination (appended to snapshot data). */
+    private val extraPages = MutableStateFlow<List<Place>>(emptyList())
+
+    /** True while a server page fetch is in-flight. */
+    private val _isLoadingMore = MutableStateFlow(false)
 
     /** Wewnętrzny model wyniku ze strumienia Firestore. */
     private sealed interface PlacesLoad {
@@ -193,7 +211,9 @@ class PlaceListViewModel @Inject constructor(
         sortContextFlow,
         _isRefreshing,
         visibleCount,
-        searchQuery
+        searchQuery,
+        extraPages,
+        _isLoadingMore
     ) { args ->
         val load = args[0] as PlacesLoad
         val category = args[1] as PlaceCategory?
@@ -202,6 +222,8 @@ class PlaceListViewModel @Inject constructor(
         val refreshing = args[4] as Boolean
         val visible = args[5] as Int
         val query = args[6] as String
+        val extras = args[7] as List<Place>
+        val loadingMore = args[8] as Boolean
 
         // Szkielety pokazujemy TYLKO przy pierwszym wejściu na ekran (pusta lista + brak zapytania)
         val isInitialLoading = load is PlacesLoad.Loading && 
@@ -230,7 +252,10 @@ class PlaceListViewModel @Inject constructor(
                 )
             }
             is PlacesLoad.Success -> {
-                val filtered = load.list
+                // Merge snapshot data with extra pages fetched via cursor pagination.
+                val allPlaces = (load.list + extras).distinctBy { it.id }
+
+                val filtered = allPlaces
                     .filter { place -> amenities.all { it in place.amenities } }
                     .let { list ->
                         // Filtr po nazwie (wyszukiwarka)
@@ -266,9 +291,10 @@ class PlaceListViewModel @Inject constructor(
                     isLoading = false,
                     isRefreshing = refreshing,
                     errorMessage = null,
-                    hasMore = paginated.size < totalCount,
+                    hasMore = paginated.size < totalCount || serverCursor != null,
                     totalCount = totalCount,
-                    searchQuery = query
+                    searchQuery = query,
+                    isLoadingMore = loadingMore
                 )
             }
             is PlacesLoad.Error -> UiState(
@@ -299,29 +325,29 @@ class PlaceListViewModel @Inject constructor(
     /** Zmiana frazy wyszukiwania — filtruje listę po nazwie (klient-side). */
     fun onSearchQueryChange(query: String) {
         searchQuery.value = query
-        visibleCount.value = PAGE_SIZE // Reset paginacji przy zmianie wyszukiwania
+        resetPagination()
     }
 
     fun onCategorySelected(category: PlaceCategory?) {
         selectedCategory.value = category
-        visibleCount.value = PAGE_SIZE // Reset paginacji przy zmianie filtra
+        resetPagination()
     }
 
     fun onAmenityToggled(amenity: Amenity) {
         selectedAmenities.update { current ->
             if (amenity in current) current - amenity else current + amenity
         }
-        visibleCount.value = PAGE_SIZE
+        resetPagination()
     }
 
     fun onAmenitiesCleared() {
         selectedAmenities.value = emptySet()
-        visibleCount.value = PAGE_SIZE
+        resetPagination()
     }
 
     fun onSortOrderChange(order: SortOrder) {
         sortOrder.value = order
-        visibleCount.value = PAGE_SIZE
+        resetPagination()
         if (order == SortOrder.NEAREST && userLocation.value == null) {
             refreshLocation()
         }
@@ -329,7 +355,51 @@ class PlaceListViewModel @Inject constructor(
 
     /** Infinite scroll – doładuj następną stronę. */
     fun loadMore() {
-        visibleCount.update { it + PAGE_SIZE }
+        // First try client-side pagination (within already-loaded data).
+        val currentVisible = visibleCount.value
+        val totalLoaded = uiState.value.totalCount
+        if (currentVisible < totalLoaded) {
+            visibleCount.update { it + PAGE_SIZE }
+            return
+        }
+
+        // All client-side data shown — fetch next page from server.
+        if (_isLoadingMore.value) return // Already fetching
+        if (serverCursor == null && extraPages.value.isNotEmpty()) return // No more pages
+
+        viewModelScope.launch {
+            _isLoadingMore.value = true
+            val category = selectedCategory.value
+            val query = searchQuery.value.takeIf { it.isNotBlank() }
+
+            when (val result = placeRepository.getPlacesPage(
+                pageSize = PAGE_SIZE,
+                cursor = serverCursor,
+                category = category,
+                query = query
+            )) {
+                is OpResult.Success -> {
+                    val page = result.data
+                    serverCursor = page.nextCursor
+                    if (page.items.isNotEmpty()) {
+                        extraPages.update { current -> current + page.items }
+                        visibleCount.update { it + page.items.size }
+                    }
+                }
+                is OpResult.Failure -> {
+                    // Silent fail — user can retry by scrolling again.
+                    Timber.w("loadMore: failed to fetch next page: ${result.error.message}")
+                }
+            }
+            _isLoadingMore.value = false
+        }
+    }
+
+    /** Resets pagination state (called on filter/sort change). */
+    private fun resetPagination() {
+        visibleCount.value = PAGE_SIZE
+        serverCursor = null
+        extraPages.value = emptyList()
     }
 
     /**
