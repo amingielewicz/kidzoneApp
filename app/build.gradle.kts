@@ -208,6 +208,11 @@ dependencies {
     // Konfetti
     implementation(libs.konfetti.compose)
 
+    // WorkManager (offline sync queue)
+    implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.work.compiler)
+
     // ===== Testing =====
     // JUnit 5
     testImplementation(libs.junit5.api)
