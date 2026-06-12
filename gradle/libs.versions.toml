@@ -41,6 +41,12 @@ googleId = "1.1.1"
 # In-App Update
 playAppUpdate = "2.1.0"
 
+# In-App Review
+playReview = "2.0.2"
+
+# Glance (AppWidget)
+glance = "1.1.1"
+
 # Logging
 timber = "5.0.1"
 
@@ -130,6 +136,14 @@ kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-cor
 # In-App Update
 play-app-update = { module = "com.google.android.play:app-update", version.ref = "playAppUpdate" }
 play-app-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "playAppUpdate" }
+
+# In-App Review
+play-review = { module = "com.google.android.play:review", version.ref = "playReview" }
+play-review-ktx = { module = "com.google.android.play:review-ktx", version.ref = "playReview" }
+
+# Glance (AppWidget)
+androidx-glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glance" }
+androidx-glance-material3 = { module = "androidx.glance:glance-material3", version.ref = "glance" }
 
 # Logging
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }

@@ -94,6 +94,18 @@
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_notification" />
 
+        <!-- Glance AppWidget: Nearby Places -->
+        <receiver
+            android:name="com.kidzone.widget.NearbyPlacesWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/nearby_places_widget_info" />
+        </receiver>
+
     </application>
 
 </manifest>

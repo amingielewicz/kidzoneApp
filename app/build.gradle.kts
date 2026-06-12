@@ -91,6 +91,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Disable Firebase Performance in debug/CI builds to prevent crashes
+            // when google-services.json contains a placeholder API key.
+            manifestPlaceholders["firebasePerformanceInstrumentationEnabled"] = "false"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -201,6 +206,14 @@ dependencies {
     // In-App Update
     implementation(libs.play.app.update)
     implementation(libs.play.app.update.ktx)
+
+    // In-App Review
+    implementation(libs.play.review)
+    implementation(libs.play.review.ktx)
+
+    // Glance AppWidget
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
 
     // Logging
     implementation(libs.timber)

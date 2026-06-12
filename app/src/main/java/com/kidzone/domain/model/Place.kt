@@ -22,5 +22,7 @@ data class Place(
     val photoUploadedBy: Map<String, String> = emptyMap(),
     /** MD5 hashe skompresowanych zdjęć — do wykrywania duplikatów bez downloadu. */
     val photoHashes: List<String> = emptyList(),
-    val createdAtMillis: Long = 0L
+    val createdAtMillis: Long = 0L,
+    /** Timestamp of last update — used for server-wins conflict resolution during sync. */
+    val updatedAtMillis: Long = 0L
 )

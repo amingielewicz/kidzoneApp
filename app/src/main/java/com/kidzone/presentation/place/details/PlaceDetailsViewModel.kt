@@ -11,6 +11,7 @@ import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.repository.ReviewRepository
 import com.kidzone.domain.service.ImageCompressorPort
 import com.kidzone.navigation.Route
+import com.kidzone.review.InAppReviewManager
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.PhotoUploader
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -70,7 +71,8 @@ class PlaceDetailsViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val reviewRepository: ReviewRepository,
     private val photoUploader: PhotoUploader,
-    private val imageCompressor: ImageCompressorPort
+    private val imageCompressor: ImageCompressorPort,
+    private val inAppReviewManager: InAppReviewManager
 ) : ViewModel() {
 
     /**
@@ -120,7 +122,8 @@ class PlaceDetailsViewModel @Inject constructor(
         val reviewPhotoDuplicateEvent: Boolean = false,
         val isPlaceReported: Boolean = false,
         val reportedPhotoUrls: Set<String> = emptySet(),
-        val reportedReviewIds: Set<String> = emptySet()
+        val reportedReviewIds: Set<String> = emptySet(),
+        val shouldRequestReview: Boolean = false
     )
 
     /**
@@ -363,6 +366,10 @@ class PlaceDetailsViewModel @Inject constructor(
         _uiState.update { it.copy(reviewActionEvent = null) }
     }
 
+    fun consumeReviewRequest() {
+        _uiState.update { it.copy(shouldRequestReview = false) }
+    }
+
     // --- Dodawanie / edycja opinii ---
 
     fun openAddReviewSheet() {
@@ -490,7 +497,8 @@ class PlaceDetailsViewModel @Inject constructor(
                         showAddReviewSheet = false,
                         addReviewError = null,
                         editingReview = null,
-                        reviewActionEvent = ReviewActionEvent.ADDED
+                        reviewActionEvent = ReviewActionEvent.ADDED,
+                        shouldRequestReview = inAppReviewManager.onReviewSubmitted()
                     )
                 }
             }

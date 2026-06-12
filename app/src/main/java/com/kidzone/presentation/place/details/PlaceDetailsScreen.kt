@@ -230,6 +230,17 @@ fun PlaceDetailsScreen(
         }
     }
 
+    // In-app review prompt (after 3rd review submitted)
+    LaunchedEffect(state.shouldRequestReview) {
+        if (state.shouldRequestReview) {
+            val activity = context as? android.app.Activity
+            if (activity != null) {
+                com.kidzone.review.InAppReviewManager(context).launchReviewFlow(activity)
+            }
+            viewModel.consumeReviewRequest()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -241,7 +252,7 @@ fun PlaceDetailsScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Wróć")
                     }
                 },
                 actions = {
@@ -257,7 +268,7 @@ fun PlaceDetailsScreen(
                             if (isOwner) {
                                 DropdownMenuItem(
                                     text = { Text("Edytuj") },
-                                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = "Edytuj") },
                                     onClick = {
                                         showOverflow = false
                                         state.place?.let { onEditPlace(it.id) }
@@ -268,7 +279,7 @@ fun PlaceDetailsScreen(
                                     leadingIcon = {
                                         Icon(
                                             Icons.Filled.Delete,
-                                            contentDescription = null,
+                                            contentDescription = "Usuń",
                                             tint = MaterialTheme.colorScheme.error
                                         )
                                     },
@@ -281,7 +292,7 @@ fun PlaceDetailsScreen(
                             // --- Udostępnij (dla wszystkich) ---
                             DropdownMenuItem(
                                 text = { Text("Udost\u0119pnij") },
-                                leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
+                                leadingIcon = { Icon(Icons.Filled.Share, contentDescription = "Udostępnij") },
                                 onClick = {
                                     showOverflow = false
                                     state.place?.let { place ->
@@ -309,7 +320,7 @@ fun PlaceDetailsScreen(
                             if (!isOwner) {
                                 DropdownMenuItem(
                                     text = { Text("Zaproponuj zmian\u0119") },
-                                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = "Zaproponuj zmianę") },
                                     onClick = {
                                         showOverflow = false
                                         showSuggestEditSheet = true
@@ -317,7 +328,7 @@ fun PlaceDetailsScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Koryguj lokalizacj\u0119") },
-                                    leadingIcon = { Icon(Icons.Filled.LocationOn, contentDescription = null) },
+                                    leadingIcon = { Icon(Icons.Filled.LocationOn, contentDescription = "Koryguj lokalizację") },
                                     onClick = {
                                         showOverflow = false
                                         showLocationCorrectionDialog = true
@@ -329,7 +340,7 @@ fun PlaceDetailsScreen(
                                         leadingIcon = {
                                             Icon(
                                                 Icons.Filled.Flag,
-                                                contentDescription = null,
+                                                contentDescription = "Zgłoś",
                                                 tint = MaterialTheme.colorScheme.error
                                             )
                                         },
@@ -692,7 +703,7 @@ private fun PlaceDetailsContent(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.AddAPhoto,
-                                contentDescription = null,
+                                contentDescription = "Dodaj zdjęcie z galerii",
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(Modifier.width(6.dp))
@@ -705,7 +716,7 @@ private fun PlaceDetailsContent(
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.CameraAlt,
-                                    contentDescription = null,
+                                    contentDescription = "Zrób zdjęcie",
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(Modifier.width(6.dp))
@@ -885,7 +896,7 @@ private fun PlaceMainCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.Star,
-                    contentDescription = null,
+                    contentDescription = "Ocena",
                     tint = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.size(20.dp)
                 )
@@ -925,7 +936,7 @@ private fun PlaceMainCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.LocationOn,
-                    contentDescription = null,
+                    contentDescription = "Lokalizacja",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
                 )
@@ -986,7 +997,7 @@ private fun PlaceMainCard(
             ) {
                 Icon(
                     imageVector = Icons.Filled.LocationOn,
-                    contentDescription = null,
+                    contentDescription = "Zobacz na mapie Google",
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(6.dp))
@@ -1002,7 +1013,7 @@ private fun PlaceMainCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.Person,
-                    contentDescription = null,
+                    contentDescription = "Autor",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
                 )
@@ -1238,7 +1249,7 @@ private fun ReviewCard(
                     repeat(5) { index ->
                         Icon(
                             imageVector = Icons.Filled.Star,
-                            contentDescription = null,
+                            contentDescription = if (index < review.rating) "Gwiazdka ${index + 1} zaznaczona" else "Gwiazdka ${index + 1}",
                             tint = if (index < review.rating) {
                                 MaterialTheme.colorScheme.secondary
                             } else {
@@ -1375,7 +1386,7 @@ private fun ReviewDistributionChart(reviews: List<Review>) {
             Spacer(Modifier.width(8.dp))
             Icon(
                 imageVector = Icons.Filled.Star,
-                contentDescription = null,
+                contentDescription = "Średnia ocena",
                 tint = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.size(20.dp)
             )
@@ -1420,7 +1431,7 @@ private fun DistributionRow(
         Spacer(Modifier.width(2.dp))
         Icon(
             imageVector = Icons.Filled.Star,
-            contentDescription = null,
+            contentDescription = "$star gwiazdek",
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             modifier = Modifier.size(12.dp)
         )
@@ -1467,14 +1478,14 @@ private fun ReviewSortDropdown(
         TextButton(onClick = { expanded = true }) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.Sort,
-                contentDescription = null,
+                contentDescription = "Sortuj",
                 modifier = Modifier.size(18.dp)
             )
             Spacer(Modifier.width(6.dp))
             Text(text = current.label)
             Icon(
                 imageVector = Icons.Filled.ArrowDropDown,
-                contentDescription = null
+                contentDescription = "Rozwiń listę sortowania"
             )
         }
         DropdownMenu(
@@ -1523,7 +1534,7 @@ private fun DeleteConfirmationDialog(
         icon = {
             Icon(
                 imageVector = Icons.Filled.Delete,
-                contentDescription = null,
+                contentDescription = "Usuń",
                 tint = MaterialTheme.colorScheme.error
             )
         },
@@ -1586,7 +1597,7 @@ private fun ReportPlaceDialog(
         icon = {
             Icon(
                 imageVector = Icons.Filled.Flag,
-                contentDescription = null,
+                contentDescription = "Zgłoś",
                 tint = MaterialTheme.colorScheme.error
             )
         },
@@ -1668,7 +1679,7 @@ private fun ReportReviewDialog(
         icon = {
             Icon(
                 imageVector = Icons.Filled.Flag,
-                contentDescription = null,
+                contentDescription = "Zgłoś opinię",
                 tint = MaterialTheme.colorScheme.error
             )
         },
@@ -1819,7 +1830,7 @@ private fun ReportPhotoDialog(
         icon = {
             Icon(
                 imageVector = Icons.Filled.Flag,
-                contentDescription = null,
+                contentDescription = "Zgłoś zdjęcie",
                 tint = MaterialTheme.colorScheme.error
             )
         },

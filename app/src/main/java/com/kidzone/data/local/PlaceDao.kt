@@ -44,6 +44,10 @@ interface PlaceDao {
     @Query("SELECT * FROM places ORDER BY averageRating DESC LIMIT :limit")
     suspend fun getTopPlaces(limit: Int): List<PlaceEntity>
 
+    /** All places for widget (fetch all, distance calculated in memory). */
+    @Query("SELECT * FROM places")
+    suspend fun getAllPlaces(): List<PlaceEntity>
+
     /** Wstawianie / nadpisywanie listy miejsc (bulk upsert). */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(places: List<PlaceEntity>)

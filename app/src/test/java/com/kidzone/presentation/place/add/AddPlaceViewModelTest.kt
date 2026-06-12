@@ -8,6 +8,7 @@ import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.service.ImageCompressorPort
 import com.kidzone.navigation.Route
+import com.kidzone.review.InAppReviewManager
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.OpResult
@@ -39,6 +40,7 @@ class AddPlaceViewModelTest {
     private lateinit var authRepository: AuthRepository
     private lateinit var photoUploader: PhotoUploader
     private lateinit var imageCompressor: ImageCompressorPort
+    private lateinit var inAppReviewManager: InAppReviewManager
 
     private val currentUserFlow = MutableStateFlow(TestFixtures.user())
 
@@ -49,6 +51,7 @@ class AddPlaceViewModelTest {
         authRepository = mockk(relaxed = true)
         photoUploader = mockk(relaxed = true)
         imageCompressor = mockk(relaxed = true)
+        inAppReviewManager = mockk(relaxed = true)
 
         every { authRepository.currentUser } returns currentUserFlow
         // observePlaces(category, query) - 2 params
@@ -59,7 +62,7 @@ class AddPlaceViewModelTest {
         if (placeId != null) {
             savedStateHandle[Route.AddPlace.ARG_PLACE_ID] = placeId
         }
-        return AddPlaceViewModel(savedStateHandle, placeRepository, authRepository, photoUploader, imageCompressor)
+        return AddPlaceViewModel(savedStateHandle, placeRepository, authRepository, photoUploader, imageCompressor, inAppReviewManager)
     }
 
     // =========================================================================

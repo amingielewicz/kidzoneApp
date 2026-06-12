@@ -1,5 +1,6 @@
 package com.kidzone.presentation.home
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.domain.model.Place
@@ -7,7 +8,9 @@ import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.service.LocationProvider
 import com.kidzone.presentation.place.add.LOCATION_TIMEOUT_USER_MESSAGE
 import com.kidzone.utils.OpResult
+import com.kidzone.widget.NearbyPlacesWidget
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -61,7 +64,8 @@ private const val HOME_PLACES_FETCH_RADIUS_KM = 50.0
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
-    private val locationProvider: LocationProvider
+    private val locationProvider: LocationProvider,
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     /**
@@ -145,6 +149,7 @@ class HomeViewModel @Inject constructor(
             }
 
             val (lat, lng) = location
+            persistLocationForWidget(lat, lng)
             when (val result = placeRepository.getPlacesNear(lat, lng, HOME_PLACES_FETCH_RADIUS_KM)) {
                 is OpResult.Success -> {
                     val placesWithDistance = result.data
@@ -232,6 +237,7 @@ class HomeViewModel @Inject constructor(
             }
 
             val (lat, lng) = location
+            persistLocationForWidget(lat, lng)
             when (val result = placeRepository.getPlacesNear(lat, lng, HOME_PLACES_FETCH_RADIUS_KM)) {
                 is OpResult.Success -> {
                     // Repo MVP zwraca wszystkie miejsca – liczymy dystans na kliencie.
@@ -277,6 +283,15 @@ class HomeViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /** Persists last known location to SharedPreferences for the Glance widget. */
+    private fun persistLocationForWidget(lat: Double, lng: Double) {
+        appContext.getSharedPreferences(NearbyPlacesWidget.LOCATION_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putFloat(NearbyPlacesWidget.KEY_LAST_LAT, lat.toFloat())
+            .putFloat(NearbyPlacesWidget.KEY_LAST_LNG, lng.toFloat())
+            .apply()
     }
 }
 

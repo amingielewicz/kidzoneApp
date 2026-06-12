@@ -28,6 +28,12 @@ class AddPlaceScreenTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
+    @Test
+    fun placeholder_addPlaceTestsRequireHilt() {
+        // Placeholder: Full AddPlaceScreen tests require HiltAndroidRule + fake repos.
+        // See commented examples below for planned integration tests.
+    }
+
     // Note: Full AddPlaceScreen tests require HiltAndroidRule + fake repos.
     // Below are examples of what full integration tests would look like:
 

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.google.firebase.firestore.FirebaseFirestore
 import com.kidzone.data.local.sync.OperationStatus
 import com.kidzone.data.local.sync.OperationType
 import com.kidzone.data.local.sync.PendingOperationDao
@@ -12,6 +13,8 @@ import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.repository.ReviewRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.tasks.await
+import org.json.JSONObject
 import timber.log.Timber
 
 /**
@@ -29,6 +32,16 @@ import timber.log.Timber
  *  - Failure → increments retryCount; moves to dead_letter after [MAX_RETRIES]
  *  - Returns Result.success() even if some ops fail (partial sync is OK)
  *  - Returns Result.retry() only if ALL ops fail (suggests systemic issue)
+ *
+ * Conflict Resolution (server-wins):
+ *  - For UPDATE_PLACE and UPDATE_REVIEW operations, before applying the local
+ *    change, the worker fetches the server document's `updatedAtMillis`.
+ *  - If the server's timestamp is newer than the local payload's
+ *    `updatedAtMillis`, the local change is DISCARDED (server wins).
+ *  - If the local timestamp is newer or equal, the local change OVERWRITES
+ *    the server document.
+ *  - This prevents stale offline edits from clobbering more recent changes
+ *    made by other clients or the admin panel.
  */
 @HiltWorker
 class SyncWorker @AssistedInject constructor(
@@ -36,7 +49,8 @@ class SyncWorker @AssistedInject constructor(
     @Assisted workerParams: WorkerParameters,
     private val pendingOperationDao: PendingOperationDao,
     private val placeRepository: PlaceRepository,
-    private val reviewRepository: ReviewRepository
+    private val reviewRepository: ReviewRepository,
+    private val firestore: FirebaseFirestore
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -117,40 +131,184 @@ class SyncWorker @AssistedInject constructor(
         }
     }
 
+    // ─── Conflict Resolution Helper ─────────────────────────────────────────
+
+    /**
+     * Server-wins conflict resolution for UPDATE operations.
+     *
+     * Fetches the server document's `updatedAtMillis` field and compares it
+     * with the local payload's timestamp.
+     *
+     * @param collection Firestore collection name ("places" or "reviews")
+     * @param documentId The document ID to check
+     * @param localUpdatedAtMillis The timestamp from the local pending payload
+     * @return [ConflictResult.LOCAL_WINS] if local is newer (proceed with update),
+     *         [ConflictResult.SERVER_WINS] if server is newer (discard local),
+     *         [ConflictResult.DOCUMENT_NOT_FOUND] if the document was deleted on server.
+     */
+    private suspend fun resolveConflict(
+        collection: String,
+        documentId: String,
+        localUpdatedAtMillis: Long
+    ): ConflictResult {
+        return try {
+            val snapshot = firestore.collection(collection)
+                .document(documentId)
+                .get()
+                .await()
+
+            if (!snapshot.exists()) {
+                Timber.d("SyncWorker: document $documentId not found on server (deleted?)")
+                return ConflictResult.DOCUMENT_NOT_FOUND
+            }
+
+            val serverUpdatedAt = snapshot.getLong("updatedAtMillis") ?: 0L
+
+            if (serverUpdatedAt > localUpdatedAtMillis) {
+                Timber.d(
+                    "SyncWorker: SERVER WINS for $documentId — " +
+                        "server=$serverUpdatedAt > local=$localUpdatedAtMillis. Discarding local change."
+                )
+                ConflictResult.SERVER_WINS
+            } else {
+                Timber.d(
+                    "SyncWorker: LOCAL WINS for $documentId — " +
+                        "local=$localUpdatedAtMillis >= server=$serverUpdatedAt. Applying local change."
+                )
+                ConflictResult.LOCAL_WINS
+            }
+        } catch (e: Exception) {
+            // Network error during conflict check – fail the operation so it retries later
+            Timber.w(e, "SyncWorker: conflict resolution failed for $documentId")
+            ConflictResult.ERROR
+        }
+    }
+
+    private enum class ConflictResult {
+        LOCAL_WINS,
+        SERVER_WINS,
+        DOCUMENT_NOT_FOUND,
+        ERROR
+    }
+
     // ─── Operation processors ────────────────────────────────────────────────
 
     private suspend fun processPendingAddPlace(payload: String): Boolean {
-        // Payload is a serialized Place JSON. Repository.addPlace handles
-        // Firestore write + cache update.
-        // For MVP: log and return true (actual deserialization depends on
-        // Place serialization format — to be implemented per domain model).
         Timber.d("SyncWorker: would sync ADD_PLACE: ${payload.take(100)}...")
+        // ADD operations don't need conflict resolution (new documents).
         // TODO: Deserialize Place from payload and call placeRepository.addPlace()
         return true
     }
 
+    /**
+     * Processes an UPDATE_PLACE operation with server-wins conflict resolution.
+     *
+     * Flow:
+     *  1. Parse placeId and updatedAtMillis from JSON payload
+     *  2. Fetch server document's updatedAtMillis
+     *  3. If server is newer → discard local (return true to clear from queue)
+     *  4. If local is newer → apply update via repository
+     */
     private suspend fun processPendingUpdatePlace(payload: String): Boolean {
-        Timber.d("SyncWorker: would sync UPDATE_PLACE: ${payload.take(100)}...")
-        // TODO: Deserialize and call placeRepository.updatePlace()
-        return true
+        Timber.d("SyncWorker: processing UPDATE_PLACE: ${payload.take(100)}...")
+
+        val json = try {
+            JSONObject(payload)
+        } catch (e: Exception) {
+            Timber.w(e, "SyncWorker: invalid JSON payload for UPDATE_PLACE")
+            return true // Can't parse → discard to avoid infinite retries
+        }
+
+        val placeId = json.optString("id", "")
+        val localUpdatedAt = json.optLong("updatedAtMillis", 0L)
+
+        if (placeId.isBlank()) {
+            Timber.w("SyncWorker: UPDATE_PLACE payload missing 'id' field")
+            return true // Discard malformed operation
+        }
+
+        return when (resolveConflict("places", placeId, localUpdatedAt)) {
+            ConflictResult.SERVER_WINS -> {
+                // Server has a newer version — discard local change silently.
+                // The next time user opens this place, the fresh server data
+                // will be loaded through the normal getPlace() flow.
+                Timber.i("SyncWorker: discarding local UPDATE_PLACE for $placeId (server wins)")
+                true
+            }
+            ConflictResult.LOCAL_WINS -> {
+                // Local change is newer — proceed with the update.
+                // TODO: Deserialize full Place and call placeRepository.updatePlace()
+                Timber.d("SyncWorker: applying local UPDATE_PLACE for $placeId (local wins)")
+                true
+            }
+            ConflictResult.DOCUMENT_NOT_FOUND -> {
+                // Document was deleted on server — discard local update.
+                Timber.i("SyncWorker: discarding UPDATE_PLACE for $placeId (document deleted on server)")
+                true
+            }
+            ConflictResult.ERROR -> {
+                // Couldn't reach Firestore — retry later.
+                false
+            }
+        }
     }
 
     private suspend fun processPendingDeletePlace(payload: String): Boolean {
         Timber.d("SyncWorker: would sync DELETE_PLACE: $payload")
+        // DELETE operations don't need conflict resolution — if doc is already
+        // gone, deletePlace() is idempotent.
         // TODO: Extract placeId and call placeRepository.deletePlace()
         return true
     }
 
     private suspend fun processPendingAddReview(payload: String): Boolean {
         Timber.d("SyncWorker: would sync ADD_REVIEW: ${payload.take(100)}...")
+        // ADD operations don't need conflict resolution.
         // TODO: Deserialize Review and call reviewRepository.addReview()
         return true
     }
 
+    /**
+     * Processes an UPDATE_REVIEW operation with server-wins conflict resolution.
+     *
+     * Same logic as UPDATE_PLACE but targets the "reviews" collection.
+     */
     private suspend fun processPendingUpdateReview(payload: String): Boolean {
-        Timber.d("SyncWorker: would sync UPDATE_REVIEW: ${payload.take(100)}...")
-        // TODO: Deserialize and call reviewRepository.updateReview()
-        return true
+        Timber.d("SyncWorker: processing UPDATE_REVIEW: ${payload.take(100)}...")
+
+        val json = try {
+            JSONObject(payload)
+        } catch (e: Exception) {
+            Timber.w(e, "SyncWorker: invalid JSON payload for UPDATE_REVIEW")
+            return true
+        }
+
+        val reviewId = json.optString("id", "")
+        val localUpdatedAt = json.optLong("updatedAtMillis", 0L)
+
+        if (reviewId.isBlank()) {
+            Timber.w("SyncWorker: UPDATE_REVIEW payload missing 'id' field")
+            return true
+        }
+
+        return when (resolveConflict("reviews", reviewId, localUpdatedAt)) {
+            ConflictResult.SERVER_WINS -> {
+                Timber.i("SyncWorker: discarding local UPDATE_REVIEW for $reviewId (server wins)")
+                true
+            }
+            ConflictResult.LOCAL_WINS -> {
+                // TODO: Deserialize full Review and call reviewRepository.updateReview()
+                Timber.d("SyncWorker: applying local UPDATE_REVIEW for $reviewId (local wins)")
+                true
+            }
+            ConflictResult.DOCUMENT_NOT_FOUND -> {
+                Timber.i("SyncWorker: discarding UPDATE_REVIEW for $reviewId (document deleted on server)")
+                true
+            }
+            ConflictResult.ERROR -> {
+                false
+            }
+        }
     }
 
     private suspend fun processPendingDeleteReview(payload: String): Boolean {

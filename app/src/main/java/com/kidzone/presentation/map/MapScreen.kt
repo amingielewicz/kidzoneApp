@@ -400,7 +400,7 @@ private fun CategoryMarkerIcon(category: PlaceCategory) {
     ) {
         Icon(
             imageVector = style.icon,
-            contentDescription = null,
+            contentDescription = "Kategoria miejsca",
             // Tinta na kolor surface (zwykle biały / prawie biały) – ikona
             // wyraźnie odcina się na kolorowym tle plakietki.
             tint = MaterialTheme.colorScheme.surface,
@@ -441,7 +441,7 @@ private fun LocationPermissionBanner(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.MyLocation,
-                    contentDescription = null,
+                    contentDescription = "Lokalizacja",
                     tint = MaterialTheme.colorScheme.onTertiaryContainer,
                     modifier = Modifier.size(20.dp)
                 )
@@ -529,7 +529,7 @@ private fun FiltersOverlay(
                         leadingIcon = {
                             Icon(
                                 imageVector = style.icon,
-                                contentDescription = null,
+                                contentDescription = stringResource(category.labelRes),
                                 tint = style.color
                             )
                         },
@@ -555,7 +555,7 @@ private fun FiltersOverlay(
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Filled.Star,
-                            contentDescription = null,
+                            contentDescription = "Najlepiej oceniane",
                             tint = if (topRatedOnly) MaterialTheme.colorScheme.secondary
                             else MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -569,7 +569,7 @@ private fun FiltersOverlay(
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Filled.Person,
-                                contentDescription = null,
+                                contentDescription = "Dodane przez Ciebie",
                                 tint = if (addedByMeOnly) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -612,7 +612,7 @@ private fun PlacePreviewContent(
         if (place.photoUrls.isNotEmpty()) {
             AsyncImage(
                 model = place.photoUrls.first(),
-                contentDescription = null,
+                contentDescription = "Zdjęcie miejsca ${place.name}",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -645,7 +645,7 @@ private fun PlacePreviewContent(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Filled.Star,
-                        contentDescription = null,
+                        contentDescription = "Ocena",
                         tint = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.size(18.dp)
                     )
@@ -664,7 +664,7 @@ private fun PlacePreviewContent(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.LocationOn,
-                    contentDescription = null,
+                    contentDescription = "Adres",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp)
                 )
@@ -700,7 +700,7 @@ private fun PlacePreviewContent(
         ) {
             Icon(
                 imageVector = Icons.Filled.LocationOn,
-                contentDescription = null,
+                contentDescription = "Pokaż na mapie Google",
                 modifier = Modifier.size(18.dp)
             )
             Spacer(Modifier.width(4.dp))

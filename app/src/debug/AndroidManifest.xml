@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        Debug-only manifest overrides.
+
+        Deactivates Firebase Performance collection at app start to prevent
+        crashes when running with a placeholder google-services.json (CI/emulator).
+        Firebase Perf's TransportManager tries to call FirebaseInstallations.getId()
+        which throws IllegalArgumentException if the API key is invalid.
+
+        This meta-data is ONLY merged into debug builds; release builds get
+        full Firebase Performance as normal.
+    -->
+    <application>
+        <meta-data
+            android:name="firebase_performance_collection_deactivated"
+            android:value="true" />
+        <meta-data
+            android:name="firebase_performance_collection_enabled"
+            android:value="false" />
+    </application>
+
+</manifest>

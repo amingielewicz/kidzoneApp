@@ -103,4 +103,8 @@
     <string name="amenity_kid_friendly_signs">Oznaczenia przyjazne dzieciom</string>
     <string name="amenity_wifi">WiFi</string>
     <string name="amenity_quiet_areas">Strefy ciszy</string>
+
+    <!-- Widget -->
+    <string name="widget_description" translatable="false">Pokazuje 3 najbliższe miejsca przyjazne dzieciom</string>
+    <string name="widget_name" translatable="false">Miejsca w pobliżu</string>
 </resources>
