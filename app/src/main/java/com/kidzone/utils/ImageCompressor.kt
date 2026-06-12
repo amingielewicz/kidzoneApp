@@ -55,14 +55,10 @@ object ImageCompressor {
         // Resize do max dimension (inSampleSize może dać trochę większy wynik)
         val resized = resizeIfNeeded(rotated, MAX_DIMENSION)
 
-        // Compress do WebP (lossy na API 30+, deprecated WEBP na starszych)
+        // Compress do WebP
         val output = ByteArrayOutputStream()
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            resized.compress(Bitmap.CompressFormat.WEBP_LOSSY, WEBP_QUALITY, output)
-        } else {
-            @Suppress("DEPRECATION")
-            resized.compress(Bitmap.CompressFormat.WEBP, WEBP_QUALITY, output)
-        }
+        @Suppress("DEPRECATION")
+        resized.compress(Bitmap.CompressFormat.WEBP, WEBP_QUALITY, output)
 
         // Cleanup
         if (resized !== rotated) resized.recycle()
