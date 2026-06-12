@@ -1,11 +1,15 @@
 package com.kidzone.ui.theme
 
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 
 /**
  * Schemat kolorów kidZone – odwzorowuje paletę marki.
@@ -74,12 +78,32 @@ private val DarkColors = darkColorScheme(
     onErrorContainer = Color(0xFFFFDAD6)
 )
 
+/**
+ * Główny motyw aplikacji kidZone.
+ *
+ * @param darkTheme true = ciemny motyw (domyślnie z ustawień systemu)
+ * @param dynamicColor true = Material You dynamic colors z tapety (Android 12+).
+ *   Na starszych urządzeniach fallbackuje do statycznej palety kidZone.
+ *   Wyłączalne np. w ustawieniach apki jeśli user preferuje brand colors.
+ */
 @Composable
 fun KidZoneTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colors = if (darkTheme) DarkColors else LightColors
+    val colors = when {
+        // Material You dynamic colors (Android 12+ / API 31+)
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            val context = LocalContext.current
+            if (darkTheme) dynamicDarkColorScheme(context)
+            else dynamicLightColorScheme(context)
+        }
+        // Static brand palette fallback
+        darkTheme -> DarkColors
+        else -> LightColors
+    }
+
     MaterialTheme(
         colorScheme = colors,
         typography = KidZoneTypography,
