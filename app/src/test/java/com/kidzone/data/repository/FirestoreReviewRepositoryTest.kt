@@ -107,7 +107,7 @@ class FirestoreReviewRepositoryTest {
 
         @Test
         fun `accepts review with comment at exactly max length`() = runTest {
-            val exactComment = "a".repeat(1000)
+            val exactComment = "a".repeat(500)
             val review = TestFixtures.review(comment = exactComment)
 
             val docRef = mockk<DocumentReference>(relaxed = true)

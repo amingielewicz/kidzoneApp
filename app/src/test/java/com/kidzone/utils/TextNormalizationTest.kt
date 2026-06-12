@@ -69,9 +69,8 @@ class TextNormalizationTest {
 
         @Test
         fun `handles mixed case input`() {
-            // Known limitation: toTitleCase lowercases rest of word,
-            // so "McDonald's" becomes "Mcdonald's" (apostrophe preserved, case lost)
-            assertEquals("Mcdonald's", TextNormalization.toTitleCase("McDonald's"))
+            // Mc prefix handling: "McDonald's" is preserved correctly
+            assertEquals("McDonald's", TextNormalization.toTitleCase("McDonald's"))
         }
 
         @ParameterizedTest
