@@ -545,8 +545,11 @@ class ProfileViewModelTest {
             val testUser = TestFixtures.user(id = "uid-1", placesAddedCount = 5)
             currentUserFlow.value = testUser
             coEvery { authRepository.observeUser("uid-1") } returns flowOf(testUser)
-            coEvery { authRepository.getTopUsers(any()) } returns OpResult.success(listOf(testUser))
-            coEvery { placeRepository.getTopPlaces(any()) } returns OpResult.success(emptyList())
+            coEvery { computeBadgesUseCase(any(), any()) } returns ComputeBadgesUseCase.BadgeResult(
+                obtainedBadges = emptyList(),
+                userRank = null,
+                bestPlaceRank = null
+            )
 
             viewModel = createViewModel()
             advanceUntilIdle()
