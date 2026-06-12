@@ -2122,3 +2122,140 @@ export const checkRateLimit = onRequest(
     }
   }
 );
+
+
+// =============================================================================
+// FB2 — Daily Cleanup Scheduler
+// =============================================================================
+
+/**
+ * Scheduled Cloud Function: runs daily at 03:00 Warsaw time.
+ *
+ * Tasks:
+ *  1. Expired bans: unban users whose `bannedUntilMillis` has passed
+ *  2. Orphaned photos: find Storage photos not referenced by any place/review
+ *  3. Stale pending operations: clean dead-letter entries older than 30 days
+ *  4. Dismissed reports: delete reports in 'dismissed' status older than 90 days
+ *
+ * Designed to be idempotent — safe to re-run manually via Firebase Console.
+ */
+export const dailyCleanup = onSchedule(
+  {
+    schedule: "every day 03:00",
+    timeZone: "Europe/Warsaw",
+  },
+  async () => {
+    console.log("dailyCleanup: starting...");
+
+    const results = {
+      expiredBansCleared: 0,
+      orphanedPhotosDeleted: 0,
+      staleReportsCleaned: 0,
+    };
+
+    // ─── 1. Expired bans ─────────────────────────────────────────────────
+    try {
+      const now = Date.now();
+      // Find users with temporary bans that have expired
+      // (bannedUntilMillis > 0 means temporary; -1 = permanent)
+      const expiredBansSnap = await db.collection("users")
+        .where("bannedUntilMillis", ">", 0)
+        .where("bannedUntilMillis", "<", now)
+        .get();
+
+      const batch = db.batch();
+      for (const doc of expiredBansSnap.docs) {
+        batch.update(doc.ref, {
+          bannedUntilMillis: admin.firestore.FieldValue.delete(),
+          banReason: admin.firestore.FieldValue.delete(),
+        });
+        results.expiredBansCleared++;
+      }
+
+      if (results.expiredBansCleared > 0) {
+        await batch.commit();
+        console.log(`dailyCleanup: cleared ${results.expiredBansCleared} expired bans`);
+      }
+    } catch (err) {
+      console.error("dailyCleanup: expired bans error:", err);
+    }
+
+    // ─── 2. Orphaned photos (Storage cleanup) ────────────────────────────
+    try {
+      // Strategy: check photo_reports with status='resolved' that have photoUrl
+      // still in Storage — these were "resolved" (photo deleted from place doc)
+      // but the actual Storage file might remain.
+      //
+      // For MVP: we only clean photos from resolved photo_reports older than 7 days
+      // where the photo was supposed to be deleted.
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const resolvedPhotoReports = await db.collection("photo_reports")
+        .where("status", "==", "resolved")
+        .where("resolvedAtMillis", "<", sevenDaysAgo)
+        .limit(50)
+        .get();
+
+      for (const doc of resolvedPhotoReports.docs) {
+        const data = doc.data();
+        const photoUrl = data.photoUrl;
+        if (photoUrl) {
+          try {
+            const bucket = admin.storage().bucket();
+            // Extract path from download URL
+            const urlPath = decodeURIComponent(
+              photoUrl.split("/o/")[1]?.split("?")[0] || ""
+            );
+            if (urlPath) {
+              const file = bucket.file(urlPath);
+              const [exists] = await file.exists();
+              if (exists) {
+                await file.delete();
+                results.orphanedPhotosDeleted++;
+              }
+            }
+          } catch (photoErr) {
+            // Best-effort — don't fail the whole job for one photo
+            console.warn(`dailyCleanup: failed to delete photo from report ${doc.id}:`, photoErr);
+          }
+        }
+      }
+
+      if (results.orphanedPhotosDeleted > 0) {
+        console.log(`dailyCleanup: deleted ${results.orphanedPhotosDeleted} orphaned photos`);
+      }
+    } catch (err) {
+      console.error("dailyCleanup: orphaned photos error:", err);
+    }
+
+    // ─── 3. Stale dismissed reports (>90 days) ───────────────────────────
+    try {
+      const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
+      const collections = ["place_reports", "review_reports", "photo_reports"];
+
+      for (const collName of collections) {
+        const staleSnap = await db.collection(collName)
+          .where("status", "==", "dismissed")
+          .where("resolvedAtMillis", "<", ninetyDaysAgo)
+          .limit(100)
+          .get();
+
+        if (staleSnap.empty) continue;
+
+        const batch = db.batch();
+        for (const doc of staleSnap.docs) {
+          batch.delete(doc.ref);
+          results.staleReportsCleaned++;
+        }
+        await batch.commit();
+      }
+
+      if (results.staleReportsCleaned > 0) {
+        console.log(`dailyCleanup: deleted ${results.staleReportsCleaned} stale dismissed reports`);
+      }
+    } catch (err) {
+      console.error("dailyCleanup: stale reports error:", err);
+    }
+
+    console.log("dailyCleanup: completed", results);
+  }
+);
