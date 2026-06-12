@@ -31,6 +31,7 @@ class FirestoreReviewRepositoryTest {
 
     private lateinit var firestore: FirebaseFirestore
     private lateinit var reviewDao: ReviewDao
+    private lateinit var syncManager: com.kidzone.sync.SyncManager
     private lateinit var repository: FirestoreReviewRepository
 
     private lateinit var reviewsCollection: CollectionReference
@@ -40,13 +41,14 @@ class FirestoreReviewRepositoryTest {
     fun setUp() {
         firestore = mockk(relaxed = true)
         reviewDao = mockk(relaxed = true)
+        syncManager = mockk(relaxed = true)
         reviewsCollection = mockk(relaxed = true)
         reviewReportsCollection = mockk(relaxed = true)
 
         every { firestore.collection(FirestoreCollections.REVIEWS) } returns reviewsCollection
         every { firestore.collection(FirestoreCollections.REVIEW_REPORTS) } returns reviewReportsCollection
 
-        repository = FirestoreReviewRepository(firestore, reviewDao)
+        repository = FirestoreReviewRepository(firestore, reviewDao, syncManager)
     }
 
     // =========================================================================
