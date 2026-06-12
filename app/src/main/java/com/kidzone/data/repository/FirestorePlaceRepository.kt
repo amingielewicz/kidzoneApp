@@ -9,6 +9,10 @@ import com.kidzone.data.remote.dto.PlaceDto
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.repository.PlaceRepository
+import com.kidzone.data.local.sync.OperationType
+import com.kidzone.sync.NetworkUtils
+import com.kidzone.sync.OfflinePayload
+import com.kidzone.sync.SyncManager
 import com.kidzone.utils.AppConfig
 import com.kidzone.utils.GeoHash
 import com.kidzone.utils.OpResult
@@ -19,6 +23,7 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import timber.log.Timber
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -29,7 +34,8 @@ import javax.inject.Singleton
 @Singleton
 class FirestorePlaceRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
-    private val placeDao: PlaceDao
+    private val placeDao: PlaceDao,
+    private val syncManager: SyncManager
 ) : PlaceRepository {
 
     override fun observePlaces(category: PlaceCategory?, query: String?): Flow<List<Place>> = channelFlow {
@@ -212,29 +218,33 @@ class FirestorePlaceRepository @Inject constructor(
             true
         }
         if (completed == null) {
-            OpResult.failure(
-                java.util.concurrent.TimeoutException(
-                    "Zapis trwa zbyt długo. Sprawdź połączenie z Internetem, " +
-                        "a jeśli używasz emulatora – wykonaj Cold Boot."
-                )
-            )
+            // Timeout — queue offline for retry
+            Timber.w("addPlace: timeout, queuing offline")
+            placeDao.upsert(PlaceEntity.fromDomain(placeWithId))
+            syncManager.enqueue(OperationType.ADD_PLACE, OfflinePayload.serializePlace(placeWithId))
+            OpResult.success(placeWithId) // Optimistic success — UI shows place
         } else {
             // Persystuj do lokalnego cache.
             placeDao.upsert(PlaceEntity.fromDomain(placeWithId))
             OpResult.success(placeWithId)
         }
     } catch (e: Exception) {
-        OpResult.failure(e)
+        if (NetworkUtils.isNetworkError(e)) {
+            // Offline: queue for later sync, persist to cache optimistically
+            val docId = placesCollection().document().id
+            val placeWithId = place.copy(id = docId)
+            placeDao.upsert(PlaceEntity.fromDomain(placeWithId))
+            syncManager.enqueue(OperationType.ADD_PLACE, OfflinePayload.serializePlace(placeWithId))
+            Timber.d("addPlace: offline, queued for sync (id=$docId)")
+            OpResult.success(placeWithId)
+        } else {
+            OpResult.failure(e)
+        }
     }
 
     override suspend fun updatePlace(place: Place): OpResult<Place> = try {
         require(place.id.isNotBlank()) { "Place.id musi być ustawione przy edycji" }
 
-        // .set() bez merge nadpisuje cały dokument - jest to świadome:
-        // przy edycji UI zawsze wysyła kompletny obiekt (z zachowanymi
-        // ownerUserId, createdAtMillis, averageRating, reviewsCount itd.),
-        // a nadpisanie zapewnia że Firestore nie zostawi nieużywanych pól
-        // gdyby user np. usunął wszystkie udogodnienia.
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             placesCollection().document(place.id)
                 .set(PlaceDto.fromDomain(place))
@@ -242,18 +252,25 @@ class FirestorePlaceRepository @Inject constructor(
             true
         }
         if (completed == null) {
-            OpResult.failure(
-                java.util.concurrent.TimeoutException(
-                    "Zapis trwa zbyt długo. Sprawdź połączenie z Internetem."
-                )
-            )
+            // Timeout — queue offline
+            Timber.w("updatePlace: timeout, queuing offline")
+            placeDao.upsert(PlaceEntity.fromDomain(place))
+            syncManager.enqueue(OperationType.UPDATE_PLACE, OfflinePayload.serializePlace(place))
+            OpResult.success(place)
         } else {
             // Zaktualizuj cache.
             placeDao.upsert(PlaceEntity.fromDomain(place))
             OpResult.success(place)
         }
     } catch (e: Exception) {
-        OpResult.failure(e)
+        if (NetworkUtils.isNetworkError(e)) {
+            placeDao.upsert(PlaceEntity.fromDomain(place))
+            syncManager.enqueue(OperationType.UPDATE_PLACE, OfflinePayload.serializePlace(place))
+            Timber.d("updatePlace: offline, queued for sync (id=${place.id})")
+            OpResult.success(place)
+        } else {
+            OpResult.failure(e)
+        }
     }
 
     override suspend fun deletePlace(placeId: String): OpResult<Unit> = try {
