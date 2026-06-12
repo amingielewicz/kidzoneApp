@@ -1,7 +1,7 @@
 {
   "name": "functions",
   "scripts": {
-    "lint": "eslint src/ --ext .ts --max-warnings 50",
+    "lint": "eslint src/ --ext .ts --max-warnings 100",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",

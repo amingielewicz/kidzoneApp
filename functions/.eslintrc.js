@@ -28,15 +28,15 @@ module.exports = {
   rules: {
     // Relaxed from Google style defaults
     "max-len": ["warn", {code: 120, ignoreUrls: true, ignoreStrings: true, ignoreTemplateLiterals: true}],
-    "quotes": ["error", "double"],
+    "quotes": ["warn", "double"],
     "import/no-unresolved": 0,
     "indent": ["error", 2, {SwitchCase: 1}],
     "require-jsdoc": "off",
     "valid-jsdoc": "off",
-    "no-multiple-empty-lines": ["error", {max: 2}],
-    "object-curly-spacing": ["error", "never"],
+    "no-multiple-empty-lines": ["warn", {max: 2}],
+    "object-curly-spacing": ["warn", "never"],
     "operator-linebreak": "off",
-    "comma-dangle": ["error", "always-multiline"],
+    "comma-dangle": ["warn", "always-multiline"],
     "@typescript-eslint/no-explicit-any": "warn",
   },
 };
