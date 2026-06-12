@@ -202,6 +202,14 @@ dependencies {
     implementation(libs.play.app.update)
     implementation(libs.play.app.update.ktx)
 
+    // In-App Review
+    implementation(libs.play.review)
+    implementation(libs.play.review.ktx)
+
+    // Glance AppWidget
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
+
     // Logging
     implementation(libs.timber)
 

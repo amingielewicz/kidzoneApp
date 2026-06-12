@@ -359,7 +359,7 @@ private fun OpenMapCta(
         ) {
             Icon(
                 imageVector = Icons.Filled.Map,
-                contentDescription = null,
+                contentDescription = "Otwórz mapę",
                 modifier = Modifier.size(32.dp)
             )
             Spacer(Modifier.width(16.dp))
@@ -376,7 +376,7 @@ private fun OpenMapCta(
             }
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = null
+                contentDescription = "Przejdź do mapy"
             )
         }
     }
@@ -517,7 +517,7 @@ private fun PlaceCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Filled.Star,
-                        contentDescription = null,
+                        contentDescription = "Ocena",
                         tint = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.size(16.dp)
                     )

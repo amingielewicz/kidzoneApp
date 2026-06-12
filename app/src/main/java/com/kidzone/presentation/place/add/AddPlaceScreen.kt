@@ -114,6 +114,14 @@ fun AddPlaceScreen(
     LaunchedEffect(state.isSaved) {
         if (state.isSaved) {
             haptic.success()
+            // Trigger in-app review if threshold reached (3rd place added)
+            if (state.shouldRequestReview) {
+                val activity = context as? android.app.Activity
+                if (activity != null) {
+                    com.kidzone.review.InAppReviewManager(context).launchReviewFlow(activity)
+                }
+                viewModel.consumeReviewRequest()
+            }
             onSaved(state.savedNewLatitude, state.savedNewLongitude)
         }
     }
@@ -238,7 +246,7 @@ fun AddPlaceScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Wróć")
                     }
                 }
             )
@@ -445,7 +453,7 @@ fun AddPlaceScreen(
                         enabled = !state.isSaving && placeHashesReady,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Filled.AddAPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Filled.AddAPhoto, contentDescription = "Dodaj zdjęcie z galerii", modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Galeria")
                     }
@@ -463,7 +471,7 @@ fun AddPlaceScreen(
                         enabled = !state.isSaving && placeHashesReady,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Filled.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Filled.CameraAlt, contentDescription = "Zrób zdjęcie", modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Aparat")
                     }
@@ -571,7 +579,7 @@ private fun CategoryDropdown(
             leadingIcon = {
                 Icon(
                     imageVector = selectedStyle.icon,
-                    contentDescription = null,
+                    contentDescription = "Ikona kategorii",
                     tint = selectedStyle.color
                 )
             },
@@ -592,7 +600,7 @@ private fun CategoryDropdown(
                     leadingIcon = {
                         Icon(
                             imageVector = style.icon,
-                            contentDescription = null,
+                            contentDescription = stringResource(category.labelRes),
                             tint = style.color
                         )
                     },
@@ -628,7 +636,7 @@ private fun LocationSection(
             } else {
                 Icon(
                     Icons.Filled.MyLocation,
-                    contentDescription = null,
+                    contentDescription = "Pobierz lokalizację",
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.size(8.dp))
@@ -740,7 +748,7 @@ private fun NearbyPlacesList(places: List<AddPlaceViewModel.NearbyPlace>) {
                 ) {
                     Icon(
                         imageVector = style.icon,
-                        contentDescription = null,
+                        contentDescription = "Kategoria",
                         tint = style.color,
                         modifier = Modifier.size(16.dp)
                     )
@@ -778,7 +786,7 @@ private fun DuplicateWarningDialog(
         icon = {
             Icon(
                 imageVector = style.icon,
-                contentDescription = null,
+                contentDescription = "Ikona kategorii",
                 tint = style.color
             )
         },
@@ -817,7 +825,7 @@ private fun PhotoThumbnail(
     Box(modifier = Modifier.size(80.dp)) {
         AsyncImage(
             model = model,
-            contentDescription = null,
+            contentDescription = "Miniatura zdjęcia",
             modifier = Modifier
                 .size(80.dp)
                 .clip(RoundedCornerShape(8.dp)),

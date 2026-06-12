@@ -22,7 +22,7 @@ import com.kidzone.data.local.sync.PendingOperationEntity
  */
 @Database(
     entities = [PlaceEntity::class, ReviewEntity::class, PendingOperationEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class KidZoneDatabase : RoomDatabase() {

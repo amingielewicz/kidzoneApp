@@ -30,6 +30,7 @@ data class PlaceEntity(
     val photoUrls: String, // pipe-separated URLs
     val photoHashes: String = "", // pipe-separated MD5 hashes
     val createdAtMillis: Long,
+    val updatedAtMillis: Long = 0L,
     /** Czas ostatniego zapisu do cache – do ewentualnej polityki TTL. */
     val cachedAtMillis: Long = System.currentTimeMillis()
 ) {
@@ -55,7 +56,8 @@ data class PlaceEntity(
         photoHashes = photoHashes
             .split("|")
             .filter { it.isNotBlank() },
-        createdAtMillis = createdAtMillis
+        createdAtMillis = createdAtMillis,
+        updatedAtMillis = updatedAtMillis
     )
 
     companion object {
@@ -73,7 +75,8 @@ data class PlaceEntity(
             amenities = place.amenities.joinToString("|") { it.name },
             photoUrls = place.photoUrls.joinToString("|"),
             photoHashes = place.photoHashes.joinToString("|"),
-            createdAtMillis = place.createdAtMillis
+            createdAtMillis = place.createdAtMillis,
+            updatedAtMillis = place.updatedAtMillis
         )
     }
 }

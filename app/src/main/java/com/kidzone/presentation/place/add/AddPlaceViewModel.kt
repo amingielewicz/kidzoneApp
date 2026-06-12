@@ -10,6 +10,7 @@ import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.service.ImageCompressorPort
 import com.kidzone.navigation.Route
+import com.kidzone.review.InAppReviewManager
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.PhotoUploader
 import com.kidzone.utils.TextNormalization
@@ -39,7 +40,8 @@ class AddPlaceViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
     private val authRepository: AuthRepository,
     private val photoUploader: PhotoUploader,
-    private val imageCompressor: ImageCompressorPort
+    private val imageCompressor: ImageCompressorPort,
+    private val inAppReviewManager: InAppReviewManager
 ) : ViewModel() {
 
     /**
@@ -108,7 +110,9 @@ class AddPlaceViewModel @Inject constructor(
         /** True podczas uploadu zdjęć. */
         val isUploadingPhotos: Boolean = false,
         /** Komunikat o duplikatach (event jednorazowy, konsumowany przez UI). */
-        val photoDuplicateMessage: String? = null
+        val photoDuplicateMessage: String? = null,
+        /** True when in-app review should be requested. */
+        val shouldRequestReview: Boolean = false
     ) {
         /** Max 5 zdjęć łącznie (nowe + istniejące). */
         val canAddMorePhotos: Boolean
@@ -382,6 +386,10 @@ class AddPlaceViewModel @Inject constructor(
         _uiState.update { it.copy(photoDuplicateMessage = null) }
     }
 
+    fun consumeReviewRequest() {
+        _uiState.update { it.copy(shouldRequestReview = false) }
+    }
+
     // --- Zarządzanie zdjęciami ---
 
     /** Zbiór hashów (MD5 skompresowanych bajtów) istniejących zdjęć. */
@@ -578,7 +586,8 @@ class AddPlaceViewModel @Inject constructor(
                             isSaving = false,
                             isSaved = true,
                             savedNewLatitude = if (isCreate) result.data.latitude else null,
-                            savedNewLongitude = if (isCreate) result.data.longitude else null
+                            savedNewLongitude = if (isCreate) result.data.longitude else null,
+                            shouldRequestReview = if (isCreate) inAppReviewManager.onPlaceAdded() else false
                         )
                     }
                     is OpResult.Failure -> it.copy(
