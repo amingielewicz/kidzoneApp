@@ -53,6 +53,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,6 +69,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.mapNotNull
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
@@ -83,6 +86,7 @@ import com.google.maps.android.compose.rememberCameraPositionState
 import com.kidzone.R
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.domain.model.GeoBounds
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.GpsDisabledBanner
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
@@ -160,6 +164,13 @@ fun MapScreen(
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(DEFAULT_CAMERA_TARGET, DEFAULT_CAMERA_ZOOM)
     }
+    var mapLoaded by remember { mutableStateOf(false) }
+
+    ReportSettledViewport(
+        cameraPositionState = cameraPositionState,
+        mapLoaded = mapLoaded,
+        onViewportChanged = viewModel::onViewportChanged
+    )
 
     // Po pomyślnym `addPlace` parent przekazuje współrzędne nowego miejsca
     // przez [focusOn] – animujemy kamerę na ten punkt na poziomie
@@ -253,6 +264,7 @@ fun MapScreen(
             // wizualny) + 24 (dodatkowy buffer, żeby zoom buttons nie były
             // zbyt blisko FAB-a). Dobierane na oko, łatwo skorygować.
             contentPadding = PaddingValues(bottom = 120.dp),
+            onMapLoaded = { mapLoaded = true },
             // Tap w pustą część mapy = zamykamy bottom sheet (jeśli otwarty).
             onMapClick = { viewModel.onPlaceSelected(null) }
         ) {
@@ -377,6 +389,32 @@ fun MapScreen(
                 }
             )
         }
+    }
+}
+
+@Composable
+private fun ReportSettledViewport(
+    cameraPositionState: CameraPositionState,
+    mapLoaded: Boolean,
+    onViewportChanged: (GeoBounds) -> Unit
+) {
+    LaunchedEffect(cameraPositionState, mapLoaded) {
+        if (!mapLoaded) return@LaunchedEffect
+        snapshotFlow { cameraPositionState.isMoving to cameraPositionState.position }
+            .filter { (isMoving, _) -> !isMoving }
+            .mapNotNull {
+                cameraPositionState.projection?.visibleRegion?.latLngBounds
+            }
+            .collect { bounds ->
+                onViewportChanged(
+                    GeoBounds(
+                        north = bounds.northeast.latitude,
+                        east = bounds.northeast.longitude,
+                        south = bounds.southwest.latitude,
+                        west = bounds.southwest.longitude
+                    )
+                )
+            }
     }
 }
 

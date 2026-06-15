@@ -8,6 +8,7 @@ import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.PlaceDto
 import com.kidzone.di.ApplicationScope
 import com.kidzone.domain.model.PagedResult
+import com.kidzone.domain.model.GeoBounds
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.repository.PlaceRepository
@@ -31,6 +32,12 @@ import kotlinx.coroutines.tasks.await
 import timber.log.Timber
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlin.math.ceil
+import kotlin.math.cos
+import kotlin.math.max
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -54,6 +61,9 @@ class FirestorePlaceRepository @Inject constructor(
         private const val PAGE_SIZE_SNAPSHOT = 20
         private const val OWNER_PLACES_LIMIT = 100
         private const val GEO_QUERY_LIMIT = 200
+        private const val MAP_GEOHASH_PREFIX_LIMIT = 9
+        private const val KM_PER_DEGREE = 111.0
+        private const val MIN_LONGITUDE_COSINE = 0.1
         private const val ROOM_CURSOR_PREFIX = "room:"
     }
 
@@ -258,6 +268,125 @@ class FirestorePlaceRepository @Inject constructor(
         } else {
             OpResult.failure(e)
         }
+    }
+
+    override suspend fun getPlacesInBounds(
+        bounds: GeoBounds,
+        category: PlaceCategory?,
+        limit: Int
+    ): OpResult<List<Place>> {
+        require(limit > 0) { "limit musi być dodatni" }
+
+        return try {
+            val places = fetchRemotePlacesInBounds(bounds, category, limit)
+
+            if (places.isNotEmpty()) {
+                placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
+            }
+            OpResult.success(places)
+        } catch (e: Exception) {
+            val cachedPlaces = getCachedPlacesInBounds(bounds, category, limit)
+            if (cachedPlaces.isNotEmpty()) {
+                OpResult.success(cachedPlaces)
+            } else {
+                OpResult.failure(e)
+            }
+        }
+    }
+
+    private suspend fun fetchRemotePlacesInBounds(
+        bounds: GeoBounds,
+        category: PlaceCategory?,
+        limit: Int
+    ): List<Place> {
+        val prefixes = viewportPrefixes(bounds)
+        val perPrefixLimit = max(1, ceil(limit.toDouble() / prefixes.size).toInt())
+
+        return coroutineScope {
+            prefixes.map { prefix ->
+                async { fetchPlacesForPrefix(prefix, category, perPrefixLimit) }
+            }.awaitAll()
+        }
+            .flatten()
+            .distinctBy { it.id }
+            .filter { bounds.contains(it.latitude, it.longitude) }
+            .take(limit)
+    }
+
+    private suspend fun fetchPlacesForPrefix(
+        prefix: String,
+        category: PlaceCategory?,
+        limit: Int
+    ): List<Place> {
+        var query: com.google.firebase.firestore.Query = placesCollection()
+        if (category != null) {
+            query = query.whereEqualTo("category", category.name)
+        }
+        return query
+            .whereGreaterThanOrEqualTo("geohash", prefix)
+            .whereLessThanOrEqualTo("geohash", prefix + "\uf8ff")
+            .limit(limit.toLong())
+            .get()
+            .await()
+            .documents
+            .mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
+    }
+
+    private suspend fun getCachedPlacesInBounds(
+        bounds: GeoBounds,
+        category: PlaceCategory?,
+        limit: Int
+    ): List<Place> {
+        val cached = if (bounds.west <= bounds.east) {
+            placeDao.getPlacesInBounds(
+                north = bounds.north,
+                east = bounds.east,
+                south = bounds.south,
+                west = bounds.west,
+                limit = limit
+            )
+        } else {
+            placeDao.getPlacesInWrappedBounds(
+                north = bounds.north,
+                east = bounds.east,
+                south = bounds.south,
+                west = bounds.west,
+                limit = limit
+            )
+        }
+        return cached
+            .map { it.toDomain() }
+            .filter { category == null || it.category == category }
+            .take(limit)
+    }
+
+    private fun viewportPrefixes(bounds: GeoBounds): List<String> {
+        val latitudeSpanKm = (bounds.north - bounds.south) * KM_PER_DEGREE
+        val longitudeSpan = if (bounds.west <= bounds.east) {
+            bounds.east - bounds.west
+        } else {
+            (180.0 - bounds.west) + (bounds.east + 180.0)
+        }
+        val longitudeSpanKm = longitudeSpan * KM_PER_DEGREE *
+            cos(Math.toRadians(bounds.centerLatitude)).coerceAtLeast(MIN_LONGITUDE_COSINE)
+        val radiusKm = max(latitudeSpanKm, longitudeSpanKm) / 2.0
+        val precision = GeoHash.prefixLengthForRadius(radiusKm)
+
+        val latitudes = listOf(bounds.south, bounds.centerLatitude, bounds.north)
+        val longitudes = if (bounds.west <= bounds.east) {
+            listOf(bounds.west, bounds.centerLongitude, bounds.east)
+        } else {
+            listOf(bounds.west, bounds.centerLongitude, bounds.east)
+        }
+
+        return latitudes
+            .flatMap { latitude ->
+                longitudes.map { longitude ->
+                    GeoHash.encode(latitude, longitude, precision)
+                }
+            }
+            .distinct()
+            .take(MAP_GEOHASH_PREFIX_LIMIT)
     }
 
     override suspend fun getPlacesPage(

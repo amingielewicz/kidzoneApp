@@ -1,6 +1,7 @@
 package com.kidzone.domain.repository
 
 import com.kidzone.domain.model.PagedResult
+import com.kidzone.domain.model.GeoBounds
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.utils.OpResult
@@ -46,6 +47,15 @@ interface PlaceRepository {
         latitude: Double,
         longitude: Double,
         radiusKm: Double
+    ): OpResult<List<Place>>
+
+    /**
+     * Ograniczona lista miejsc widocznych w aktualnym viewportcie mapy.
+     */
+    suspend fun getPlacesInBounds(
+        bounds: GeoBounds,
+        category: PlaceCategory? = null,
+        limit: Int = 200
     ): OpResult<List<Place>>
 
     /** Top miejsc wg [Place.averageRating]. */
