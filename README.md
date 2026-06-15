@@ -17,14 +17,14 @@ Społecznościowa aplikacja mobilna dla rodziców — odkrywaj, dodawaj i ocenia
 ## 📱 Funkcje
 
 ### Dla użytkowników:
-- 🗺️ Mapa miejsc przyjaznych dzieciom w okolicy (Google Maps)
+- 🗺️ Mapa miejsc przyjaznych dzieciom w okolicy (Google Maps + custom cluster markery)
 - 📍 Dodawanie nowych miejsc z kategoriami i udogodnieniami
 - ⭐ Opinie i oceny (1-5 gwiazdek + komentarz + zdjęcia)
 - 🏆 System odznak i rankingów (użytkownicy + miejsca)
 - 📷 Galeria zdjęć miejsc
-- 🔔 Powiadomienia push (nowa opinia, nowe zdjęcie, ranking)
+- 🔔 Powiadomienia push (nowa opinia, nowe zdjęcie, ranking, odznaki)
 - 👤 Profil użytkownika z edycją danych
-- 🔍 Wyszukiwanie miejsc
+- 🔍 Wyszukiwanie miejsc (po nazwie + geobounds na mapie)
 - 📊 Ranking TOP 10 użytkowników i miejsc
 - 🚨 Zgłaszanie naruszeń (miejsca, opinie, zdjęcia)
 - 💡 Propozycje zmian w danych miejsc
@@ -71,7 +71,10 @@ Społecznościowa aplikacja mobilna dla rodziców — odkrywaj, dodawaj i ocenia
 - **Firebase Hosting** (SPA + static pages)
 
 ### CI/CD (GitHub Actions):
-- **Android CI** — lint + assembleDebug + unit tests (JDK 17, Gradle caching)
+- **Android CI** — lint + assembleDebug + unit tests + Gitleaks secret scan (JDK 17, Gradle caching)
+- **Android UI Tests** — instrumented tests na emulatorze (API 30)
+- **Release Build** — manual workflow do budowania APK
+- **Signed Release** — signed AAB/APK z keystore z GitHub Secrets
 - **Cloud Functions CI** — ESLint + tsc + build
 - **Admin Panel CI** — ESLint + Prettier + tsc + vite build
 - **Firestore Rules Tests** — vitest + @firebase/rules-unit-testing + emulator
@@ -188,34 +191,31 @@ Szczegóły: patrz `experiment/` package.
 
 ## 🔢 Wersjonowanie
 
-Aplikacja używa automatycznego systemu wersjonowania opartego na Git:
+Wersja aplikacji jest zarządzana w pliku `version.properties` w katalogu głównym:
 
-### `versionCode` (numer buildu)
-Generowany automatycznie jako **liczba commitów na HEAD**:
-```kotlin
-versionCode = providers.exec {
-    commandLine("git", "rev-list", "--count", "HEAD")
-}.standardOutput.asText.get().trim().toIntOrNull() ?: 1
+```properties
+VERSION_NAME=1.0.0
+VERSION_CODE=1
 ```
-Każdy commit na `main` automatycznie podnosi `versionCode` — nie trzeba go ręcznie bumpować.
 
-### `versionName` (wersja widoczna dla użytkownika)
-Format: `MAJOR.MINOR.PATCH` na `main`, z suffixem `-dev#<nr>` na feature branchach:
+- **`VERSION_NAME`** — wersja widoczna dla użytkownika (Semantic Versioning: `MAJOR.MINOR.PATCH`)
+- **`VERSION_CODE`** — wewnętrzny numer buildu Android (musi rosnąć przy każdym uploade do Play)
 
-| Branch | Przykład `versionName` |
-|--------|----------------------|
-| `main` | `0.1.0` |
-| `feature/72-nowy-ekran` | `0.1.0-dev#72` |
-| CI z `PR_NUMBER=85` | `0.1.0-dev#85` |
-| Inny (fallback) | `0.1.0-dev#a3f4b2c` (skrócony SHA) |
+### Kiedy bumpować:
 
-**Łańcuch rozwiązywania numeru PR:**
-1. Zmienna środowiskowa `PR_NUMBER` (ustawiana w CI/CD)
-2. Gradle property `-PPR_NUMBER=72`
-3. Cyfry z nazwy brancha (np. `fix/72-opis` → `72`)
-4. Skrócony commit hash (7 znaków) jako fallback
+| Zmiana | Bump | Przykład |
+|--------|------|---------|
+| Bug fix, drobna poprawka UI | PATCH | `1.0.0` → `1.0.1` |
+| Nowy ekran, filtr, feature | MINOR | `1.0.1` → `1.1.0` |
+| Breaking data migration, redesign | MAJOR | `1.1.0` → `2.0.0` |
 
-Aby zmienić wersję bazową, edytuj `baseVersion` w `app/build.gradle.kts`.
+### Proces release:
+1. Edytuj `version.properties` (bump `VERSION_NAME` + `VERSION_CODE`)
+2. Commit zmiany
+3. Uruchom Android CI (green check)
+4. Uruchom signed release workflow
+
+Szczegóły: [docs/versioning.md](./docs/versioning.md)
 
 ## 🚀 Setup
 
@@ -288,12 +288,16 @@ Szczegóły: [STAGING.md](./STAGING.md)
 - Input sanitization (escapeHtml) w emailach
 - Firestore Security Rules z walidacją typów i ownershipem
 - Storage Rules z limitami rozmiaru i MIME
-- CSP headers na hostingu
+- Content Security Policy (CSP) headers na hostingu
 - ProGuard/R8 w release (zawężone -keep reguły + dontwarn dla wewnętrznych klas play-services)
+- Gitleaks secret scanning w CI (blokuje merge przy wykryciu sekretu)
+- Deep link input validation (`NavigationArgumentValidator`)
 - allowBackup=false
 - Network Security Config (no cleartext)
-- Release signing config (keystore z local.properties / env vars)
+- Release signing config (keystore z local.properties / env vars / GitHub Secrets)
 - 1 zgłoszenie per user per target (duplicate prevention)
+
+Szczegóły: [SECURITY_REVIEW.md](./SECURITY_REVIEW.md) • [docs/firebase-security-plan.md](./docs/firebase-security-plan.md)
 
 ## 📁 Struktura projektu
 
@@ -347,16 +351,28 @@ Szczegóły: [STAGING.md](./STAGING.md)
 ├── tests/
 │   └── firestore-rules/          # Firestore rules unit tests (vitest)
 ├── .github/workflows/            # CI/CD
-│   ├── android.yml
+│   ├── android.yml               # Lint + build + test + Gitleaks
+│   ├── android-ui-tests.yml      # Instrumented tests (emulator)
+│   ├── release-build.yml         # Manual APK build
+│   ├── signed-release.yml        # Signed release AAB/APK
 │   ├── functions.yml
 │   ├── admin-panel.yml
 │   └── firestore-rules.yml
 ├── gradle/libs.versions.toml     # Version catalog (all deps in one place)
+├── version.properties            # VERSION_NAME + VERSION_CODE
+├── detekt.yml                    # Static analysis config
+├── docs/                         # Dokumentacja dodatkowa
+│   ├── versioning.md             # Szczegóły systemu wersjonowania
+│   ├── firebase-security-plan.md # Plan bezpieczeństwa Firebase
+│   └── milestones/               # Dokumentacja kamieni milowych
 ├── firestore.rules
 ├── firestore.indexes.json
 ├── storage.rules
 ├── firebase.json
 ├── .firebaserc                   # Project aliases (default + staging)
+├── CHANGELOG.md                  # Historia zmian (Keep a Changelog)
+├── CONTRIBUTING.md               # Zasady kontrybucji i workflow PR
+├── SECURITY_REVIEW.md            # Checklist bezpieczeństwa przed release
 └── STAGING.md                    # Staging environment docs
 ```
 
@@ -434,13 +450,16 @@ devops: CI/CD, deploy config
 ```
 
 ### Signing config:
-Release build wymaga keystore. Skonfiguruj w `~/.gradle/gradle.properties` (lub CI secrets):
+Release build wymaga keystore. Skonfiguruj w `local.properties` (lub CI env vars):
 ```properties
-KIDZONE_KEYSTORE_FILE=/path/to/kidzone-release.keystore
-KIDZONE_KEYSTORE_PASSWORD=***
-KIDZONE_KEY_ALIAS=kidzone
-KIDZONE_KEY_PASSWORD=***
+KEYSTORE_PATH=../kidzone-upload.jks
+KEYSTORE_PASSWORD=***
+KEY_ALIAS=kidzone-upload
+KEY_PASSWORD=***
 ```
+
+Dla CI/CD (GitHub Actions) — ustaw te same wartości jako GitHub Secrets
+i użyj workflow `signed-release.yml`.
 
 ### Checklist przed uploadem do Play Console:
 1. ✅ `./gradlew bundleRelease` przechodzi bez błędów
@@ -498,3 +517,9 @@ i dodaj wymienione tam reguły do `proguard-rules.pro`.
 ## 📄 Licencja
 
 Projekt prywatny.
+
+## 🤝 Kontrybucja
+
+Szczegóły: [CONTRIBUTING.md](./CONTRIBUTING.md)
+
+**TL;DR:** Nie commitujemy bezpośrednio do `main`. Każda zmiana przez PR → zielony CI → squash & merge.
