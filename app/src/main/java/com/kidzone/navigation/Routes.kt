@@ -45,9 +45,17 @@ sealed class Route(val path: String) {
     data object PlaceDetails : Route("place_details/{placeId}?source={source}") {
         const val ARG_PLACE_ID = "placeId"
         const val ARG_SOURCE = "source"
-        fun create(placeId: String, source: String? = null): String =
-            if (source == null) "place_details/$placeId"
-            else "place_details/$placeId?source=$source"
+
+        fun create(placeId: String, source: String? = null): String {
+            val safePlaceId = NavigationArgumentValidator.sanitizePlaceId(placeId)
+                ?: throw IllegalArgumentException("Invalid placeId")
+
+            return if (source == null) {
+                "place_details/$safePlaceId"
+            } else {
+                "place_details/$safePlaceId?source=$source"
+            }
+        }
     }
 
     /**
