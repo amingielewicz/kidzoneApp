@@ -2,10 +2,12 @@ package com.kidzone.presentation.map
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kidzone.domain.model.GeoBounds
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
+import com.kidzone.utils.OpResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -14,23 +16,24 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
+import kotlin.math.roundToInt
 
 /**
  * ViewModel ekranu mapy.
  *
- * Subskrybuje [PlaceRepository.observePlaces] – snapshot listener Firestore
- * automatycznie pushuje nowe miejsca (np. dodane przez `AddPlaceScreen`),
- * dzięki czemu pinezki pojawiają się na żywo bez ręcznego odświeżania.
+ * Pobiera ograniczony zestaw miejsc dla aktualnego viewportu. Zmiany kamery
+ * są debouncowane, a ostatnie obszary są cache'owane w pamięci ViewModelu.
  *
  * Filtrowanie:
- *  - **kategoria** – po stronie Firestore (`whereEqualTo("category", ...)`).
- *    Zmiana kategorii rebinduje strumień przez `flatMapLatest`, stary
- *    listener jest unsubscribowany.
+ *  - **kategoria** – po stronie Firestore razem z bucketami geohash.
  *  - **najlepiej oceniane** – po stronie klienta, próg [TOP_RATED_THRESHOLD].
  *    Trzymamy lokalnie, bo Firestore w jednym query nie umie
  *    `whereEqualTo(category) AND whereGreaterThan(averageRating)` bez
@@ -38,12 +41,8 @@ import javax.inject.Inject
  *
  * Filter "darmowe" jest wzmiankowany w docs ekranu, ale `Place` nie ma na
  * dziś pola ceny – świadomie pomijamy do czasu rozszerzenia modelu.
- *
- * TODO: Przy skali wymagającej więcej niż pierwsza strona markerów dodać
- * viewport/geohash query uruchamiane dopiero po zakończeniu ruchu kamery.
- * Obecnie mapa celowo nie odpala requestów przy każdym przesunięciu.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
 @HiltViewModel
 class MapViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
@@ -81,23 +80,89 @@ class MapViewModel @Inject constructor(
     private val topRatedOnly = MutableStateFlow(false)
     private val addedByMeOnly = MutableStateFlow(false)
     private val selectedPlaceId = MutableStateFlow<String?>(null)
+    private val viewport = MutableStateFlow<GeoBounds?>(null)
 
-    /** Wewnętrzny model wyniku ze strumienia Firestore. */
     private sealed interface PlacesLoad {
-        data object Loading : PlacesLoad
+        data class Loading(val previous: List<Place>) : PlacesLoad
         data class Success(val list: List<Place>) : PlacesLoad
-        data class Error(val message: String) : PlacesLoad
+        data class Error(val message: String, val previous: List<Place>) : PlacesLoad
     }
 
-    private val placesLoad: Flow<PlacesLoad> = selectedCategory
-        .flatMapLatest { category ->
-            placeRepository.observePlaces(category)
-                .map<List<Place>, PlacesLoad> { PlacesLoad.Success(it) }
-                .onStart { emit(PlacesLoad.Loading) }
-                .catch { e ->
-                    emit(PlacesLoad.Error(e.message ?: "Nie udało się wczytać miejsc"))
+    private data class ViewportRequest(
+        val bounds: GeoBounds,
+        val category: PlaceCategory?
+    )
+
+    private data class CacheEntry(
+        val places: List<Place>,
+        val createdAtMillis: Long
+    )
+
+    private val viewportCache = object : LinkedHashMap<String, CacheEntry>(
+        VIEWPORT_CACHE_SIZE,
+        0.75f,
+        true
+    ) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<String, CacheEntry>?
+        ): Boolean = size > VIEWPORT_CACHE_SIZE
+    }
+
+    private var lastLoadedPlaces: List<Place> = emptyList()
+
+    private val debouncedViewport = viewport
+        .filterNotNull()
+        .debounce(VIEWPORT_DEBOUNCE_MS)
+        .distinctUntilChangedBy { bounds -> viewportKey(bounds) }
+
+    private val placesLoad: Flow<PlacesLoad> = combine(
+        debouncedViewport,
+        selectedCategory
+    ) { bounds, category ->
+        ViewportRequest(bounds, category)
+    }.flatMapLatest { request ->
+        flow {
+            val key = viewportKey(request.bounds, request.category)
+            val cached = viewportCache[key]
+                ?.takeIf { System.currentTimeMillis() - it.createdAtMillis <= VIEWPORT_CACHE_TTL_MS }
+            if (cached != null) {
+                lastLoadedPlaces = cached.places
+                emit(PlacesLoad.Success(cached.places))
+                return@flow
+            }
+
+            emit(PlacesLoad.Loading(lastLoadedPlaces))
+            when (
+                val result = placeRepository.getPlacesInBounds(
+                    bounds = request.bounds,
+                    category = request.category,
+                    limit = MAP_MARKERS_LIMIT
+                )
+            ) {
+                is OpResult.Success -> {
+                    lastLoadedPlaces = result.data
+                    viewportCache[key] = CacheEntry(result.data, System.currentTimeMillis())
+                    emit(PlacesLoad.Success(result.data))
                 }
+                is OpResult.Failure -> {
+                    emit(
+                        PlacesLoad.Error(
+                            message = result.error.message
+                                ?: "Nie udało się wczytać miejsc na mapie",
+                            previous = lastLoadedPlaces
+                        )
+                    )
+                }
+            }
+        }.catch { error ->
+            emit(
+                PlacesLoad.Error(
+                    message = error.message ?: "Nie udało się wczytać miejsc na mapie",
+                    previous = lastLoadedPlaces
+                )
+            )
         }
+    }
 
     /**
      * Strumień zalogowanego usera ścieśniony do samego id (lub null gdy
@@ -132,7 +197,8 @@ class MapViewModel @Inject constructor(
         selectedPlaceId
     ) { load, category, filters, sel ->
         when (load) {
-            PlacesLoad.Loading -> UiState(
+            is PlacesLoad.Loading -> UiState(
+                places = load.previous,
                 selectedCategory = category,
                 topRatedOnly = filters.topRatedOnly,
                 addedByMeOnly = filters.addedByMeOnly,
@@ -172,6 +238,7 @@ class MapViewModel @Inject constructor(
                 )
             }
             is PlacesLoad.Error -> UiState(
+                places = load.previous,
                 selectedCategory = category,
                 topRatedOnly = filters.topRatedOnly,
                 addedByMeOnly = filters.addedByMeOnly,
@@ -189,6 +256,10 @@ class MapViewModel @Inject constructor(
 
     fun onCategorySelected(category: PlaceCategory?) {
         selectedCategory.value = category
+    }
+
+    fun onViewportChanged(bounds: GeoBounds) {
+        viewport.value = bounds
     }
 
     fun toggleTopRated() {
@@ -216,5 +287,25 @@ class MapViewModel @Inject constructor(
          * gdy bazka miejsc urośnie.
          */
         const val TOP_RATED_THRESHOLD = 4.0
+        const val MAP_MARKERS_LIMIT = 200
+        const val VIEWPORT_DEBOUNCE_MS = 450L
+        const val VIEWPORT_CACHE_TTL_MS = 5 * 60 * 1000L
+        const val VIEWPORT_CACHE_SIZE = 12
     }
+
+    private fun viewportKey(bounds: GeoBounds, category: PlaceCategory? = null): String =
+        listOf(
+            (bounds.centerLatitude * 100).roundToInt(),
+            (bounds.centerLongitude * 100).roundToInt(),
+            ((bounds.north - bounds.south) * 100).roundToInt(),
+            ((longitudeSpan(bounds)) * 100).roundToInt(),
+            category?.name.orEmpty()
+        ).joinToString(":")
+
+    private fun longitudeSpan(bounds: GeoBounds): Double =
+        if (bounds.west <= bounds.east) {
+            bounds.east - bounds.west
+        } else {
+            (180.0 - bounds.west) + (bounds.east + 180.0)
+        }
 }

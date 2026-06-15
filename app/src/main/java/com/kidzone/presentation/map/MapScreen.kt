@@ -53,6 +53,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,9 +69,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.mapNotNull
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
@@ -83,6 +87,7 @@ import com.google.maps.android.compose.rememberCameraPositionState
 import com.kidzone.R
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.domain.model.GeoBounds
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.GpsDisabledBanner
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
@@ -111,6 +116,9 @@ private const val NEAR_ME_ZOOM = 14f
  * świeży pin był wyraźnie widoczny pośrodku ekranu z otoczeniem ulicznym.
  */
 private const val FOCUS_PLACE_ZOOM = 16f
+private const val MAX_SPIDERFIED_CLUSTER_SIZE = 10
+private const val SPIDERFY_MIN_ZOOM = 13f
+private const val CLUSTER_FIT_BOUNDS_PADDING_PX = 96
 
 /**
  * Ekran mapy z pinezkami miejsc.
@@ -160,6 +168,25 @@ fun MapScreen(
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(DEFAULT_CAMERA_TARGET, DEFAULT_CAMERA_ZOOM)
     }
+    var mapLoaded by remember { mutableStateOf(false) }
+    var expandedClusterKey by remember { mutableStateOf<String?>(null) }
+    var expandedClusterPlaceIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var userTouchedMap by remember { mutableStateOf(false) }
+    val currentZoom = cameraPositionState.position.zoom
+    val markerItems = remember(state.places, expandedClusterKey, expandedClusterPlaceIds, currentZoom) {
+        buildMapMarkerItems(
+            places = state.places,
+            expandedClusterKey = expandedClusterKey,
+            expandedPlaceIds = expandedClusterPlaceIds,
+            zoom = currentZoom
+        )
+    }
+
+    ReportSettledViewport(
+        cameraPositionState = cameraPositionState,
+        mapLoaded = mapLoaded,
+        onViewportChanged = viewModel::onViewportChanged
+    )
 
     // Po pomyślnym `addPlace` parent przekazuje współrzędne nowego miejsca
     // przez [focusOn] – animujemy kamerę na ten punkt na poziomie
@@ -183,7 +210,13 @@ fun MapScreen(
             // Nadanie uprawnienia = jasny sygnał "chcę się znaleźć", więc
             // sami centrujemy kamerę. Native crosshair user może później
             // używać do "wróć do mnie" po przewinięciu mapy.
-            scope.launch { recenterOnUser(context, cameraPositionState) }
+            scope.launch {
+                recenterOnUser(
+                    context = context,
+                    cameraPositionState = cameraPositionState,
+                    shouldAnimate = { !userTouchedMap }
+                )
+            }
         }
     }
 
@@ -201,7 +234,11 @@ fun MapScreen(
         if (!locationPermissionGranted) {
             locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         } else if (focusOn == null) {
-            recenterOnUser(context, cameraPositionState)
+            recenterOnUser(
+                context = context,
+                cameraPositionState = cameraPositionState,
+                shouldAnimate = { !userTouchedMap }
+            )
         }
     }
 
@@ -253,23 +290,75 @@ fun MapScreen(
             // wizualny) + 24 (dodatkowy buffer, żeby zoom buttons nie były
             // zbyt blisko FAB-a). Dobierane na oko, łatwo skorygować.
             contentPadding = PaddingValues(bottom = 120.dp),
+            onMapLoaded = { mapLoaded = true },
             // Tap w pustą część mapy = zamykamy bottom sheet (jeśli otwarty).
-            onMapClick = { viewModel.onPlaceSelected(null) }
+            onMapClick = {
+                userTouchedMap = true
+                expandedClusterKey = null
+                expandedClusterPlaceIds = emptySet()
+                viewModel.onPlaceSelected(null)
+            }
         ) {
-            state.places.forEach { place ->
+            markerItems.forEach { marker ->
+                val markerKeys: Array<Any> = arrayOf(
+                    marker.key,
+                    marker.place?.category?.name.orEmpty(),
+                    marker.cluster?.places?.size ?: 0
+                )
                 MarkerComposable(
-                    keys = arrayOf(place.id, place.category),
-                    state = MarkerState(LatLng(place.latitude, place.longitude)),
-                    title = place.name,
-                    snippet = place.address.takeIf { it.isNotBlank() },
+                    keys = markerKeys,
+                    state = MarkerState(marker.position),
+                    title = marker.place?.name ?: "${marker.cluster?.places?.size.orZero()} miejsc",
+                    snippet = marker.place?.address?.takeIf { it.isNotBlank() },
                     // true = consume zdarzenie. Domyślny info-window ma
                     // uboższe info niż nasz sheet, więc nadpisujemy własnym.
                     onClick = {
-                        viewModel.onPlaceSelected(place.id)
+                        userTouchedMap = true
+                        marker.cluster?.let { cluster ->
+                            val shouldZoomIntoCluster =
+                                currentZoom < SPIDERFY_MIN_ZOOM ||
+                                    cluster.places.size >= MAX_SPIDERFIED_CLUSTER_SIZE
+                            if (shouldZoomIntoCluster) {
+                                expandedClusterKey = null
+                                expandedClusterPlaceIds = if (
+                                    cluster.places.size <= MAX_SPIDERFIED_CLUSTER_SIZE
+                                ) {
+                                    cluster.places.mapTo(mutableSetOf()) { place -> place.id }
+                                } else {
+                                    emptySet()
+                                }
+                                scope.launch {
+                                    cameraPositionState.animate(
+                                        cameraUpdateForCluster(cluster)
+                                    )
+                                }
+                            } else {
+                                expandedClusterPlaceIds = emptySet()
+                                expandedClusterKey = cluster.key
+                            }
+                            viewModel.onPlaceSelected(null)
+                        }
+                        marker.place?.let { place ->
+                            if (marker.isSpiderfied) {
+                                scope.launch {
+                                    cameraPositionState.animate(
+                                        CameraUpdateFactory.newLatLngZoom(
+                                            LatLng(place.latitude, place.longitude),
+                                            FOCUS_PLACE_ZOOM
+                                        )
+                                    )
+                                }
+                            }
+                            viewModel.onPlaceSelected(place.id)
+                        }
                         true
                     }
                 ) {
-                    CategoryMarkerIcon(category = place.category)
+                    if (marker.cluster != null) {
+                        ClusterMarkerIcon(count = marker.cluster.places.size)
+                    } else {
+                        CategoryMarkerIcon(category = marker.place!!.category)
+                    }
                 }
             }
         }
@@ -328,6 +417,7 @@ fun MapScreen(
         MapMyLocationButton(
             onClick = {
                 if (locationPermissionGranted) {
+                    userTouchedMap = false
                     scope.launch { recenterOnUser(context, cameraPositionState) }
                 } else {
                     locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -380,6 +470,55 @@ fun MapScreen(
     }
 }
 
+private fun Int?.orZero(): Int = this ?: 0
+
+private fun cameraUpdateForCluster(cluster: MarkerCluster) =
+    if (cluster.places.hasSameCoordinates()) {
+        CameraUpdateFactory.newLatLngZoom(cluster.center, FOCUS_PLACE_ZOOM)
+    } else {
+        CameraUpdateFactory.newLatLngBounds(
+            LatLngBounds.builder().apply {
+                cluster.places.forEach { place ->
+                    include(LatLng(place.latitude, place.longitude))
+                }
+            }.build(),
+            CLUSTER_FIT_BOUNDS_PADDING_PX
+        )
+    }
+
+private fun List<Place>.hasSameCoordinates(): Boolean {
+    val first = firstOrNull() ?: return true
+    return all { place ->
+        place.latitude == first.latitude && place.longitude == first.longitude
+    }
+}
+
+@Composable
+private fun ReportSettledViewport(
+    cameraPositionState: CameraPositionState,
+    mapLoaded: Boolean,
+    onViewportChanged: (GeoBounds) -> Unit
+) {
+    LaunchedEffect(cameraPositionState, mapLoaded) {
+        if (!mapLoaded) return@LaunchedEffect
+        snapshotFlow { cameraPositionState.isMoving to cameraPositionState.position }
+            .filter { (isMoving, _) -> !isMoving }
+            .mapNotNull {
+                cameraPositionState.projection?.visibleRegion?.latLngBounds
+            }
+            .collect { bounds ->
+                onViewportChanged(
+                    GeoBounds(
+                        north = bounds.northeast.latitude,
+                        east = bounds.northeast.longitude,
+                        south = bounds.southwest.latitude,
+                        west = bounds.southwest.longitude
+                    )
+                )
+            }
+    }
+}
+
 /**
  * Pojedyncza pinezka renderowana jako [MarkerComposable] – kółko w kolorze
  * kategorii z białą ikoną tej kategorii w środku, plus białe obramowanie
@@ -408,6 +547,34 @@ private fun CategoryMarkerIcon(category: PlaceCategory) {
                 .size(36.dp)
                 .padding(6.dp)
         )
+    }
+}
+
+@Composable
+private fun ClusterMarkerIcon(count: Int) {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.primary,
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.surface),
+        shadowElevation = 4.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .padding(4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (count > MAX_SPIDERFIED_CLUSTER_SIZE) {
+                    "$MAX_SPIDERFIED_CLUSTER_SIZE+"
+                } else {
+                    count.toString()
+                },
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onPrimary,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 
@@ -760,9 +927,11 @@ private fun MapMyLocationButton(
  */
 private suspend fun recenterOnUser(
     context: Context,
-    cameraPositionState: CameraPositionState
+    cameraPositionState: CameraPositionState,
+    shouldAnimate: () -> Boolean = { true }
 ) {
     val coords = runCatching { fetchCurrentLocation(context) }.getOrNull() ?: return
+    if (!shouldAnimate()) return
     cameraPositionState.animate(
         CameraUpdateFactory.newLatLngZoom(
             LatLng(coords.first, coords.second),

@@ -51,6 +51,34 @@ interface PlaceDao {
     @Query("SELECT * FROM places ORDER BY cachedAtMillis DESC LIMIT :limit")
     suspend fun getRecentPlaces(limit: Int): List<PlaceEntity>
 
+    /** Ograniczony fallback mapy dla zwykłego viewportu. */
+    @Query(
+        "SELECT * FROM places WHERE latitude BETWEEN :south AND :north " +
+            "AND longitude BETWEEN :west AND :east " +
+            "ORDER BY cachedAtMillis DESC LIMIT :limit"
+    )
+    suspend fun getPlacesInBounds(
+        north: Double,
+        east: Double,
+        south: Double,
+        west: Double,
+        limit: Int
+    ): List<PlaceEntity>
+
+    /** Fallback mapy dla viewportu przecinającego południk 180°. */
+    @Query(
+        "SELECT * FROM places WHERE latitude BETWEEN :south AND :north " +
+            "AND (longitude >= :west OR longitude <= :east) " +
+            "ORDER BY cachedAtMillis DESC LIMIT :limit"
+    )
+    suspend fun getPlacesInWrappedBounds(
+        north: Double,
+        east: Double,
+        south: Double,
+        west: Double,
+        limit: Int
+    ): List<PlaceEntity>
+
     /** Strona cache'u zgodna z filtrami listy. */
     @Query(
         "SELECT * FROM places " +
