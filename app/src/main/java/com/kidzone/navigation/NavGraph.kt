@@ -110,6 +110,13 @@ fun KidZoneNavGraph(
                                     navController.currentBackStackEntry
                                         ?.savedStateHandle
                                         ?.set("focusTab", Route.Profile.path)
+                                    // Jeśli deep link zawiera segment (np. "badges"),
+                                    // przekazujemy go jako sygnał do ProfileScreen
+                                    if (firstSegment.isNotBlank()) {
+                                        navController.currentBackStackEntry
+                                            ?.savedStateHandle
+                                            ?.set("profileSection", firstSegment)
+                                    }
                                 }
                                 "ranking" -> {
                                     // firstSegment = "places" or "users"
@@ -198,16 +205,21 @@ fun KidZoneNavGraph(
                 val rankingTab by savedHandle
                     .getStateFlow("rankingTab", "")
                     .collectAsState()
+                val profileSection by savedHandle
+                    .getStateFlow("profileSection", "")
+                    .collectAsState()
 
                 MainScreen(
                     focusLatitude = focusLat,
                     focusLongitude = focusLng,
                     focusTab = focusTab,
                     rankingTab = rankingTab,
+                    profileSection = profileSection,
                     onFocusConsumed = {
                         savedHandle[NEW_PLACE_LAT] = null
                         savedHandle["focusTab"] = ""
                         savedHandle["rankingTab"] = ""
+                        savedHandle["profileSection"] = ""
                         savedHandle[NEW_PLACE_LNG] = null
                     },
                     onOpenPlaceDetails = { placeId, source ->

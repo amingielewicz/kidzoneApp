@@ -121,7 +121,7 @@ class KidZoneMessagingService : FirebaseMessagingService() {
             }
             "place_top_rank" -> "kidzone://ranking/places"
             "user_top_rank" -> "kidzone://ranking/users"
-            "new_badge" -> "kidzone://profile"
+            "new_badge" -> "kidzone://profile/badges"
             else -> null
         }
     }

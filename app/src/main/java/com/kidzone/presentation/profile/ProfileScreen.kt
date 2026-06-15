@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -113,6 +114,7 @@ fun ProfileScreen(
     onSignOut: () -> Unit,
     onOpenMyPlaces: () -> Unit,
     onOpenMyReviews: () -> Unit,
+    scrollToSection: String = "",
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val user by viewModel.user.collectAsState()
@@ -159,6 +161,7 @@ fun ProfileScreen(
                     signInProvider = ui.signInProvider,
                     obtainedBadges = ui.obtainedBadges,
                     userRank = ui.userRank,
+                    scrollToSection = scrollToSection,
                     onEdit = viewModel::openEditSheet,
                     onOpenMyPlaces = onOpenMyPlaces,
                     onOpenMyReviews = onOpenMyReviews,
@@ -276,6 +279,7 @@ private fun ProfileContent(
     signInProvider: SignInProvider,
     obtainedBadges: List<UserBadge>,
     userRank: Int?,
+    scrollToSection: String = "",
     onEdit: () -> Unit,
     onOpenMyPlaces: () -> Unit,
     onOpenMyReviews: () -> Unit,
@@ -288,7 +292,21 @@ private fun ProfileContent(
     onNotificationPrefs: () -> Unit,
     onSignOut: () -> Unit
 ) {
+    val lazyListState = rememberLazyListState()
+
+    // Auto-scroll do sekcji "Odznaki" gdy user wchodzi z push notification
+    LaunchedEffect(scrollToSection) {
+        if (scrollToSection == "badges") {
+            // Indeks BadgesCard w LazyColumn:
+            // 0: Header, 1: PersonalInfo (warunkowy), 2: Stats, 3: MyContent, 4/5: Badges
+            val hasPersonalInfo = user.firstName.isNotBlank() || user.lastName.isNotBlank()
+            val badgesIndex = if (hasPersonalInfo) 4 else 3
+            lazyListState.animateScrollToItem(badgesIndex)
+        }
+    }
+
     LazyColumn(
+        state = lazyListState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
