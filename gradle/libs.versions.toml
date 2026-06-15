@@ -4,6 +4,7 @@ agp = "8.13.2"
 kotlin = "2.0.20"
 ksp = "2.0.20-1.0.25"
 googleServices = "4.4.2"
+detekt = "1.23.8"
 
 # AndroidX
 coreKtx = "1.13.1"
@@ -184,3 +185,4 @@ hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
