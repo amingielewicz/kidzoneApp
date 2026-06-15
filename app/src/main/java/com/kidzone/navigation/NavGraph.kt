@@ -101,8 +101,8 @@ fun KidZoneNavGraph(
                             val firstSegment = uri.pathSegments?.firstOrNull().orEmpty()
                             when (host) {
                                 "place" -> {
-                                    val placeId = firstSegment
-                                    if (placeId.isNotBlank()) {
+                                    val placeId = NavigationArgumentValidator.sanitizePlaceId(firstSegment)
+                                    if (placeId != null) {
                                         navController.navigate(Route.PlaceDetails.create(placeId))
                                     }
                                 }
@@ -223,10 +223,10 @@ fun KidZoneNavGraph(
                         savedHandle[NEW_PLACE_LNG] = null
                     },
                     onOpenPlaceDetails = { placeId, source ->
-                    navController.navigate(Route.PlaceDetails.create(placeId, source)) {
-                        launchSingleTop = true
-                    }
-                },
+                        navController.navigate(Route.PlaceDetails.create(placeId, source)) {
+                            launchSingleTop = true
+                        }
+                    },
                     onOpenAddPlace = { navController.navigate(Route.AddPlace.create()) },
                     onOpenMyPlaces = { navController.navigate(Route.MyPlaces.path) },
                     onOpenMyReviews = { navController.navigate(Route.MyReviews.path) },
@@ -296,7 +296,15 @@ fun KidZoneNavGraph(
                 )
             ) { backStackEntry ->
                 val source = backStackEntry.arguments?.getString(Route.PlaceDetails.ARG_SOURCE)
-                val placeId = backStackEntry.arguments?.getString(Route.PlaceDetails.ARG_PLACE_ID).orEmpty()
+                val placeId = NavigationArgumentValidator.sanitizePlaceId(
+                    backStackEntry.arguments?.getString(Route.PlaceDetails.ARG_PLACE_ID)
+                ).orEmpty()
+
+                if (placeId.isBlank()) {
+                    navController.popBackStack()
+                    return@composable
+                }
+
                 PlaceDetailsScreen(
                     onBack = { navController.popBackStack() },
                     onEditPlace = { navController.navigate(Route.AddPlace.create(it)) },
