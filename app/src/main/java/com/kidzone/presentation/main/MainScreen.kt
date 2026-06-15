@@ -92,6 +92,7 @@ fun MainScreen(
     focusLongitude: Double? = null,
     focusTab: String = "",
     rankingTab: String = "",
+    profileSection: String = "",
     onFocusConsumed: () -> Unit = {},
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedContentScope: AnimatedContentScope? = null
@@ -305,7 +306,8 @@ fun MainScreen(
                     ProfileScreen(
                         onSignOut = onSignOut,
                         onOpenMyPlaces = onOpenMyPlaces,
-                        onOpenMyReviews = onOpenMyReviews
+                        onOpenMyReviews = onOpenMyReviews,
+                        scrollToSection = profileSection
                     )
                 }
             }
