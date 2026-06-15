@@ -166,6 +166,7 @@ fun MapScreen(
     }
     var mapLoaded by remember { mutableStateOf(false) }
     var expandedClusterKey by remember { mutableStateOf<String?>(null) }
+    var userTouchedMap by remember { mutableStateOf(false) }
     val markerItems = remember(state.places, expandedClusterKey) {
         buildMapMarkerItems(state.places, expandedClusterKey)
     }
@@ -198,7 +199,13 @@ fun MapScreen(
             // Nadanie uprawnienia = jasny sygnał "chcę się znaleźć", więc
             // sami centrujemy kamerę. Native crosshair user może później
             // używać do "wróć do mnie" po przewinięciu mapy.
-            scope.launch { recenterOnUser(context, cameraPositionState) }
+            scope.launch {
+                recenterOnUser(
+                    context = context,
+                    cameraPositionState = cameraPositionState,
+                    shouldAnimate = { !userTouchedMap }
+                )
+            }
         }
     }
 
@@ -216,7 +223,11 @@ fun MapScreen(
         if (!locationPermissionGranted) {
             locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         } else if (focusOn == null) {
-            recenterOnUser(context, cameraPositionState)
+            recenterOnUser(
+                context = context,
+                cameraPositionState = cameraPositionState,
+                shouldAnimate = { !userTouchedMap }
+            )
         }
     }
 
@@ -271,6 +282,7 @@ fun MapScreen(
             onMapLoaded = { mapLoaded = true },
             // Tap w pustą część mapy = zamykamy bottom sheet (jeśli otwarty).
             onMapClick = {
+                userTouchedMap = true
                 expandedClusterKey = null
                 viewModel.onPlaceSelected(null)
             }
@@ -289,6 +301,7 @@ fun MapScreen(
                     // true = consume zdarzenie. Domyślny info-window ma
                     // uboższe info niż nasz sheet, więc nadpisujemy własnym.
                     onClick = {
+                        userTouchedMap = true
                         marker.cluster?.let { cluster ->
                             expandedClusterKey = cluster.key
                             viewModel.onPlaceSelected(null)
@@ -362,6 +375,7 @@ fun MapScreen(
         MapMyLocationButton(
             onClick = {
                 if (locationPermissionGranted) {
+                    userTouchedMap = false
                     scope.launch { recenterOnUser(context, cameraPositionState) }
                 } else {
                     locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -846,9 +860,11 @@ private fun MapMyLocationButton(
  */
 private suspend fun recenterOnUser(
     context: Context,
-    cameraPositionState: CameraPositionState
+    cameraPositionState: CameraPositionState,
+    shouldAnimate: () -> Boolean = { true }
 ) {
     val coords = runCatching { fetchCurrentLocation(context) }.getOrNull() ?: return
+    if (!shouldAnimate()) return
     cameraPositionState.animate(
         CameraUpdateFactory.newLatLngZoom(
             LatLng(coords.first, coords.second),
