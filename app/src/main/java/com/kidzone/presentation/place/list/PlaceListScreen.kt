@@ -176,8 +176,16 @@ fun PlaceListScreen(
     // porządku - co jest mylące (nie wiadomo, czy to jeszcze ten sam wynik
     // czy nowy item w środku rankingu). animateScrollToItem(0) jest
     // bezpieczny gdy lista jest pusta - po prostu nic nie robi.
+    //
+    // Używamy rememberSaveable, żeby uniknąć scrollowania na górę po
+    // nawigacji powrotnej z PlaceDetails (LaunchedEffect odpalałby się
+    // ponownie z tym samym kluczem sortOrder przy re-compose).
+    var lastAppliedSortOrder by rememberSaveable { mutableStateOf(state.sortOrder.name) }
     LaunchedEffect(state.sortOrder) {
-        lazyListState.animateScrollToItem(0)
+        if (state.sortOrder.name != lastAppliedSortOrder) {
+            lastAppliedSortOrder = state.sortOrder.name
+            lazyListState.animateScrollToItem(0)
+        }
     }
 
     // Launcher requestu uprawnienia. Po nadaniu odświeżamy lokalizację -
