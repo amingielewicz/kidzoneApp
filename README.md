@@ -2,6 +2,18 @@
 
 Społecznościowa aplikacja mobilna dla rodziców — odkrywaj, dodawaj i oceniaj miejsca przyjazne dzieciom.
 
+## 📋 Wymagania systemowe
+
+| Komponent | Wersja |
+|-----------|--------|
+| Android min SDK | **26** (Android 8.0 Oreo) |
+| Android target SDK | **35** (Android 15) |
+| Java / JDK | **17** |
+| Kotlin | **2.0.20** |
+| Gradle | **8.13.2** (AGP) |
+| Node.js (Functions) | **22** |
+| Firebase CLI | najnowsza (`npm i -g firebase-tools`) |
+
 ## 📱 Funkcje
 
 ### Dla użytkowników:
@@ -16,6 +28,11 @@ Społecznościowa aplikacja mobilna dla rodziców — odkrywaj, dodawaj i ocenia
 - 📊 Ranking TOP 10 użytkowników i miejsc
 - 🚨 Zgłaszanie naruszeń (miejsca, opinie, zdjęcia)
 - 💡 Propozycje zmian w danych miejsc
+- 📲 Widget "Miejsca w pobliżu" na ekranie głównym (Glance AppWidget)
+- 🔄 In-App Update — automatyczne powiadomienie o nowej wersji
+- ⭐ In-App Review — zachęta do oceny w Google Play
+- 📴 Tryb offline — cache Room + synchronizacja w tle (WorkManager)
+- 🔗 Deep linking (`https://playground-705e7162.web.app/place/{id}` + `kidzone://place/{id}`)
 - 🧪 A/B Testing (Remote Config + Analytics)
 - 🛑 Maintenance mode (Remote Config gate)
 
@@ -58,6 +75,35 @@ Społecznościowa aplikacja mobilna dla rodziców — odkrywaj, dodawaj i ocenia
 - **Cloud Functions CI** — ESLint + tsc + build
 - **Admin Panel CI** — ESLint + Prettier + tsc + vite build
 - **Firestore Rules Tests** — vitest + @firebase/rules-unit-testing + emulator
+
+## 🏷️ Kategorie i udogodnienia
+
+### Kategorie miejsc (7):
+| Enum | Opis |
+|------|------|
+| `PLAYGROUND` | Plac zabaw (outdoor) |
+| `PLAY_ROOM` | Sala zabaw (indoor) |
+| `CAFE` | Kawiarnia |
+| `RESTAURANT` | Restauracja |
+| `PARK` | Park |
+| `ATTRACTION` | Atrakcja (zoo, muzeum, aquapark itp.) |
+| `OTHER` | Inne |
+
+### Udogodnienia (40+):
+Każde udogodnienie jest przypisane do odpowiednich kategorii — UI filtruje listę po wybranej kategorii.
+
+| Grupa | Przykłady |
+|-------|-----------|
+| **Uniwersalne** | Przewijak, toaleta, dostęp dla wózka, parking |
+| **Plac zabaw** | Ogrodzenie, miękka nawierzchnia, zadaszone ławki, strefa malucha, strefa bez aut |
+| **Restauracja / Kawiarnia** | Menu dla dzieci, krzesełko, sztućce dla dzieci, szybka obsługa, kącik zabaw widoczny z sali |
+| **Sala zabaw** | Strefy wiekowe, animator, monitoring, dezynfekcja zabawek, strefa rodzica, szafki |
+| **Kawiarnia (specyficzne)** | Miejsce do spokojnego karmienia, mikrofalówka, brak głośnej muzyki, zabawki sensoryczne |
+| **Park** | Strefa piknikowa, bezpieczne ścieżki, woda pitna, miejsce do karmienia piersią, oświetlenie |
+| **Atrakcja** | Wypożyczalnia wózków, strefy odpoczynku, fast-track dla rodzin, pokój matki z dzieckiem, punkt zgubionego dziecka |
+| **Ogólne** | Szerokie drzwi, parking rodzinny, przyjazne oznakowania, WiFi, ciche strefy |
+
+Pełna lista: `domain/model/Amenity.kt` • Kategorie: `domain/model/PlaceCategory.kt`
 
 ## 📐 Architektura
 
@@ -140,6 +186,37 @@ ExperimentSwitch(
 Aktywne eksperymenty definiowane w `experiment/ActiveExperiments.kt`.
 Szczegóły: patrz `experiment/` package.
 
+## 🔢 Wersjonowanie
+
+Aplikacja używa automatycznego systemu wersjonowania opartego na Git:
+
+### `versionCode` (numer buildu)
+Generowany automatycznie jako **liczba commitów na HEAD**:
+```kotlin
+versionCode = providers.exec {
+    commandLine("git", "rev-list", "--count", "HEAD")
+}.standardOutput.asText.get().trim().toIntOrNull() ?: 1
+```
+Każdy commit na `main` automatycznie podnosi `versionCode` — nie trzeba go ręcznie bumpować.
+
+### `versionName` (wersja widoczna dla użytkownika)
+Format: `MAJOR.MINOR.PATCH` na `main`, z suffixem `-dev#<nr>` na feature branchach:
+
+| Branch | Przykład `versionName` |
+|--------|----------------------|
+| `main` | `0.1.0` |
+| `feature/72-nowy-ekran` | `0.1.0-dev#72` |
+| CI z `PR_NUMBER=85` | `0.1.0-dev#85` |
+| Inny (fallback) | `0.1.0-dev#a3f4b2c` (skrócony SHA) |
+
+**Łańcuch rozwiązywania numeru PR:**
+1. Zmienna środowiskowa `PR_NUMBER` (ustawiana w CI/CD)
+2. Gradle property `-PPR_NUMBER=72`
+3. Cyfry z nazwy brancha (np. `fix/72-opis` → `72`)
+4. Skrócony commit hash (7 znaków) jako fallback
+
+Aby zmienić wersję bazową, edytuj `baseVersion` w `app/build.gradle.kts`.
+
 ## 🚀 Setup
 
 ### Android:
@@ -187,6 +264,23 @@ firebase use default    # wróć na produkcję
 
 Szczegóły: [STAGING.md](./STAGING.md)
 
+## 📱 Uprawnienia (Permissions)
+
+| Uprawnienie | Cel | Wymagane? |
+|-------------|-----|-----------|
+| `INTERNET` | Komunikacja z Firebase (Auth, Firestore, Storage, FCM) | Tak |
+| `ACCESS_NETWORK_STATE` | Sprawdzenie dostępności sieci (offline mode) | Tak |
+| `ACCESS_FINE_LOCATION` | Lokalizacja użytkownika na mapie, "miejsca w pobliżu" | Tak |
+| `ACCESS_COARSE_LOCATION` | Przybliżona lokalizacja (fallback) | Tak |
+| `CAMERA` | Robienie zdjęć miejsc bezpośrednio z appki | Nie (`required=false`) |
+| `READ_MEDIA_IMAGES` | Wybór zdjęć z galerii (Android 13+) | Tak |
+| `POST_NOTIFICATIONS` | Powiadomienia push (FCM) — Android 13+ wymaga runtime permission | Tak |
+
+### Hardware features (opcjonalne):
+- `android.hardware.camera` — `required=false` (appka działa bez kamery)
+- `android.hardware.camera.autofocus` — `required=false`
+- `android.hardware.location` — `required=false` (użytkownik może przeglądać bez GPS)
+
 ## 🔒 Bezpieczeństwo
 
 - Firebase App Check (Play Integrity + reCAPTCHA Enterprise)
@@ -195,7 +289,7 @@ Szczegóły: [STAGING.md](./STAGING.md)
 - Firestore Security Rules z walidacją typów i ownershipem
 - Storage Rules z limitami rozmiaru i MIME
 - CSP headers na hostingu
-- ProGuard/R8 w release (zawężone -keep reguły)
+- ProGuard/R8 w release (zawężone -keep reguły + dontwarn dla wewnętrznych klas play-services)
 - allowBackup=false
 - Network Security Config (no cleartext)
 - 1 zgłoszenie per user per target (duplicate prevention)
@@ -329,6 +423,76 @@ devops: CI/CD, deploy config
 | Firebase Hosting | Spark | 10GB storage, 360MB/day |
 | Google Maps SDK | — | $200/month credit (~28k loads) |
 | Play Integrity | — | 10k requests/day |
+
+## 🚀 Release / Google Play Store
+
+### Budowanie release bundle:
+```bash
+./gradlew bundleRelease
+# Output: app/build/outputs/bundle/release/app-release.aab
+```
+
+### Signing config:
+Release build wymaga keystore. Skonfiguruj w `~/.gradle/gradle.properties` (lub CI secrets):
+```properties
+KIDZONE_KEYSTORE_FILE=/path/to/kidzone-release.keystore
+KIDZONE_KEYSTORE_PASSWORD=***
+KIDZONE_KEY_ALIAS=kidzone
+KIDZONE_KEY_PASSWORD=***
+```
+
+### Checklist przed uploadem do Play Console:
+1. ✅ `./gradlew bundleRelease` przechodzi bez błędów
+2. ✅ `versionCode` jest wyższy niż poprzedni upload
+3. ✅ `google-services.json` — produkcyjny (nie staging!)
+4. ✅ ProGuard mapping: `app/build/outputs/mapping/release/mapping.txt` → upload do Play Console (Crashlytics)
+5. ✅ Testuj na fizycznym urządzeniu z release buildem
+6. ✅ Sprawdź deep linki (`adb shell am start -d "kidzone://place/testId"`)
+
+### Upload do Google Play Console:
+1. Zaloguj się do [Play Console](https://play.google.com/console)
+2. Production → Create new release
+3. Upload `app-release.aab`
+4. Dodaj release notes (co nowego)
+5. Review → Start rollout (staged rollout zalecany: 10% → 50% → 100%)
+
+### Materiały do listingu:
+| Element | Wymiary | Format |
+|---------|---------|--------|
+| Ikona | 512×512 px | PNG, 32-bit |
+| Feature graphic | 1024×500 px | PNG / JPEG |
+| Screenshoty (phone) | 16:9 (np. 1080×1920) | PNG / JPEG, min 2, max 8 |
+| Screenshoty (tablet) | 16:9 (np. 1920×1200) | PNG / JPEG (opcjonalne) |
+
+### Google Play dane:
+| Pole | Wartość |
+|------|---------|
+| Kategoria | Parenting |
+| Content rating | PEGI 3 / Everyone (IARC questionnaire) |
+| Target audience | Rodzice (18+) — **nie** zaznaczaj "dzieci" |
+| Polityka prywatności | `https://playground-705e7162.web.app/privacy-policy` |
+| Reklamy | Nie |
+| In-app purchases | Nie |
+
+## ⚠️ Troubleshooting
+
+### `bundleRelease` / R8 missing classes
+Jeśli `./gradlew bundleRelease` (lub `assembleRelease`) kończy się błędem:
+```
+ERROR: Missing classes detected while running R8.
+```
+Upewnij się, że `proguard-rules.pro` zawiera:
+```proguard
+-dontwarn com.google.android.gms.internal.**
+-dontwarn com.google.android.gms.common.annotation.NoNullnessRewrite
+```
+Te klasy to wewnętrzne adnotacje Google Play Services, które nie są potrzebne w runtime.
+
+Alternatywnie, sprawdź plik wygenerowany przez R8:
+```
+app/build/outputs/mapping/release/missing_rules.txt
+```
+i dodaj wymienione tam reguły do `proguard-rules.pro`.
 
 ## 📄 Licencja
 
