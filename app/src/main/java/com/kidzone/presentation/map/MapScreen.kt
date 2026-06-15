@@ -74,6 +74,7 @@ import kotlinx.coroutines.flow.mapNotNull
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
@@ -116,8 +117,8 @@ private const val NEAR_ME_ZOOM = 14f
  */
 private const val FOCUS_PLACE_ZOOM = 16f
 private const val MAX_SPIDERFIED_CLUSTER_SIZE = 10
-private const val CLUSTER_ZOOM_STEP = 3f
 private const val SPIDERFY_MIN_ZOOM = 13f
+private const val CLUSTER_FIT_BOUNDS_PADDING_PX = 96
 
 /**
  * Ekran mapy z pinezkami miejsc.
@@ -318,11 +319,7 @@ fun MapScreen(
                                 expandedClusterKey = null
                                 scope.launch {
                                     cameraPositionState.animate(
-                                        CameraUpdateFactory.newLatLngZoom(
-                                            cluster.center,
-                                            (currentZoom + CLUSTER_ZOOM_STEP)
-                                                .coerceAtMost(FOCUS_PLACE_ZOOM)
-                                        )
+                                        cameraUpdateForCluster(cluster)
                                     )
                                 }
                             } else {
@@ -463,6 +460,27 @@ fun MapScreen(
 }
 
 private fun Int?.orZero(): Int = this ?: 0
+
+private fun cameraUpdateForCluster(cluster: MarkerCluster) =
+    if (cluster.places.hasSameCoordinates()) {
+        CameraUpdateFactory.newLatLngZoom(cluster.center, FOCUS_PLACE_ZOOM)
+    } else {
+        CameraUpdateFactory.newLatLngBounds(
+            LatLngBounds.builder().apply {
+                cluster.places.forEach { place ->
+                    include(LatLng(place.latitude, place.longitude))
+                }
+            }.build(),
+            CLUSTER_FIT_BOUNDS_PADDING_PX
+        )
+    }
+
+private fun List<Place>.hasSameCoordinates(): Boolean {
+    val first = firstOrNull() ?: return true
+    return all { place ->
+        place.latitude == first.latitude && place.longitude == first.longitude
+    }
+}
 
 @Composable
 private fun ReportSettledViewport(
