@@ -2,5 +2,5 @@
 <paths>
     <cache-path
         name="review_photos"
-        path="." />
+        path="review_photos/" />
 </paths>
