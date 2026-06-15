@@ -117,6 +117,7 @@ private const val NEAR_ME_ZOOM = 14f
 private const val FOCUS_PLACE_ZOOM = 16f
 private const val MAX_SPIDERFIED_CLUSTER_SIZE = 10
 private const val CLUSTER_ZOOM_STEP = 3f
+private const val SPIDERFY_MIN_ZOOM = 13f
 
 /**
  * Ekran mapy z pinezkami miejsc.
@@ -310,7 +311,10 @@ fun MapScreen(
                     onClick = {
                         userTouchedMap = true
                         marker.cluster?.let { cluster ->
-                            if (cluster.places.size > MAX_SPIDERFIED_CLUSTER_SIZE) {
+                            val shouldZoomIntoCluster =
+                                currentZoom < SPIDERFY_MIN_ZOOM ||
+                                    cluster.places.size >= MAX_SPIDERFIED_CLUSTER_SIZE
+                            if (shouldZoomIntoCluster) {
                                 expandedClusterKey = null
                                 scope.launch {
                                     cameraPositionState.animate(
