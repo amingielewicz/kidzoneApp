@@ -34,15 +34,8 @@ import kotlin.math.sqrt
 import timber.log.Timber
 
 /**
- * Rozmiar jednej strony (paginacja klient-side).
- *
- * LazyColumn ładuje kolejne porcje po [PAGE_SIZE] elementów. User scrolluje
- * na dół → UI automatycznie doładowuje następną stronę z już-załadowanej
- * kolekcji (dane z Firestore snapshot listenera / Room cache).
- *
- * Soft-limit całej listy to nadal ~500 miejsc w pamięci (Firestore snapshot) –
- * wystarczające dla skali MVP. Ciężka server-side paginacja (limit+startAfter)
- * do dorobienia gdy baza przekroczy 1000+ miejsc.
+ * Rozmiar jednej strony. Pierwsza strona jest obserwowana przez Firestore
+ * i Room, a kolejne są pobierane kursorem dopiero przy końcu LazyColumn.
  */
 private const val PAGE_SIZE = 20
 
@@ -162,6 +155,9 @@ class PlaceListViewModel @Inject constructor(
     /** True while a server page fetch is in-flight. */
     private val _isLoadingMore = MutableStateFlow(false)
 
+    /** Zapobiega ponownym fetchom po otrzymaniu ostatniej strony. */
+    private var serverExhausted = false
+
     /** Wewnętrzny model wyniku ze strumienia Firestore. */
     private sealed interface PlacesLoad {
         data object Loading : PlacesLoad
@@ -171,7 +167,7 @@ class PlaceListViewModel @Inject constructor(
 
     private val placesLoad: Flow<PlacesLoad> = combine(
         selectedCategory,
-        searchQuery.debounce(300).distinctUntilChanged()
+        searchQuery.debounce(400).distinctUntilChanged()
     ) { category, query ->
         category to query
     }.flatMapLatest { (category, query) ->
@@ -412,31 +408,49 @@ class PlaceListViewModel @Inject constructor(
 
         // All client-side data shown — fetch next page from server.
         if (_isLoadingMore.value) return // Already fetching
-        if (serverCursor == null && extraPages.value.isNotEmpty()) return // No more pages
+        if (serverExhausted) return
 
         viewModelScope.launch {
             _isLoadingMore.value = true
             val category = selectedCategory.value
             val query = searchQuery.value.takeIf { it.isNotBlank() }
 
-            when (val result = placeRepository.getPlacesPage(
-                pageSize = PAGE_SIZE,
-                cursor = serverCursor,
-                category = category,
-                query = query
-            )) {
-                is OpResult.Success -> {
-                    val page = result.data
-                    serverCursor = page.nextCursor
-                    if (page.items.isNotEmpty()) {
-                        extraPages.update { current -> current + page.items }
-                        visibleCount.update { it + page.items.size }
+            var attempts = 0
+            var addedCount = 0
+            do {
+                attempts++
+                when (val result = placeRepository.getPlacesPage(
+                    pageSize = PAGE_SIZE,
+                    cursor = serverCursor,
+                    category = category,
+                    query = query
+                )) {
+                    is OpResult.Success -> {
+                        val page = result.data
+                        serverCursor = page.nextCursor
+                        serverExhausted = page.nextCursor == null
+
+                        val knownIds = (uiState.value.places + extraPages.value)
+                            .asSequence()
+                            .map { it.id }
+                            .toHashSet()
+                        val newItems = page.items.filterNot { it.id in knownIds }
+                        if (newItems.isNotEmpty()) {
+                            extraPages.update { current ->
+                                (current + newItems).distinctBy { it.id }
+                            }
+                            addedCount += newItems.size
+                        }
+                    }
+                    is OpResult.Failure -> {
+                        Timber.w("loadMore: failed to fetch next page: ${result.error.message}")
+                        break
                     }
                 }
-                is OpResult.Failure -> {
-                    // Silent fail — user can retry by scrolling again.
-                    Timber.w("loadMore: failed to fetch next page: ${result.error.message}")
-                }
+            } while (addedCount == 0 && !serverExhausted && attempts < 2)
+
+            if (addedCount > 0) {
+                visibleCount.update { it + addedCount }
             }
             _isLoadingMore.value = false
         }
@@ -446,6 +460,7 @@ class PlaceListViewModel @Inject constructor(
     private fun resetPagination() {
         visibleCount.value = PAGE_SIZE
         serverCursor = null
+        serverExhausted = false
         extraPages.value = emptyList()
         // Reset scroll position — UI will scroll to top via LaunchedEffect.
         savedScrollIndex = 0

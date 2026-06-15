@@ -16,25 +16,28 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface PlaceDao {
 
-    /** Wszystkie miejsca z cache'u, jako Flow (Room LiveData-like). */
-    @Query("SELECT * FROM places ORDER BY createdAtMillis DESC")
-    fun observeAll(): Flow<List<PlaceEntity>>
+    /** Ograniczona, najnowsza część cache'u jako Flow. */
+    @Query("SELECT * FROM places ORDER BY createdAtMillis DESC LIMIT :limit")
+    fun observeAll(limit: Int): Flow<List<PlaceEntity>>
 
     /** Miejsca filtrowane po kategorii. */
-    @Query("SELECT * FROM places WHERE category = :category ORDER BY createdAtMillis DESC")
-    fun observeByCategory(category: String): Flow<List<PlaceEntity>>
+    @Query("SELECT * FROM places WHERE category = :category ORDER BY createdAtMillis DESC LIMIT :limit")
+    fun observeByCategory(category: String, limit: Int): Flow<List<PlaceEntity>>
 
     /** Miejsca filtrowane po nazwie (wyszukiwarka). */
-    @Query("SELECT * FROM places WHERE name LIKE '%' || :query || '%' ORDER BY createdAtMillis DESC")
-    fun observeByName(query: String): Flow<List<PlaceEntity>>
+    @Query("SELECT * FROM places WHERE name LIKE '%' || :query || '%' ORDER BY createdAtMillis DESC LIMIT :limit")
+    fun observeByName(query: String, limit: Int): Flow<List<PlaceEntity>>
 
     /** Miejsca filtrowane po kategorii i nazwie. */
-    @Query("SELECT * FROM places WHERE category = :category AND name LIKE '%' || :query || '%' ORDER BY createdAtMillis DESC")
-    fun observeByCategoryAndName(category: String, query: String): Flow<List<PlaceEntity>>
+    @Query(
+        "SELECT * FROM places WHERE category = :category " +
+            "AND name LIKE '%' || :query || '%' ORDER BY createdAtMillis DESC LIMIT :limit"
+    )
+    fun observeByCategoryAndName(category: String, query: String, limit: Int): Flow<List<PlaceEntity>>
 
     /** Miejsca dodane przez konkretnego usera. */
-    @Query("SELECT * FROM places WHERE ownerUserId = :userId ORDER BY createdAtMillis DESC")
-    fun observeByOwner(userId: String): Flow<List<PlaceEntity>>
+    @Query("SELECT * FROM places WHERE ownerUserId = :userId ORDER BY createdAtMillis DESC LIMIT :limit")
+    fun observeByOwner(userId: String, limit: Int): Flow<List<PlaceEntity>>
 
     /** Pojedyncze miejsce po id (one-shot). */
     @Query("SELECT * FROM places WHERE id = :placeId LIMIT 1")
@@ -43,6 +46,24 @@ interface PlaceDao {
     /** Top N miejsc wg averageRating. */
     @Query("SELECT * FROM places ORDER BY averageRating DESC LIMIT :limit")
     suspend fun getTopPlaces(limit: Int): List<PlaceEntity>
+
+    /** Ograniczony fallback dla zapytań geo, sortowany od najświeższych danych. */
+    @Query("SELECT * FROM places ORDER BY cachedAtMillis DESC LIMIT :limit")
+    suspend fun getRecentPlaces(limit: Int): List<PlaceEntity>
+
+    /** Strona cache'u zgodna z filtrami listy. */
+    @Query(
+        "SELECT * FROM places " +
+            "WHERE (:category IS NULL OR category = :category) " +
+            "AND (:query IS NULL OR name LIKE '%' || :query || '%') " +
+            "ORDER BY createdAtMillis DESC LIMIT :limit OFFSET :offset"
+    )
+    suspend fun getPlacesPage(
+        category: String?,
+        query: String?,
+        limit: Int,
+        offset: Int
+    ): List<PlaceEntity>
 
     /** All places for widget (fetch all, distance calculated in memory). */
     @Query("SELECT * FROM places")

@@ -1,12 +1,14 @@
 package com.kidzone.presentation.place.list
 
 import com.kidzone.domain.model.Amenity
+import com.kidzone.domain.model.PagedResult
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.service.LocationProvider
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
+import com.kidzone.utils.OpResult
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -276,10 +278,29 @@ class PlaceListViewModelTest {
             advanceUntilIdle()
 
             viewModel.onSearchQueryChange("restauracja")
-            advanceTimeBy(350) // debounce is 300ms
+            advanceTimeBy(450) // debounce is 400ms
             advanceUntilIdle()
 
             verify { placeRepository.observePlaces(any(), eq("restauracja")) }
+        }
+
+        @Test
+        fun `typing quickly triggers only final repository query`() = runTest {
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+            clearMocks(placeRepository, answers = false, recordedCalls = true)
+
+            viewModel.onSearchQueryChange("r")
+            advanceTimeBy(100)
+            viewModel.onSearchQueryChange("re")
+            advanceTimeBy(100)
+            viewModel.onSearchQueryChange("res")
+            advanceTimeBy(450)
+            advanceUntilIdle()
+
+            verify(exactly = 1) { placeRepository.observePlaces(any(), eq("res")) }
+            verify(exactly = 0) { placeRepository.observePlaces(any(), eq("r")) }
+            verify(exactly = 0) { placeRepository.observePlaces(any(), eq("re")) }
         }
     }
 
@@ -307,6 +328,36 @@ class PlaceListViewModelTest {
 
             assertTrue(viewModel.uiState.value.places.size > initialCount,
                 "Expected more places after loadMore. Before: $initialCount, After: ${viewModel.uiState.value.places.size}")
+        }
+
+        @Test
+        fun `loadMore skips duplicated snapshot page and appends next server page`() = runTest {
+            val firstPage = (1..20).map {
+                TestFixtures.place(id = "p$it", createdAtMillis = it.toLong())
+            }
+            val secondPage = (21..40).map {
+                TestFixtures.place(id = "p$it", createdAtMillis = it.toLong())
+            }
+            every { placeRepository.observePlaces(any(), any()) } returns flowOf(firstPage)
+            coEvery {
+                placeRepository.getPlacesPage(20, null, null, null)
+            } returns OpResult.success(PagedResult(firstPage, "cursor-1"))
+            coEvery {
+                placeRepository.getPlacesPage(20, "cursor-1", null, null)
+            } returns OpResult.success(PagedResult(secondPage, null))
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+            viewModel.loadMore()
+            advanceUntilIdle()
+
+            assertEquals(40, viewModel.uiState.value.places.size)
+            coVerify(exactly = 1) {
+                placeRepository.getPlacesPage(20, null, null, null)
+            }
+            coVerify(exactly = 1) {
+                placeRepository.getPlacesPage(20, "cursor-1", null, null)
+            }
         }
     }
 }

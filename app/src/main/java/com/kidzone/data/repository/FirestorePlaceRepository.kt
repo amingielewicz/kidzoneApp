@@ -6,6 +6,7 @@ import com.kidzone.data.local.PlaceDao
 import com.kidzone.data.local.PlaceEntity
 import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.PlaceDto
+import com.kidzone.di.ApplicationScope
 import com.kidzone.domain.model.PagedResult
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
@@ -22,10 +23,15 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import timber.log.Timber
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.CoroutineScope
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -36,7 +42,8 @@ import javax.inject.Singleton
 class FirestorePlaceRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val placeDao: PlaceDao,
-    private val syncManager: SyncManager
+    private val syncManager: SyncManager,
+    @ApplicationScope private val applicationScope: CoroutineScope
 ) : PlaceRepository {
 
     companion object {
@@ -45,16 +52,48 @@ class FirestorePlaceRepository @Inject constructor(
          * Additional pages are fetched on demand via [getPlacesPage] cursor pagination.
          */
         private const val PAGE_SIZE_SNAPSHOT = 20
+        private const val OWNER_PLACES_LIMIT = 100
+        private const val GEO_QUERY_LIMIT = 200
+        private const val ROOM_CURSOR_PREFIX = "room:"
     }
 
-    override fun observePlaces(category: PlaceCategory?, query: String?): Flow<List<Place>> = channelFlow {
+    private data class PlacesQueryKey(
+        val category: PlaceCategory?,
+        val query: String?
+    )
+
+    private val sharedPlaceFlows = ConcurrentHashMap<PlacesQueryKey, Flow<List<Place>>>()
+
+    override fun observePlaces(category: PlaceCategory?, query: String?): Flow<List<Place>> {
+        val normalizedQuery = query?.trim()?.takeIf { it.isNotEmpty() }
+        if (normalizedQuery != null) {
+            // Frazy są krótkotrwałe i praktycznie nie współdzielą się między
+            // ekranami. Nie trzymamy ich w mapie przez cały proces aplikacji.
+            return createPlacesFlow(category, normalizedQuery)
+        }
+        val key = PlacesQueryKey(category, normalizedQuery)
+        return sharedPlaceFlows.computeIfAbsent(key) {
+            createPlacesFlow(category, normalizedQuery)
+                .shareIn(
+                    scope = applicationScope,
+                    started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
+                    replay = 1
+                )
+        }
+    }
+
+    private fun createPlacesFlow(
+        category: PlaceCategory?,
+        query: String?
+    ): Flow<List<Place>> = channelFlow {
         // 1. Room jako local source – emitujemy z niego do kanału.
         // Jeśli jest query, Room filtruje po 'contains', Firestore po prefixie.
         val localFlow = when {
-            category != null && !query.isNullOrBlank() -> placeDao.observeByCategoryAndName(category.name, query)
-            category != null -> placeDao.observeByCategory(category.name)
-            !query.isNullOrBlank() -> placeDao.observeByName(query)
-            else -> placeDao.observeAll()
+            category != null && !query.isNullOrBlank() ->
+                placeDao.observeByCategoryAndName(category.name, query, PAGE_SIZE_SNAPSHOT)
+            category != null -> placeDao.observeByCategory(category.name, PAGE_SIZE_SNAPSHOT)
+            !query.isNullOrBlank() -> placeDao.observeByName(query, PAGE_SIZE_SNAPSHOT)
+            else -> placeDao.observeAll(PAGE_SIZE_SNAPSHOT)
         }
 
         // 2. Firestore snapshot listener – aktualizuje Room w tle.
@@ -88,9 +127,16 @@ class FirestorePlaceRepository @Inject constructor(
                 }
                 awaitClose { registration.remove() }
             }
-            firestoreFlow.collect { places ->
-                placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
-            }
+            firestoreFlow
+                .catch {
+                    Timber.w(
+                        it,
+                        "observePlaces sync failed (category=$category, query=$query)"
+                    )
+                }
+                .collect { places ->
+                    placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
+                }
         }
 
         // 3. Emituj dane z Room (re-emituje automatycznie po upsert z synca).
@@ -105,12 +151,13 @@ class FirestorePlaceRepository @Inject constructor(
             return@channelFlow
         }
 
-        val localFlow = placeDao.observeByOwner(ownerUserId)
+        val localFlow = placeDao.observeByOwner(ownerUserId, OWNER_PLACES_LIMIT)
 
         val syncJob = launch {
             val firestoreFlow = callbackFlow {
                 val registration = placesCollection()
                     .whereEqualTo("ownerUserId", ownerUserId)
+                    .limit(OWNER_PLACES_LIMIT.toLong())
                     .addSnapshotListener { snapshot, error ->
                         if (error != null) {
                             close(error)
@@ -172,6 +219,7 @@ class FirestorePlaceRepository @Inject constructor(
             val snapshot = placesCollection()
                 .whereGreaterThanOrEqualTo("geohash", centerHash)
                 .whereLessThan("geohash", hashEnd)
+                .limit(GEO_QUERY_LIMIT.toLong())
                 .get()
                 .await()
             val places = snapshot.documents.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
@@ -183,7 +231,7 @@ class FirestorePlaceRepository @Inject constructor(
             OpResult.success(places)
         } catch (e: Exception) {
             // Offline fallback: zwróć z Room cache, klient filtruje haversinem.
-            val cached = placeDao.getTopPlaces(Int.MAX_VALUE)
+            val cached = placeDao.getRecentPlaces(GEO_QUERY_LIMIT)
             if (cached.isNotEmpty()) {
                 OpResult.success(cached.map { it.toDomain() })
             } else {
@@ -218,21 +266,32 @@ class FirestorePlaceRepository @Inject constructor(
         category: PlaceCategory?,
         query: String?
     ): OpResult<PagedResult<Place>> = try {
-        // Build base query ordered by createdAtMillis DESC (newest first).
-        var firestoreQuery = placesCollection()
-            .orderBy("createdAtMillis", com.google.firebase.firestore.Query.Direction.DESCENDING)
-
-        // Apply optional category filter.
+        var firestoreQuery: com.google.firebase.firestore.Query = placesCollection()
         if (category != null) {
             firestoreQuery = firestoreQuery.whereEqualTo("category", category.name)
         }
 
+        firestoreQuery = if (!query.isNullOrBlank()) {
+            firestoreQuery.orderBy("name")
+        } else {
+            firestoreQuery.orderBy(
+                "createdAtMillis",
+                com.google.firebase.firestore.Query.Direction.DESCENDING
+            )
+        }
+
         // Apply cursor: fetch the document snapshot for startAfter.
-        if (!cursor.isNullOrBlank()) {
+        if (!cursor.isNullOrBlank() && !cursor.startsWith(ROOM_CURSOR_PREFIX)) {
             val cursorSnapshot = placesCollection().document(cursor).get().await()
             if (cursorSnapshot.exists()) {
                 firestoreQuery = firestoreQuery.startAfter(cursorSnapshot)
             }
+        } else if (!query.isNullOrBlank()) {
+            firestoreQuery = firestoreQuery.startAt(query)
+        }
+
+        if (!query.isNullOrBlank()) {
+            firestoreQuery = firestoreQuery.endAt(query + "\uf8ff")
         }
 
         // Fetch pageSize + 1 to know if there's a next page.
@@ -243,13 +302,7 @@ class FirestorePlaceRepository @Inject constructor(
         val hasMore = allDocs.size > pageSize
         val pageDocs = if (hasMore) allDocs.take(pageSize) else allDocs
 
-        var places = pageDocs.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
-
-        // Client-side name filter (Firestore prefix search requires composite
-        // index with orderBy("name") which conflicts with orderBy("createdAtMillis")).
-        if (!query.isNullOrBlank()) {
-            places = places.filter { it.name.contains(query, ignoreCase = true) }
-        }
+        val places = pageDocs.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
 
         // Persist to Room cache.
         if (places.isNotEmpty()) {
@@ -262,12 +315,23 @@ class FirestorePlaceRepository @Inject constructor(
         OpResult.success(PagedResult(items = places, nextCursor = nextCursor))
     } catch (e: Exception) {
         // Offline fallback: paginate from Room cache.
-        val cached = placeDao.getTopPlaces(pageSize)
+        val offset = cursor
+            ?.removePrefix(ROOM_CURSOR_PREFIX)
+            ?.toIntOrNull()
+            ?: 0
+        val cached = placeDao.getPlacesPage(
+            category = category?.name,
+            query = query,
+            limit = pageSize + 1,
+            offset = offset
+        )
         if (cached.isNotEmpty()) {
+            val hasMore = cached.size > pageSize
+            val page = if (hasMore) cached.take(pageSize) else cached
             OpResult.success(
                 PagedResult(
-                    items = cached.map { it.toDomain() },
-                    nextCursor = null // No cursor for offline fallback
+                    items = page.map { it.toDomain() },
+                    nextCursor = if (hasMore) "$ROOM_CURSOR_PREFIX${offset + pageSize}" else null
                 )
             )
         } else {
