@@ -9,6 +9,7 @@ on:
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
       - 'gradle.properties'
+      - '.github/workflows/**'
   pull_request:
     branches: [main]
     paths:
@@ -17,6 +18,7 @@ on:
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
       - 'gradle.properties'
+      - '.github/workflows/**'
 
 concurrency:
   group: android-${{ github.ref }}
@@ -64,18 +66,23 @@ jobs:
           }
           EOF
 
-      - name: Lint (ktlint via Android Lint)
-        run: ./gradlew lintDebug --continue
+      - name: Scan secrets with Gitleaks
+        uses: gitleaks/gitleaks-action@v2
         env:
-          MAPS_API_KEY: "AIzaSyPlaceholder"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
+      - name: Run Android Lint
+        run: ./gradlew lintDebug
         env:
           MAPS_API_KEY: "AIzaSyPlaceholder"
 
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest
+        env:
+          MAPS_API_KEY: "AIzaSyPlaceholder"
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug
         env:
           MAPS_API_KEY: "AIzaSyPlaceholder"
 
@@ -93,4 +100,11 @@ jobs:
         with:
           name: lint-results
           path: app/build/reports/lint-results-debug.html
+          retention-days: 7
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: app/build/outputs/apk/debug/*.apk
           retention-days: 7
