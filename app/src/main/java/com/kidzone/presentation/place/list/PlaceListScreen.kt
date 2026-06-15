@@ -57,7 +57,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -150,24 +149,27 @@ fun PlaceListScreen(
 
     val context = LocalContext.current
 
-    // Stan przewijania listy - dzielony przez wszystkie stany (loading,
-    // empty, content), żeby przy zmianie sortowania zawsze móc go
-    // animować do top-u (zob. LaunchedEffect poniżej).
-    val lazyListState = rememberLazyListState(
-        initialFirstVisibleItemIndex = viewModel.savedScrollIndex,
-        initialFirstVisibleItemScrollOffset = viewModel.savedScrollOffset
-    )
+    // Stan przewijania listy — inicjalizowany z pozycji zapisanej w ViewModel
+    // TYLKO gdy user wraca z PlaceDetails. Przy powrocie z innej zakładki
+    // (lub pierwszym wejściu) zaczynamy od góry.
+    val returningFromDetails = remember { viewModel.consumeReturnFromDetails() }
+    val lazyListState = rememberLazyListState()
 
-    // Zapisz pozycję scrollu w ViewModelu przy opuszczaniu composable
-    // (nawigacja do PlaceDetails lub zmiana zakładki). ViewModel przetrwa
-    // nawigację, więc po powrocie lazyListState zostanie zainicjalizowany
-    // z zachowanymi wartościami.
-    DisposableEffect(Unit) {
-        onDispose {
-            viewModel.saveScrollPosition(
-                firstVisibleItemIndex = lazyListState.firstVisibleItemIndex,
-                firstVisibleItemScrollOffset = lazyListState.firstVisibleItemScrollOffset
+    // Przy wejściu na zakładkę Lista z innej zakładki (NIE z PlaceDetails)
+    // odświeżamy lokalizację i scrollujemy na górę. Dane i tak są real-time
+    // przez snapshot listener, ale lokalizacja mogła się zmienić.
+    // Przy powrocie z PlaceDetails — przywracamy zapisaną pozycję scrollu.
+    LaunchedEffect(returningFromDetails) {
+        if (returningFromDetails) {
+            // Przywróć scroll do miejsca, gdzie user kliknął na item
+            lazyListState.scrollToItem(
+                viewModel.savedScrollIndex,
+                viewModel.savedScrollOffset
             )
+        } else {
+            // Powrót z innej zakładki lub pierwsze wejście — scroll na górze
+            lazyListState.scrollToItem(0)
+            viewModel.refreshLocation()
         }
     }
 
@@ -324,7 +326,16 @@ fun PlaceListScreen(
                             showDistance = state.sortOrder ==
                                 PlaceListViewModel.SortOrder.NEAREST &&
                                 state.userLocation != null,
-                            onClick = { onOpenPlaceDetails(place.id, "list") },
+                            onClick = {
+                                // Zapisz pozycję scrollu i ustaw flagę przed nawigacją
+                                // do szczegółów — po powrocie lista wróci w to samo miejsce.
+                                viewModel.saveScrollPosition(
+                                    firstVisibleItemIndex = lazyListState.firstVisibleItemIndex,
+                                    firstVisibleItemScrollOffset = lazyListState.firstVisibleItemScrollOffset
+                                )
+                                viewModel.markNavigatingToDetails()
+                                onOpenPlaceDetails(place.id, "list")
+                            },
                             sharedTransitionScope = sharedTransitionScope,
                             animatedContentScope = animatedContentScope,
                             animationSource = "list"

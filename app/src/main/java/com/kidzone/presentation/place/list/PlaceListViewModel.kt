@@ -329,8 +329,33 @@ class PlaceListViewModel @Inject constructor(
         private set
 
     /**
-     * Zapisuje aktualną pozycję scrollu. Wołane z UI w [DisposableEffect]
-     * (onDispose) lub przed nawigacją do PlaceDetails.
+     * Flaga informująca, że user nawigował do PlaceDetails. UI ją ustawia
+     * przed nawigacją, a po powrocie odczytuje — jeśli true, przywraca
+     * pozycję scrollu zamiast resetować na górę.
+     *
+     * Przy przejściu na inną zakładkę flaga NIE jest ustawiana, więc
+     * composable po odtworzeniu (restoreState) dostaje false → scroll na górze.
+     */
+    var navigatedToDetails: Boolean = false
+        private set
+
+    fun markNavigatingToDetails() {
+        navigatedToDetails = true
+    }
+
+    /**
+     * Konsumuje flagę powrotu z PlaceDetails. Zwraca true jeśli user
+     * wraca z Details (pozycja scrollu powinna być przywrócona).
+     */
+    fun consumeReturnFromDetails(): Boolean {
+        val was = navigatedToDetails
+        navigatedToDetails = false
+        return was
+    }
+
+    /**
+     * Zapisuje aktualną pozycję scrollu. Wołane z UI przed nawigacją
+     * do PlaceDetails.
      */
     fun saveScrollPosition(firstVisibleItemIndex: Int, firstVisibleItemScrollOffset: Int) {
         savedScrollIndex = firstVisibleItemIndex
