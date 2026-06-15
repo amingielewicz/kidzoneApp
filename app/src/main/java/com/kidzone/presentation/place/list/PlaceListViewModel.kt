@@ -315,6 +315,28 @@ class PlaceListViewModel @Inject constructor(
         initialValue = UiState()
     )
 
+    // ─── Scroll position preservation ───────────────────────────────────
+    // ViewModel przetrwa nawigację do PlaceDetails i z powrotem, więc
+    // trzymamy tu ostatnią pozycję scrollu, którą UI zapisze w onDispose
+    // (lub przed nawigacją) i przywróci po ponownym wejściu w kompozycję.
+
+    /** Indeks pierwszego widocznego elementu na liście. */
+    var savedScrollIndex: Int = 0
+        private set
+
+    /** Offset pikseli scrollu wewnątrz pierwszego widocznego elementu. */
+    var savedScrollOffset: Int = 0
+        private set
+
+    /**
+     * Zapisuje aktualną pozycję scrollu. Wołane z UI w [DisposableEffect]
+     * (onDispose) lub przed nawigacją do PlaceDetails.
+     */
+    fun saveScrollPosition(firstVisibleItemIndex: Int, firstVisibleItemScrollOffset: Int) {
+        savedScrollIndex = firstVisibleItemIndex
+        savedScrollOffset = firstVisibleItemScrollOffset
+    }
+
     init {
         // Próbujemy pobrać lokalizację już na start - jeśli user wcześniej
         // nadał permission, lista od razu pojawi się posortowana po odległości.
@@ -400,6 +422,9 @@ class PlaceListViewModel @Inject constructor(
         visibleCount.value = PAGE_SIZE
         serverCursor = null
         extraPages.value = emptyList()
+        // Reset scroll position — UI will scroll to top via LaunchedEffect.
+        savedScrollIndex = 0
+        savedScrollOffset = 0
     }
 
     /**

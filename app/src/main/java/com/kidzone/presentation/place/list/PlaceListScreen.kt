@@ -57,6 +57,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -152,7 +153,23 @@ fun PlaceListScreen(
     // Stan przewijania listy - dzielony przez wszystkie stany (loading,
     // empty, content), żeby przy zmianie sortowania zawsze móc go
     // animować do top-u (zob. LaunchedEffect poniżej).
-    val lazyListState = rememberLazyListState()
+    val lazyListState = rememberLazyListState(
+        initialFirstVisibleItemIndex = viewModel.savedScrollIndex,
+        initialFirstVisibleItemScrollOffset = viewModel.savedScrollOffset
+    )
+
+    // Zapisz pozycję scrollu w ViewModelu przy opuszczaniu composable
+    // (nawigacja do PlaceDetails lub zmiana zakładki). ViewModel przetrwa
+    // nawigację, więc po powrocie lazyListState zostanie zainicjalizowany
+    // z zachowanymi wartościami.
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.saveScrollPosition(
+                firstVisibleItemIndex = lazyListState.firstVisibleItemIndex,
+                firstVisibleItemScrollOffset = lazyListState.firstVisibleItemScrollOffset
+            )
+        }
+    }
 
     // Po zmianie sortowania automatycznie przewijamy listę na górę.
     // Bez tego user widziałby "tę samą pozycję pod palcem", ale w nowym
