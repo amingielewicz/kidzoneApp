@@ -195,7 +195,7 @@ Szczegóły: [STAGING.md](./STAGING.md)
 - Firestore Security Rules z walidacją typów i ownershipem
 - Storage Rules z limitami rozmiaru i MIME
 - CSP headers na hostingu
-- ProGuard/R8 w release (zawężone -keep reguły)
+- ProGuard/R8 w release (zawężone -keep reguły + dontwarn dla wewnętrznych klas play-services)
 - allowBackup=false
 - Network Security Config (no cleartext)
 - 1 zgłoszenie per user per target (duplicate prevention)
@@ -329,6 +329,26 @@ devops: CI/CD, deploy config
 | Firebase Hosting | Spark | 10GB storage, 360MB/day |
 | Google Maps SDK | — | $200/month credit (~28k loads) |
 | Play Integrity | — | 10k requests/day |
+
+## ⚠️ Troubleshooting
+
+### `bundleRelease` / R8 missing classes
+Jeśli `./gradlew bundleRelease` (lub `assembleRelease`) kończy się błędem:
+```
+ERROR: Missing classes detected while running R8.
+```
+Upewnij się, że `proguard-rules.pro` zawiera:
+```proguard
+-dontwarn com.google.android.gms.internal.**
+-dontwarn com.google.android.gms.common.annotation.NoNullnessRewrite
+```
+Te klasy to wewnętrzne adnotacje Google Play Services, które nie są potrzebne w runtime.
+
+Alternatywnie, sprawdź plik wygenerowany przez R8:
+```
+app/build/outputs/mapping/release/missing_rules.txt
+```
+i dodaj wymienione tam reguły do `proguard-rules.pro`.
 
 ## 📄 Licencja
 
