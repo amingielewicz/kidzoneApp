@@ -170,12 +170,14 @@ fun MapScreen(
     }
     var mapLoaded by remember { mutableStateOf(false) }
     var expandedClusterKey by remember { mutableStateOf<String?>(null) }
+    var expandedClusterPlaceIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var userTouchedMap by remember { mutableStateOf(false) }
     val currentZoom = cameraPositionState.position.zoom
-    val markerItems = remember(state.places, expandedClusterKey, currentZoom) {
+    val markerItems = remember(state.places, expandedClusterKey, expandedClusterPlaceIds, currentZoom) {
         buildMapMarkerItems(
             places = state.places,
             expandedClusterKey = expandedClusterKey,
+            expandedPlaceIds = expandedClusterPlaceIds,
             zoom = currentZoom
         )
     }
@@ -293,6 +295,7 @@ fun MapScreen(
             onMapClick = {
                 userTouchedMap = true
                 expandedClusterKey = null
+                expandedClusterPlaceIds = emptySet()
                 viewModel.onPlaceSelected(null)
             }
         ) {
@@ -317,12 +320,20 @@ fun MapScreen(
                                     cluster.places.size >= MAX_SPIDERFIED_CLUSTER_SIZE
                             if (shouldZoomIntoCluster) {
                                 expandedClusterKey = null
+                                expandedClusterPlaceIds = if (
+                                    cluster.places.size <= MAX_SPIDERFIED_CLUSTER_SIZE
+                                ) {
+                                    cluster.places.mapTo(mutableSetOf()) { place -> place.id }
+                                } else {
+                                    emptySet()
+                                }
                                 scope.launch {
                                     cameraPositionState.animate(
                                         cameraUpdateForCluster(cluster)
                                     )
                                 }
                             } else {
+                                expandedClusterPlaceIds = emptySet()
                                 expandedClusterKey = cluster.key
                             }
                             viewModel.onPlaceSelected(null)

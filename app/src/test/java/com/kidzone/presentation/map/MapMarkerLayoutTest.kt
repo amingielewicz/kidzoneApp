@@ -98,6 +98,28 @@ class MapMarkerLayoutTest {
         assertTrue(expanded.all { it.isSpiderfied })
     }
 
+    @Test
+    fun `expanded place ids render real markers even at country zoom`() {
+        val places = listOf(
+            TestFixtures.place(id = "p1", latitude = 52.10, longitude = 21.10),
+            TestFixtures.place(id = "p2", latitude = 52.12, longitude = 21.12)
+        )
+
+        val expanded = buildMapMarkerItems(
+            places = places,
+            expandedClusterKey = null,
+            expandedPlaceIds = places.map { it.id }.toSet(),
+            zoom = 6f
+        )
+
+        assertEquals(2, expanded.size)
+        assertTrue(expanded.all { it.place != null })
+        assertTrue(expanded.none { it.cluster != null })
+        assertEquals(places.map { it.latitude to it.longitude }, expanded.map {
+            it.position.latitude to it.position.longitude
+        })
+    }
+
     private fun overlappingPlaces() = listOf(
         TestFixtures.place(id = "p1", latitude = 52.123456, longitude = 21.123456),
         TestFixtures.place(id = "p2", latitude = 52.123456, longitude = 21.123456),

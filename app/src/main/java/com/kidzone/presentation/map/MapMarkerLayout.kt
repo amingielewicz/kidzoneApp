@@ -25,6 +25,7 @@ data class MarkerCluster(
 fun buildMapMarkerItems(
     places: List<Place>,
     expandedClusterKey: String?,
+    expandedPlaceIds: Set<String> = emptySet(),
     zoom: Float = DEFAULT_CLUSTER_ZOOM
 ): List<MapMarkerItem> {
     val clusterDecimals = clusterDecimalsForZoom(zoom)
@@ -32,8 +33,14 @@ fun buildMapMarkerItems(
         .groupBy { place -> clusterKeyFor(place, clusterDecimals) }
         .flatMap { (key, groupedPlaces) ->
             val center = groupedPlaces.center()
+            val isExpandedByPlaceIds = groupedPlaces.all { place -> place.id in expandedPlaceIds }
             if (groupedPlaces.size == 1) {
                 listOf(groupedPlaces.first().toMarkerItem(center))
+            } else if (isExpandedByPlaceIds && !groupedPlaces.hasSameCoordinates()) {
+                groupedPlaces.map { place ->
+                    place.toMarkerItem(LatLng(place.latitude, place.longitude))
+                        .copy(key = "expanded_${place.id}")
+                }
             } else if (key == expandedClusterKey) {
                 spiderfy(groupedPlaces, center)
             } else {
@@ -68,6 +75,13 @@ private fun List<Place>.center(): LatLng =
         sumOf { it.latitude } / size,
         sumOf { it.longitude } / size
     )
+
+private fun List<Place>.hasSameCoordinates(): Boolean {
+    val first = firstOrNull() ?: return true
+    return all { place ->
+        place.latitude == first.latitude && place.longitude == first.longitude
+    }
+}
 
 private fun Place.toMarkerItem(position: LatLng): MapMarkerItem =
     MapMarkerItem(
