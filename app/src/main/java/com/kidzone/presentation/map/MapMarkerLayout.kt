@@ -24,12 +24,14 @@ data class MarkerCluster(
 
 fun buildMapMarkerItems(
     places: List<Place>,
-    expandedClusterKey: String?
+    expandedClusterKey: String?,
+    zoom: Float = DEFAULT_CLUSTER_ZOOM
 ): List<MapMarkerItem> {
+    val clusterDecimals = clusterDecimalsForZoom(zoom)
     return places
-        .groupBy(::clusterKeyFor)
+        .groupBy { place -> clusterKeyFor(place, clusterDecimals) }
         .flatMap { (key, groupedPlaces) ->
-            val center = groupedPlaces.first().let { LatLng(it.latitude, it.longitude) }
+            val center = groupedPlaces.center()
             if (groupedPlaces.size == 1) {
                 listOf(groupedPlaces.first().toMarkerItem(center))
             } else if (key == expandedClusterKey) {
@@ -48,9 +50,24 @@ fun buildMapMarkerItems(
         }
 }
 
-fun clusterKeyFor(place: Place): String =
-    "${place.latitude.roundToDecimals(CLUSTER_DECIMALS)}:" +
-        place.longitude.roundToDecimals(CLUSTER_DECIMALS)
+fun clusterKeyFor(place: Place): String = clusterKeyFor(place, CLUSTER_DECIMALS_EXACT)
+
+private fun clusterKeyFor(place: Place, decimals: Int): String =
+    "${place.latitude.roundToDecimals(decimals)}:" +
+        place.longitude.roundToDecimals(decimals)
+
+private fun clusterDecimalsForZoom(zoom: Float): Int = when {
+    zoom < 7f -> 1
+    zoom < 10f -> 2
+    zoom < 13f -> 3
+    else -> CLUSTER_DECIMALS_EXACT
+}
+
+private fun List<Place>.center(): LatLng =
+    LatLng(
+        sumOf { it.latitude } / size,
+        sumOf { it.longitude } / size
+    )
 
 private fun Place.toMarkerItem(position: LatLng): MapMarkerItem =
     MapMarkerItem(
@@ -83,7 +100,8 @@ private fun Double.roundToDecimals(decimals: Int): Double {
     return (this * factor).roundToInt() / factor
 }
 
-private const val CLUSTER_DECIMALS = 5
+private const val CLUSTER_DECIMALS_EXACT = 5
+private const val DEFAULT_CLUSTER_ZOOM = 16f
 private const val SPIDERFY_RADIUS_DEGREES = 0.00012
 private const val SPIDERFY_RADIUS_STEP_DEGREES = 0.000015
 private const val SPIDERFY_MAX_EXTRA = 8

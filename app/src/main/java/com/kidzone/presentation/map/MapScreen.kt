@@ -115,6 +115,8 @@ private const val NEAR_ME_ZOOM = 14f
  * świeży pin był wyraźnie widoczny pośrodku ekranu z otoczeniem ulicznym.
  */
 private const val FOCUS_PLACE_ZOOM = 16f
+private const val MAX_SPIDERFIED_CLUSTER_SIZE = 10
+private const val CLUSTER_ZOOM_STEP = 3f
 
 /**
  * Ekran mapy z pinezkami miejsc.
@@ -167,8 +169,13 @@ fun MapScreen(
     var mapLoaded by remember { mutableStateOf(false) }
     var expandedClusterKey by remember { mutableStateOf<String?>(null) }
     var userTouchedMap by remember { mutableStateOf(false) }
-    val markerItems = remember(state.places, expandedClusterKey) {
-        buildMapMarkerItems(state.places, expandedClusterKey)
+    val currentZoom = cameraPositionState.position.zoom
+    val markerItems = remember(state.places, expandedClusterKey, currentZoom) {
+        buildMapMarkerItems(
+            places = state.places,
+            expandedClusterKey = expandedClusterKey,
+            zoom = currentZoom
+        )
     }
 
     ReportSettledViewport(
@@ -303,10 +310,33 @@ fun MapScreen(
                     onClick = {
                         userTouchedMap = true
                         marker.cluster?.let { cluster ->
-                            expandedClusterKey = cluster.key
+                            if (cluster.places.size > MAX_SPIDERFIED_CLUSTER_SIZE) {
+                                expandedClusterKey = null
+                                scope.launch {
+                                    cameraPositionState.animate(
+                                        CameraUpdateFactory.newLatLngZoom(
+                                            cluster.center,
+                                            (currentZoom + CLUSTER_ZOOM_STEP)
+                                                .coerceAtMost(FOCUS_PLACE_ZOOM)
+                                        )
+                                    )
+                                }
+                            } else {
+                                expandedClusterKey = cluster.key
+                            }
                             viewModel.onPlaceSelected(null)
                         }
                         marker.place?.let { place ->
+                            if (marker.isSpiderfied) {
+                                scope.launch {
+                                    cameraPositionState.animate(
+                                        CameraUpdateFactory.newLatLngZoom(
+                                            LatLng(place.latitude, place.longitude),
+                                            FOCUS_PLACE_ZOOM
+                                        )
+                                    )
+                                }
+                            }
                             viewModel.onPlaceSelected(place.id)
                         }
                         true
@@ -502,7 +532,11 @@ private fun ClusterMarkerIcon(count: Int) {
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = count.toString(),
+                text = if (count > MAX_SPIDERFIED_CLUSTER_SIZE) {
+                    "$MAX_SPIDERFIED_CLUSTER_SIZE+"
+                } else {
+                    count.toString()
+                },
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onPrimary,
                 fontWeight = FontWeight.Bold
