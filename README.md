@@ -428,10 +428,10 @@ devops: CI/CD, deploy config
 ### Signing config:
 Release build wymaga keystore. Skonfiguruj w `local.properties` (lub CI env vars):
 ```properties
-KIDZONE_KEYSTORE_FILE=/path/to/kidzone-release.keystore
-KIDZONE_KEYSTORE_PASSWORD=***
-KIDZONE_KEY_ALIAS=kidzone
-KIDZONE_KEY_PASSWORD=***
+KEYSTORE_PATH=../kidzone-upload.jks
+KEYSTORE_PASSWORD=***
+KEY_ALIAS=kidzone-upload
+KEY_PASSWORD=***
 ```
 
 ### Checklist przed uploadem do Play Console:
@@ -483,7 +483,7 @@ i dodaj wymienione tam reguły do `proguard-rules.pro`.
 ### Release signing nie działa
 Sprawdź, że w `local.properties` (lub env vars) ustawione są:
 ```
-KIDZONE_KEYSTORE_FILE, KIDZONE_KEYSTORE_PASSWORD, KIDZONE_KEY_ALIAS, KIDZONE_KEY_PASSWORD
+KEYSTORE_PATH, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
 ```
 Build Gradle wypisze warning jeśli brakuje któregoś z tych kluczy.
 

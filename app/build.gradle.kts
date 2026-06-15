@@ -95,20 +95,20 @@ android {
      *   local.properties (dev) → gradle.properties / -P → zmienne środowiskowe (CI/CD).
      *
      * Wymagane zmienne:
-     *   KIDZONE_KEYSTORE_FILE     — ścieżka do keystore (.jks / .keystore)
-     *   KIDZONE_KEYSTORE_PASSWORD — hasło do keystore
-     *   KIDZONE_KEY_ALIAS         — alias klucza
-     *   KIDZONE_KEY_PASSWORD      — hasło do klucza
+     *   KEYSTORE_PATH             — ścieżka do keystore (.jks / .keystore)
+     *   KEYSTORE_PASSWORD         — hasło do keystore
+     *   KEY_ALIAS                 — alias klucza
+     *   KEY_PASSWORD              — hasło do klucza
      *
      * Jeśli brakuje któregokolwiek — release build zostanie niepodpisany
      * (build przejdzie, ale AAB/APK nie zainstaluje się na urządzeniu).
      */
     signingConfigs {
         create("release") {
-            val keystoreFile = resolveSecret("KIDZONE_KEYSTORE_FILE")
-            val keystorePass = resolveSecret("KIDZONE_KEYSTORE_PASSWORD")
-            val keyAlias = resolveSecret("KIDZONE_KEY_ALIAS")
-            val keyPass = resolveSecret("KIDZONE_KEY_PASSWORD")
+            val keystoreFile = resolveSecret("KEYSTORE_PATH")
+            val keystorePass = resolveSecret("KEYSTORE_PASSWORD")
+            val keyAlias = resolveSecret("KEY_ALIAS")
+            val keyPass = resolveSecret("KEY_PASSWORD")
 
             if (keystoreFile.isNotBlank() && keystorePass.isNotBlank() &&
                 keyAlias.isNotBlank() && keyPass.isNotBlank()
@@ -119,8 +119,8 @@ android {
                 keyPassword = keyPass
             } else {
                 logger.warn(
-                    "[kidzone] Release signing not configured. Set KIDZONE_KEYSTORE_FILE, " +
-                        "KIDZONE_KEYSTORE_PASSWORD, KIDZONE_KEY_ALIAS, KIDZONE_KEY_PASSWORD " +
+                    "[kidzone] Release signing not configured. Set KEYSTORE_PATH, " +
+                        "KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD " +
                         "in local.properties or environment."
                 )
             }
