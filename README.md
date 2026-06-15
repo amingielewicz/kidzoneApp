@@ -98,8 +98,10 @@ Każde udogodnienie jest przypisane do odpowiednich kategorii — UI filtruje li
 | **Plac zabaw** | Ogrodzenie, miękka nawierzchnia, zadaszone ławki, strefa malucha, strefa bez aut |
 | **Restauracja / Kawiarnia** | Menu dla dzieci, krzesełko, sztućce dla dzieci, szybka obsługa, kącik zabaw widoczny z sali |
 | **Sala zabaw** | Strefy wiekowe, animator, monitoring, dezynfekcja zabawek, strefa rodzica, szafki |
+| **Kawiarnia (specyficzne)** | Miejsce do spokojnego karmienia, mikrofalówka, brak głośnej muzyki, zabawki sensoryczne |
 | **Park** | Strefa piknikowa, bezpieczne ścieżki, woda pitna, miejsce do karmienia piersią, oświetlenie |
 | **Atrakcja** | Wypożyczalnia wózków, strefy odpoczynku, fast-track dla rodzin, pokój matki z dzieckiem, punkt zgubionego dziecka |
+| **Ogólne** | Szerokie drzwi, parking rodzinny, przyjazne oznakowania, WiFi, ciche strefy |
 
 Pełna lista: `domain/model/Amenity.kt` • Kategorie: `domain/model/PlaceCategory.kt`
 
@@ -202,10 +204,16 @@ Format: `MAJOR.MINOR.PATCH` na `main`, z suffixem `-dev#<nr>` na feature brancha
 
 | Branch | Przykład `versionName` |
 |--------|----------------------|
-| `main` | `1.0.0` |
-| `feature/72-nowy-ekran` | `1.0.0-dev#72` |
-| CI z `PR_NUMBER=85` | `1.0.0-dev#85` |
-| Inny (fallback) | `1.0.0-dev#a3f4b2c` (skrócony SHA) |
+| `main` | `0.1.0` |
+| `feature/72-nowy-ekran` | `0.1.0-dev#72` |
+| CI z `PR_NUMBER=85` | `0.1.0-dev#85` |
+| Inny (fallback) | `0.1.0-dev#a3f4b2c` (skrócony SHA) |
+
+**Łańcuch rozwiązywania numeru PR:**
+1. Zmienna środowiskowa `PR_NUMBER` (ustawiana w CI/CD)
+2. Gradle property `-PPR_NUMBER=72`
+3. Cyfry z nazwy brancha (np. `fix/72-opis` → `72`)
+4. Skrócony commit hash (7 znaków) jako fallback
 
 Aby zmienić wersję bazową, edytuj `baseVersion` w `app/build.gradle.kts`.
 
@@ -280,7 +288,7 @@ Szczegóły: [STAGING.md](./STAGING.md)
 - Input sanitization (escapeHtml) w emailach
 - Firestore Security Rules z walidacją typów i ownershipem
 - Storage Rules z limitami rozmiaru i MIME
-- Content Security Policy (CSP) headers na hostingu
+- CSP headers na hostingu
 - ProGuard/R8 w release (zawężone -keep reguły + dontwarn dla wewnętrznych klas play-services)
 - allowBackup=false
 - Network Security Config (no cleartext)
@@ -426,12 +434,12 @@ devops: CI/CD, deploy config
 ```
 
 ### Signing config:
-Release build wymaga keystore. Skonfiguruj w `local.properties` (lub CI env vars):
+Release build wymaga keystore. Skonfiguruj w `~/.gradle/gradle.properties` (lub CI secrets):
 ```properties
-KEYSTORE_PATH=../kidzone-upload.jks
-KEYSTORE_PASSWORD=***
-KEY_ALIAS=kidzone-upload
-KEY_PASSWORD=***
+KIDZONE_KEYSTORE_FILE=/path/to/kidzone-release.keystore
+KIDZONE_KEYSTORE_PASSWORD=***
+KIDZONE_KEY_ALIAS=kidzone
+KIDZONE_KEY_PASSWORD=***
 ```
 
 ### Checklist przed uploadem do Play Console:
@@ -441,6 +449,13 @@ KEY_PASSWORD=***
 4. ✅ ProGuard mapping: `app/build/outputs/mapping/release/mapping.txt` → upload do Play Console (Crashlytics)
 5. ✅ Testuj na fizycznym urządzeniu z release buildem
 6. ✅ Sprawdź deep linki (`adb shell am start -d "kidzone://place/testId"`)
+
+### Upload do Google Play Console:
+1. Zaloguj się do [Play Console](https://play.google.com/console)
+2. Production → Create new release
+3. Upload `app-release.aab`
+4. Dodaj release notes (co nowego)
+5. Review → Start rollout (staged rollout zalecany: 10% → 50% → 100%)
 
 ### Materiały do listingu:
 | Element | Wymiary | Format |
@@ -479,13 +494,6 @@ Alternatywnie, sprawdź plik wygenerowany przez R8:
 app/build/outputs/mapping/release/missing_rules.txt
 ```
 i dodaj wymienione tam reguły do `proguard-rules.pro`.
-
-### Release signing nie działa
-Sprawdź, że w `local.properties` (lub env vars) ustawione są:
-```
-KEYSTORE_PATH, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
-```
-Build Gradle wypisze warning jeśli brakuje któregoś z tych kluczy.
 
 ## 📄 Licencja
 

@@ -149,18 +149,45 @@ fun PlaceListScreen(
 
     val context = LocalContext.current
 
-    // Stan przewijania listy - dzielony przez wszystkie stany (loading,
-    // empty, content), żeby przy zmianie sortowania zawsze móc go
-    // animować do top-u (zob. LaunchedEffect poniżej).
+    // Stan przewijania listy — inicjalizowany z pozycji zapisanej w ViewModel
+    // TYLKO gdy user wraca z PlaceDetails. Przy powrocie z innej zakładki
+    // (lub pierwszym wejściu) zaczynamy od góry.
+    val returningFromDetails = remember { viewModel.consumeReturnFromDetails() }
     val lazyListState = rememberLazyListState()
+
+    // Przy wejściu na zakładkę Lista z innej zakładki (NIE z PlaceDetails)
+    // odświeżamy lokalizację i scrollujemy na górę. Dane i tak są real-time
+    // przez snapshot listener, ale lokalizacja mogła się zmienić.
+    // Przy powrocie z PlaceDetails — przywracamy zapisaną pozycję scrollu.
+    LaunchedEffect(returningFromDetails) {
+        if (returningFromDetails) {
+            // Przywróć scroll do miejsca, gdzie user kliknął na item
+            lazyListState.scrollToItem(
+                viewModel.savedScrollIndex,
+                viewModel.savedScrollOffset
+            )
+        } else {
+            // Powrót z innej zakładki lub pierwsze wejście — scroll na górze
+            lazyListState.scrollToItem(0)
+            viewModel.refreshLocation()
+        }
+    }
 
     // Po zmianie sortowania automatycznie przewijamy listę na górę.
     // Bez tego user widziałby "tę samą pozycję pod palcem", ale w nowym
     // porządku - co jest mylące (nie wiadomo, czy to jeszcze ten sam wynik
     // czy nowy item w środku rankingu). animateScrollToItem(0) jest
     // bezpieczny gdy lista jest pusta - po prostu nic nie robi.
+    //
+    // Używamy rememberSaveable, żeby uniknąć scrollowania na górę po
+    // nawigacji powrotnej z PlaceDetails (LaunchedEffect odpalałby się
+    // ponownie z tym samym kluczem sortOrder przy re-compose).
+    var lastAppliedSortOrder by rememberSaveable { mutableStateOf(state.sortOrder.name) }
     LaunchedEffect(state.sortOrder) {
-        lazyListState.animateScrollToItem(0)
+        if (state.sortOrder.name != lastAppliedSortOrder) {
+            lastAppliedSortOrder = state.sortOrder.name
+            lazyListState.animateScrollToItem(0)
+        }
     }
 
     // Launcher requestu uprawnienia. Po nadaniu odświeżamy lokalizację -
@@ -299,7 +326,16 @@ fun PlaceListScreen(
                             showDistance = state.sortOrder ==
                                 PlaceListViewModel.SortOrder.NEAREST &&
                                 state.userLocation != null,
-                            onClick = { onOpenPlaceDetails(place.id, "list") },
+                            onClick = {
+                                // Zapisz pozycję scrollu i ustaw flagę przed nawigacją
+                                // do szczegółów — po powrocie lista wróci w to samo miejsce.
+                                viewModel.saveScrollPosition(
+                                    firstVisibleItemIndex = lazyListState.firstVisibleItemIndex,
+                                    firstVisibleItemScrollOffset = lazyListState.firstVisibleItemScrollOffset
+                                )
+                                viewModel.markNavigatingToDetails()
+                                onOpenPlaceDetails(place.id, "list")
+                            },
                             sharedTransitionScope = sharedTransitionScope,
                             animatedContentScope = animatedContentScope,
                             animationSource = "list"
