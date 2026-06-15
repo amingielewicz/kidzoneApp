@@ -44,7 +44,7 @@ android {
             commandLine("git", "rev-list", "--count", "HEAD")
         }.standardOutput.asText.get().trim().toIntOrNull() ?: 1
         versionName = run {
-            val baseVersion = "0.1.0"
+            val baseVersion = "1.0.0"
             // Na branchach dev/feature dodajemy suffix dev#<numerPR>.
             // Np. branch po merge jako PR #63 → "0.1.0-dev#63".
             // Na main (release) zostaje czyste "0.1.0".
@@ -90,6 +90,43 @@ android {
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
+    /**
+     * Release signing config – ładowany z tych samych źródeł co MAPS_API_KEY:
+     *   local.properties (dev) → gradle.properties / -P → zmienne środowiskowe (CI/CD).
+     *
+     * Wymagane zmienne:
+     *   KIDZONE_KEYSTORE_FILE     — ścieżka do keystore (.jks / .keystore)
+     *   KIDZONE_KEYSTORE_PASSWORD — hasło do keystore
+     *   KIDZONE_KEY_ALIAS         — alias klucza
+     *   KIDZONE_KEY_PASSWORD      — hasło do klucza
+     *
+     * Jeśli brakuje któregokolwiek — release build zostanie niepodpisany
+     * (build przejdzie, ale AAB/APK nie zainstaluje się na urządzeniu).
+     */
+    signingConfigs {
+        create("release") {
+            val keystoreFile = resolveSecret("KIDZONE_KEYSTORE_FILE")
+            val keystorePass = resolveSecret("KIDZONE_KEYSTORE_PASSWORD")
+            val keyAlias = resolveSecret("KIDZONE_KEY_ALIAS")
+            val keyPass = resolveSecret("KIDZONE_KEY_PASSWORD")
+
+            if (keystoreFile.isNotBlank() && keystorePass.isNotBlank() &&
+                keyAlias.isNotBlank() && keyPass.isNotBlank()
+            ) {
+                storeFile = file(keystoreFile)
+                storePassword = keystorePass
+                this.keyAlias = keyAlias
+                keyPassword = keyPass
+            } else {
+                logger.warn(
+                    "[kidzone] Release signing not configured. Set KIDZONE_KEYSTORE_FILE, " +
+                        "KIDZONE_KEYSTORE_PASSWORD, KIDZONE_KEY_ALIAS, KIDZONE_KEY_PASSWORD " +
+                        "in local.properties or environment."
+                )
+            }
+        }
+    }
+
     buildTypes {
         debug {
             // Disable Firebase Performance in debug/CI builds to prevent crashes
@@ -99,6 +136,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
