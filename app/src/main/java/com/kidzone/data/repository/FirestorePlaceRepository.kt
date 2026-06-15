@@ -6,6 +6,7 @@ import com.kidzone.data.local.PlaceDao
 import com.kidzone.data.local.PlaceEntity
 import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.PlaceDto
+import com.kidzone.domain.model.PagedResult
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.repository.PlaceRepository
@@ -38,6 +39,14 @@ class FirestorePlaceRepository @Inject constructor(
     private val syncManager: SyncManager
 ) : PlaceRepository {
 
+    companion object {
+        /**
+         * Number of places fetched via snapshot listener (initial/real-time page).
+         * Additional pages are fetched on demand via [getPlacesPage] cursor pagination.
+         */
+        private const val PAGE_SIZE_SNAPSHOT = 20
+    }
+
     override fun observePlaces(category: PlaceCategory?, query: String?): Flow<List<Place>> = channelFlow {
         // 1. Room jako local source – emitujemy z niego do kanału.
         // Jeśli jest query, Room filtruje po 'contains', Firestore po prefixie.
@@ -51,7 +60,7 @@ class FirestorePlaceRepository @Inject constructor(
         // 2. Firestore snapshot listener – aktualizuje Room w tle.
         launch {
             val firestoreFlow = callbackFlow {
-                var firestoreQuery = placesCollection().limit(100) // Zabezpieczenie przed pobraniem całej bazy
+                var firestoreQuery = placesCollection().limit(PAGE_SIZE_SNAPSHOT.toLong()) // First page via snapshot; rest via cursor pagination
 
                 if (category != null) {
                     firestoreQuery = firestoreQuery.whereEqualTo("category", category.name)
@@ -198,6 +207,69 @@ class FirestorePlaceRepository @Inject constructor(
         val cached = placeDao.getTopPlaces(limit)
         if (cached.isNotEmpty()) {
             OpResult.success(cached.map { it.toDomain() })
+        } else {
+            OpResult.failure(e)
+        }
+    }
+
+    override suspend fun getPlacesPage(
+        pageSize: Int,
+        cursor: String?,
+        category: PlaceCategory?,
+        query: String?
+    ): OpResult<PagedResult<Place>> = try {
+        // Build base query ordered by createdAtMillis DESC (newest first).
+        var firestoreQuery = placesCollection()
+            .orderBy("createdAtMillis", com.google.firebase.firestore.Query.Direction.DESCENDING)
+
+        // Apply optional category filter.
+        if (category != null) {
+            firestoreQuery = firestoreQuery.whereEqualTo("category", category.name)
+        }
+
+        // Apply cursor: fetch the document snapshot for startAfter.
+        if (!cursor.isNullOrBlank()) {
+            val cursorSnapshot = placesCollection().document(cursor).get().await()
+            if (cursorSnapshot.exists()) {
+                firestoreQuery = firestoreQuery.startAfter(cursorSnapshot)
+            }
+        }
+
+        // Fetch pageSize + 1 to know if there's a next page.
+        val fetchLimit = pageSize + 1
+        val snapshot = firestoreQuery.limit(fetchLimit.toLong()).get().await()
+
+        val allDocs = snapshot.documents
+        val hasMore = allDocs.size > pageSize
+        val pageDocs = if (hasMore) allDocs.take(pageSize) else allDocs
+
+        var places = pageDocs.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
+
+        // Client-side name filter (Firestore prefix search requires composite
+        // index with orderBy("name") which conflicts with orderBy("createdAtMillis")).
+        if (!query.isNullOrBlank()) {
+            places = places.filter { it.name.contains(query, ignoreCase = true) }
+        }
+
+        // Persist to Room cache.
+        if (places.isNotEmpty()) {
+            placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
+        }
+
+        // Next cursor = document ID of the last item on this page.
+        val nextCursor = if (hasMore) pageDocs.lastOrNull()?.id else null
+
+        OpResult.success(PagedResult(items = places, nextCursor = nextCursor))
+    } catch (e: Exception) {
+        // Offline fallback: paginate from Room cache.
+        val cached = placeDao.getTopPlaces(pageSize)
+        if (cached.isNotEmpty()) {
+            OpResult.success(
+                PagedResult(
+                    items = cached.map { it.toDomain() },
+                    nextCursor = null // No cursor for offline fallback
+                )
+            )
         } else {
             OpResult.failure(e)
         }
