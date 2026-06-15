@@ -292,6 +292,7 @@ Szczegóły: [STAGING.md](./STAGING.md)
 - ProGuard/R8 w release (zawężone -keep reguły + dontwarn dla wewnętrznych klas play-services)
 - allowBackup=false
 - Network Security Config (no cleartext)
+- Release signing config (keystore z local.properties / env vars)
 - 1 zgłoszenie per user per target (duplicate prevention)
 
 ## 📁 Struktura projektu
