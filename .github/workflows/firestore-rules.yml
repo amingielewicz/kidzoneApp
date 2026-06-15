@@ -6,11 +6,16 @@ on:
     paths:
       - 'firestore.rules'
       - 'tests/firestore-rules/**'
+      - '.github/workflows/firestore-rules.yml'
   pull_request:
     branches: [main]
     paths:
       - 'firestore.rules'
       - 'tests/firestore-rules/**'
+      - '.github/workflows/firestore-rules.yml'
+
+permissions:
+  contents: read
 
 concurrency:
   group: firestore-rules-${{ github.ref }}
@@ -24,6 +29,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
