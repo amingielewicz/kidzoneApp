@@ -38,6 +38,10 @@ import javax.inject.Inject
  *
  * Filter "darmowe" jest wzmiankowany w docs ekranu, ale `Place` nie ma na
  * dziś pola ceny – świadomie pomijamy do czasu rozszerzenia modelu.
+ *
+ * TODO: Przy skali wymagającej więcej niż pierwsza strona markerów dodać
+ * viewport/geohash query uruchamiane dopiero po zakończeniu ruchu kamery.
+ * Obecnie mapa celowo nie odpala requestów przy każdym przesunięciu.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel

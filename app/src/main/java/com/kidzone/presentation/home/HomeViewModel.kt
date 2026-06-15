@@ -44,8 +44,8 @@ private const val TOP_PLACES_RADIUS_KM = 10.0
 /**
  * Promień techniczny fetcha miejsc do sekcji startowych.
  *
- * Aktualne repo MVP i tak zwraca całą kolekcję, ale podajemy duży promień,
- * żeby przyszła implementacja geo-query miała sensowny limit dla "Blisko Ciebie".
+ * Repo wykonuje ograniczone zapytanie po prefiksie geohash i docina wynik
+ * dokładnym dystansem po stronie klienta.
  */
 private const val HOME_PLACES_FETCH_RADIUS_KM = 50.0
 
@@ -240,8 +240,8 @@ class HomeViewModel @Inject constructor(
             persistLocationForWidget(lat, lng)
             when (val result = placeRepository.getPlacesNear(lat, lng, HOME_PLACES_FETCH_RADIUS_KM)) {
                 is OpResult.Success -> {
-                    // Repo MVP zwraca wszystkie miejsca – liczymy dystans na kliencie.
-                    // "Blisko Ciebie" to po prostu 20 najbliższych miejsc, bez
+                    // Repo zwraca ograniczony bucket geohash; dokładny dystans
+                    // liczymy na kliencie. "Blisko Ciebie" to 20 najbliższych, bez
                     // patrzenia na oceny. "Top miejsca" to ranking z miejsc
                     // znajdujących się blisko usera.
                     val placesWithDistance = result.data
