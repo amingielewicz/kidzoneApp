@@ -165,6 +165,10 @@ fun MapScreen(
         position = CameraPosition.fromLatLngZoom(DEFAULT_CAMERA_TARGET, DEFAULT_CAMERA_ZOOM)
     }
     var mapLoaded by remember { mutableStateOf(false) }
+    var expandedClusterKey by remember { mutableStateOf<String?>(null) }
+    val markerItems = remember(state.places, expandedClusterKey) {
+        buildMapMarkerItems(state.places, expandedClusterKey)
+    }
 
     ReportSettledViewport(
         cameraPositionState = cameraPositionState,
@@ -266,22 +270,40 @@ fun MapScreen(
             contentPadding = PaddingValues(bottom = 120.dp),
             onMapLoaded = { mapLoaded = true },
             // Tap w pustą część mapy = zamykamy bottom sheet (jeśli otwarty).
-            onMapClick = { viewModel.onPlaceSelected(null) }
+            onMapClick = {
+                expandedClusterKey = null
+                viewModel.onPlaceSelected(null)
+            }
         ) {
-            state.places.forEach { place ->
+            markerItems.forEach { marker ->
+                val markerKeys: Array<Any> = arrayOf(
+                    marker.key,
+                    marker.place?.category?.name.orEmpty(),
+                    marker.cluster?.places?.size ?: 0
+                )
                 MarkerComposable(
-                    keys = arrayOf(place.id, place.category),
-                    state = MarkerState(LatLng(place.latitude, place.longitude)),
-                    title = place.name,
-                    snippet = place.address.takeIf { it.isNotBlank() },
+                    keys = markerKeys,
+                    state = MarkerState(marker.position),
+                    title = marker.place?.name ?: "${marker.cluster?.places?.size.orZero()} miejsc",
+                    snippet = marker.place?.address?.takeIf { it.isNotBlank() },
                     // true = consume zdarzenie. Domyślny info-window ma
                     // uboższe info niż nasz sheet, więc nadpisujemy własnym.
                     onClick = {
-                        viewModel.onPlaceSelected(place.id)
+                        marker.cluster?.let { cluster ->
+                            expandedClusterKey = cluster.key
+                            viewModel.onPlaceSelected(null)
+                        }
+                        marker.place?.let { place ->
+                            viewModel.onPlaceSelected(place.id)
+                        }
                         true
                     }
                 ) {
-                    CategoryMarkerIcon(category = place.category)
+                    if (marker.cluster != null) {
+                        ClusterMarkerIcon(count = marker.cluster.places.size)
+                    } else {
+                        CategoryMarkerIcon(category = marker.place!!.category)
+                    }
                 }
             }
         }
@@ -392,6 +414,8 @@ fun MapScreen(
     }
 }
 
+private fun Int?.orZero(): Int = this ?: 0
+
 @Composable
 private fun ReportSettledViewport(
     cameraPositionState: CameraPositionState,
@@ -446,6 +470,30 @@ private fun CategoryMarkerIcon(category: PlaceCategory) {
                 .size(36.dp)
                 .padding(6.dp)
         )
+    }
+}
+
+@Composable
+private fun ClusterMarkerIcon(count: Int) {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.primary,
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.surface),
+        shadowElevation = 4.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .padding(4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = count.toString(),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onPrimary,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 

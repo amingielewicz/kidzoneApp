@@ -304,25 +304,21 @@ class FirestorePlaceRepository @Inject constructor(
 
         return coroutineScope {
             prefixes.map { prefix ->
-                async { fetchPlacesForPrefix(prefix, category, perPrefixLimit) }
+                async { fetchPlacesForPrefix(prefix, perPrefixLimit) }
             }.awaitAll()
         }
             .flatten()
             .distinctBy { it.id }
             .filter { bounds.contains(it.latitude, it.longitude) }
+            .filter { category == null || it.category == category }
             .take(limit)
     }
 
     private suspend fun fetchPlacesForPrefix(
         prefix: String,
-        category: PlaceCategory?,
         limit: Int
     ): List<Place> {
-        var query: com.google.firebase.firestore.Query = placesCollection()
-        if (category != null) {
-            query = query.whereEqualTo("category", category.name)
-        }
-        return query
+        return placesCollection()
             .whereGreaterThanOrEqualTo("geohash", prefix)
             .whereLessThanOrEqualTo("geohash", prefix + "\uf8ff")
             .limit(limit.toLong())
