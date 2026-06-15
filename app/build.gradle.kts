@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.services)
     alias(libs.plugins.firebase.crashlytics)
+    alias(libs.plugins.detekt)
 }
 
 /**
@@ -168,6 +169,14 @@ android {
             it.useJUnitPlatform()
         }
     }
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    config.setFrom("$rootDir/detekt.yml")
+    parallel = true
+    ignoreFailures = true
 }
 
 dependencies {
