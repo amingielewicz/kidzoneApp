@@ -46,6 +46,10 @@
 -keep class com.google.android.gms.maps.** { *; }
 -dontwarn com.google.android.gms.maps.**
 
+# --- Google Play Services & Play Core (R8 missing classes fix) ---
+-dontwarn com.google.android.gms.internal.**
+-dontwarn com.google.android.gms.common.annotation.NoNullnessRewrite
+
 # --- Google Play Services Auth / Credential Manager ---
 -keep class com.google.android.gms.auth.api.credentials.** { *; }
 -keep class com.google.android.libraries.identity.googleid.** { *; }
