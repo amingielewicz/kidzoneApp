@@ -8,8 +8,10 @@ import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.toPlacesErrorMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -147,17 +149,17 @@ class MapViewModel @Inject constructor(
                 is OpResult.Failure -> {
                     emit(
                         PlacesLoad.Error(
-                            message = result.error.message
-                                ?: "Nie udało się wczytać miejsc na mapie",
+                            message = result.error.toPlacesErrorMessage(MAP_ERROR_FALLBACK),
                             previous = lastLoadedPlaces
                         )
                     )
                 }
             }
         }.catch { error ->
+            if (error is CancellationException) throw error
             emit(
                 PlacesLoad.Error(
-                    message = error.message ?: "Nie udało się wczytać miejsc na mapie",
+                    message = error.toPlacesErrorMessage(MAP_ERROR_FALLBACK),
                     previous = lastLoadedPlaces
                 )
             )
@@ -291,6 +293,7 @@ class MapViewModel @Inject constructor(
         const val VIEWPORT_DEBOUNCE_MS = 450L
         const val VIEWPORT_CACHE_TTL_MS = 5 * 60 * 1000L
         const val VIEWPORT_CACHE_SIZE = 12
+        const val MAP_ERROR_FALLBACK = "Nie udało się wczytać miejsc na mapie"
     }
 
     private fun viewportKey(bounds: GeoBounds, category: PlaceCategory? = null): String =
