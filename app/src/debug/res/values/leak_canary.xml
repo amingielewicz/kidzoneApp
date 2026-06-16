@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Keep the built-in LeakCanary auto installer enabled for debug builds. -->
-    <bool name="leak_canary_watcher_auto_install">true</bool>
+    <!--
+        Disable the always-on watcher in debug builds while profiling map
+        performance. LeakCanary periodically triggers explicit GC, which makes
+        map zoom/pan jank look much worse on physical devices.
+    -->
+    <bool name="leak_canary_watcher_auto_install">false</bool>
 </resources>
