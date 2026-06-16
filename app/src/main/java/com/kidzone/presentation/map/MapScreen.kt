@@ -26,9 +26,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -69,6 +71,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.mapNotNull
@@ -184,6 +187,7 @@ fun MapScreen(
     }
     var mapLoaded by remember { mutableStateOf(false) }
     var userTouchedMap by remember { mutableStateOf(false) }
+    val markerIconCache = rememberMarkerIcons()
     val clusterItems = remember(state.places) {
         buildPlaceClusterItems(state.places)
     }
@@ -280,22 +284,14 @@ fun MapScreen(
                 // prawym górnym rogu, co daje pełną kontrolę nad stylem i
                 // zachowaniem (np. wyzwalanie permission launchera).
                 myLocationButtonEnabled = false,
-                // Natywne +/- w prawym dolnym rogu mapy. contentPadding
-                // poniżej przesuwa je tak, by nie kolidowały z `+` FAB-em
-                // z MainScreena (też BottomEnd).
-                zoomControlsEnabled = true,
+                // Wyłączamy natywne +/- i implementujemy własne w Compose, 
+                // aby móc pozycjonować je niezależnie od logo Google.
+                zoomControlsEnabled = false,
                 mapToolbarEnabled = false,
                 compassEnabled = true
             ),
-            // Native zoom controls + atrybucja Google'a domyślnie siedzą w
-            // prawym dolnym rogu canvasu mapy, czyli pod globalnym FAB-em
-            // "+" z MainScreena. Przesuwamy je o ok. wysokość FAB-a +
-            // bottom navigation, żeby były dostępne palcem.
-            //
-            // 120.dp ≈ 56 (FAB) + 16 (margin Scaffolda wokół FAB) + 24 (luz
-            // wizualny) + 24 (dodatkowy buffer, żeby zoom buttons nie były
-            // zbyt blisko FAB-a). Dobierane na oko, łatwo skorygować.
-            contentPadding = PaddingValues(bottom = 120.dp),
+            // Ustawiamy mały padding, aby logo Google było nisko (zgodnie z życzeniem 4-6dp).
+            contentPadding = PaddingValues(bottom = 6.dp),
             onMapLoaded = { mapLoaded = true },
             // Tap w pustą część mapy = zamykamy bottom sheet (jeśli otwarty).
             onMapClick = {
@@ -305,15 +301,14 @@ fun MapScreen(
         ) {
             val clusterManager = rememberClusterManager<PlaceClusterItem>()
             val clusterRenderer = rememberPlaceClusterRenderer(
-                clusterManager = clusterManager
+                clusterManager = clusterManager,
+                markerIconCache = markerIconCache
             )
 
             if (clusterManager != null && clusterRenderer != null) {
-                Clustering(
-                    items = clusterItems,
-                    clusterManager = clusterManager
-                )
-                SideEffect {
+                // KLUCZOWE: Konfiguracja renderera i listenerów. 
+                // Usunięcie key() i SideEffect zapobiega znikaniu markerów przy zoomie.
+                LaunchedEffect(clusterManager, clusterRenderer) {
                     clusterManager.renderer = clusterRenderer
                     clusterManager.setOnClusterClickListener { cluster ->
                         userTouchedMap = true
@@ -329,6 +324,11 @@ fun MapScreen(
                         true
                     }
                 }
+
+                Clustering(
+                    items = clusterItems,
+                    clusterManager = clusterManager
+                )
             }
         }
 
@@ -398,6 +398,36 @@ fun MapScreen(
                 // Offset w dół, żeby nie kolidować z filtrami overlay
                 .offset(y = 160.dp)
         )
+
+        // --- Custom Zoom Controls ---
+        // Pozwalają na podniesienie przycisków +/- wyżej, podczas gdy logo 
+        // Google (atrybucja) pozostaje nisko na ekranie.
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 12.dp, bottom = 180.dp), // Przyciski +/- na poprzedniej, dobrej wysokości
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            MapIconButton(
+                icon = Icons.Filled.Add,
+                contentDescription = "Powiększ",
+                onClick = {
+                    scope.launch {
+                        cameraPositionState.animate(CameraUpdateFactory.zoomIn())
+                    }
+                }
+            )
+            MapIconButton(
+                icon = Icons.Filled.Remove,
+                contentDescription = "Pomniejsz",
+                onClick = {
+                    scope.launch {
+                        cameraPositionState.animate(CameraUpdateFactory.zoomOut())
+                    }
+                }
+            )
+        }
+
         state.errorMessage?.let { msg ->
             Surface(
                 modifier = Modifier
@@ -447,6 +477,14 @@ internal data class PlaceClusterItem(
     override fun getTitle(): String = place.name
     override fun getSnippet(): String? = place.address.takeIf { it.isNotBlank() }
     override fun getZIndex(): Float? = null
+    
+    // KLUCZOWE: hashCode i equals oparte na id miejsca, aby Clustering nie migał
+    override fun hashCode(): Int = place.id.hashCode()
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is PlaceClusterItem) return false
+        return place.id == other.place.id
+    }
 }
 
 internal fun buildPlaceClusterItems(places: List<Place>): List<PlaceClusterItem> =
@@ -503,7 +541,8 @@ private fun List<Place>.hasSameCoordinates(): Boolean {
 @GoogleMapComposable
 @OptIn(MapsComposeExperimentalApi::class)
 private fun rememberPlaceClusterRenderer(
-    clusterManager: ClusterManager<PlaceClusterItem>?
+    clusterManager: ClusterManager<PlaceClusterItem>?,
+    markerIconCache: MarkerIconCache
 ): ClusterRenderer<PlaceClusterItem>? {
     val context = LocalContext.current
     val rendererState = remember {
@@ -511,17 +550,12 @@ private fun rememberPlaceClusterRenderer(
     }
 
     clusterManager ?: return null
-    MapEffect(clusterManager) { map ->
-        val categoryMarkerIcons = PlaceCategory.entries.associateWith { category ->
-            BitmapDescriptorFactory.fromResource(category.mapMarkerDrawableRes)
-        }
-        val clusterMarkerIcon = BitmapDescriptorFactory.fromResource(R.drawable.ic_map_cluster)
+    MapEffect(clusterManager, markerIconCache) { map ->
         val renderer = PlaceClusterRenderer(
             context = context,
-            map = map,
+            googleMap = map,
             clusterManager = clusterManager,
-            categoryMarkerIcons = categoryMarkerIcons,
-            clusterMarkerIcon = clusterMarkerIcon
+            markerIconCache = markerIconCache
         ).apply {
             setMinClusterSize(MIN_CLUSTER_SIZE)
             setAnimation(false)
@@ -535,11 +569,18 @@ private fun rememberPlaceClusterRenderer(
 
 private class PlaceClusterRenderer(
     context: Context,
-    map: GoogleMapSdk,
+    private val googleMap: GoogleMapSdk,
     clusterManager: ClusterManager<PlaceClusterItem>,
-    private val categoryMarkerIcons: Map<PlaceCategory, BitmapDescriptor>,
-    private val clusterMarkerIcon: BitmapDescriptor
-) : DefaultClusterRenderer<PlaceClusterItem>(context, map, clusterManager) {
+    private val markerIconCache: MarkerIconCache
+) : DefaultClusterRenderer<PlaceClusterItem>(context, googleMap, clusterManager) {
+
+    override fun shouldRenderAsCluster(cluster: Cluster<PlaceClusterItem>): Boolean {
+        val zoom = googleMap.cameraPosition.zoom
+        return when {
+            zoom > 15f -> cluster.size >= 10 // Przy dużym zbliżeniu (ulica) - wolimy osobne ikony pinezek
+            else -> cluster.size >= MIN_CLUSTER_SIZE // Przy oddaleniu (miasto/kraj) - wolimy kółeczka z cyframi
+        }
+    }
 
     override fun onBeforeClusterItemRendered(
         item: PlaceClusterItem,
@@ -547,13 +588,13 @@ private class PlaceClusterRenderer(
     ) {
         super.onBeforeClusterItemRendered(item, markerOptions)
         markerOptions
-            .icon(categoryMarkerIcons.getValue(item.place.category))
+            .icon(markerIconCache.getCategoryIcon(item.place.category))
             .anchor(MARKER_ANCHOR_CENTER, MARKER_ANCHOR_CENTER)
     }
 
     override fun onClusterItemUpdated(item: PlaceClusterItem, marker: Marker) {
         super.onClusterItemUpdated(item, marker)
-        marker.setIcon(categoryMarkerIcons.getValue(item.place.category))
+        marker.setIcon(markerIconCache.getCategoryIcon(item.place.category))
     }
 
     override fun onBeforeClusterRendered(
@@ -561,34 +602,22 @@ private class PlaceClusterRenderer(
         markerOptions: MarkerOptions
     ) {
         markerOptions
-            .icon(clusterMarkerIcon)
+            .icon(markerIconCache.getClusterIcon(cluster.size))
             .anchor(MARKER_ANCHOR_CENTER, MARKER_ANCHOR_CENTER)
-            .title("${cluster.size} miejsc")
     }
 
     override fun onClusterUpdated(cluster: Cluster<PlaceClusterItem>, marker: Marker) {
-        marker.setIcon(clusterMarkerIcon)
-        marker.title = "${cluster.size} miejsc"
+        marker.setIcon(markerIconCache.getClusterIcon(cluster.size))
     }
 }
 
 internal fun clusterCountLabel(count: Int): String = when {
-    count < 10 -> count.toString()
-    count >= 100 -> "90+"
+    count <= 10 -> count.toString()
+    count >= 100 -> "100+"
     else -> "${(count / 10) * 10}+"
 }
 
-private val PlaceCategory.mapMarkerDrawableRes: Int
-    get() = when (this) {
-        PlaceCategory.PLAYGROUND -> R.drawable.ic_map_marker_playground
-        PlaceCategory.PLAY_ROOM -> R.drawable.ic_map_marker_play_room
-        PlaceCategory.CAFE -> R.drawable.ic_map_marker_cafe
-        PlaceCategory.RESTAURANT -> R.drawable.ic_map_marker_restaurant
-        PlaceCategory.PARK -> R.drawable.ic_map_marker_park
-        PlaceCategory.ATTRACTION -> R.drawable.ic_map_marker_attraction
-        PlaceCategory.OTHER -> R.drawable.ic_map_marker_other
-    }
-
+@OptIn(kotlinx.coroutines.FlowPreview::class)
 @Composable
 private fun ReportSettledViewport(
     cameraPositionState: CameraPositionState,
@@ -599,10 +628,10 @@ private fun ReportSettledViewport(
         if (!mapLoaded) return@LaunchedEffect
         snapshotFlow { cameraPositionState.isMoving to cameraPositionState.position }
             .filter { (isMoving, _) -> !isMoving }
-            .distinctUntilChanged()
             .mapNotNull {
                 cameraPositionState.projection?.visibleRegion?.latLngBounds
             }
+            .distinctUntilChanged()
             .collect { bounds ->
                 onViewportChanged(
                     GeoBounds(
@@ -911,6 +940,29 @@ private fun PlacePreviewContent(
             Spacer(Modifier.width(4.dp))
             Text(stringResource(R.string.view_on_google_maps))
         }
+    }
+}
+
+@Composable
+private fun MapIconButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FloatingActionButton(
+        onClick = onClick,
+        modifier = modifier.size(40.dp),
+        shape = CircleShape,
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        elevation = FloatingActionButtonDefaults.elevation(2.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 

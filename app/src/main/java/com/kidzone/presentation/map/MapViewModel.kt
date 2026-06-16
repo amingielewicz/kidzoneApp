@@ -289,7 +289,7 @@ class MapViewModel @Inject constructor(
          * gdy bazka miejsc urośnie.
          */
         const val TOP_RATED_THRESHOLD = 4.0
-        const val MAP_MARKERS_LIMIT = 200
+        const val MAP_MARKERS_LIMIT = 1000
         const val VIEWPORT_DEBOUNCE_MS = 450L
         const val VIEWPORT_CACHE_TTL_MS = 5 * 60 * 1000L
         const val VIEWPORT_CACHE_SIZE = 12
@@ -298,10 +298,10 @@ class MapViewModel @Inject constructor(
 
     private fun viewportKey(bounds: GeoBounds, category: PlaceCategory? = null): String =
         listOf(
-            (bounds.centerLatitude * 100).roundToInt(),
-            (bounds.centerLongitude * 100).roundToInt(),
-            ((bounds.north - bounds.south) * 100).roundToInt(),
-            ((longitudeSpan(bounds)) * 100).roundToInt(),
+            (bounds.centerLatitude * 1000).roundToInt(),
+            (bounds.centerLongitude * 1000).roundToInt(),
+            ((bounds.north - bounds.south) * 1000).roundToInt(),
+            ((longitudeSpan(bounds)) * 1000).roundToInt(),
             category?.name.orEmpty()
         ).joinToString(":")
 
