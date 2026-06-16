@@ -10,7 +10,9 @@ import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.service.LocationProvider
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.toPlacesErrorMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -155,14 +157,19 @@ class PlaceListViewModel @Inject constructor(
     /** True while a server page fetch is in-flight. */
     private val _isLoadingMore = MutableStateFlow(false)
 
+    /** User-facing error from cursor pagination. */
+    private val loadMoreErrorMessage = MutableStateFlow<String?>(null)
+
     /** Zapobiega ponownym fetchom po otrzymaniu ostatniej strony. */
     private var serverExhausted = false
+
+    private var lastLoadedPlaces: List<Place> = emptyList()
 
     /** Wewnętrzny model wyniku ze strumienia Firestore. */
     private sealed interface PlacesLoad {
         data object Loading : PlacesLoad
         data class Success(val list: List<Place>) : PlacesLoad
-        data class Error(val message: String) : PlacesLoad
+        data class Error(val message: String, val previous: List<Place>) : PlacesLoad
     }
 
     private val placesLoad: Flow<PlacesLoad> = combine(
@@ -172,10 +179,20 @@ class PlaceListViewModel @Inject constructor(
         category to query
     }.flatMapLatest { (category, query) ->
         placeRepository.observePlaces(category, query)
-            .map<List<Place>, PlacesLoad> { PlacesLoad.Success(it) }
+            .map<List<Place>, PlacesLoad> { places ->
+                lastLoadedPlaces = places
+                loadMoreErrorMessage.value = null
+                PlacesLoad.Success(places)
+            }
             .onStart { emit(PlacesLoad.Loading) }
             .catch { e ->
-                emit(PlacesLoad.Error(e.message ?: "Nie udało się wczytać listy miejsc"))
+                if (e is CancellationException) throw e
+                emit(
+                    PlacesLoad.Error(
+                        message = e.toPlacesErrorMessage(LIST_ERROR_FALLBACK),
+                        previous = lastLoadedPlaces
+                    )
+                )
             }
     }
 
@@ -209,7 +226,8 @@ class PlaceListViewModel @Inject constructor(
         visibleCount,
         searchQuery,
         extraPages,
-        _isLoadingMore
+        _isLoadingMore,
+        loadMoreErrorMessage
     ) { args ->
         val load = args[0] as PlacesLoad
         val category = args[1] as PlaceCategory?
@@ -220,6 +238,7 @@ class PlaceListViewModel @Inject constructor(
         val query = args[6] as String
         val extras = args[7] as List<Place>
         val loadingMore = args[8] as Boolean
+        val loadMoreError = args[9] as String?
 
         // Szkielety pokazujemy TYLKO przy pierwszym wejściu na ekran (pusta lista + brak zapytania)
         val isInitialLoading = load is PlacesLoad.Loading && 
@@ -242,7 +261,7 @@ class PlaceListViewModel @Inject constructor(
                     currentUserId = sortCtx.currentUserId,
                     isLoading = isInitialLoading,
                     isRefreshing = refreshing,
-                    errorMessage = null,
+                    errorMessage = loadMoreError,
                     places = instantFiltered,
                     searchQuery = query
                 )
@@ -286,7 +305,7 @@ class PlaceListViewModel @Inject constructor(
                         sortCtx.userLocation == null,
                     isLoading = false,
                     isRefreshing = refreshing,
-                    errorMessage = null,
+                    errorMessage = loadMoreError,
                     hasMore = paginated.size < totalCount || serverCursor != null,
                     totalCount = totalCount,
                     searchQuery = query,
@@ -302,7 +321,10 @@ class PlaceListViewModel @Inject constructor(
                 isLoading = false,
                 isRefreshing = refreshing,
                 errorMessage = load.message,
-                places = emptyList()
+                places = load.previous,
+                totalCount = load.previous.size,
+                searchQuery = query,
+                isLoadingMore = loadingMore
             )
         }
     }.stateIn(
@@ -412,6 +434,7 @@ class PlaceListViewModel @Inject constructor(
 
         viewModelScope.launch {
             _isLoadingMore.value = true
+            loadMoreErrorMessage.value = null
             val category = selectedCategory.value
             val query = searchQuery.value.takeIf { it.isNotBlank() }
 
@@ -443,7 +466,9 @@ class PlaceListViewModel @Inject constructor(
                         }
                     }
                     is OpResult.Failure -> {
-                        Timber.w("loadMore: failed to fetch next page: ${result.error.message}")
+                        val message = result.error.toPlacesErrorMessage(LIST_MORE_ERROR_FALLBACK)
+                        loadMoreErrorMessage.value = message
+                        Timber.w(result.error, "loadMore: failed to fetch next page")
                         break
                     }
                 }
@@ -462,6 +487,7 @@ class PlaceListViewModel @Inject constructor(
         serverCursor = null
         serverExhausted = false
         extraPages.value = emptyList()
+        loadMoreErrorMessage.value = null
         // Reset scroll position — UI will scroll to top via LaunchedEffect.
         savedScrollIndex = 0
         savedScrollOffset = 0
@@ -549,3 +575,6 @@ private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double):
     val c = 2 * atan2(sqrt(a), sqrt(1 - a))
     return r * c
 }
+
+private const val LIST_ERROR_FALLBACK = "Nie udało się wczytać listy miejsc"
+private const val LIST_MORE_ERROR_FALLBACK = "Nie udało się doładować kolejnych miejsc"
