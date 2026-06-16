@@ -48,6 +48,7 @@ class KidZoneApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         initTimber()
+        initDebugTools()
         initAppCheck()
         initRemoteConfig()
         cleanStaleCache()
@@ -98,6 +99,17 @@ class KidZoneApplication : Application() {
             Timber.plant(CrashlyticsTree())
         }
         Timber.d("Timber initialized (debug=${BuildConfig.DEBUG})")
+    }
+
+    private fun initDebugTools() {
+        if (!BuildConfig.DEBUG) return
+        runCatching {
+            Class.forName("com.kidzone.DebugTools")
+                .getMethod("install")
+                .invoke(null)
+        }.onFailure { error ->
+            Timber.d(error, "Debug tools not installed")
+        }
     }
 
     private fun cleanStaleCache() {
