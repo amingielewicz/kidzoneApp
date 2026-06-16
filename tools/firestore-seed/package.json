@@ -1,0 +1,16 @@
+{
+  "name": "kidzone-firestore-seed",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate:100": "node generate-scalability-data.mjs --places=100",
+    "generate:1000": "node generate-scalability-data.mjs --places=1000",
+    "generate": "node generate-scalability-data.mjs",
+    "validate": "node validate-scalability-data.mjs",
+    "seed": "node seed-firestore.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}
