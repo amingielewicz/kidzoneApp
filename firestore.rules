@@ -3,8 +3,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Funkcje pomocnicze ---
-
     function isSignedIn() {
       return request.auth != null;
     }
@@ -17,33 +15,41 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.admin == true;
     }
 
-    // Sprawdza czy żądanie nie próbuje zmienić chronionych pól
     function isNotUpdating(fields) {
       return !(request.resource.data.diff(resource.data).affectedKeys().hasAny(fields));
     }
 
-    // --- Kolekcje ---
-
     match /users/{userId} {
-      // Czytać może każdy zalogowany, ale... (patrz niżej)
       allow read: if isSignedIn();
 
-      // ...ale tylko właściciel i admin widzą pola prywatne (email, fcmTokens, lastName)
-      // W wersji produkcyjnej zalecane przeniesienie tych pól do subkolekcji /private/
-      // Tutaj stosujemy zabezpieczenie na poziomie pól (wersja uproszczona):
-      function onlyPublicFields() {
-        let privateFields = ['email', 'fcmTokens', 'lastName', 'firstName', 'bannedUntilMillis', 'banReason'];
-        return !request.query.limit || !resource.data.keys().hasAny(privateFields);
-      }
-
       allow create: if isOwner(userId)
-        && request.resource.data.role == 'user' // Domyślna rola
+        && request.resource.data.role == 'user'
         && request.resource.data.placesAddedCount == 0;
 
-      allow update: if (isOwner(userId) && isNotUpdating(['role', 'bannedUntilMillis', 'placesAddedCount', 'reviewsCount', 'email']))
-                    || isAdmin();
+      allow update: if (isOwner(userId)
+          && isNotUpdating([
+            'role',
+            'bannedUntilMillis',
+            'placesAddedCount',
+            'reviewsCount',
+            'email',
+            'firstName',
+            'lastName',
+            'emailNotificationsEnabled'
+          ]))
+          || isAdmin();
 
-      allow delete: if isAdmin(); // Tylko admin może trwale usuwać doc userów (użytkownik tylko przez procedurę anonimizacji)
+      allow delete: if isAdmin();
+
+      match /private/profile {
+        allow read: if isOwner(userId) || isAdmin();
+
+        allow create: if isOwner(userId);
+
+        allow update: if isOwner(userId) || isAdmin();
+
+        allow delete: if isAdmin();
+      }
     }
 
     match /places/{placeId} {
@@ -56,8 +62,6 @@ service cloud.firestore {
 
       allow update: if isAdmin()
         || (isSignedIn() && resource.data.ownerUserId == request.auth.uid && isNotUpdating(['averageRating', 'reviewsCount', 'ownerUserId']))
-        // Średnia ocen jest teraz obliczana przez Cloud Functions (onReviewCreated/Deleted).
-        // Zwykli użytkownicy mogą tylko dodawać/usuwać swoje zdjęcia.
         || (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoUrls', 'photoUploadedBy']));
 
       allow delete: if isAdmin() || (isSignedIn() && resource.data.ownerUserId == request.auth.uid);
@@ -70,7 +74,6 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.rating >= 1
         && request.resource.data.rating <= 5
-        // Zapobiega ocenianiu własnych miejsc (integrity check)
         && get(/databases/$(database)/documents/places/$(request.resource.data.placeId)).data.ownerUserId != request.auth.uid;
 
       allow update: if isAdmin() || (isOwner(resource.data.userId) && isNotUpdating(['userId', 'placeId']));
@@ -78,13 +81,11 @@ service cloud.firestore {
       allow delete: if isAdmin() || isOwner(resource.data.userId);
     }
 
-    // Raporty - użytkownik może czytać własne zgłoszenia, admin wszystko
     match /{reportCollection}/{reportId} {
       allow create: if isSignedIn() && request.resource.data.reporterId == request.auth.uid;
       allow read: if isAdmin() || (isSignedIn() && resource.data.reporterId == request.auth.uid);
       allow update, delete: if isAdmin();
 
-      // Ograniczenie dla kolekcji raportów
       match /placeholder {
         allow read: if reportCollection in ['place_reports', 'review_reports', 'photo_reports', 'place_change_requests'];
       }
