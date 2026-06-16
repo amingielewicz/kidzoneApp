@@ -59,7 +59,7 @@ class FirestorePlaceRepository @Inject constructor(
          */
         private const val PAGE_SIZE_SNAPSHOT = 20
         private const val OWNER_PLACES_LIMIT = 100
-        private const val GEO_QUERY_LIMIT = 200
+        private const val GEO_QUERY_LIMIT = 1500
         private const val MAP_GEOHASH_PREFIX_LIMIT = 25
         private const val PER_PREFIX_FETCH_LIMIT = 150
         private const val KM_PER_DEGREE = 111.0

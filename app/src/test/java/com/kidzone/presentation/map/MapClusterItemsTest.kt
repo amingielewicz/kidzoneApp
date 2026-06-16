@@ -46,12 +46,14 @@ class MapClusterItemsTest {
     }
 
     @Test
-    fun `cluster labels are bucketed by tens and capped at ninety plus`() {
+    fun `cluster labels are bucketed by tens and capped at 100 plus`() {
         assertEquals("2", clusterCountLabel(2))
         assertEquals("9", clusterCountLabel(9))
-        assertEquals("10+", clusterCountLabel(10))
+        assertEquals("10", clusterCountLabel(10))
+        assertEquals("10+", clusterCountLabel(11))
         assertEquals("20+", clusterCountLabel(29))
         assertEquals("90+", clusterCountLabel(90))
-        assertEquals("90+", clusterCountLabel(140))
+        assertEquals("100+", clusterCountLabel(100))
+        assertEquals("100+", clusterCountLabel(140))
     }
 }

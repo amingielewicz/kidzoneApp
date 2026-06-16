@@ -612,8 +612,8 @@ private class PlaceClusterRenderer(
 }
 
 internal fun clusterCountLabel(count: Int): String = when {
-    count >= 90 -> "90+"
-    count >= 10 -> "${(count / 10) * 10}+"
+    count >= 100 -> "100+"
+    count > 10 -> "${(count / 10) * 10}+"
     else -> count.toString()
 }
 
