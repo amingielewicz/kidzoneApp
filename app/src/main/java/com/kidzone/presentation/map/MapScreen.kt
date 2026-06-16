@@ -317,7 +317,7 @@ fun MapScreen(
                         marker.cluster?.let { cluster ->
                             val shouldZoomIntoCluster =
                                 currentZoom < SPIDERFY_MIN_ZOOM ||
-                                    cluster.places.size >= MAX_SPIDERFIED_CLUSTER_SIZE
+                                    cluster.places.size > MAX_SPIDERFIED_CLUSTER_SIZE
                             if (shouldZoomIntoCluster) {
                                 expandedClusterKey = null
                                 expandedClusterPlaceIds = if (

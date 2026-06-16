@@ -75,6 +75,50 @@ class MapMarkerLayoutTest {
     }
 
     @Test
+    fun `country zoom clusters Lodz area places into one marker`() {
+        val places = listOf(
+            TestFixtures.place(id = "p1", latitude = 51.722, longitude = 19.356),
+            TestFixtures.place(id = "p2", latitude = 51.735, longitude = 19.428),
+            TestFixtures.place(id = "p3", latitude = 51.744, longitude = 19.456),
+            TestFixtures.place(id = "p4", latitude = 51.756, longitude = 19.469),
+            TestFixtures.place(id = "p5", latitude = 51.762, longitude = 19.503),
+            TestFixtures.place(id = "p6", latitude = 51.775, longitude = 19.401),
+            TestFixtures.place(id = "p7", latitude = 51.781, longitude = 19.456),
+            TestFixtures.place(id = "p8", latitude = 51.794, longitude = 19.512),
+            TestFixtures.place(id = "p9", latitude = 51.806, longitude = 19.381),
+            TestFixtures.place(id = "p10", latitude = 51.821, longitude = 19.474)
+        )
+
+        val markers = buildMapMarkerItems(
+            places = places,
+            expandedClusterKey = null,
+            zoom = 6f
+        )
+
+        assertEquals(1, markers.size)
+        assertEquals(10, markers.single().cluster!!.places.size)
+    }
+
+    @Test
+    fun `city zoom shows Lodz area places as individual markers`() {
+        val places = listOf(
+            TestFixtures.place(id = "p1", latitude = 51.722, longitude = 19.356),
+            TestFixtures.place(id = "p2", latitude = 51.735, longitude = 19.428),
+            TestFixtures.place(id = "p3", latitude = 51.744, longitude = 19.456),
+            TestFixtures.place(id = "p4", latitude = 51.756, longitude = 19.469)
+        )
+
+        val markers = buildMapMarkerItems(
+            places = places,
+            expandedClusterKey = null,
+            zoom = 13f
+        )
+
+        assertEquals(4, markers.size)
+        assertTrue(markers.all { it.place != null })
+    }
+
+    @Test
     fun `expanded country zoom cluster spiderfies its grouped places`() {
         val places = listOf(
             TestFixtures.place(id = "p1", latitude = 52.10, longitude = 21.10),
@@ -118,6 +162,29 @@ class MapMarkerLayoutTest {
         assertEquals(places.map { it.latitude to it.longitude }, expanded.map {
             it.position.latitude to it.position.longitude
         })
+    }
+
+    @Test
+    fun `expanded place ids spiderfy markers with same coordinates`() {
+        val places = (1..10).map { index ->
+            TestFixtures.place(
+                id = "p$index",
+                latitude = 51.760,
+                longitude = 19.458
+            )
+        }
+
+        val expanded = buildMapMarkerItems(
+            places = places,
+            expandedClusterKey = null,
+            expandedPlaceIds = places.map { it.id }.toSet(),
+            zoom = 16f
+        )
+
+        assertEquals(10, expanded.size)
+        assertTrue(expanded.all { it.place != null })
+        assertTrue(expanded.all { it.isSpiderfied })
+        assertTrue(expanded.map { it.position }.toSet().size > 1)
     }
 
     private fun overlappingPlaces() = listOf(
