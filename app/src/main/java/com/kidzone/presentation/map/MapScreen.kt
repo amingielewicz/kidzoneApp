@@ -69,7 +69,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -172,15 +174,23 @@ fun MapScreen(
     var expandedClusterKey by remember { mutableStateOf<String?>(null) }
     var expandedClusterPlaceIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var userTouchedMap by remember { mutableStateOf(false) }
-    val currentZoom = cameraPositionState.position.zoom
-    val markerItems = remember(state.places, expandedClusterKey, expandedClusterPlaceIds, currentZoom) {
+    var markerLayoutZoom by remember { mutableStateOf(markerLayoutZoomFor(DEFAULT_CAMERA_ZOOM)) }
+    val markerItems = remember(state.places, expandedClusterKey, expandedClusterPlaceIds, markerLayoutZoom) {
         buildMapMarkerItems(
             places = state.places,
             expandedClusterKey = expandedClusterKey,
             expandedPlaceIds = expandedClusterPlaceIds,
-            zoom = currentZoom
+            zoom = markerLayoutZoom
         )
     }
+
+    ReportSettledMarkerZoom(
+        cameraPositionState = cameraPositionState,
+        mapLoaded = mapLoaded,
+        onMarkerZoomChanged = { zoom ->
+            markerLayoutZoom = zoom
+        }
+    )
 
     ReportSettledViewport(
         cameraPositionState = cameraPositionState,
@@ -316,7 +326,7 @@ fun MapScreen(
                         userTouchedMap = true
                         marker.cluster?.let { cluster ->
                             val shouldZoomIntoCluster =
-                                currentZoom < SPIDERFY_MIN_ZOOM ||
+                                markerLayoutZoom < SPIDERFY_MIN_ZOOM ||
                                     cluster.places.size > MAX_SPIDERFIED_CLUSTER_SIZE
                             if (shouldZoomIntoCluster) {
                                 expandedClusterKey = null
@@ -491,6 +501,29 @@ private fun List<Place>.hasSameCoordinates(): Boolean {
     return all { place ->
         place.latitude == first.latitude && place.longitude == first.longitude
     }
+}
+
+@Composable
+private fun ReportSettledMarkerZoom(
+    cameraPositionState: CameraPositionState,
+    mapLoaded: Boolean,
+    onMarkerZoomChanged: (Float) -> Unit
+) {
+    LaunchedEffect(cameraPositionState, mapLoaded) {
+        if (!mapLoaded) return@LaunchedEffect
+        snapshotFlow { cameraPositionState.isMoving to cameraPositionState.position.zoom }
+            .filter { (isMoving, _) -> !isMoving }
+            .map { (_, zoom) -> markerLayoutZoomFor(zoom) }
+            .distinctUntilChanged()
+            .collect { zoom -> onMarkerZoomChanged(zoom) }
+    }
+}
+
+private fun markerLayoutZoomFor(cameraZoom: Float): Float = when {
+    cameraZoom < 7f -> 6f
+    cameraZoom < 10f -> 9f
+    cameraZoom < SPIDERFY_MIN_ZOOM -> 12f
+    else -> FOCUS_PLACE_ZOOM
 }
 
 @Composable
