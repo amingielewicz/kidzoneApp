@@ -58,6 +58,10 @@ class KidZoneApplication : Application() {
      * Inicjalizacja Firebase App Check:
      *  - Debug: DebugAppCheckProviderFactory (pozwala na testowanie w emulatorze)
      *  - Release: PlayIntegrityAppCheckProviderFactory (produkcyjna weryfikacja)
+     *
+     * Debug provider wypisuje token w Logcat. Token trzeba dodać w Firebase
+     * Console przed włączeniem App Check enforcement dla debug buildów.
+     * Szczegóły: docs/app-check.md.
      */
     private fun initAppCheck() {
         val firebaseAppCheck = FirebaseAppCheck.getInstance()
