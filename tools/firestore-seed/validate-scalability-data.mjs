@@ -42,12 +42,12 @@ console.log(`placesWithPhotos=${placesWithPhotos.length}`);
 console.log(`reviewsWithPhotos=${reviewsWithPhotos.length}`);
 console.log(`brokenPhotoUrls=${brokenPhotoUrls.length}`);
 
-if (placesWithPhotos.length === 0) {
-  throw new Error('Expected at least one place with photoUrls');
+if (placesWithPhotos.length !== places.length) {
+  throw new Error(`Expected every place to have photoUrls, got ${placesWithPhotos.length}/${places.length}`);
 }
 
-if (reviews.length > 0 && reviewsWithPhotos.length === 0) {
-  throw new Error('Expected at least one review with photoUrls');
+if (reviewsWithPhotos.length !== reviews.length) {
+  throw new Error(`Expected every review to have photoUrls, got ${reviewsWithPhotos.length}/${reviews.length}`);
 }
 
 if (brokenPhotoUrls.length === 0) {
