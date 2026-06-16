@@ -10,6 +10,7 @@ Projekt korzysta z:
 
 - Firestore Rules,
 - Storage Rules,
+- Firebase App Check,
 - Firebase Hosting,
 - Firebase Auth,
 - Firebase Cloud Functions,
@@ -82,11 +83,23 @@ request.auth.token.admin == true
 
 Pole `role` może istnieć informacyjnie w Firestore, ale nie powinno być źródłem prawdy dla dostępu admina.
 
+### 4. App Check wymaga kontrolowanego rollout'u
+
+Aplikacja inicjalizuje Firebase App Check w `KidZoneApplication`:
+
+- debug build używa debug providera,
+- release build używa Play Integrity.
+
+Procedura rejestracji debug tokenów i włączania enforcement jest opisana w [`docs/app-check.md`](app-check.md).
+
+Nie należy włączać enforcement bez wcześniejszego smoke testu logowania, Firestore, Storage i Cloud Functions.
+
 ## Kolejność wdrożenia
 
 ### Etap 1 — dokumentacja i testy
 
 - opisać aktualne ryzyka,
+- udokumentować App Check i debug tokeny,
 - dopisać testy Firestore Rules,
 - dopisać lub przygotować testy Storage Rules,
 - upewnić się, że CI testuje reguły.
@@ -118,6 +131,8 @@ Nie należy usuwać pól `email` ani `fcmTokens` ręcznie z Firebase Console.
 - [ ] Wiemy, które ekrany czytają `users/{uid}`.
 - [ ] Wiemy, gdzie aplikacja zapisuje `fcmTokens`.
 - [ ] Wiemy, gdzie aplikacja czyta `email`.
+- [ ] Debug tokeny App Check są dodane w Firebase Console.
+- [ ] App Check enforcement został sprawdzony smoke testem.
 - [ ] Mamy testy odmowy odczytu prywatnych danych.
 - [ ] Mamy testy odmowy uploadu do cudzej ścieżki.
 - [ ] Android CI jest zielony.
