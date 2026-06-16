@@ -32,6 +32,8 @@ app/release/
 # Node
 node_modules/
 npm-debug.log
+tools/firestore-seed/output/
+tools/firestore-seed/output-*/
 
 # Local IDE / Compiler
 .kotlin/
