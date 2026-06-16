@@ -4,12 +4,6 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RectF
-import android.graphics.Typeface
 import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -66,12 +60,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.toArgb
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -178,7 +170,6 @@ fun MapScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val gpsEnabled = rememberLocationServiceEnabled()
 
@@ -314,8 +305,7 @@ fun MapScreen(
         ) {
             val clusterManager = rememberClusterManager<PlaceClusterItem>()
             val clusterRenderer = rememberPlaceClusterRenderer(
-                clusterManager = clusterManager,
-                density = density.density
+                clusterManager = clusterManager
             )
 
             if (clusterManager != null && clusterRenderer != null) {
@@ -513,8 +503,7 @@ private fun List<Place>.hasSameCoordinates(): Boolean {
 @GoogleMapComposable
 @OptIn(MapsComposeExperimentalApi::class)
 private fun rememberPlaceClusterRenderer(
-    clusterManager: ClusterManager<PlaceClusterItem>?,
-    density: Float
+    clusterManager: ClusterManager<PlaceClusterItem>?
 ): ClusterRenderer<PlaceClusterItem>? {
     val context = LocalContext.current
     val rendererState = remember {
@@ -522,24 +511,17 @@ private fun rememberPlaceClusterRenderer(
     }
 
     clusterManager ?: return null
-    MapEffect(clusterManager, density) { map ->
+    MapEffect(clusterManager) { map ->
         val categoryMarkerIcons = PlaceCategory.entries.associateWith { category ->
-            createCategoryMarkerDescriptor(
-                category = category,
-                backgroundColor = category.style.color.toArgb(),
-                borderColor = android.graphics.Color.WHITE,
-                density = density
-            )
+            BitmapDescriptorFactory.fromResource(category.mapMarkerDrawableRes)
         }
-        val clusterMarkerIcons = clusterCountLabels().associateWith { label ->
-            createClusterMarkerDescriptor(label, density)
-        }
+        val clusterMarkerIcon = BitmapDescriptorFactory.fromResource(R.drawable.ic_map_cluster)
         val renderer = PlaceClusterRenderer(
             context = context,
             map = map,
             clusterManager = clusterManager,
             categoryMarkerIcons = categoryMarkerIcons,
-            clusterMarkerIcons = clusterMarkerIcons
+            clusterMarkerIcon = clusterMarkerIcon
         ).apply {
             setMinClusterSize(MIN_CLUSTER_SIZE)
             setAnimation(false)
@@ -556,7 +538,7 @@ private class PlaceClusterRenderer(
     map: GoogleMapSdk,
     clusterManager: ClusterManager<PlaceClusterItem>,
     private val categoryMarkerIcons: Map<PlaceCategory, BitmapDescriptor>,
-    private val clusterMarkerIcons: Map<String, BitmapDescriptor>
+    private val clusterMarkerIcon: BitmapDescriptor
 ) : DefaultClusterRenderer<PlaceClusterItem>(context, map, clusterManager) {
 
     override fun onBeforeClusterItemRendered(
@@ -579,176 +561,15 @@ private class PlaceClusterRenderer(
         markerOptions: MarkerOptions
     ) {
         markerOptions
-            .icon(clusterMarkerIcons.getValue(clusterCountLabel(cluster.size)))
+            .icon(clusterMarkerIcon)
             .anchor(MARKER_ANCHOR_CENTER, MARKER_ANCHOR_CENTER)
             .title("${cluster.size} miejsc")
     }
 
     override fun onClusterUpdated(cluster: Cluster<PlaceClusterItem>, marker: Marker) {
-        marker.setIcon(clusterMarkerIcons.getValue(clusterCountLabel(cluster.size)))
+        marker.setIcon(clusterMarkerIcon)
         marker.title = "${cluster.size} miejsc"
     }
-}
-
-private fun createCategoryMarkerDescriptor(
-    category: PlaceCategory,
-    backgroundColor: Int,
-    borderColor: Int,
-    density: Float
-): BitmapDescriptor {
-    val size = (58 * density).toInt().coerceAtLeast(58)
-    val center = size / 2f
-    val padding = (6 * density).coerceAtLeast(6f)
-    val strokeWidth = (2.5f * density).coerceAtLeast(2.5f)
-    val radius = (size / 2f) - padding - strokeWidth
-    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-
-    paint.color = android.graphics.Color.argb(72, 0, 0, 0)
-    paint.style = Paint.Style.FILL
-    canvas.drawCircle(center, center + 2 * density, radius, paint)
-
-    paint.color = backgroundColor
-    paint.style = Paint.Style.FILL
-    canvas.drawCircle(center, center, radius, paint)
-
-    paint.color = borderColor
-    paint.style = Paint.Style.STROKE
-    paint.strokeWidth = strokeWidth
-    canvas.drawCircle(center, center, radius - paint.strokeWidth / 2f, paint)
-
-    drawCategoryGlyph(canvas, paint, category, center, center, density)
-
-    return BitmapDescriptorFactory.fromBitmap(bitmap)
-}
-
-private fun drawCategoryGlyph(
-    canvas: Canvas,
-    paint: Paint,
-    category: PlaceCategory,
-    centerX: Float,
-    centerY: Float,
-    density: Float
-) {
-    paint.color = android.graphics.Color.WHITE
-    paint.strokeCap = Paint.Cap.ROUND
-    paint.strokeJoin = Paint.Join.ROUND
-    paint.strokeWidth = (2.2f * density).coerceAtLeast(2.2f)
-    paint.style = Paint.Style.STROKE
-
-    when (category) {
-        PlaceCategory.PLAYGROUND -> drawSlideGlyph(canvas, paint, centerX, centerY, density)
-        PlaceCategory.PLAY_ROOM -> drawRobotGlyph(canvas, paint, centerX, centerY, density)
-        PlaceCategory.CAFE -> drawCafeGlyph(canvas, paint, centerX, centerY, density)
-        PlaceCategory.RESTAURANT -> drawRestaurantGlyph(canvas, paint, centerX, centerY, density)
-        PlaceCategory.PARK -> drawTreeGlyph(canvas, paint, centerX, centerY, density)
-        PlaceCategory.ATTRACTION -> drawStarGlyph(canvas, paint, centerX, centerY, density)
-        PlaceCategory.OTHER -> drawPinGlyph(canvas, paint, centerX, centerY, density)
-    }
-}
-
-private fun drawSlideGlyph(canvas: Canvas, paint: Paint, x: Float, y: Float, d: Float) {
-    canvas.drawLine(x - 8 * d, y - 9 * d, x - 8 * d, y + 9 * d, paint)
-    canvas.drawLine(x - 8 * d, y - 8 * d, x + 1 * d, y - 8 * d, paint)
-    canvas.drawLine(x + 1 * d, y - 8 * d, x + 9 * d, y + 8 * d, paint)
-    canvas.drawLine(x - 3 * d, y + 8 * d, x + 10 * d, y + 8 * d, paint)
-}
-
-private fun drawRobotGlyph(canvas: Canvas, paint: Paint, x: Float, y: Float, d: Float) {
-    val rect = RectF(x - 9 * d, y - 7 * d, x + 9 * d, y + 8 * d)
-    canvas.drawRoundRect(rect, 4 * d, 4 * d, paint)
-    canvas.drawLine(x, y - 7 * d, x, y - 11 * d, paint)
-    paint.style = Paint.Style.FILL
-    canvas.drawCircle(x - 4 * d, y - 1 * d, 1.6f * d, paint)
-    canvas.drawCircle(x + 4 * d, y - 1 * d, 1.6f * d, paint)
-    paint.style = Paint.Style.STROKE
-    canvas.drawLine(x - 4 * d, y + 5 * d, x + 4 * d, y + 5 * d, paint)
-}
-
-private fun drawCafeGlyph(canvas: Canvas, paint: Paint, x: Float, y: Float, d: Float) {
-    val cup = RectF(x - 9 * d, y - 2 * d, x + 5 * d, y + 8 * d)
-    canvas.drawRoundRect(cup, 3 * d, 3 * d, paint)
-    canvas.drawArc(RectF(x + 3 * d, y, x + 12 * d, y + 7 * d), -70f, 220f, false, paint)
-    canvas.drawLine(x - 11 * d, y + 10 * d, x + 9 * d, y + 10 * d, paint)
-    canvas.drawLine(x - 4 * d, y - 10 * d, x - 4 * d, y - 6 * d, paint)
-    canvas.drawLine(x + 2 * d, y - 11 * d, x + 2 * d, y - 7 * d, paint)
-}
-
-private fun drawRestaurantGlyph(canvas: Canvas, paint: Paint, x: Float, y: Float, d: Float) {
-    canvas.drawLine(x - 7 * d, y - 10 * d, x - 7 * d, y + 10 * d, paint)
-    canvas.drawLine(x - 11 * d, y - 10 * d, x - 11 * d, y - 3 * d, paint)
-    canvas.drawLine(x - 3 * d, y - 10 * d, x - 3 * d, y - 3 * d, paint)
-    canvas.drawLine(x - 11 * d, y - 3 * d, x - 3 * d, y - 3 * d, paint)
-    canvas.drawLine(x + 6 * d, y - 10 * d, x + 6 * d, y + 10 * d, paint)
-    canvas.drawArc(RectF(x + 2 * d, y - 10 * d, x + 12 * d, y + 1 * d), 100f, 160f, false, paint)
-}
-
-private fun drawTreeGlyph(canvas: Canvas, paint: Paint, x: Float, y: Float, d: Float) {
-    paint.style = Paint.Style.FILL
-    canvas.drawCircle(x, y - 7 * d, 6 * d, paint)
-    canvas.drawCircle(x - 6 * d, y - 2 * d, 5 * d, paint)
-    canvas.drawCircle(x + 6 * d, y - 2 * d, 5 * d, paint)
-    paint.style = Paint.Style.STROKE
-    canvas.drawLine(x, y + 1 * d, x, y + 10 * d, paint)
-    canvas.drawLine(x - 6 * d, y + 10 * d, x + 6 * d, y + 10 * d, paint)
-}
-
-private fun drawStarGlyph(canvas: Canvas, paint: Paint, x: Float, y: Float, d: Float) {
-    val path = Path()
-    repeat(10) { index ->
-        val angle = Math.toRadians((-90 + index * 36).toDouble())
-        val radius = if (index % 2 == 0) 10 * d else 4.5f * d
-        val px = x + kotlin.math.cos(angle).toFloat() * radius
-        val py = y + kotlin.math.sin(angle).toFloat() * radius
-        if (index == 0) path.moveTo(px, py) else path.lineTo(px, py)
-    }
-    path.close()
-    paint.style = Paint.Style.FILL
-    canvas.drawPath(path, paint)
-    paint.style = Paint.Style.STROKE
-}
-
-private fun drawPinGlyph(canvas: Canvas, paint: Paint, x: Float, y: Float, d: Float) {
-    val path = Path().apply {
-        moveTo(x, y + 11 * d)
-        cubicTo(x - 10 * d, y, x - 6 * d, y - 10 * d, x, y - 10 * d)
-        cubicTo(x + 6 * d, y - 10 * d, x + 10 * d, y, x, y + 11 * d)
-    }
-    canvas.drawPath(path, paint)
-    canvas.drawCircle(x, y - 2 * d, 2.5f * d, paint)
-}
-
-private fun createClusterMarkerDescriptor(
-    label: String,
-    density: Float
-): BitmapDescriptor {
-    val size = (54 * density).toInt().coerceAtLeast(54)
-    val center = size / 2f
-    val padding = (5 * density).coerceAtLeast(5f)
-    val strokeWidth = (2.5f * density).coerceAtLeast(2.5f)
-    val radius = (size / 2f) - padding - strokeWidth
-    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-
-    paint.color = android.graphics.Color.rgb(33, 150, 243)
-    paint.style = Paint.Style.FILL
-    canvas.drawCircle(center, center, radius, paint)
-
-    paint.color = android.graphics.Color.WHITE
-    paint.style = Paint.Style.STROKE
-    paint.strokeWidth = strokeWidth
-    canvas.drawCircle(center, center, radius - paint.strokeWidth / 2f, paint)
-
-    paint.style = Paint.Style.FILL
-    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-    paint.textSize = (13 * density).coerceAtLeast(13f)
-    paint.textAlign = Paint.Align.CENTER
-    val textBaseline = center - (paint.descent() + paint.ascent()) / 2f
-    canvas.drawText(label, center, textBaseline, paint)
-
-    return BitmapDescriptorFactory.fromBitmap(bitmap)
 }
 
 internal fun clusterCountLabel(count: Int): String = when {
@@ -757,9 +578,16 @@ internal fun clusterCountLabel(count: Int): String = when {
     else -> "${(count / 10) * 10}+"
 }
 
-private fun clusterCountLabels(): List<String> =
-    (2..9).map { count -> count.toString() } +
-        (10..90 step 10).map { count -> "$count+" }
+private val PlaceCategory.mapMarkerDrawableRes: Int
+    get() = when (this) {
+        PlaceCategory.PLAYGROUND -> R.drawable.ic_map_marker_playground
+        PlaceCategory.PLAY_ROOM -> R.drawable.ic_map_marker_play_room
+        PlaceCategory.CAFE -> R.drawable.ic_map_marker_cafe
+        PlaceCategory.RESTAURANT -> R.drawable.ic_map_marker_restaurant
+        PlaceCategory.PARK -> R.drawable.ic_map_marker_park
+        PlaceCategory.ATTRACTION -> R.drawable.ic_map_marker_attraction
+        PlaceCategory.OTHER -> R.drawable.ic_map_marker_other
+    }
 
 @Composable
 private fun ReportSettledViewport(
