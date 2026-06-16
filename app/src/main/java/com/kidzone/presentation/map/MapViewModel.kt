@@ -20,14 +20,11 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChangedBy
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.take
 import javax.inject.Inject
 import kotlin.math.roundToInt
 
@@ -115,12 +112,10 @@ class MapViewModel @Inject constructor(
 
     private var lastLoadedPlaces: List<Place> = emptyList()
 
-    private val reportedViewport = viewport.filterNotNull()
-
-    private val debouncedViewport = merge(
-        reportedViewport.take(1),
-        reportedViewport.drop(1).debounce(VIEWPORT_DEBOUNCE_MS)
-    ).distinctUntilChangedBy { bounds -> viewportKey(bounds) }
+    private val debouncedViewport = viewport
+        .filterNotNull()
+        .debounce(VIEWPORT_DEBOUNCE_MS)
+        .distinctUntilChangedBy { bounds -> viewportKey(bounds) }
 
     private val placesLoad: Flow<PlacesLoad> = combine(
         debouncedViewport,
@@ -295,7 +290,7 @@ class MapViewModel @Inject constructor(
          */
         const val TOP_RATED_THRESHOLD = 4.0
         const val MAP_MARKERS_LIMIT = 1000
-        const val VIEWPORT_DEBOUNCE_MS = 300L
+        const val VIEWPORT_DEBOUNCE_MS = 450L
         const val VIEWPORT_CACHE_TTL_MS = 5 * 60 * 1000L
         const val VIEWPORT_CACHE_SIZE = 12
         const val MAP_ERROR_FALLBACK = "Nie udało się wczytać miejsc na mapie"

@@ -35,7 +35,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.max
 import java.util.concurrent.ConcurrentHashMap
@@ -61,7 +60,8 @@ class FirestorePlaceRepository @Inject constructor(
         private const val PAGE_SIZE_SNAPSHOT = 20
         private const val OWNER_PLACES_LIMIT = 100
         private const val GEO_QUERY_LIMIT = 200
-        private const val MAP_GEOHASH_PREFIX_LIMIT = 9
+        private const val MAP_GEOHASH_PREFIX_LIMIT = 25
+        private const val PER_PREFIX_FETCH_LIMIT = 150
         private const val KM_PER_DEGREE = 111.0
         private const val MIN_LONGITUDE_COSINE = 0.1
         private const val ROOM_CURSOR_PREFIX = "room:"
@@ -321,17 +321,17 @@ class FirestorePlaceRepository @Inject constructor(
         limit: Int
     ): List<Place> {
         val prefixes = viewportPrefixes(bounds)
-        val perPrefixLimit = max(1, ceil(limit.toDouble() / prefixes.size).toInt())
 
         return coroutineScope {
             prefixes.map { prefix ->
-                async { fetchPlacesForPrefix(prefix, perPrefixLimit) }
+                async { fetchPlacesForPrefix(prefix, PER_PREFIX_FETCH_LIMIT) }
             }.awaitAll()
         }
             .flatten()
             .distinctBy { it.id }
             .filter { bounds.contains(it.latitude, it.longitude) }
             .filter { category == null || it.category == category }
+            .sortedByDescending { it.averageRating }
             .take(limit)
     }
 
@@ -393,29 +393,36 @@ class FirestorePlaceRepository @Inject constructor(
     }
 
     private fun viewportPrefixes(bounds: GeoBounds): List<String> {
-        val latitudeSpanKm = (bounds.north - bounds.south) * KM_PER_DEGREE
+        val latitudeSpan = bounds.north - bounds.south
         val longitudeSpan = if (bounds.west <= bounds.east) {
             bounds.east - bounds.west
         } else {
-            (180.0 - bounds.west) + (bounds.east + 180.0)
+            360.0 - bounds.west + bounds.east
         }
         val longitudeSpanKm = longitudeSpan * KM_PER_DEGREE *
             cos(Math.toRadians(bounds.centerLatitude)).coerceAtLeast(MIN_LONGITUDE_COSINE)
-        val radiusKm = max(latitudeSpanKm, longitudeSpanKm) / 2.0
-        val precision = GeoHash.prefixLengthForRadius(radiusKm)
+        val radiusKm = max(latitudeSpan * KM_PER_DEGREE, longitudeSpanKm) / 2.0
 
-        val latitudes = listOf(bounds.south, bounds.centerLatitude, bounds.north)
-        val longitudes = if (bounds.west <= bounds.east) {
-            listOf(bounds.west, bounds.centerLongitude, bounds.east)
-        } else {
-            listOf(bounds.west, bounds.centerLongitude, bounds.east)
+        val precision = when {
+            radiusKm < 10 -> 5
+            radiusKm < 50 -> 4
+            else -> 3
+        }
+
+        val steps = 5
+        val latitudes = (0 until steps).map { index ->
+            bounds.south + latitudeSpan * index / (steps - 1)
+        }
+        val longitudes = (0 until steps).map { index ->
+            var longitude = bounds.west + longitudeSpan * index / (steps - 1)
+            if (longitude > 180.0) longitude -= 360.0
+            if (longitude < -180.0) longitude += 360.0
+            longitude
         }
 
         return latitudes
             .flatMap { latitude ->
-                longitudes.map { longitude ->
-                    GeoHash.encode(latitude, longitude, precision)
-                }
+                longitudes.map { longitude -> GeoHash.encode(latitude, longitude, precision) }
             }
             .distinct()
             .take(MAP_GEOHASH_PREFIX_LIMIT)

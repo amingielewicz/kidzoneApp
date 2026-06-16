@@ -109,6 +109,7 @@ firebase-analytics = { module = "com.google.firebase:firebase-analytics-ktx" }
 
 # Google Maps
 maps-compose = { module = "com.google.maps.android:maps-compose", version.ref = "mapsCompose" }
+maps-compose-utils = { module = "com.google.maps.android:maps-compose-utils", version.ref = "mapsCompose" }
 play-services-maps = { module = "com.google.android.gms:play-services-maps", version.ref = "playServicesMaps" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 
