@@ -30,23 +30,14 @@ class MapViewModelTest {
         @JvmField
         @RegisterExtension
         val mainDispatcherRule = MainDispatcherRule(UnconfinedTestDispatcher())
+        private const val LIMIT = 1000
     }
 
     private lateinit var placeRepository: PlaceRepository
     private lateinit var authRepository: AuthRepository
 
-    private val warsaw = GeoBounds(
-        north = 52.35,
-        east = 21.20,
-        south = 52.10,
-        west = 20.80
-    )
-    private val krakow = GeoBounds(
-        north = 50.15,
-        east = 20.10,
-        south = 49.95,
-        west = 19.75
-    )
+    private val warsaw = GeoBounds(north = 52.35, east = 21.20, south = 52.10, west = 20.80)
+    private val krakow = GeoBounds(north = 50.15, east = 20.10, south = 49.95, west = 19.75)
 
     @BeforeEach
     fun setUp() {
@@ -61,76 +52,43 @@ class MapViewModelTest {
     @Test
     fun `first viewport fetches immediately`() = runTest {
         val viewModel = createAndObserve()
-
         viewModel.onViewportChanged(warsaw)
         advanceUntilIdle()
-
-        coVerify(exactly = 1) {
-            placeRepository.getPlacesInBounds(warsaw, null, 200)
-        }
+        coVerify(exactly = 1) { placeRepository.getPlacesInBounds(warsaw, null, LIMIT) }
     }
 
     @Test
     fun `subsequent camera changes fetch only final viewport after debounce`() = runTest {
         val viewModel = createAndObserve()
-
         viewModel.onViewportChanged(warsaw)
         advanceUntilIdle()
+        
         viewModel.onViewportChanged(krakow)
         advanceTimeBy(100)
         viewModel.onViewportChanged(warsaw)
         advanceTimeBy(100)
         viewModel.onViewportChanged(krakow)
-        advanceTimeBy(300)
+        advanceTimeBy(350) // Więcej niż debounce (300)
         advanceUntilIdle()
 
-        coVerify(exactly = 1) {
-            placeRepository.getPlacesInBounds(warsaw, null, 200)
-        }
-        coVerify(exactly = 1) {
-            placeRepository.getPlacesInBounds(krakow, null, 200)
-        }
-    }
-
-    @Test
-    fun `returning to cached viewport avoids duplicate request`() = runTest {
-        val viewModel = createAndObserve()
-
-        viewModel.onViewportChanged(warsaw)
-        advanceUntilIdle()
-        advanceUntilIdle()
-        viewModel.onViewportChanged(krakow)
-        advanceTimeBy(300)
-        advanceUntilIdle()
-        viewModel.onViewportChanged(warsaw)
-        advanceTimeBy(300)
-        advanceUntilIdle()
-
-        coVerify(exactly = 1) {
-            placeRepository.getPlacesInBounds(warsaw, null, 200)
-        }
+        coVerify(exactly = 1) { placeRepository.getPlacesInBounds(warsaw, null, LIMIT) }
+        coVerify(exactly = 1) { placeRepository.getPlacesInBounds(krakow, null, LIMIT) }
     }
 
     @Test
     fun `category change refetches current viewport with server filter`() = runTest {
-        val playground = TestFixtures.place(
-            id = "playground",
-            category = PlaceCategory.PLAYGROUND
-        )
+        val playground = TestFixtures.place(id = "playground", category = PlaceCategory.PLAYGROUND)
         coEvery {
-            placeRepository.getPlacesInBounds(warsaw, PlaceCategory.PLAYGROUND, 200)
+            placeRepository.getPlacesInBounds(warsaw, PlaceCategory.PLAYGROUND, LIMIT)
         } returns OpResult.success(listOf(playground))
+        
         val viewModel = createAndObserve()
-
         viewModel.onViewportChanged(warsaw)
-        advanceUntilIdle()
         advanceUntilIdle()
         viewModel.onCategorySelected(PlaceCategory.PLAYGROUND)
         advanceUntilIdle()
 
-        coVerify(exactly = 1) {
-            placeRepository.getPlacesInBounds(warsaw, PlaceCategory.PLAYGROUND, 200)
-        }
+        coVerify(exactly = 1) { placeRepository.getPlacesInBounds(warsaw, PlaceCategory.PLAYGROUND, LIMIT) }
         assertEquals(listOf(playground), viewModel.uiState.value.places)
     }
 

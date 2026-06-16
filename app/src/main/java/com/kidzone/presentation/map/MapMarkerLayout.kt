@@ -26,9 +26,9 @@ data class MarkerCluster(
 )
 
 fun clusterCountLabel(count: Int): String = when {
-    count >= MAX_CLUSTER_LABEL_THRESHOLD -> "$MAX_CLUSTER_LABEL_THRESHOLD+"
-    count >= MIN_ABBREVIATED_CLUSTER_COUNT -> "${count / CLUSTER_LABEL_STEP * CLUSTER_LABEL_STEP}+"
-    else -> count.toString()
+    count <= 10 -> count.toString()
+    count >= 100 -> "100+"
+    else -> "${(count / 10) * 10}+"
 }
 
 fun buildMapMarkerItems(
@@ -145,9 +145,6 @@ private const val LONGITUDE_OFFSET = 180.0
 private const val FULL_LONGITUDE_DEGREES = 360.0
 private const val MAX_MERCATOR_LAT = 85.05112878
 private const val MIN_MERCATOR_LAT = -85.05112878
-private const val MIN_ABBREVIATED_CLUSTER_COUNT = 10
-private const val CLUSTER_LABEL_STEP = 10
-private const val MAX_CLUSTER_LABEL_THRESHOLD = 90
 private const val SPIDERFY_RADIUS_DEGREES = 0.00012
 private const val SPIDERFY_RADIUS_STEP_DEGREES = 0.000015
 private const val SPIDERFY_MAX_EXTRA = 8

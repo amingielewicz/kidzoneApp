@@ -11,16 +11,13 @@ import org.junit.jupiter.api.Test
 class MapMarkerLayoutTest {
 
     @Test
-    fun `cluster label rounds down to tens and caps at 90 plus`() {
+    fun `cluster label rounds down to tens and caps at 100 plus`() {
         assertEquals("1", clusterCountLabel(1))
         assertEquals("9", clusterCountLabel(9))
-        assertEquals("10+", clusterCountLabel(10))
-        assertEquals("10+", clusterCountLabel(19))
-        assertEquals("20+", clusterCountLabel(20))
-        assertEquals("80+", clusterCountLabel(89))
-        assertEquals("90+", clusterCountLabel(90))
-        assertEquals("90+", clusterCountLabel(100))
-        assertEquals("90+", clusterCountLabel(250))
+        assertEquals("10", clusterCountLabel(10))
+        assertEquals("11", clusterCountLabel(11))
+        assertEquals("100+", clusterCountLabel(100))
+        assertEquals("100+", clusterCountLabel(250))
     }
 
     @Test

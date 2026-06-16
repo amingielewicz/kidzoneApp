@@ -339,14 +339,29 @@ class FirestorePlaceRepository @Inject constructor(
         prefix: String,
         limit: Int
     ): List<Place> {
-        return placesCollection()
-            .whereGreaterThanOrEqualTo("geohash", prefix)
-            .whereLessThanOrEqualTo("geohash", prefix + "\uf8ff")
-            .limit(limit.toLong())
-            .get()
-            .await()
-            .documents
-            .mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
+        return try {
+            firestore.collection(FirestoreCollections.PLACES)
+                .whereGreaterThanOrEqualTo("geohash", prefix)
+                .whereLessThanOrEqualTo("geohash", prefix + "\uf8ff")
+                .orderBy("geohash")
+                .orderBy("averageRating", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .limit(limit.toLong())
+                .get()
+                .await()
+                .documents
+                .mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
+        } catch (e: Exception) {
+            // Fallback: jeśli indeks jeszcze się buduje lub wystąpił błąd,
+            // pobieramy dane bez sortowania po stronie serwera.
+            firestore.collection(FirestoreCollections.PLACES)
+                .whereGreaterThanOrEqualTo("geohash", prefix)
+                .whereLessThanOrEqualTo("geohash", prefix + "\uf8ff")
+                .limit(limit.toLong())
+                .get()
+                .await()
+                .documents
+                .mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
+        }
     }
 
     private suspend fun getCachedPlacesInBounds(
