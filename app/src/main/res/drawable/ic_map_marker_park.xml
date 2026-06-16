@@ -6,6 +6,9 @@
     <path android:fillColor="#33000000" android:pathData="M22,6a16,16 0,1 0,0.1 0M22,38a16,16 0,1 0,-0.1 0" android:translateY="2" />
     <path android:fillColor="#2E7D32" android:pathData="M22,5a17,17 0,1 0,0.1 0M22,39a17,17 0,1 0,-0.1 0" />
     <path android:strokeColor="#FFFFFF" android:strokeWidth="2.5" android:fillColor="@android:color/transparent" android:pathData="M22,6.8a15.2,15.2 0,1 0,0.1 0M22,37.2a15.2,15.2 0,1 0,-0.1 0" />
-    <path android:fillColor="#FFFFFF" android:pathData="M22,12a6,6 0,1 0,0.1 0M16,18a5,5 0,1 0,0.1 0M28,18a5,5 0,1 0,0.1 0" />
-    <path android:strokeColor="#FFFFFF" android:strokeWidth="2.4" android:strokeLineCap="round" android:fillColor="@android:color/transparent" android:pathData="M22,21L22,31M16,31L28,31" />
+    <group android:translateX="10" android:translateY="10">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M17,12h2L12,2L5.05,12H7l-3.9,6h6.92v4h3.96v-4H21z" />
+    </group>
 </vector>
