@@ -129,6 +129,61 @@ class PlaceListViewModelTest {
         }
 
         @Test
+        fun `RECENTLY_ADDED keeps newest seeded test place first from unsorted input`() = runTest {
+            val seededPlaces = listOf(
+                TestFixtures.place(
+                    id = "test-place-7",
+                    name = "Testowe miejsce 7",
+                    createdAtMillis = 1_700_000_000_007L
+                ),
+                TestFixtures.place(
+                    id = "test-place-3",
+                    name = "Testowe miejsce 3",
+                    createdAtMillis = 1_700_000_000_003L
+                ),
+                TestFixtures.place(
+                    id = "test-place-1",
+                    name = "Testowe miejsce 1",
+                    createdAtMillis = 1_700_000_000_010L
+                )
+            )
+            every { placeRepository.observePlaces(any(), any()) } returns flowOf(seededPlaces)
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+            viewModel.onCategorySelected(PlaceCategory.PLAYGROUND)
+            viewModel.onAmenitiesCleared()
+            viewModel.onCategorySelected(null)
+            viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.RECENTLY_ADDED)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals("test-place-1", state.places.first().id)
+            assertTrue(state.selectedAmenities.isEmpty())
+            assertNull(state.selectedCategory)
+        }
+
+        @Test
+        fun `RECENTLY_ADDED has stable id tie breaker for identical timestamps`() = runTest {
+            val seededPlaces = listOf(
+                TestFixtures.place(id = "test-place-7", createdAtMillis = 1_700_000_000_000L),
+                TestFixtures.place(id = "test-place-1", createdAtMillis = 1_700_000_000_000L),
+                TestFixtures.place(id = "test-place-3", createdAtMillis = 1_700_000_000_000L)
+            )
+            every { placeRepository.observePlaces(any(), any()) } returns flowOf(seededPlaces)
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+            viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.RECENTLY_ADDED)
+            advanceUntilIdle()
+
+            assertEquals(
+                listOf("test-place-1", "test-place-3", "test-place-7"),
+                viewModel.uiState.value.places.map { it.id }
+            )
+        }
+
+        @Test
         fun `BEST_RATED sorts by averageRating desc`() = runTest {
             viewModel = createAndObserve()
             advanceUntilIdle()
@@ -326,8 +381,11 @@ class PlaceListViewModelTest {
             viewModel.loadMore()
             advanceUntilIdle()
 
-            assertTrue(viewModel.uiState.value.places.size > initialCount,
-                "Expected more places after loadMore. Before: $initialCount, After: ${viewModel.uiState.value.places.size}")
+            val afterCount = viewModel.uiState.value.places.size
+            assertTrue(
+                afterCount > initialCount,
+                "Expected more places after loadMore. Before: $initialCount, After: $afterCount"
+            )
         }
 
         @Test
@@ -358,6 +416,26 @@ class PlaceListViewModelTest {
             coVerify(exactly = 1) {
                 placeRepository.getPlacesPage(20, "cursor-1", null, null)
             }
+        }
+
+        @Test
+        fun `changing sort resets visible count after pagination`() = runTest {
+            val manyPlaces = (1..30).map {
+                TestFixtures.place(id = "p$it", createdAtMillis = it.toLong())
+            }
+            every { placeRepository.observePlaces(any(), any()) } returns flowOf(manyPlaces)
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+            viewModel.loadMore()
+            advanceUntilIdle()
+            assertEquals(30, viewModel.uiState.value.places.size)
+
+            viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.RECENTLY_ADDED)
+            advanceUntilIdle()
+
+            assertEquals(20, viewModel.uiState.value.places.size)
+            assertEquals("p30", viewModel.uiState.value.places.first().id)
         }
     }
 }

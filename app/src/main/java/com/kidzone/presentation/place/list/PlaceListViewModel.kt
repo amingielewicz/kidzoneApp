@@ -544,11 +544,11 @@ class PlaceListViewModel @Inject constructor(
                 // odległości. Spadamy na "ostatnio dodane" jako sensowny
                 // domyślny porządek (najnowsze są najczęściej najbardziej
                 // istotne dla rodziców szukających "co nowego w okolicy").
-                list.sortedByDescending { it.createdAtMillis }
+                list.sortedByRecentlyAdded()
             }
         }
-        SortOrder.RECENTLY_ADDED -> list.sortedByDescending { it.createdAtMillis }
-        SortOrder.ADDED_BY_ME -> list.sortedByDescending { it.createdAtMillis }
+        SortOrder.RECENTLY_ADDED -> list.sortedByRecentlyAdded()
+        SortOrder.ADDED_BY_ME -> list.sortedByRecentlyAdded()
         SortOrder.BEST_RATED -> list.sortedWith(
             compareByDescending<Place> { it.averageRating }
                 .thenByDescending { it.reviewsCount }
@@ -563,6 +563,17 @@ class PlaceListViewModel @Inject constructor(
         )
     }
 }
+
+/**
+ * Stabilny porządek "Ostatnio dodane": najpierw timestamp z Firestore, potem id.
+ * Tie-breaker po id zapobiega zmianom kolejności po restarcie, gdy seed/testy
+ * stworzą kilka dokumentów z identycznym `createdAtMillis`.
+ */
+private fun List<Place>.sortedByRecentlyAdded(): List<Place> =
+    sortedWith(
+        compareByDescending<Place> { it.createdAtMillis }
+            .thenBy { it.id }
+    )
 
 /** Odległość w km między dwoma punktami (formuła haversine). */
 private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
