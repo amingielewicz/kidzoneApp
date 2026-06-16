@@ -109,7 +109,7 @@ class FirestorePlaceRepository @Inject constructor(
         // 2. Firestore snapshot listener – aktualizuje Room w tle.
         launch {
             val firestoreFlow = callbackFlow {
-                var firestoreQuery = placesCollection().limit(PAGE_SIZE_SNAPSHOT.toLong()) // First page via snapshot; rest via cursor pagination
+                var firestoreQuery: com.google.firebase.firestore.Query = placesCollection()
 
                 if (category != null) {
                     firestoreQuery = firestoreQuery.whereEqualTo("category", category.name)
@@ -122,19 +122,30 @@ class FirestorePlaceRepository @Inject constructor(
                     firestoreQuery = firestoreQuery.orderBy("name")
                         .startAt(query)
                         .endAt(query + "\uf8ff")
+                } else {
+                    // Pierwsza strona snapshot listenera musi być najnowszym
+                    // wycinkiem kolekcji. Inaczej po seedzie dużej liczby miejsc
+                    // ViewModel sortowałby poprawnie, ale tylko przypadkowe 20
+                    // dokumentów zwrócone przez Firestore.
+                    firestoreQuery = firestoreQuery.orderBy(
+                        "createdAtMillis",
+                        com.google.firebase.firestore.Query.Direction.DESCENDING
+                    )
                 }
 
-                val registration = firestoreQuery.addSnapshotListener { snapshot, error ->
-                    if (error != null) {
-                        // Jeśli brakuje indeksu, Firestore rzuci błędem z linkiem do konsoli.
-                        close(error)
-                        return@addSnapshotListener
+                val registration = firestoreQuery
+                    .limit(PAGE_SIZE_SNAPSHOT.toLong()) // First page; rest via cursor pagination.
+                    .addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            // Jeśli brakuje indeksu, Firestore rzuci błędem z linkiem do konsoli.
+                            close(error)
+                            return@addSnapshotListener
+                        }
+                        val places = snapshot?.documents
+                            ?.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
+                            .orEmpty()
+                        trySend(places)
                     }
-                    val places = snapshot?.documents
-                        ?.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
-                        .orEmpty()
-                    trySend(places)
-                }
                 awaitClose { registration.remove() }
             }
             firestoreFlow

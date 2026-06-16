@@ -173,20 +173,33 @@ fun PlaceListScreen(
         }
     }
 
-    // Po zmianie sortowania automatycznie przewijamy listę na górę.
+    // Po zmianie kategorii/sortowania automatycznie przewijamy listę na górę.
     // Bez tego user widziałby "tę samą pozycję pod palcem", ale w nowym
     // porządku - co jest mylące (nie wiadomo, czy to jeszcze ten sam wynik
-    // czy nowy item w środku rankingu). animateScrollToItem(0) jest
-    // bezpieczny gdy lista jest pusta - po prostu nic nie robi.
+    // czy nowy item w środku rankingu).
     //
     // Używamy rememberSaveable, żeby uniknąć scrollowania na górę po
     // nawigacji powrotnej z PlaceDetails (LaunchedEffect odpalałby się
-    // ponownie z tym samym kluczem sortOrder przy re-compose).
+    // ponownie z tym samym kluczem przy re-compose).
+    //
+    // Uwaga: nie używamy animateScrollToItem(). Na Compose 2024.09.x potrafi
+    // zderzyć się z LazyColumn + shared transition/lookahead przy nagłej
+    // zmianie listy i skończyć crashem "Placement happened before lookahead".
+    var lastAppliedCategory by rememberSaveable {
+        mutableStateOf(state.selectedCategory?.name.orEmpty())
+    }
     var lastAppliedSortOrder by rememberSaveable { mutableStateOf(state.sortOrder.name) }
+    LaunchedEffect(state.selectedCategory) {
+        val categoryName = state.selectedCategory?.name.orEmpty()
+        if (categoryName != lastAppliedCategory) {
+            lastAppliedCategory = categoryName
+            lazyListState.scrollToItem(0)
+        }
+    }
     LaunchedEffect(state.sortOrder) {
         if (state.sortOrder.name != lastAppliedSortOrder) {
             lastAppliedSortOrder = state.sortOrder.name
-            lazyListState.animateScrollToItem(0)
+            lazyListState.scrollToItem(0)
         }
     }
 

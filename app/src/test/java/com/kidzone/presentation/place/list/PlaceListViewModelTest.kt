@@ -53,6 +53,9 @@ class PlaceListViewModelTest {
             latitude = 52.25, longitude = 21.03, amenities = setOf(Amenity.PARKING, Amenity.TOILET)),
         TestFixtures.place(id = "p4", name = "Moje Miejsce", category = PlaceCategory.PLAYGROUND,
             ownerUserId = "user-1", averageRating = 0.0, reviewsCount = 0, createdAtMillis = 4000L,
+            latitude = 52.26, longitude = 21.04),
+        TestFixtures.place(id = "p5", name = "Moja Restauracja", category = PlaceCategory.RESTAURANT,
+            ownerUserId = "user-1", averageRating = 0.0, reviewsCount = 0, createdAtMillis = 3500L,
             latitude = 52.26, longitude = 21.04)
     )
 
@@ -64,6 +67,10 @@ class PlaceListViewModelTest {
 
         every { authRepository.currentUser } returns currentUserFlow
         every { placeRepository.observePlaces(any(), any()) } returns flowOf(samplePlaces)
+        every { placeRepository.observePlacesByOwner(any()) } answers {
+            val userId = firstArg<String>()
+            flowOf(samplePlaces.filter { it.ownerUserId == userId })
+        }
     }
 
     /**
@@ -129,6 +136,61 @@ class PlaceListViewModelTest {
         }
 
         @Test
+        fun `RECENTLY_ADDED keeps newest seeded test place first from unsorted input`() = runTest {
+            val seededPlaces = listOf(
+                TestFixtures.place(
+                    id = "test-place-7",
+                    name = "Testowe miejsce 7",
+                    createdAtMillis = 1_700_000_000_007L
+                ),
+                TestFixtures.place(
+                    id = "test-place-3",
+                    name = "Testowe miejsce 3",
+                    createdAtMillis = 1_700_000_000_003L
+                ),
+                TestFixtures.place(
+                    id = "test-place-1",
+                    name = "Testowe miejsce 1",
+                    createdAtMillis = 1_700_000_000_010L
+                )
+            )
+            every { placeRepository.observePlaces(any(), any()) } returns flowOf(seededPlaces)
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+            viewModel.onCategorySelected(PlaceCategory.PLAYGROUND)
+            viewModel.onAmenitiesCleared()
+            viewModel.onCategorySelected(null)
+            viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.RECENTLY_ADDED)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals("test-place-1", state.places.first().id)
+            assertTrue(state.selectedAmenities.isEmpty())
+            assertNull(state.selectedCategory)
+        }
+
+        @Test
+        fun `RECENTLY_ADDED has stable id tie breaker for identical timestamps`() = runTest {
+            val seededPlaces = listOf(
+                TestFixtures.place(id = "test-place-7", createdAtMillis = 1_700_000_000_000L),
+                TestFixtures.place(id = "test-place-1", createdAtMillis = 1_700_000_000_000L),
+                TestFixtures.place(id = "test-place-3", createdAtMillis = 1_700_000_000_000L)
+            )
+            every { placeRepository.observePlaces(any(), any()) } returns flowOf(seededPlaces)
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+            viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.RECENTLY_ADDED)
+            advanceUntilIdle()
+
+            assertEquals(
+                listOf("test-place-1", "test-place-3", "test-place-7"),
+                viewModel.uiState.value.places.map { it.id }
+            )
+        }
+
+        @Test
         fun `BEST_RATED sorts by averageRating desc`() = runTest {
             viewModel = createAndObserve()
             advanceUntilIdle()
@@ -156,6 +218,59 @@ class PlaceListViewModelTest {
             val state = viewModel.uiState.value
             assertTrue(state.places.all { it.ownerUserId == "user-1" },
                 "Expected only user-1 places but got: ${state.places.map { it.id to it.ownerUserId }}")
+        }
+
+        @Test
+        fun `ADDED_BY_ME with all categories uses owner source instead of global first page`() = runTest {
+            val globalFirstPage = listOf(
+                TestFixtures.place(id = "global-1", ownerUserId = "other-user"),
+                TestFixtures.place(id = "global-2", ownerUserId = "other-user")
+            )
+            val myPlaces = listOf(
+                TestFixtures.place(
+                    id = "mine-playground",
+                    category = PlaceCategory.PLAYGROUND,
+                    ownerUserId = "user-1",
+                    createdAtMillis = 2_000L
+                ),
+                TestFixtures.place(
+                    id = "mine-restaurant",
+                    category = PlaceCategory.RESTAURANT,
+                    ownerUserId = "user-1",
+                    createdAtMillis = 1_000L
+                )
+            )
+            every { placeRepository.observePlaces(any(), any()) } returns flowOf(globalFirstPage)
+            every { placeRepository.observePlacesByOwner("user-1") } returns flowOf(myPlaces)
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+            viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.ADDED_BY_ME)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertNull(state.selectedCategory)
+            assertEquals(listOf("mine-playground", "mine-restaurant"), state.places.map { it.id })
+            verify { placeRepository.observePlacesByOwner("user-1") }
+        }
+
+        @Test
+        fun `ADDED_BY_ME still applies selected category locally`() = runTest {
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.ADDED_BY_ME)
+            viewModel.onCategorySelected(PlaceCategory.RESTAURANT)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals(PlaceCategory.RESTAURANT, state.selectedCategory)
+            assertTrue(
+                state.places.isNotEmpty(),
+                "Expected current user's restaurant places"
+            )
+            assertTrue(state.places.all { it.ownerUserId == "user-1" })
+            assertTrue(state.places.all { it.category == PlaceCategory.RESTAURANT })
         }
     }
 
@@ -326,8 +441,11 @@ class PlaceListViewModelTest {
             viewModel.loadMore()
             advanceUntilIdle()
 
-            assertTrue(viewModel.uiState.value.places.size > initialCount,
-                "Expected more places after loadMore. Before: $initialCount, After: ${viewModel.uiState.value.places.size}")
+            val afterCount = viewModel.uiState.value.places.size
+            assertTrue(
+                afterCount > initialCount,
+                "Expected more places after loadMore. Before: $initialCount, After: $afterCount"
+            )
         }
 
         @Test
@@ -358,6 +476,26 @@ class PlaceListViewModelTest {
             coVerify(exactly = 1) {
                 placeRepository.getPlacesPage(20, "cursor-1", null, null)
             }
+        }
+
+        @Test
+        fun `changing sort resets visible count after pagination`() = runTest {
+            val manyPlaces = (1..30).map {
+                TestFixtures.place(id = "p$it", createdAtMillis = it.toLong())
+            }
+            every { placeRepository.observePlaces(any(), any()) } returns flowOf(manyPlaces)
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+            viewModel.loadMore()
+            advanceUntilIdle()
+            assertEquals(30, viewModel.uiState.value.places.size)
+
+            viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.RECENTLY_ADDED)
+            advanceUntilIdle()
+
+            assertEquals(20, viewModel.uiState.value.places.size)
+            assertEquals("p30", viewModel.uiState.value.places.first().id)
         }
     }
 }

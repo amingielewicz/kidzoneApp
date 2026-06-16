@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
@@ -172,13 +173,37 @@ class PlaceListViewModel @Inject constructor(
         data class Error(val message: String, val previous: List<Place>) : PlacesLoad
     }
 
+    /** Strumień zalogowanego usera - tylko id. */
+    private val currentUserIdFlow: Flow<String?> = authRepository.currentUser
+        .map { it?.id }
+
+    private data class PlacesSourceContext(
+        val category: PlaceCategory?,
+        val query: String,
+        val sortOrder: SortOrder,
+        val currentUserId: String?
+    )
+
     private val placesLoad: Flow<PlacesLoad> = combine(
         selectedCategory,
-        searchQuery.debounce(400).distinctUntilChanged()
-    ) { category, query ->
-        category to query
-    }.flatMapLatest { (category, query) ->
-        placeRepository.observePlaces(category, query)
+        searchQuery.debounce(400).distinctUntilChanged(),
+        sortOrder,
+        currentUserIdFlow
+    ) { category, query, sort, uid ->
+        PlacesSourceContext(category, query, sort, uid)
+    }.flatMapLatest { source ->
+        val placesFlow = if (source.sortOrder == SortOrder.ADDED_BY_ME) {
+            val uid = source.currentUserId
+            if (uid.isNullOrBlank()) {
+                flowOf(emptyList())
+            } else {
+                placeRepository.observePlacesByOwner(uid)
+            }
+        } else {
+            placeRepository.observePlaces(source.category, source.query)
+        }
+
+        placesFlow
             .map<List<Place>, PlacesLoad> { places ->
                 lastLoadedPlaces = places
                 loadMoreErrorMessage.value = null
@@ -195,10 +220,6 @@ class PlaceListViewModel @Inject constructor(
                 )
             }
     }
-
-    /** Strumień zalogowanego usera - tylko id. */
-    private val currentUserIdFlow: Flow<String?> = authRepository.currentUser
-        .map { it?.id }
 
     /**
      * Pakujemy "kontekst sortowania" (sortOrder + lokalizacja + uid) w jeden
@@ -271,6 +292,7 @@ class PlaceListViewModel @Inject constructor(
                 val allPlaces = (load.list + extras).distinctBy { it.id }
 
                 val filtered = allPlaces
+                    .filter { place -> category == null || place.category == category }
                     .filter { place -> amenities.all { it in place.amenities } }
                     .let { list ->
                         // Filtr po nazwie (wyszukiwarka)
@@ -544,11 +566,11 @@ class PlaceListViewModel @Inject constructor(
                 // odległości. Spadamy na "ostatnio dodane" jako sensowny
                 // domyślny porządek (najnowsze są najczęściej najbardziej
                 // istotne dla rodziców szukających "co nowego w okolicy").
-                list.sortedByDescending { it.createdAtMillis }
+                list.sortedByRecentlyAdded()
             }
         }
-        SortOrder.RECENTLY_ADDED -> list.sortedByDescending { it.createdAtMillis }
-        SortOrder.ADDED_BY_ME -> list.sortedByDescending { it.createdAtMillis }
+        SortOrder.RECENTLY_ADDED -> list.sortedByRecentlyAdded()
+        SortOrder.ADDED_BY_ME -> list.sortedByRecentlyAdded()
         SortOrder.BEST_RATED -> list.sortedWith(
             compareByDescending<Place> { it.averageRating }
                 .thenByDescending { it.reviewsCount }
@@ -563,6 +585,17 @@ class PlaceListViewModel @Inject constructor(
         )
     }
 }
+
+/**
+ * Stabilny porządek "Ostatnio dodane": najpierw timestamp z Firestore, potem id.
+ * Tie-breaker po id zapobiega zmianom kolejności po restarcie, gdy seed/testy
+ * stworzą kilka dokumentów z identycznym `createdAtMillis`.
+ */
+private fun List<Place>.sortedByRecentlyAdded(): List<Place> =
+    sortedWith(
+        compareByDescending<Place> { it.createdAtMillis }
+            .thenBy { it.id }
+    )
 
 /** Odległość w km między dwoma punktami (formuła haversine). */
 private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
