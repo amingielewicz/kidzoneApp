@@ -139,6 +139,7 @@ private const val NEAR_ME_ZOOM = 14f
 private const val FOCUS_PLACE_ZOOM = 16f
 private const val MIN_CLUSTER_SIZE = 2
 private const val CLUSTER_FIT_BOUNDS_PADDING_PX = 96
+private const val MARKER_ANCHOR_CENTER = 0.5f
 private const val SPIDERFY_RADIUS_DEGREES = 0.00012
 private const val SPIDERFY_RADIUS_STEP_DEGREES = 0.000015
 private const val SPIDERFY_MAX_EXTRA = 8
@@ -563,7 +564,9 @@ private class PlaceClusterRenderer(
         markerOptions: MarkerOptions
     ) {
         super.onBeforeClusterItemRendered(item, markerOptions)
-        markerOptions.icon(categoryMarkerIcons.getValue(item.place.category))
+        markerOptions
+            .icon(categoryMarkerIcons.getValue(item.place.category))
+            .anchor(MARKER_ANCHOR_CENTER, MARKER_ANCHOR_CENTER)
     }
 
     override fun onClusterItemUpdated(item: PlaceClusterItem, marker: Marker) {
@@ -577,6 +580,7 @@ private class PlaceClusterRenderer(
     ) {
         markerOptions
             .icon(clusterMarkerIcons.getValue(clusterCountLabel(cluster.size)))
+            .anchor(MARKER_ANCHOR_CENTER, MARKER_ANCHOR_CENTER)
             .title("${cluster.size} miejsc")
     }
 
@@ -592,9 +596,11 @@ private fun createCategoryMarkerDescriptor(
     borderColor: Int,
     density: Float
 ): BitmapDescriptor {
-    val size = (50 * density).toInt().coerceAtLeast(50)
+    val size = (58 * density).toInt().coerceAtLeast(58)
     val center = size / 2f
-    val radius = size * 0.38f
+    val padding = (6 * density).coerceAtLeast(6f)
+    val strokeWidth = (2.5f * density).coerceAtLeast(2.5f)
+    val radius = (size / 2f) - padding - strokeWidth
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -609,7 +615,7 @@ private fun createCategoryMarkerDescriptor(
 
     paint.color = borderColor
     paint.style = Paint.Style.STROKE
-    paint.strokeWidth = (2 * density).coerceAtLeast(2f)
+    paint.strokeWidth = strokeWidth
     canvas.drawCircle(center, center, radius - paint.strokeWidth / 2f, paint)
 
     drawCategoryGlyph(canvas, paint, category, center, center, density)
@@ -717,9 +723,11 @@ private fun createClusterMarkerDescriptor(
     label: String,
     density: Float
 ): BitmapDescriptor {
-    val size = (44 * density).toInt().coerceAtLeast(44)
+    val size = (54 * density).toInt().coerceAtLeast(54)
     val center = size / 2f
-    val radius = size * 0.44f
+    val padding = (5 * density).coerceAtLeast(5f)
+    val strokeWidth = (2.5f * density).coerceAtLeast(2.5f)
+    val radius = (size / 2f) - padding - strokeWidth
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -730,7 +738,7 @@ private fun createClusterMarkerDescriptor(
 
     paint.color = android.graphics.Color.WHITE
     paint.style = Paint.Style.STROKE
-    paint.strokeWidth = (2 * density).coerceAtLeast(2f)
+    paint.strokeWidth = strokeWidth
     canvas.drawCircle(center, center, radius - paint.strokeWidth / 2f, paint)
 
     paint.style = Paint.Style.FILL
