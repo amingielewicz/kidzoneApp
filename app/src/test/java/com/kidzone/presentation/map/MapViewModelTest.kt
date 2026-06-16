@@ -59,16 +59,32 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `camera changes fetch only final viewport after debounce`() = runTest {
+    fun `first viewport fetches immediately`() = runTest {
         val viewModel = createAndObserve()
 
         viewModel.onViewportChanged(warsaw)
-        advanceTimeBy(200)
-        viewModel.onViewportChanged(krakow)
-        advanceTimeBy(500)
         advanceUntilIdle()
 
-        coVerify(exactly = 0) {
+        coVerify(exactly = 1) {
+            placeRepository.getPlacesInBounds(warsaw, null, 200)
+        }
+    }
+
+    @Test
+    fun `subsequent camera changes fetch only final viewport after debounce`() = runTest {
+        val viewModel = createAndObserve()
+
+        viewModel.onViewportChanged(warsaw)
+        advanceUntilIdle()
+        viewModel.onViewportChanged(krakow)
+        advanceTimeBy(100)
+        viewModel.onViewportChanged(warsaw)
+        advanceTimeBy(100)
+        viewModel.onViewportChanged(krakow)
+        advanceTimeBy(300)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) {
             placeRepository.getPlacesInBounds(warsaw, null, 200)
         }
         coVerify(exactly = 1) {
@@ -81,13 +97,13 @@ class MapViewModelTest {
         val viewModel = createAndObserve()
 
         viewModel.onViewportChanged(warsaw)
-        advanceTimeBy(500)
+        advanceUntilIdle()
         advanceUntilIdle()
         viewModel.onViewportChanged(krakow)
-        advanceTimeBy(500)
+        advanceTimeBy(300)
         advanceUntilIdle()
         viewModel.onViewportChanged(warsaw)
-        advanceTimeBy(500)
+        advanceTimeBy(300)
         advanceUntilIdle()
 
         coVerify(exactly = 1) {
@@ -107,7 +123,7 @@ class MapViewModelTest {
         val viewModel = createAndObserve()
 
         viewModel.onViewportChanged(warsaw)
-        advanceTimeBy(500)
+        advanceUntilIdle()
         advanceUntilIdle()
         viewModel.onCategorySelected(PlaceCategory.PLAYGROUND)
         advanceUntilIdle()

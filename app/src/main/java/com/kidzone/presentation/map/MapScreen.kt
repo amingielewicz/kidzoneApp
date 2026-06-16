@@ -565,11 +565,7 @@ private fun ClusterMarkerIcon(count: Int) {
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = if (count > MAX_SPIDERFIED_CLUSTER_SIZE) {
-                    "$MAX_SPIDERFIED_CLUSTER_SIZE+"
-                } else {
-                    count.toString()
-                },
+                text = clusterCountLabel(count),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onPrimary,
                 fontWeight = FontWeight.Bold
