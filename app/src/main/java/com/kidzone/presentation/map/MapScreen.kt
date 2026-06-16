@@ -310,6 +310,11 @@ fun MapScreen(
             }
         ) {
             markerItems.forEach { marker ->
+                val markerState = remember(marker.key) {
+                    MarkerState(marker.position)
+                }.apply {
+                    position = marker.position
+                }
                 val markerKeys: Array<Any> = arrayOf(
                     marker.key,
                     marker.place?.category?.name.orEmpty(),
@@ -317,7 +322,7 @@ fun MapScreen(
                 )
                 MarkerComposable(
                     keys = markerKeys,
-                    state = MarkerState(marker.position),
+                    state = markerState,
                     title = marker.place?.name ?: "${marker.cluster?.places?.size.orZero()} miejsc",
                     snippet = marker.place?.address?.takeIf { it.isNotBlank() },
                     // true = consume zdarzenie. Domyślny info-window ma
