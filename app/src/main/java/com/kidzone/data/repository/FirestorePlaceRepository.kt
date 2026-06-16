@@ -288,6 +288,21 @@ class FirestorePlaceRepository @Inject constructor(
     ): OpResult<List<Place>> {
         require(limit > 0) { "limit musi być dodatni" }
 
+        val cachedPlaces = getCachedPlacesInBounds(bounds, category, limit)
+        if (cachedPlaces.isNotEmpty()) {
+            applicationScope.launch {
+                runCatching {
+                    val remotePlaces = fetchRemotePlacesInBounds(bounds, category, limit)
+                    if (remotePlaces.isNotEmpty()) {
+                        placeDao.upsertAll(remotePlaces.map(PlaceEntity::fromDomain))
+                    }
+                }.onFailure { error ->
+                    Timber.d(error, "getPlacesInBounds: background refresh failed")
+                }
+            }
+            return OpResult.success(cachedPlaces)
+        }
+
         return try {
             val places = fetchRemotePlacesInBounds(bounds, category, limit)
 
@@ -296,12 +311,7 @@ class FirestorePlaceRepository @Inject constructor(
             }
             OpResult.success(places)
         } catch (e: Exception) {
-            val cachedPlaces = getCachedPlacesInBounds(bounds, category, limit)
-            if (cachedPlaces.isNotEmpty()) {
-                OpResult.success(cachedPlaces)
-            } else {
-                OpResult.failure(e)
-            }
+            OpResult.failure(e)
         }
     }
 
