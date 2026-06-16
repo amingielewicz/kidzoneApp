@@ -612,9 +612,9 @@ private class PlaceClusterRenderer(
 }
 
 internal fun clusterCountLabel(count: Int): String = when {
-    count <= 10 -> count.toString()
-    count >= 100 -> "100+"
-    else -> "${(count / 10) * 10}+"
+    count >= 90 -> "90+"
+    count >= 10 -> "${(count / 10) * 10}+"
+    else -> count.toString()
 }
 
 @OptIn(kotlinx.coroutines.FlowPreview::class)
