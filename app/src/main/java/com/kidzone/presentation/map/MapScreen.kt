@@ -56,11 +56,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -180,20 +178,6 @@ fun MapScreen(
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val gpsEnabled = rememberLocationServiceEnabled()
-    val categoryMarkerIcons = remember(density) {
-        PlaceCategory.entries.associateWith { category ->
-            createCategoryMarkerDescriptor(
-                backgroundColor = category.style.color.toArgb(),
-                borderColor = android.graphics.Color.WHITE,
-                density = density.density
-            )
-        }
-    }
-    val clusterMarkerIcons = remember(density) {
-        clusterCountLabels().associateWith { label ->
-            createClusterMarkerDescriptor(label, density.density)
-        }
-    }
 
     // Trzymamy lokalnie, bo musimy reagować na nadanie uprawnienia bez
     // restartu ekranu. Wartość początkowa = stan systemowy w chwili pierwszej
@@ -328,8 +312,7 @@ fun MapScreen(
             val clusterManager = rememberClusterManager<PlaceClusterItem>()
             val clusterRenderer = rememberPlaceClusterRenderer(
                 clusterManager = clusterManager,
-                categoryMarkerIcons = categoryMarkerIcons,
-                clusterMarkerIcons = clusterMarkerIcons
+                density = density.density
             )
 
             if (clusterManager != null && clusterRenderer != null) {
@@ -528,24 +511,31 @@ private fun List<Place>.hasSameCoordinates(): Boolean {
 @OptIn(MapsComposeExperimentalApi::class)
 private fun rememberPlaceClusterRenderer(
     clusterManager: ClusterManager<PlaceClusterItem>?,
-    categoryMarkerIcons: Map<PlaceCategory, BitmapDescriptor>,
-    clusterMarkerIcons: Map<String, BitmapDescriptor>
+    density: Float
 ): ClusterRenderer<PlaceClusterItem>? {
     val context = LocalContext.current
-    val categoryMarkerIconsState = rememberUpdatedState(categoryMarkerIcons)
-    val clusterMarkerIconsState = rememberUpdatedState(clusterMarkerIcons)
     val rendererState = remember {
         mutableStateOf<ClusterRenderer<PlaceClusterItem>?>(null)
     }
 
     clusterManager ?: return null
-    MapEffect(clusterManager) { map ->
+    MapEffect(clusterManager, density) { map ->
+        val categoryMarkerIcons = PlaceCategory.entries.associateWith { category ->
+            createCategoryMarkerDescriptor(
+                backgroundColor = category.style.color.toArgb(),
+                borderColor = android.graphics.Color.WHITE,
+                density = density
+            )
+        }
+        val clusterMarkerIcons = clusterCountLabels().associateWith { label ->
+            createClusterMarkerDescriptor(label, density)
+        }
         val renderer = PlaceClusterRenderer(
             context = context,
             map = map,
             clusterManager = clusterManager,
-            categoryMarkerIcons = categoryMarkerIconsState,
-            clusterMarkerIcons = clusterMarkerIconsState
+            categoryMarkerIcons = categoryMarkerIcons,
+            clusterMarkerIcons = clusterMarkerIcons
         ).apply {
             setMinClusterSize(MIN_CLUSTER_SIZE)
             setAnimation(false)
@@ -561,8 +551,8 @@ private class PlaceClusterRenderer(
     context: Context,
     map: GoogleMapSdk,
     clusterManager: ClusterManager<PlaceClusterItem>,
-    private val categoryMarkerIcons: State<Map<PlaceCategory, BitmapDescriptor>>,
-    private val clusterMarkerIcons: State<Map<String, BitmapDescriptor>>
+    private val categoryMarkerIcons: Map<PlaceCategory, BitmapDescriptor>,
+    private val clusterMarkerIcons: Map<String, BitmapDescriptor>
 ) : DefaultClusterRenderer<PlaceClusterItem>(context, map, clusterManager) {
 
     override fun onBeforeClusterItemRendered(
@@ -570,12 +560,12 @@ private class PlaceClusterRenderer(
         markerOptions: MarkerOptions
     ) {
         super.onBeforeClusterItemRendered(item, markerOptions)
-        markerOptions.icon(categoryMarkerIcons.value.getValue(item.place.category))
+        markerOptions.icon(categoryMarkerIcons.getValue(item.place.category))
     }
 
     override fun onClusterItemUpdated(item: PlaceClusterItem, marker: Marker) {
         super.onClusterItemUpdated(item, marker)
-        marker.setIcon(categoryMarkerIcons.value.getValue(item.place.category))
+        marker.setIcon(categoryMarkerIcons.getValue(item.place.category))
     }
 
     override fun onBeforeClusterRendered(
@@ -583,12 +573,12 @@ private class PlaceClusterRenderer(
         markerOptions: MarkerOptions
     ) {
         markerOptions
-            .icon(clusterMarkerIcons.value.getValue(clusterCountLabel(cluster.size)))
+            .icon(clusterMarkerIcons.getValue(clusterCountLabel(cluster.size)))
             .title("${cluster.size} miejsc")
     }
 
     override fun onClusterUpdated(cluster: Cluster<PlaceClusterItem>, marker: Marker) {
-        marker.setIcon(clusterMarkerIcons.value.getValue(clusterCountLabel(cluster.size)))
+        marker.setIcon(clusterMarkerIcons.getValue(clusterCountLabel(cluster.size)))
         marker.title = "${cluster.size} miejsc"
     }
 }
