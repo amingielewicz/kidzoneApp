@@ -11,8 +11,8 @@ import javax.inject.Singleton
  * Upload skompresowanych zdjęć (WebP ByteArray) do Firebase Storage.
  *
  * Ścieżki w Storage:
- *  - Miejsca: `places/{placeId}/photos/{uuid}.webp`
- *  - Opinie:  `reviews/{reviewId}/photos/{uuid}.webp`
+ *  - Miejsca: `places/{ownerUserId}/{placeId}/photos/{uuid}.webp`
+ *  - Opinie:  `reviews/{ownerUserId}/{reviewId}/photos/{uuid}.webp`
  *  - Avatary: `avatars/{userId}/avatar.jpg` (istniejące, nie ruszamy)
  *
  * Zwraca download URL po pomyślnym uploadzie.
@@ -26,18 +26,21 @@ class PhotoUploader @Inject constructor(
     /**
      * Uploaduje zdjęcie miejsca.
      *
-     * @param placeId ID miejsca (może być tymczasowe "" – wtedy caller
-     *   musi uploadować PO uzyskaniu ID z Firestore)
+     * @param ownerUserId ID użytkownika, który dodaje zdjęcie
+     * @param placeId ID miejsca
      * @param imageBytes skompresowany WebP
      * @return download URL
      */
-    suspend fun uploadPlacePhoto(placeId: String, imageBytes: ByteArray): String {
+    suspend fun uploadPlacePhoto(ownerUserId: String, placeId: String, imageBytes: ByteArray): String {
         val trace = performanceTraces.startTrace(PerformanceTraces.PHOTO_UPLOAD)
         trace.putAttribute("type", "place")
         trace.putMetric("size_bytes", imageBytes.size.toLong())
         return try {
+            require(ownerUserId.isNotBlank()) { "ownerUserId must not be blank" }
+            require(placeId.isNotBlank()) { "placeId must not be blank" }
+
             val fileName = "${UUID.randomUUID()}.webp"
-            val ref = storage.reference.child("places/$placeId/photos/$fileName")
+            val ref = storage.reference.child("places/$ownerUserId/$placeId/photos/$fileName")
             ref.putBytes(imageBytes).await()
             val url = ref.downloadUrl.await().toString()
             trace.putAttribute("status", "success")
@@ -53,13 +56,16 @@ class PhotoUploader @Inject constructor(
     /**
      * Uploaduje zdjęcie opinii.
      */
-    suspend fun uploadReviewPhoto(reviewId: String, imageBytes: ByteArray): String {
+    suspend fun uploadReviewPhoto(ownerUserId: String, reviewId: String, imageBytes: ByteArray): String {
         val trace = performanceTraces.startTrace(PerformanceTraces.PHOTO_UPLOAD)
         trace.putAttribute("type", "review")
         trace.putMetric("size_bytes", imageBytes.size.toLong())
         return try {
+            require(ownerUserId.isNotBlank()) { "ownerUserId must not be blank" }
+            require(reviewId.isNotBlank()) { "reviewId must not be blank" }
+
             val fileName = "${UUID.randomUUID()}.webp"
-            val ref = storage.reference.child("reviews/$reviewId/photos/$fileName")
+            val ref = storage.reference.child("reviews/$ownerUserId/$reviewId/photos/$fileName")
             ref.putBytes(imageBytes).await()
             val url = ref.downloadUrl.await().toString()
             trace.putAttribute("status", "success")
