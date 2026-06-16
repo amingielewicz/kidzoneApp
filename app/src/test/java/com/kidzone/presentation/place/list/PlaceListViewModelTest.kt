@@ -53,6 +53,9 @@ class PlaceListViewModelTest {
             latitude = 52.25, longitude = 21.03, amenities = setOf(Amenity.PARKING, Amenity.TOILET)),
         TestFixtures.place(id = "p4", name = "Moje Miejsce", category = PlaceCategory.PLAYGROUND,
             ownerUserId = "user-1", averageRating = 0.0, reviewsCount = 0, createdAtMillis = 4000L,
+            latitude = 52.26, longitude = 21.04),
+        TestFixtures.place(id = "p5", name = "Moja Restauracja", category = PlaceCategory.RESTAURANT,
+            ownerUserId = "user-1", averageRating = 0.0, reviewsCount = 0, createdAtMillis = 3500L,
             latitude = 52.26, longitude = 21.04)
     )
 
@@ -64,6 +67,10 @@ class PlaceListViewModelTest {
 
         every { authRepository.currentUser } returns currentUserFlow
         every { placeRepository.observePlaces(any(), any()) } returns flowOf(samplePlaces)
+        every { placeRepository.observePlacesByOwner(any()) } answers {
+            val userId = firstArg<String>()
+            flowOf(samplePlaces.filter { it.ownerUserId == userId })
+        }
     }
 
     /**
@@ -211,6 +218,59 @@ class PlaceListViewModelTest {
             val state = viewModel.uiState.value
             assertTrue(state.places.all { it.ownerUserId == "user-1" },
                 "Expected only user-1 places but got: ${state.places.map { it.id to it.ownerUserId }}")
+        }
+
+        @Test
+        fun `ADDED_BY_ME with all categories uses owner source instead of global first page`() = runTest {
+            val globalFirstPage = listOf(
+                TestFixtures.place(id = "global-1", ownerUserId = "other-user"),
+                TestFixtures.place(id = "global-2", ownerUserId = "other-user")
+            )
+            val myPlaces = listOf(
+                TestFixtures.place(
+                    id = "mine-playground",
+                    category = PlaceCategory.PLAYGROUND,
+                    ownerUserId = "user-1",
+                    createdAtMillis = 2_000L
+                ),
+                TestFixtures.place(
+                    id = "mine-restaurant",
+                    category = PlaceCategory.RESTAURANT,
+                    ownerUserId = "user-1",
+                    createdAtMillis = 1_000L
+                )
+            )
+            every { placeRepository.observePlaces(any(), any()) } returns flowOf(globalFirstPage)
+            every { placeRepository.observePlacesByOwner("user-1") } returns flowOf(myPlaces)
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+            viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.ADDED_BY_ME)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertNull(state.selectedCategory)
+            assertEquals(listOf("mine-playground", "mine-restaurant"), state.places.map { it.id })
+            verify { placeRepository.observePlacesByOwner("user-1") }
+        }
+
+        @Test
+        fun `ADDED_BY_ME still applies selected category locally`() = runTest {
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.ADDED_BY_ME)
+            viewModel.onCategorySelected(PlaceCategory.RESTAURANT)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals(PlaceCategory.RESTAURANT, state.selectedCategory)
+            assertTrue(
+                state.places.isNotEmpty(),
+                "Expected current user's restaurant places"
+            )
+            assertTrue(state.places.all { it.ownerUserId == "user-1" })
+            assertTrue(state.places.all { it.category == PlaceCategory.RESTAURANT })
         }
     }
 
