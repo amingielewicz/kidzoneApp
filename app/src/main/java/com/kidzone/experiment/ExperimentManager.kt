@@ -103,8 +103,9 @@ class ExperimentManager @Inject constructor(
             param("variant", variant)
         }
 
-        // Also set as user property for segmentation in Analytics dashboards
-        analytics.setUserProperty("exp_${experiment.key}", variant)
+        // Also set as user property for segmentation in Analytics dashboards.
+        // Firebase Analytics user property names are limited to 24 chars.
+        analytics.setUserProperty(experiment.analyticsUserPropertyName(), variant)
     }
 
     /**
@@ -117,7 +118,7 @@ class ExperimentManager @Inject constructor(
     fun syncAssignments() {
         ActiveExperiments.all.forEach { experiment ->
             val variant = getVariant(experiment)
-            analytics.setUserProperty("exp_${experiment.key}", variant)
+            analytics.setUserProperty(experiment.analyticsUserPropertyName(), variant)
             Timber.d("Experiment assignment synced: ${experiment.name} → $variant")
         }
     }
@@ -125,5 +126,19 @@ class ExperimentManager @Inject constructor(
     /** Reset exposure tracking (e.g., on sign-out). */
     fun resetSession() {
         exposedThisSession.clear()
+    }
+
+    private fun Experiment.analyticsUserPropertyName(): String {
+        val normalizedKey = if (key.startsWith(EXPERIMENT_KEY_PREFIX)) {
+            key
+        } else {
+            "$EXPERIMENT_KEY_PREFIX$key"
+        }
+        return normalizedKey.take(MAX_USER_PROPERTY_NAME_LENGTH)
+    }
+
+    private companion object {
+        const val EXPERIMENT_KEY_PREFIX = "exp_"
+        const val MAX_USER_PROPERTY_NAME_LENGTH = 24
     }
 }
