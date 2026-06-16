@@ -6,8 +6,8 @@ import path from 'node:path';
 const DEFAULT_PLACES_COUNT = 100;
 const DEFAULT_USERS_COUNT = 25;
 const DEFAULT_REVIEWS_PER_PLACE = 3;
-const DEFAULT_PLACE_PHOTO_EVERY = 3;
-const DEFAULT_REVIEW_PHOTO_EVERY = 5;
+const DEFAULT_PLACE_PHOTO_EVERY = 1;
+const DEFAULT_REVIEW_PHOTO_EVERY = 1;
 const BROKEN_PLACE_PHOTO_URL = 'https://example.invalid/kidzone/broken-place-photo.jpg';
 
 const categories = [

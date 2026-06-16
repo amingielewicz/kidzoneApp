@@ -31,19 +31,19 @@ Generator tworzy:
 - users
 - places
 - reviews
-- placeholderowe `photoUrls` dla części miejsc i opinii
+- placeholderowe `photoUrls` dla wszystkich miejsc i opinii
 - jeden kontrolowany błędny URL zdjęcia, żeby sprawdzić error state ładowania obrazka
 
 Plik wynikowy trafia do katalogu output.
 
-Zdjęcia są domyślnie włączone. Można je wyłączyć albo zmienić gęstość generowania:
+Zdjęcia są domyślnie włączone dla wszystkich miejsc i wszystkich opinii. Można je wyłączyć albo zmienić gęstość generowania:
 
 ```bash
 node generate-scalability-data.mjs \
   --places=1000 \
   --photos=true \
-  --placePhotoEvery=3 \
-  --reviewPhotoEvery=5 \
+  --placePhotoEvery=1 \
+  --reviewPhotoEvery=1 \
   --brokenPhoto=true
 ```
 
@@ -57,8 +57,8 @@ npm run validate -- --input=output/kidzone-scalability-100.json
 
 Walidator sprawdza, czy:
 
-- część miejsc ma minimum jeden `photoUrl`,
-- część opinii ma minimum jeden `photoUrl`,
+- każde miejsce ma minimum jeden `photoUrl`,
+- każda opinia ma minimum jeden `photoUrl`,
 - miejsca z `photoUrls` mają kompletne `photoUploadedBy`,
 - liczba `photoHashes` zgadza się z liczbą `photoUrls`,
 - w danych jest co najmniej jeden błędny URL do testu placeholder/error state.
