@@ -7,6 +7,8 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.net.Uri
 import android.provider.Settings
@@ -522,6 +524,7 @@ private fun rememberPlaceClusterRenderer(
     MapEffect(clusterManager, density) { map ->
         val categoryMarkerIcons = PlaceCategory.entries.associateWith { category ->
             createCategoryMarkerDescriptor(
+                category = category,
                 backgroundColor = category.style.color.toArgb(),
                 borderColor = android.graphics.Color.WHITE,
                 density = density
@@ -584,16 +587,21 @@ private class PlaceClusterRenderer(
 }
 
 private fun createCategoryMarkerDescriptor(
+    category: PlaceCategory,
     backgroundColor: Int,
     borderColor: Int,
     density: Float
 ): BitmapDescriptor {
-    val size = (40 * density).toInt().coerceAtLeast(40)
+    val size = (50 * density).toInt().coerceAtLeast(50)
     val center = size / 2f
-    val radius = size * 0.42f
+    val radius = size * 0.38f
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    paint.color = android.graphics.Color.argb(72, 0, 0, 0)
+    paint.style = Paint.Style.FILL
+    canvas.drawCircle(center, center + 2 * density, radius, paint)
 
     paint.color = backgroundColor
     paint.style = Paint.Style.FILL
@@ -604,7 +612,105 @@ private fun createCategoryMarkerDescriptor(
     paint.strokeWidth = (2 * density).coerceAtLeast(2f)
     canvas.drawCircle(center, center, radius - paint.strokeWidth / 2f, paint)
 
+    drawCategoryGlyph(canvas, paint, category, center, center, density)
+
     return BitmapDescriptorFactory.fromBitmap(bitmap)
+}
+
+private fun drawCategoryGlyph(
+    canvas: Canvas,
+    paint: Paint,
+    category: PlaceCategory,
+    centerX: Float,
+    centerY: Float,
+    density: Float
+) {
+    paint.color = android.graphics.Color.WHITE
+    paint.strokeCap = Paint.Cap.ROUND
+    paint.strokeJoin = Paint.Join.ROUND
+    paint.strokeWidth = (2.2f * density).coerceAtLeast(2.2f)
+    paint.style = Paint.Style.STROKE
+
+    when (category) {
+        PlaceCategory.PLAYGROUND -> drawSlideGlyph(canvas, paint, centerX, centerY, density)
+        PlaceCategory.PLAY_ROOM -> drawRobotGlyph(canvas, paint, centerX, centerY, density)
+        PlaceCategory.CAFE -> drawCafeGlyph(canvas, paint, centerX, centerY, density)
+        PlaceCategory.RESTAURANT -> drawRestaurantGlyph(canvas, paint, centerX, centerY, density)
+        PlaceCategory.PARK -> drawTreeGlyph(canvas, paint, centerX, centerY, density)
+        PlaceCategory.ATTRACTION -> drawStarGlyph(canvas, paint, centerX, centerY, density)
+        PlaceCategory.OTHER -> drawPinGlyph(canvas, paint, centerX, centerY, density)
+    }
+}
+
+private fun drawSlideGlyph(canvas: Canvas, paint: Paint, x: Float, y: Float, d: Float) {
+    canvas.drawLine(x - 8 * d, y - 9 * d, x - 8 * d, y + 9 * d, paint)
+    canvas.drawLine(x - 8 * d, y - 8 * d, x + 1 * d, y - 8 * d, paint)
+    canvas.drawLine(x + 1 * d, y - 8 * d, x + 9 * d, y + 8 * d, paint)
+    canvas.drawLine(x - 3 * d, y + 8 * d, x + 10 * d, y + 8 * d, paint)
+}
+
+private fun drawRobotGlyph(canvas: Canvas, paint: Paint, x: Float, y: Float, d: Float) {
+    val rect = RectF(x - 9 * d, y - 7 * d, x + 9 * d, y + 8 * d)
+    canvas.drawRoundRect(rect, 4 * d, 4 * d, paint)
+    canvas.drawLine(x, y - 7 * d, x, y - 11 * d, paint)
+    paint.style = Paint.Style.FILL
+    canvas.drawCircle(x - 4 * d, y - 1 * d, 1.6f * d, paint)
+    canvas.drawCircle(x + 4 * d, y - 1 * d, 1.6f * d, paint)
+    paint.style = Paint.Style.STROKE
+    canvas.drawLine(x - 4 * d, y + 5 * d, x + 4 * d, y + 5 * d, paint)
+}
+
+private fun drawCafeGlyph(canvas: Canvas, paint: Paint, x: Float, y: Float, d: Float) {
+    val cup = RectF(x - 9 * d, y - 2 * d, x + 5 * d, y + 8 * d)
+    canvas.drawRoundRect(cup, 3 * d, 3 * d, paint)
+    canvas.drawArc(RectF(x + 3 * d, y, x + 12 * d, y + 7 * d), -70f, 220f, false, paint)
+    canvas.drawLine(x - 11 * d, y + 10 * d, x + 9 * d, y + 10 * d, paint)
+    canvas.drawLine(x - 4 * d, y - 10 * d, x - 4 * d, y - 6 * d, paint)
+    canvas.drawLine(x + 2 * d, y - 11 * d, x + 2 * d, y - 7 * d, paint)
+}
+
+private fun drawRestaurantGlyph(canvas: Canvas, paint: Paint, x: Float, y: Float, d: Float) {
+    canvas.drawLine(x - 7 * d, y - 10 * d, x - 7 * d, y + 10 * d, paint)
+    canvas.drawLine(x - 11 * d, y - 10 * d, x - 11 * d, y - 3 * d, paint)
+    canvas.drawLine(x - 3 * d, y - 10 * d, x - 3 * d, y - 3 * d, paint)
+    canvas.drawLine(x - 11 * d, y - 3 * d, x - 3 * d, y - 3 * d, paint)
+    canvas.drawLine(x + 6 * d, y - 10 * d, x + 6 * d, y + 10 * d, paint)
+    canvas.drawArc(RectF(x + 2 * d, y - 10 * d, x + 12 * d, y + 1 * d), 100f, 160f, false, paint)
+}
+
+private fun drawTreeGlyph(canvas: Canvas, paint: Paint, x: Float, y: Float, d: Float) {
+    paint.style = Paint.Style.FILL
+    canvas.drawCircle(x, y - 7 * d, 6 * d, paint)
+    canvas.drawCircle(x - 6 * d, y - 2 * d, 5 * d, paint)
+    canvas.drawCircle(x + 6 * d, y - 2 * d, 5 * d, paint)
+    paint.style = Paint.Style.STROKE
+    canvas.drawLine(x, y + 1 * d, x, y + 10 * d, paint)
+    canvas.drawLine(x - 6 * d, y + 10 * d, x + 6 * d, y + 10 * d, paint)
+}
+
+private fun drawStarGlyph(canvas: Canvas, paint: Paint, x: Float, y: Float, d: Float) {
+    val path = Path()
+    repeat(10) { index ->
+        val angle = Math.toRadians((-90 + index * 36).toDouble())
+        val radius = if (index % 2 == 0) 10 * d else 4.5f * d
+        val px = x + kotlin.math.cos(angle).toFloat() * radius
+        val py = y + kotlin.math.sin(angle).toFloat() * radius
+        if (index == 0) path.moveTo(px, py) else path.lineTo(px, py)
+    }
+    path.close()
+    paint.style = Paint.Style.FILL
+    canvas.drawPath(path, paint)
+    paint.style = Paint.Style.STROKE
+}
+
+private fun drawPinGlyph(canvas: Canvas, paint: Paint, x: Float, y: Float, d: Float) {
+    val path = Path().apply {
+        moveTo(x, y + 11 * d)
+        cubicTo(x - 10 * d, y, x - 6 * d, y - 10 * d, x, y - 10 * d)
+        cubicTo(x + 6 * d, y - 10 * d, x + 10 * d, y, x, y + 11 * d)
+    }
+    canvas.drawPath(path, paint)
+    canvas.drawCircle(x, y - 2 * d, 2.5f * d, paint)
 }
 
 private fun createClusterMarkerDescriptor(
