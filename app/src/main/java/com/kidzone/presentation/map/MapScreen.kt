@@ -4,12 +4,15 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,36 +56,54 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.toArgb
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.mapNotNull
 import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.GoogleMap as GoogleMapSdk
+import com.google.android.gms.maps.model.BitmapDescriptor
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.gms.maps.model.Marker
+import com.google.android.gms.maps.model.MarkerOptions
+import com.google.maps.android.clustering.Cluster
+import com.google.maps.android.clustering.ClusterItem
+import com.google.maps.android.clustering.ClusterManager
+import com.google.maps.android.clustering.view.ClusterRenderer
+import com.google.maps.android.clustering.view.DefaultClusterRenderer
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.GoogleMapComposable
+import com.google.maps.android.compose.MapEffect
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapType
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.MapsComposeExperimentalApi
-import com.google.maps.android.compose.MarkerComposable
-import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.clustering.Clustering
+import com.google.maps.android.compose.clustering.rememberClusterManager
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.kidzone.R
 import com.kidzone.domain.model.Place
@@ -116,17 +137,18 @@ private const val NEAR_ME_ZOOM = 14f
  * świeży pin był wyraźnie widoczny pośrodku ekranu z otoczeniem ulicznym.
  */
 private const val FOCUS_PLACE_ZOOM = 16f
-private const val MAX_SPIDERFIED_CLUSTER_SIZE = 10
-private const val SPIDERFY_MIN_ZOOM = 13f
+private const val MIN_CLUSTER_SIZE = 2
 private const val CLUSTER_FIT_BOUNDS_PADDING_PX = 96
+private const val SPIDERFY_RADIUS_DEGREES = 0.00012
+private const val SPIDERFY_RADIUS_STEP_DEGREES = 0.000015
+private const val SPIDERFY_MAX_EXTRA = 8
 
 /**
  * Ekran mapy z pinezkami miejsc.
  *
- *  - Pinezki to [MarkerComposable] z maps-compose – każdy marker renderuje
- *    okrągłą plakietkę w kolorze kategorii z ikonką tej kategorii w środku
- *    (spójne z [com.kidzone.presentation.common.CategoryStyle], czyli
- *    tym co user widzi na chipach / kartach miejsc).
+ *  - Pinezki i klastry obsługuje maps-compose-utils [Clustering] z własnym
+ *    lekkim rendererem bitmapowym. Dzięki temu algorytm klastrowania działa
+ *    poza UI, a mapa nie renderuje setek composable do bitmap przy zoomie.
  *  - Filtry na overlayu nad mapą: kategoria + przełącznik "Najlepiej oceniane".
  *  - Natywne kontrolki Maps SDK: przycisk "Moja lokalizacja" (top-right) i
  *    zoom +/- (bottom-right) – żeby mapa wyglądała "po Google'owemu".
@@ -142,8 +164,7 @@ private const val CLUSTER_FIT_BOUNDS_PADDING_PX = 96
  * `MapProperties.isMyLocationEnabled = locationPermissionGranted` jest
  * ustawiane tylko gdy uprawnienie faktycznie zostało nadane (sprawdzamy
  * w runtime). [MapsComposeExperimentalApi] – wymagane przez
- * `MarkerComposable`, oficjalna ścieżka renderowania custom contentu jako
- * pinezki.
+ * maps-compose-utils [Clustering].
  */
 @SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class)
@@ -156,8 +177,23 @@ fun MapScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val gpsEnabled = rememberLocationServiceEnabled()
+    val categoryMarkerIcons = remember(density) {
+        PlaceCategory.entries.associateWith { category ->
+            createCategoryMarkerDescriptor(
+                backgroundColor = category.style.color.toArgb(),
+                borderColor = android.graphics.Color.WHITE,
+                density = density.density
+            )
+        }
+    }
+    val clusterMarkerIcons = remember(density) {
+        clusterCountLabels().associateWith { label ->
+            createClusterMarkerDescriptor(label, density.density)
+        }
+    }
 
     // Trzymamy lokalnie, bo musimy reagować na nadanie uprawnienia bez
     // restartu ekranu. Wartość początkowa = stan systemowy w chwili pierwszej
@@ -169,17 +205,9 @@ fun MapScreen(
         position = CameraPosition.fromLatLngZoom(DEFAULT_CAMERA_TARGET, DEFAULT_CAMERA_ZOOM)
     }
     var mapLoaded by remember { mutableStateOf(false) }
-    var expandedClusterKey by remember { mutableStateOf<String?>(null) }
-    var expandedClusterPlaceIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var userTouchedMap by remember { mutableStateOf(false) }
-    val currentZoom = cameraPositionState.position.zoom
-    val markerItems = remember(state.places, expandedClusterKey, expandedClusterPlaceIds, currentZoom) {
-        buildMapMarkerItems(
-            places = state.places,
-            expandedClusterKey = expandedClusterKey,
-            expandedPlaceIds = expandedClusterPlaceIds,
-            zoom = currentZoom
-        )
+    val clusterItems = remember(state.places) {
+        buildPlaceClusterItems(state.places)
     }
 
     ReportSettledViewport(
@@ -294,70 +322,35 @@ fun MapScreen(
             // Tap w pustą część mapy = zamykamy bottom sheet (jeśli otwarty).
             onMapClick = {
                 userTouchedMap = true
-                expandedClusterKey = null
-                expandedClusterPlaceIds = emptySet()
                 viewModel.onPlaceSelected(null)
             }
         ) {
-            markerItems.forEach { marker ->
-                val markerKeys: Array<Any> = arrayOf(
-                    marker.key,
-                    marker.place?.category?.name.orEmpty(),
-                    marker.cluster?.places?.size ?: 0
+            val clusterManager = rememberClusterManager<PlaceClusterItem>()
+            val clusterRenderer = rememberPlaceClusterRenderer(
+                clusterManager = clusterManager,
+                categoryMarkerIcons = categoryMarkerIcons,
+                clusterMarkerIcons = clusterMarkerIcons
+            )
+
+            if (clusterManager != null && clusterRenderer != null) {
+                Clustering(
+                    items = clusterItems,
+                    clusterManager = clusterManager
                 )
-                MarkerComposable(
-                    keys = markerKeys,
-                    state = MarkerState(marker.position),
-                    title = marker.place?.name ?: "${marker.cluster?.places?.size.orZero()} miejsc",
-                    snippet = marker.place?.address?.takeIf { it.isNotBlank() },
-                    // true = consume zdarzenie. Domyślny info-window ma
-                    // uboższe info niż nasz sheet, więc nadpisujemy własnym.
-                    onClick = {
+                SideEffect {
+                    clusterManager.renderer = clusterRenderer
+                    clusterManager.setOnClusterClickListener { cluster ->
                         userTouchedMap = true
-                        marker.cluster?.let { cluster ->
-                            val shouldZoomIntoCluster =
-                                currentZoom < SPIDERFY_MIN_ZOOM ||
-                                    cluster.places.size >= MAX_SPIDERFIED_CLUSTER_SIZE
-                            if (shouldZoomIntoCluster) {
-                                expandedClusterKey = null
-                                expandedClusterPlaceIds = if (
-                                    cluster.places.size <= MAX_SPIDERFIED_CLUSTER_SIZE
-                                ) {
-                                    cluster.places.mapTo(mutableSetOf()) { place -> place.id }
-                                } else {
-                                    emptySet()
-                                }
-                                scope.launch {
-                                    cameraPositionState.animate(
-                                        cameraUpdateForCluster(cluster)
-                                    )
-                                }
-                            } else {
-                                expandedClusterPlaceIds = emptySet()
-                                expandedClusterKey = cluster.key
-                            }
-                            viewModel.onPlaceSelected(null)
-                        }
-                        marker.place?.let { place ->
-                            if (marker.isSpiderfied) {
-                                scope.launch {
-                                    cameraPositionState.animate(
-                                        CameraUpdateFactory.newLatLngZoom(
-                                            LatLng(place.latitude, place.longitude),
-                                            FOCUS_PLACE_ZOOM
-                                        )
-                                    )
-                                }
-                            }
-                            viewModel.onPlaceSelected(place.id)
+                        viewModel.onPlaceSelected(null)
+                        scope.launch {
+                            cameraPositionState.animate(cameraUpdateForCluster(cluster))
                         }
                         true
                     }
-                ) {
-                    if (marker.cluster != null) {
-                        ClusterMarkerIcon(count = marker.cluster.places.size)
-                    } else {
-                        CategoryMarkerIcon(category = marker.place!!.category)
+                    clusterManager.setOnClusterItemClickListener { item ->
+                        userTouchedMap = true
+                        viewModel.onPlaceSelected(item.place.id)
+                        true
                     }
                 }
             }
@@ -470,16 +463,53 @@ fun MapScreen(
     }
 }
 
-private fun Int?.orZero(): Int = this ?: 0
+internal data class PlaceClusterItem(
+    val place: Place,
+    private val markerPosition: LatLng
+) : ClusterItem {
+    override fun getPosition(): LatLng = markerPosition
+    override fun getTitle(): String = place.name
+    override fun getSnippet(): String? = place.address.takeIf { it.isNotBlank() }
+    override fun getZIndex(): Float? = null
+}
 
-private fun cameraUpdateForCluster(cluster: MarkerCluster) =
-    if (cluster.places.hasSameCoordinates()) {
-        CameraUpdateFactory.newLatLngZoom(cluster.center, FOCUS_PLACE_ZOOM)
+internal fun buildPlaceClusterItems(places: List<Place>): List<PlaceClusterItem> =
+    places
+        .groupBy { place -> place.latitude to place.longitude }
+        .flatMap { (_, group) ->
+            if (group.size == 1) {
+                group.map { place ->
+                    PlaceClusterItem(place, LatLng(place.latitude, place.longitude))
+                }
+            } else {
+                spiderfyPlaceItems(group)
+            }
+        }
+
+private fun spiderfyPlaceItems(places: List<Place>): List<PlaceClusterItem> {
+    val center = LatLng(places.first().latitude, places.first().longitude)
+    val radius = SPIDERFY_RADIUS_DEGREES + places.size.coerceAtMost(SPIDERFY_MAX_EXTRA) *
+        SPIDERFY_RADIUS_STEP_DEGREES
+    return places.mapIndexed { index, place ->
+        val angle = (2.0 * kotlin.math.PI * index) / places.size
+        PlaceClusterItem(
+            place = place,
+            markerPosition = LatLng(
+                center.latitude + kotlin.math.sin(angle) * radius,
+                center.longitude + kotlin.math.cos(angle) * radius
+            )
+        )
+    }
+}
+
+private fun cameraUpdateForCluster(cluster: Cluster<PlaceClusterItem>) =
+    if (cluster.items.map { item -> item.place }.hasSameCoordinates()) {
+        CameraUpdateFactory.newLatLngZoom(cluster.position, FOCUS_PLACE_ZOOM)
     } else {
         CameraUpdateFactory.newLatLngBounds(
             LatLngBounds.builder().apply {
-                cluster.places.forEach { place ->
-                    include(LatLng(place.latitude, place.longitude))
+                cluster.items.forEach { item ->
+                    include(LatLng(item.place.latitude, item.place.longitude))
                 }
             }.build(),
             CLUSTER_FIT_BOUNDS_PADDING_PX
@@ -494,6 +524,140 @@ private fun List<Place>.hasSameCoordinates(): Boolean {
 }
 
 @Composable
+@GoogleMapComposable
+@OptIn(MapsComposeExperimentalApi::class)
+private fun rememberPlaceClusterRenderer(
+    clusterManager: ClusterManager<PlaceClusterItem>?,
+    categoryMarkerIcons: Map<PlaceCategory, BitmapDescriptor>,
+    clusterMarkerIcons: Map<String, BitmapDescriptor>
+): ClusterRenderer<PlaceClusterItem>? {
+    val context = LocalContext.current
+    val categoryMarkerIconsState = rememberUpdatedState(categoryMarkerIcons)
+    val clusterMarkerIconsState = rememberUpdatedState(clusterMarkerIcons)
+    val rendererState = remember {
+        mutableStateOf<ClusterRenderer<PlaceClusterItem>?>(null)
+    }
+
+    clusterManager ?: return null
+    MapEffect(clusterManager) { map ->
+        val renderer = PlaceClusterRenderer(
+            context = context,
+            map = map,
+            clusterManager = clusterManager,
+            categoryMarkerIcons = categoryMarkerIconsState,
+            clusterMarkerIcons = clusterMarkerIconsState
+        ).apply {
+            setMinClusterSize(MIN_CLUSTER_SIZE)
+            setAnimation(false)
+        }
+        clusterManager.renderer = renderer
+        rendererState.value = renderer
+    }
+
+    return rendererState.value
+}
+
+private class PlaceClusterRenderer(
+    context: Context,
+    map: GoogleMapSdk,
+    clusterManager: ClusterManager<PlaceClusterItem>,
+    private val categoryMarkerIcons: State<Map<PlaceCategory, BitmapDescriptor>>,
+    private val clusterMarkerIcons: State<Map<String, BitmapDescriptor>>
+) : DefaultClusterRenderer<PlaceClusterItem>(context, map, clusterManager) {
+
+    override fun onBeforeClusterItemRendered(
+        item: PlaceClusterItem,
+        markerOptions: MarkerOptions
+    ) {
+        super.onBeforeClusterItemRendered(item, markerOptions)
+        markerOptions.icon(categoryMarkerIcons.value.getValue(item.place.category))
+    }
+
+    override fun onClusterItemUpdated(item: PlaceClusterItem, marker: Marker) {
+        super.onClusterItemUpdated(item, marker)
+        marker.setIcon(categoryMarkerIcons.value.getValue(item.place.category))
+    }
+
+    override fun onBeforeClusterRendered(
+        cluster: Cluster<PlaceClusterItem>,
+        markerOptions: MarkerOptions
+    ) {
+        markerOptions
+            .icon(clusterMarkerIcons.value.getValue(clusterCountLabel(cluster.size)))
+            .title("${cluster.size} miejsc")
+    }
+
+    override fun onClusterUpdated(cluster: Cluster<PlaceClusterItem>, marker: Marker) {
+        marker.setIcon(clusterMarkerIcons.value.getValue(clusterCountLabel(cluster.size)))
+        marker.title = "${cluster.size} miejsc"
+    }
+}
+
+private fun createCategoryMarkerDescriptor(
+    backgroundColor: Int,
+    borderColor: Int,
+    density: Float
+): BitmapDescriptor {
+    val size = (40 * density).toInt().coerceAtLeast(40)
+    val center = size / 2f
+    val radius = size * 0.42f
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    paint.color = backgroundColor
+    paint.style = Paint.Style.FILL
+    canvas.drawCircle(center, center, radius, paint)
+
+    paint.color = borderColor
+    paint.style = Paint.Style.STROKE
+    paint.strokeWidth = (2 * density).coerceAtLeast(2f)
+    canvas.drawCircle(center, center, radius - paint.strokeWidth / 2f, paint)
+
+    return BitmapDescriptorFactory.fromBitmap(bitmap)
+}
+
+private fun createClusterMarkerDescriptor(
+    label: String,
+    density: Float
+): BitmapDescriptor {
+    val size = (44 * density).toInt().coerceAtLeast(44)
+    val center = size / 2f
+    val radius = size * 0.44f
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    paint.color = android.graphics.Color.rgb(33, 150, 243)
+    paint.style = Paint.Style.FILL
+    canvas.drawCircle(center, center, radius, paint)
+
+    paint.color = android.graphics.Color.WHITE
+    paint.style = Paint.Style.STROKE
+    paint.strokeWidth = (2 * density).coerceAtLeast(2f)
+    canvas.drawCircle(center, center, radius - paint.strokeWidth / 2f, paint)
+
+    paint.style = Paint.Style.FILL
+    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    paint.textSize = (13 * density).coerceAtLeast(13f)
+    paint.textAlign = Paint.Align.CENTER
+    val textBaseline = center - (paint.descent() + paint.ascent()) / 2f
+    canvas.drawText(label, center, textBaseline, paint)
+
+    return BitmapDescriptorFactory.fromBitmap(bitmap)
+}
+
+internal fun clusterCountLabel(count: Int): String = when {
+    count < 10 -> count.toString()
+    count >= 100 -> "90+"
+    else -> "${(count / 10) * 10}+"
+}
+
+private fun clusterCountLabels(): List<String> =
+    (2..9).map { count -> count.toString() } +
+        (10..90 step 10).map { count -> "$count+" }
+
+@Composable
 private fun ReportSettledViewport(
     cameraPositionState: CameraPositionState,
     mapLoaded: Boolean,
@@ -503,6 +667,7 @@ private fun ReportSettledViewport(
         if (!mapLoaded) return@LaunchedEffect
         snapshotFlow { cameraPositionState.isMoving to cameraPositionState.position }
             .filter { (isMoving, _) -> !isMoving }
+            .distinctUntilChanged()
             .mapNotNull {
                 cameraPositionState.projection?.visibleRegion?.latLngBounds
             }
@@ -516,65 +681,6 @@ private fun ReportSettledViewport(
                     )
                 )
             }
-    }
-}
-
-/**
- * Pojedyncza pinezka renderowana jako [MarkerComposable] – kółko w kolorze
- * kategorii z białą ikoną tej kategorii w środku, plus białe obramowanie
- * dla kontrastu na różnych tłach mapy.
- *
- * MarkerComposable zamienia ten Composable na bitmapę przy starcie i
- * dalej traktuje ją tak jak zwykłą pinezkę Maps SDK, więc nie ma kosztu
- * recompose przy każdym przesunięciu kamery.
- */
-@Composable
-private fun CategoryMarkerIcon(category: PlaceCategory) {
-    val style = category.style
-    Surface(
-        shape = CircleShape,
-        color = style.color,
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.surface),
-        shadowElevation = 4.dp
-    ) {
-        Icon(
-            imageVector = style.icon,
-            contentDescription = "Kategoria miejsca",
-            // Tinta na kolor surface (zwykle biały / prawie biały) – ikona
-            // wyraźnie odcina się na kolorowym tle plakietki.
-            tint = MaterialTheme.colorScheme.surface,
-            modifier = Modifier
-                .size(36.dp)
-                .padding(6.dp)
-        )
-    }
-}
-
-@Composable
-private fun ClusterMarkerIcon(count: Int) {
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.primary,
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.surface),
-        shadowElevation = 4.dp
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .padding(4.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = if (count > MAX_SPIDERFIED_CLUSTER_SIZE) {
-                    "$MAX_SPIDERFIED_CLUSTER_SIZE+"
-                } else {
-                    count.toString()
-                },
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onPrimary,
-                fontWeight = FontWeight.Bold
-            )
-        }
     }
 }
 
