@@ -459,7 +459,11 @@ class PlaceDetailsViewModel @Inject constructor(
                 if (hash in newHashes) continue // duplikat wśród nowych
                 newHashes.add(hash)
                 try {
-                    val url = photoUploader.uploadReviewPhoto("pending_${System.currentTimeMillis()}", bytes)
+                    val url = photoUploader.uploadReviewPhoto(
+                        ownerUserId = user.id,
+                        reviewId = "pending_${System.currentTimeMillis()}",
+                        imageBytes = bytes
+                    )
                     uploadedPhotoUrls.add(url)
                 } catch (_: Exception) { /* best-effort – pomijamy nieudane */ }
             }
@@ -552,7 +556,11 @@ class PlaceDetailsViewModel @Inject constructor(
                 }
                 existingHashes.add(hash)
                 try {
-                    val url = photoUploader.uploadReviewPhoto(existing.id, bytes)
+                    val url = photoUploader.uploadReviewPhoto(
+                        ownerUserId = existing.userId,
+                        reviewId = existing.id,
+                        imageBytes = bytes
+                    )
                     newUploadedUrls.add(url)
                 } catch (_: Exception) { /* best-effort */ }
             }
@@ -727,7 +735,11 @@ class PlaceDetailsViewModel @Inject constructor(
             }
 
             try {
-                val url = photoUploader.uploadPlacePhoto(place.id, newBytes)
+                val url = photoUploader.uploadPlacePhoto(
+                    ownerUserId = user.id,
+                    placeId = place.id,
+                    imageBytes = newBytes
+                )
                 when (placeRepository.addPhotoUrl(place.id, url, user.id)) {
                     is OpResult.Success -> {
                         placePhotoHashes.add(newHash)

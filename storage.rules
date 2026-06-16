@@ -11,38 +11,62 @@ service firebase.storage {
       return isSignedIn() && request.auth.token.admin == true;
     }
 
-    // Zdjęcia miejsc (wspiera dowolną głębokość podfolderów, np. /photos/...)
-    match /places/{placeId}/{allPaths=**} {
-      allow read: if true;
-
-      allow write: if isSignedIn()
-        && request.resource.size < 10 * 1024 * 1024
+    function isImageUnder(maxSizeBytes) {
+      return request.resource != null
+        && request.resource.size < maxSizeBytes
         && request.resource.contentType.matches('image/.*');
-
-      allow delete: if isAdmin();
     }
 
-    // Zdjęcia opinii
-    match /reviews/{reviewId}/{allPaths=**} {
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Zdjęcia miejsc.
+    // Nowy format właścicielski:
+    // places/{ownerUserId}/{placeId}/photos/{fileName}
+    match /places/{ownerUserId}/{placeId}/photos/{fileName} {
       allow read: if true;
 
-      allow write: if isSignedIn()
-        && request.resource.size < 10 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+      allow create, update: if isOwner(ownerUserId)
+        && isImageUnder(10 * 1024 * 1024);
 
-      allow delete: if isAdmin();
+      allow delete: if isOwner(ownerUserId) || isAdmin();
+    }
+
+    // Legacy path zostaje tylko do odczytu, żeby nie popsuć istniejących URL-i.
+    // Nowe zapisy i usuwanie muszą używać ścieżki z ownerUserId.
+    match /places/{placeId}/{allPaths=**} {
+      allow read: if true;
+      allow write, delete: if isAdmin();
+    }
+
+    // Zdjęcia opinii.
+    // Nowy format właścicielski:
+    // reviews/{ownerUserId}/{reviewId}/photos/{fileName}
+    match /reviews/{ownerUserId}/{reviewId}/photos/{fileName} {
+      allow read: if true;
+
+      allow create, update: if isOwner(ownerUserId)
+        && isImageUnder(10 * 1024 * 1024);
+
+      allow delete: if isOwner(ownerUserId) || isAdmin();
+    }
+
+    // Legacy path zostaje tylko do odczytu, żeby nie popsuć istniejących URL-i.
+    // Nowe zapisy i usuwanie muszą używać ścieżki z ownerUserId.
+    match /reviews/{reviewId}/{allPaths=**} {
+      allow read: if true;
+      allow write, delete: if isAdmin();
     }
 
     // Avatary
     match /avatars/{userId}/{fileName} {
       allow read: if isSignedIn();
 
-      allow write: if isSignedIn()
-        && request.auth.uid == userId
-        && request.resource.size < 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+      allow create, update: if isOwner(userId)
+        && isImageUnder(5 * 1024 * 1024);
 
-      allow delete: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if isOwner(userId) || isAdmin();
     }
   }
 }

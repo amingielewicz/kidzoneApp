@@ -490,7 +490,11 @@ class AddPlaceViewModel @Inject constructor(
 
                         try {
                             val tempId = state.editingPlaceId ?: "pending_${System.currentTimeMillis()}"
-                            val url = photoUploader.uploadPlacePhoto(tempId, bytes)
+                            val url = photoUploader.uploadPlacePhoto(
+                                ownerUserId = currentUser.id,
+                                placeId = tempId,
+                                imageBytes = bytes
+                            )
                             uploadedUrls.add(url)
                         } catch (e: Exception) {
                             _uiState.update {
