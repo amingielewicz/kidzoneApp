@@ -766,6 +766,7 @@ class FirebaseAuthRepository @Inject constructor(
                     SetOptions.merge()
                 ).await()
             }
+            migrateLegacyFcmTokens(firebaseUser.uid, publicSnap)
             return
         }
 
@@ -780,6 +781,45 @@ class FirebaseAuthRepository @Inject constructor(
             updatedAtMillis = System.currentTimeMillis()
         )
         privateRef.set(privateDto).await()
+        migrateLegacyFcmTokens(firebaseUser.uid, publicSnap)
+    }
+
+    /**
+     * Migracja: jeśli publiczny dokument users/{uid} nadal zawiera pole
+     * `fcmTokens` (legacy sprzed przeniesienia do private/messaging),
+     * przenosimy tokeny do subdoc `private/messaging` i usuwamy z publicznego.
+     *
+     * Idempotentne — jeśli pole nie istnieje lub jest puste, nie generuje write'ów.
+     * Best-effort: błędy są tłumione, żeby nie blokować logowania.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun migrateLegacyFcmTokens(
+        uid: String,
+        publicSnap: com.google.firebase.firestore.DocumentSnapshot
+    ) {
+        try {
+            val legacyTokens = publicSnap.get("fcmTokens") as? List<String>
+            if (legacyTokens.isNullOrEmpty()) return
+
+            val messagingRef = privateMessagingRef(uid)
+            val docRef = firestore.collection(FirestoreCollections.USERS).document(uid)
+
+            val batch = firestore.batch()
+            batch.set(
+                messagingRef,
+                mapOf(
+                    "userId" to uid,
+                    "fcmTokens" to com.google.firebase.firestore.FieldValue.arrayUnion(*legacyTokens.toTypedArray()),
+                    "updatedAtMillis" to System.currentTimeMillis()
+                ),
+                SetOptions.merge()
+            )
+            batch.update(docRef, "fcmTokens", com.google.firebase.firestore.FieldValue.delete())
+            batch.commit().await()
+        } catch (_: Exception) {
+            // Best-effort: nie blokujemy logowania przy błędzie migracji.
+            // CF getFcmTokens() też ma fallback do legacy, więc push nadal działa.
+        }
     }
 
     private fun privateProfileRef(userId: String) =

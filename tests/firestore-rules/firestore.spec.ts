@@ -29,6 +29,9 @@ import {
   collection,
   addDoc,
   writeBatch,
+  arrayUnion,
+  deleteField,
+  setLogLevel,
 } from 'firebase/firestore';
 
 const PROJECT_ID = 'kidzone-rules-test';
@@ -38,6 +41,7 @@ let testEnv: RulesTestEnvironment;
 beforeAll(async () => {
   const rulesPath = resolve(__dirname, '../../firestore.rules');
   const rules = readFileSync(rulesPath, 'utf-8');
+  setLogLevel('silent');
 
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
@@ -197,6 +201,43 @@ describe('Users collection', () => {
       userId: 'user1',
       fcmTokens: ['token-1'],
       updatedAtMillis: Date.now(),
+    });
+
+    await assertSucceeds(batch.commit());
+  });
+
+  it('allows owner to delete legacy public FCM tokens only', async () => {
+    const createdAtMillis = Date.now();
+    await seedUser('user1', { createdAtMillis, fcmTokens: ['token-1'] });
+    const db = authedDb('user1');
+
+    await assertSucceeds(
+      setDoc(doc(db, 'users', 'user1'), {
+        name: 'Test User',
+        placesAddedCount: 0,
+        reviewsCount: 0,
+        role: 'user',
+        createdAtMillis,
+      }),
+    );
+  });
+
+  it('allows login migration batch to write private token and delete public legacy field', async () => {
+    const createdAtMillis = Date.now();
+    await seedUser('user1', { createdAtMillis, fcmTokens: ['legacy-token'] });
+    const db = authedDb('user1');
+    const batch = writeBatch(db);
+    batch.set(
+      doc(db, 'users', 'user1', 'private', 'messaging'),
+      {
+        userId: 'user1',
+        fcmTokens: arrayUnion('legacy-token'),
+        updatedAtMillis: Date.now(),
+      },
+      { merge: true },
+    );
+    batch.update(doc(db, 'users', 'user1'), {
+      fcmTokens: deleteField(),
     });
 
     await assertSucceeds(batch.commit());

@@ -38,6 +38,7 @@ module.exports = {
     "operator-linebreak": "off",
     "linebreak-style": "off",
     "comma-dangle": ["warn", "always-multiline"],
+    "linebreak-style": "off",
     "@typescript-eslint/no-explicit-any": "warn",
   },
 };

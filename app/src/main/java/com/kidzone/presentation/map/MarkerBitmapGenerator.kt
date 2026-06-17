@@ -158,7 +158,7 @@ class MarkerIconCache(
 }
 
 internal fun clusterCountLabel(count: Int): String = when {
-    count < 10 -> count.toString()
+    count <= 10 -> count.toString()
     count >= 100 -> "100+"
     else -> "${(count / 10) * 10}+"
 }
