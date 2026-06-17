@@ -5,10 +5,11 @@ import {
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 let testEnv;
 
-const PROJECT_ID = 'kidzone-rules-test';
+const PROJECT_ID = 'kidzone-rules-test-js';
 const OWNER_UID = 'owner-user';
 const OTHER_UID = 'other-user';
 const ADMIN_UID = 'admin-user';
@@ -28,10 +29,12 @@ async function seed(path, data) {
 }
 
 beforeAll(async () => {
+  const rulesPath = resolve(__dirname, '../../firestore.rules');
+
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
     firestore: {
-      rules: readFileSync('../../firestore.rules', 'utf8'),
+      rules: readFileSync(rulesPath, 'utf8'),
     },
   });
 });
@@ -41,7 +44,7 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await testEnv.cleanup();
+  await testEnv?.cleanup();
 });
 
 describe('users rules', () => {
