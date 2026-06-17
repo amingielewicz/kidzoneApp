@@ -1,5 +1,5 @@
 {
-  "name": "kidzone-firestore-rules-tests",
+  "name": "kidzone-firebase-rules-tests",
   "private": true,
   "type": "module",
   "scripts": {
