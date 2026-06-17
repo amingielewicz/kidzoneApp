@@ -25,7 +25,7 @@ Data weryfikacji: 2026-06-17.
 | Firebase Storage | Zostaje | Zdjęcia miejsc, opinii i avatarów. |
 | Firebase Crashlytics | Zostaje | Crash logs, diagnostics, device/app info. |
 | Firebase Analytics | Zostaje | App activity, app interactions, search, screen views, login/sign-up events, user properties, user ID, device or other IDs. |
-| Firebase Performance Monitoring | Zostaje | Performance data, diagnostics, device/app info. Custom traces są użyte w kodzie; debug/CI ma wyłączoną instrumentację przez manifest placeholder, release nie ma tego wyłączenia. |
+| Firebase Performance Monitoring | Zostaje | Performance data, diagnostics, device/app info. Custom traces są użyte w kodzie; Gradle plugin `com.google.firebase.firebase-perf` jest podpięty; debug/CI wyłącza kolekcję przez debug manifest, release nie ma tego wyłączenia. |
 | Firebase Cloud Messaging | Zostaje | Push notifications, FCM registration tokeny, device or other IDs. Tokeny są zapisywane w `users/{uid}/private/messaging`, a Cloud Functions wysyłają push przez Admin SDK. |
 | Firebase App Check | Zostaje | Security, fraud prevention, device/app integrity. Debug używa Debug provider fallback, release używa Play Integrity. |
 | Firebase Remote Config | Zostaje | App functionality / configuration, eksperymenty i warianty UX; używa Analytics do exposure/user properties. |
@@ -41,7 +41,7 @@ Na podstawie aktualnych dokumentów i funkcji aplikacji zakładamy, że kidZone:
 - używa Google Maps Platform,
 - używa Firebase Crashlytics,
 - używa Firebase Analytics,
-- używa Firebase Performance Monitoring przez custom traces i pozostawia SDK w release,
+- używa Firebase Performance Monitoring przez SDK, Gradle plugin i custom traces w release,
 - używa Firebase Cloud Messaging do push notifications,
 - zapisuje FCM tokeny w prywatnym subdokumencie `users/{uid}/private/messaging`,
 - pozwala dodawać miejsca, opinie, oceny, zdjęcia i zgłoszenia,
@@ -230,11 +230,12 @@ Decyzje:
 Wynik audytu Performance Monitoring:
 
 - dependency `firebase-perf` jest podpięte w `app/build.gradle.kts`,
+- Gradle plugin `com.google.firebase.firebase-perf` jest podpięty w top-level i app-level Gradle,
 - `PerformanceTraces` używa `FirebasePerformance.getInstance()` i custom traces,
 - custom traces są używane m.in. dla lokalizacji, kompresji zdjęć, uploadu zdjęć, Remote Config i innych ścieżek,
-- debug/CI wyłącza instrumentację przez `firebasePerformanceInstrumentationEnabled=false`,
+- debug/CI wyłącza kolekcję przez debug manifest metadata `firebase_performance_collection_deactivated=true` i `firebase_performance_collection_enabled=false`,
 - release build nie ustawia tego wyłączenia,
-- w projekcie nie ma osobno zastosowanego pluginu Gradle `com.google.firebase.firebase-perf`, więc decyzję Data Safety opieramy na realnie użytym SDK i custom traces, a nie na dodatkowej automatycznej instrumentacji pluginu,
+- plugin Gradle włącza automatyczną instrumentację buildów release obok ręcznych custom traces,
 - według oficjalnej strony Firebase Pricing usługa Performance Monitoring jest no-cost.
 
 Do potwierdzenia:
@@ -324,8 +325,8 @@ Sprawdzone pliki i wnioski:
 | Plik / obszar | Wniosek |
 | --- | --- |
 | `gradle/libs.versions.toml` | Zdefiniowane są Firebase Auth, Firestore, Storage, Crashlytics, Messaging, Analytics, App Check, Performance i Remote Config. |
-| `app/build.gradle.kts` | Wszystkie powyższe SDK są podpięte; debug wyłącza Firebase Performance instrumentation placeholderem, release nie. |
-| top-level `build.gradle.kts` | Zastosowane są Google Services i Crashlytics plugin; nie ma osobnego Firebase Performance Gradle pluginu. |
+| `app/build.gradle.kts` | Wszystkie powyższe SDK są podpięte; app-level Gradle stosuje Google Services, Crashlytics i Firebase Performance plugin; debug wyłącza Firebase Performance collection przez debug manifest, release nie. |
+| top-level `build.gradle.kts` | Zastosowane są Google Services, Crashlytics i Firebase Performance plugin. |
 | `AndroidManifest.xml` | Są uprawnienia lokalizacji, zdjęć, kamery i `POST_NOTIFICATIONS`; jest zarejestrowany `KidZoneMessagingService`. |
 | `KidZoneMessagingService.kt` | FCM token jest zapisywany, wiadomości są odbierane, tworzone są lokalne powiadomienia i deep linki. |
 | `FirebaseAuthRepository.kt` | Sign-out usuwa token z `private/messaging`; login migruje legacy publiczne `fcmTokens`. |
@@ -333,7 +334,7 @@ Sprawdzone pliki i wnioski:
 | `functions/src/index.ts` | Cloud Functions czytają tokeny z `private/messaging`, migrują fallback legacy i wysyłają push przez `sendEachForMulticast`. |
 | `firestore.rules` | Publiczne `fcmTokens` są blokowane; prywatny subdokument `private/messaging` jest dostępny dla właściciela/admina. |
 | `AnalyticsHelper.kt` i `ExperimentManager.kt` | Analytics jest realnie używane do screenów, auth, search, interakcji, eksperymentów, user ID i user properties. |
-| `PerformanceTraces.kt` i użycia w serwisach | Performance Monitoring jest realnie użyty przez custom traces. |
+| `PerformanceTraces.kt` i użycia w serwisach | Performance Monitoring jest realnie użyty przez custom traces, a Gradle plugin dodaje automatyczną instrumentację release. |
 | `RemoteConfigService.kt` | Remote Config jest inicjalizowany i fetchowany przy starcie aplikacji. |
 | Oficjalna Firebase Pricing page | Analytics, FCM, Crashlytics, Performance Monitoring i Remote Config są produktami no-cost; Firestore/Functions/Storage mają limity no-cost i potem billing zależny od użycia. |
 
@@ -389,7 +390,7 @@ Przed finalnym wypełnieniem Data Safety trzeba sprawdzić:
 
 - [ ] aktywne usługi Firebase w konsoli,
 - [ ] czy Crashlytics jest aktywny w release,
-- [x] Performance Monitoring jest użyty w kodzie przez custom traces i pozostaje w release,
+- [x] Performance Monitoring jest użyty w kodzie przez custom traces, Gradle plugin jest podpięty i całość pozostaje w release,
 - [x] Performance Monitoring jest no-cost według Firebase Pricing,
 - [x] eventy Analytics są zidentyfikowane w `AnalyticsHelper` i `ExperimentManager`,
 - [x] FCM/powiadomienia są używane,
@@ -459,7 +460,7 @@ Messages / notifications:
 - Zweryfikować aktywne usługi Firebase.
 - Uwzględnić Analytics w Data Safety, ponieważ zostaje w aplikacji.
 - Uwzględnić Crashlytics w Data Safety, ponieważ zostaje w aplikacji.
-- Uwzględnić Performance Monitoring, ponieważ SDK i custom traces zostają w aplikacji.
+- Uwzględnić Performance Monitoring, ponieważ SDK, Gradle plugin i custom traces zostają w aplikacji.
 - Uwzględnić FCM/push notifications, ponieważ tokeny i wysyłka powiadomień są realnie używane.
 - Nie oznaczać danych jako opcjonalnych, jeśli konto jest wymagane do korzystania z kluczowych funkcji.
 - Dodać widoczne ostrzeżenie w UI przed publikacją zdjęć dzieci lub osób trzecich.
