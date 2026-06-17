@@ -1,7 +1,7 @@
 # Google Play Data Safety — robocze odpowiedzi
 
-Powiązane issue: #213
-
+Powiązane issue: #213  
+Powiązane issue pomocnicze: #216  
 Parent: #182
 
 Milestone: v0.1.0-alpha — pierwszy release techniczny
@@ -12,6 +12,20 @@ Dokument zbiera robocze odpowiedzi do formularza **Google Play Data Safety** dla
 
 To jest materiał pomocniczy do przepisania w Google Play Console. Ostateczne odpowiedzi trzeba potwierdzić z faktyczną konfiguracją Firebase, Google Play Console i aktualnym buildem aplikacji.
 
+## Aktualne decyzje Firebase SDK
+
+| SDK / usługa | Decyzja | Wpływ na Google Play Data Safety |
+| --- | --- | --- |
+| Firebase Authentication | Zostaje | Dane konta, e-mail, logowanie, account management. |
+| Cloud Firestore | Zostaje | Profil, treści użytkownika, miejsca, opinie, zgłoszenia. |
+| Firebase Storage | Zostaje | Zdjęcia miejsc, opinii i avatarów. |
+| Firebase Crashlytics | Zostaje | Crash logs, diagnostics, device/app info. |
+| Firebase Analytics | Zostaje | App activity, analytics, app interactions, device or other IDs — do potwierdzenia w konsoli. |
+| Firebase Performance Monitoring | Chcemy używać, jeśli jest bezpieczne kosztowo / w darmowym zakresie | Performance data, diagnostics, device/app info. |
+| Firebase Cloud Messaging | Dependency jest podpięte; kiedyś działało; obecnie aplikacja nic nie wysyła | Do weryfikacji w #216. Jeśli zostaje: notifications, FCM tokeny, device or other IDs. |
+| Firebase App Check | Zostaje / do potwierdzenia trybu | Security, fraud prevention, device/app integrity. |
+| Firebase Remote Config | Podpięte; do potwierdzenia faktycznego użycia | Może wpływać na app functionality / configuration, zwykle bez danych użytkownika. |
+
 ## Ważne założenia
 
 Na podstawie aktualnych dokumentów i funkcji aplikacji zakładamy, że kidZone:
@@ -21,7 +35,10 @@ Na podstawie aktualnych dokumentów i funkcji aplikacji zakładamy, że kidZone:
 - przechowuje dane w Cloud Firestore,
 - przechowuje zdjęcia w Firebase Storage,
 - używa Google Maps Platform,
-- może używać Firebase Crashlytics / Performance Monitoring / Google Play Services,
+- używa Firebase Crashlytics,
+- używa Firebase Analytics,
+- chce używać Firebase Performance Monitoring, jeżeli koszt i limity są bezpieczne,
+- ma podpięte Firebase Cloud Messaging, ale wymaga potwierdzenia realnego użycia,
 - pozwala dodawać miejsca, opinie, oceny, zdjęcia i zgłoszenia,
 - korzysta z lokalizacji do pokazywania miejsc w pobliżu,
 - nie jest aplikacją kierowaną bezpośrednio do dzieci.
@@ -34,9 +51,12 @@ Na podstawie aktualnych dokumentów i funkcji aplikacji zakładamy, że kidZone:
 | Lokalizacja | Do zadeklarowania | Używana do mapy i miejsc w pobliżu. |
 | Zdjęcia | Do zadeklarowania | Użytkownik może przesyłać zdjęcia miejsc, opinii i avatar. |
 | Treści użytkownika | Do zadeklarowania | Miejsca, opinie, oceny, zgłoszenia. |
-| Diagnostyka | Do potwierdzenia | Zależnie od aktywnej konfiguracji Crashlytics/Performance. |
-| Identyfikatory | Do potwierdzenia | Możliwe przez Firebase/Google Play Services. |
-| Udostępnianie danych | Do potwierdzenia | Dane przetwarzane przez Google jako dostawcę usług. |
+| Crash logs | Do zadeklarowania | Crashlytics zostaje. |
+| Diagnostics | Do zadeklarowania | Crashlytics i Performance Monitoring. |
+| Analytics / app activity | Do zadeklarowania | Analytics zostaje. |
+| Performance data | Do zadeklarowania, jeśli Performance Monitoring zostaje aktywne w release | Decyzja zależna od kosztu i konfiguracji. |
+| Device or other IDs | Do zadeklarowania roboczo | Firebase/Google Play Services/Analytics/Crashlytics/FCM mogą używać identyfikatorów. |
+| Push notifications / FCM | Do weryfikacji w #216 | Dependency istnieje; aplikacja obecnie nic nie wysyła. |
 | Usuwanie danych | Do potwierdzenia | Powiązane z #212. |
 
 ## 1. Czy aplikacja zbiera dane użytkownika?
@@ -49,7 +69,7 @@ Tak.
 
 Uzasadnienie:
 
-Aplikacja obsługuje konto użytkownika, treści użytkownika, zdjęcia, lokalizację i dane techniczne.
+Aplikacja obsługuje konto użytkownika, treści użytkownika, zdjęcia, lokalizację, diagnostykę i analitykę.
 
 ## 2. Czy wszystkie dane są szyfrowane podczas przesyłania?
 
@@ -97,8 +117,6 @@ Do potwierdzenia:
 | Cel | Funkcjonalność aplikacji, konto użytkownika, społeczność, ranking |
 | Widoczność | Może być widoczne dla innych użytkowników |
 
-Uwagi:
-
 Nazwa użytkownika jest publicznym identyfikatorem autora treści, opinii, miejsc lub rankingu.
 
 ### 4.2 Dane osobowe — adres e-mail
@@ -110,8 +128,6 @@ Nazwa użytkownika jest publicznym identyfikatorem autora treści, opinii, miejs
 | Czy wymagane? | Tak, jeśli użytkownik loguje się e-mailem; możliwe także przy logowaniu Google |
 | Cel | Uwierzytelnianie, obsługa konta, bezpieczeństwo, kontakt administracyjny |
 | Widoczność | Prywatne |
-
-Uwagi:
 
 Adres e-mail powinien znajdować się w prywatnym profilu użytkownika. Migracja prywatnych pól jest śledzona w #202.
 
@@ -125,8 +141,6 @@ Adres e-mail powinien znajdować się w prywatnym profilu użytkownika. Migracja
 | Cel | Profil użytkownika, obsługa konta |
 | Widoczność | Prywatne albo zależne od UI — wymaga potwierdzenia |
 
-Uwagi:
-
 Jeżeli imię i nazwisko nie są wymagane do działania aplikacji, traktować jako opcjonalne dane profilu. Docelowo powinny trafić do `users/{uid}/private/profile`.
 
 ### 4.4 Zdjęcia i pliki użytkownika
@@ -138,10 +152,6 @@ Jeżeli imię i nazwisko nie są wymagane do działania aplikacji, traktować ja
 | Czy wymagane? | Opcjonalne |
 | Cel | Funkcjonalność aplikacji, treści użytkownika, profil, miejsca, opinie |
 | Widoczność | Publiczna lub prywatna zależnie od typu zdjęcia |
-
-Uwagi:
-
-Zdjęcia miejsc i opinii mogą być widoczne publicznie. Avatar użytkownika może być widoczny przy profilu lub treściach, jeśli UI go pokazuje.
 
 Do potwierdzenia:
 
@@ -196,44 +206,75 @@ Przykłady:
 - zgłoszenia naruszeń,
 - zgłoszenia błędnych danych.
 
-### 4.7 Dane diagnostyczne
+### 4.7 Dane diagnostyczne, crash logs i performance data
 
 | Pole | Propozycja odpowiedzi |
 | --- | --- |
-| Czy zbierane? | Tak, jeśli Crashlytics / Performance Monitoring są aktywne |
+| Czy zbierane? | Tak |
 | Czy udostępniane? | Przetwarzane przez Firebase/Google jako dostawcę usług |
-| Czy wymagane? | Zwykle automatyczne dla diagnostyki, zależnie od konfiguracji |
-| Cel | Diagnostyka, stabilność, bezpieczeństwo, analiza awarii |
+| Czy wymagane? | Zależne od konfiguracji; w release może działać automatycznie |
+| Cel | Diagnostyka, stabilność, bezpieczeństwo, analiza awarii, poprawa wydajności |
 | Widoczność | Niepubliczne |
+
+Decyzje:
+
+- Crashlytics zostaje, więc `Crash logs` i `Diagnostics` trzeba uwzględnić.
+- Analytics zostaje, więc app activity / analytics trzeba uwzględnić.
+- Performance Monitoring chcemy używać, jeśli jest bezpieczne kosztowo, więc roboczo uwzględniamy `Performance data`.
 
 Do potwierdzenia:
 
 - czy Crashlytics jest włączony w buildzie release,
-- czy Performance Monitoring jest aktywny,
-- czy użytkownik jest informowany o diagnostyce w polityce prywatności,
-- czy zbieranie danych diagnostycznych można ograniczyć.
+- czy Performance Monitoring jest aktywny w release,
+- czy Performance Monitoring mieści się w bezpiecznym / darmowym zakresie,
+- jakie eventy zbiera Analytics,
+- czy użytkownik jest informowany o diagnostyce i analityce w polityce prywatności.
 
 ### 4.8 Identyfikatory urządzenia lub instalacji
 
 | Pole | Propozycja odpowiedzi |
 | --- | --- |
-| Czy zbierane? | Możliwe |
+| Czy zbierane? | Tak / prawdopodobnie tak |
 | Czy udostępniane? | Przetwarzane przez Firebase/Google Play Services |
 | Czy wymagane? | Zależne od Firebase/Google Play Services |
-| Cel | Bezpieczeństwo, diagnostyka, działanie usług, powiadomienia, antynadużycia |
+| Cel | Bezpieczeństwo, diagnostyka, analityka, działanie usług, powiadomienia, antynadużycia |
 | Widoczność | Niepubliczne |
 
 Do potwierdzenia:
 
 - Firebase Installation ID,
 - Crashlytics installation UUID,
-- tokeny FCM, jeśli powiadomienia są aktywne,
+- Analytics app instance ID,
+- tokeny FCM, jeśli powiadomienia zostają,
 - App Check tokeny,
 - Google Play Services identifiers.
 
-## 5. Udostępnianie danych
+### 4.9 Push notifications / Firebase Cloud Messaging
 
-W Google Play termin „sharing” może obejmować przekazywanie danych podmiotom trzecim, ale nie zawsze obejmuje dostawców usług przetwarzających dane w imieniu operatora.
+| Pole | Propozycja odpowiedzi |
+| --- | --- |
+| Czy zbierane? | Do weryfikacji w #216 |
+| Czy udostępniane? | Przetwarzane przez Firebase/Google jako dostawcę usług, jeśli FCM zostaje |
+| Czy wymagane? | Opcjonalne, jeśli służy tylko do powiadomień |
+| Cel | Powiadomienia, funkcjonalność aplikacji, komunikaty systemowe lub społecznościowe |
+| Widoczność | Niepubliczne tokeny urządzenia; treść powiadomienia zależna od funkcji |
+
+Aktualny stan:
+
+- dependency `firebase-messaging` jest podpięte,
+- push notifications miały działać i wcześniej prawdopodobnie działały,
+- obecnie aplikacja nic nie wysyła,
+- decyzja wymaga sprawdzenia w #216.
+
+Jeżeli FCM zostaje, trzeba sprawdzić:
+
+- czy aplikacja zapisuje tokeny FCM,
+- czy tokeny są przechowywane w Firestore,
+- czy użytkownik ma zgodę `POST_NOTIFICATIONS` na Androidzie 13+,
+- czy użytkownik może wyłączyć powiadomienia,
+- czy istnieje mechanizm wysyłki po stronie Firebase Console, Cloud Functions lub innego backendu.
+
+## 5. Udostępnianie danych
 
 Robocza interpretacja:
 
@@ -247,7 +288,8 @@ Do potwierdzenia w Google Play Console:
 
 - czy Google/Firebase należy oznaczyć jako „shared” w konkretnych pytaniach formularza,
 - czy publiczne treści użytkownika traktować jako udostępniane innym użytkownikom,
-- czy Crashlytics/Performance wpływa na deklarację udostępniania.
+- czy Crashlytics / Performance / Analytics wpływa na deklarację udostępniania,
+- czy FCM wpływa na deklarację udostępniania.
 
 ## 6. Cele przetwarzania danych
 
@@ -255,8 +297,9 @@ Prawdopodobne cele do zaznaczenia:
 
 | Cel | Dane |
 | --- | --- |
-| App functionality | konto, profil, miejsca, opinie, zdjęcia, lokalizacja |
-| Analytics / diagnostics | crash logs, performance data, device/app info |
+| App functionality | konto, profil, miejsca, opinie, zdjęcia, lokalizacja, powiadomienia |
+| Analytics | Analytics app events, app interactions, device/app info |
+| Diagnostics | crash logs, performance data, diagnostics |
 | Developer communications | e-mail, zgłoszenia, obsługa konta |
 | Fraud prevention, security, compliance | e-mail, identyfikatory, logi, App Check, reguły Firebase |
 | Personalization | potencjalnie lokalizacja i treści, jeśli aplikacja personalizuje listy/mapę |
@@ -272,7 +315,10 @@ Prawdopodobne cele do zaznaczenia:
 | Zdjęcia | Opcjonalne | Funkcja dodatkowa. |
 | Lokalizacja | Opcjonalna | Aplikacja powinna działać bez zgody, ale bez funkcji „w pobliżu”. |
 | Opinie i miejsca | Opcjonalne | Użytkownik może korzystać tylko z przeglądania. |
-| Diagnostyka | Zależne od konfiguracji | Do potwierdzenia. |
+| Crash logs / diagnostics | Zależne od konfiguracji | Crashlytics zostaje. |
+| Analytics | Zależne od konfiguracji | Analytics zostaje. |
+| Performance data | Zależne od konfiguracji | Performance Monitoring zostaje, jeśli kosztowo bezpieczne. |
+| FCM tokeny | Do weryfikacji | Zależy od decyzji w #216. |
 
 ## 8. Elementy do ręcznego potwierdzenia
 
@@ -281,10 +327,12 @@ Przed finalnym wypełnieniem Data Safety trzeba sprawdzić:
 - [ ] aktywne usługi Firebase w konsoli,
 - [ ] czy Crashlytics jest aktywny w release,
 - [ ] czy Performance Monitoring jest aktywny w release,
-- [ ] czy Analytics jest używany,
+- [ ] czy Performance Monitoring jest bezpieczne kosztowo,
+- [ ] jakie eventy zbiera Analytics,
 - [ ] czy FCM/powiadomienia są używane,
+- [ ] czy aplikacja zapisuje tokeny FCM,
 - [ ] czy App Check jest aktywny i w jakim trybie,
-- [ ] manifest Androida pod kątem uprawnień lokalizacji i zdjęć,
+- [ ] manifest Androida pod kątem uprawnień lokalizacji, zdjęć i powiadomień,
 - [ ] realne flow usuwania konta,
 - [ ] realne flow eksportu/usunięcia danych na żądanie,
 - [ ] czy publiczne treści użytkownika są anonimizowane po usunięciu konta.
@@ -325,34 +373,42 @@ Photos and videos:
 
 App activity:
 - User-generated content
-- App interactions, jeśli zbierane przez Firebase/Analytics
+- App interactions
+- Other user-generated content / app activity, jeśli formularz tego wymaga
 
 App info and performance:
 - Crash logs
 - Diagnostics
-- Performance data, jeśli aktywne
+- Performance data
 
 Device or other IDs:
-- Device or other IDs, jeśli używane przez Firebase/Google Play Services
+- Device or other IDs
+
+Messages / notifications:
+- Do weryfikacji tylko, jeśli FCM zostaje i aplikacja faktycznie obsługuje powiadomienia
 ```
 
 ## 10. Rekomendacje przed publikacją
 
 - Domknąć #212, zanim formularz zostanie oznaczony jako finalny.
+- Domknąć #216 albo przynajmniej podjąć decyzję dla FCM.
 - Zweryfikować manifest i uprawnienia Androida.
 - Zweryfikować aktywne usługi Firebase.
-- Unikać deklaracji „nie zbieramy”, jeśli Firebase lub Google Play Services mogą zbierać diagnostykę/identyfikatory.
+- Uwzględnić Analytics w Data Safety, ponieważ zostaje w aplikacji.
+- Uwzględnić Crashlytics w Data Safety, ponieważ zostaje w aplikacji.
+- Uwzględnić Performance Monitoring, jeśli zostaje aktywne w release.
 - Nie oznaczać danych jako opcjonalnych, jeśli konto jest wymagane do korzystania z kluczowych funkcji.
 - Dodać widoczne ostrzeżenie w UI przed publikacją zdjęć dzieci lub osób trzecich.
 
 ## 11. Wniosek
 
-Aplikacja powinna być deklarowana jako aplikacja zbierająca dane użytkownika, w szczególności dane konta, treści użytkownika, zdjęcia i lokalizację.
+Aplikacja powinna być deklarowana jako aplikacja zbierająca dane użytkownika, w szczególności dane konta, treści użytkownika, zdjęcia, lokalizację, diagnostykę i analitykę.
 
 Największe ryzyka przed publikacją:
 
 1. brak potwierdzonego flow usuwania konta,
-2. niepewna konfiguracja Crashlytics / Performance / Analytics,
-3. brak finalnej migracji prywatnych pól użytkownika,
-4. zdjęcia dzieci i osób trzecich,
-5. lokalizacja dokładna versus przybliżona.
+2. niezamknięta decyzja dotycząca FCM,
+3. niepotwierdzone koszty i aktywność Performance Monitoring,
+4. brak finalnej migracji prywatnych pól użytkownika,
+5. zdjęcia dzieci i osób trzecich,
+6. lokalizacja dokładna versus przybliżona.
