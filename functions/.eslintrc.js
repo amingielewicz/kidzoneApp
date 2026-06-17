@@ -36,6 +36,7 @@ module.exports = {
     "no-multiple-empty-lines": ["warn", {max: 2}],
     "object-curly-spacing": ["warn", "never"],
     "operator-linebreak": "off",
+    "linebreak-style": "off",
     "comma-dangle": ["warn", "always-multiline"],
     "linebreak-style": "off",
     "@typescript-eslint/no-explicit-any": "warn",
