@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -61,16 +62,8 @@ fun SplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            // Bardzo jasny chłodny błękit – echo brand-blue logo
-            // (~43% pikseli loga to odcienie błękitu). Logo zostaje
-            // czytelne, a tło wzmacnia "techniczny" feel marki.
-            // Alternatywy gdyby ten wybór się znudził:
-            //   Color.White         – czysty biały (klinicznie)
-            //   Color(0xFFFFFBF7)   – ciepły off-white (subtelny krem)
-            //   Color(0xFFFFF8EB)   – wyraźniej kremowy (echo beżu z logo)
-            //   Color(0xFFEEF4F8)   – mocniejszy chłodny błękit
-            //   Color(0xFFF5F8FB)   – aktualny: jasny chłodny błękit
-            .background(Color(0xFFF5F8FB)),
+            .background(Color(0xFFF5F8FB))
+            .safeDrawingPadding(),
         contentAlignment = Alignment.Center
     ) {
         Column(
