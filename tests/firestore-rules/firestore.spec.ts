@@ -28,6 +28,7 @@ import {
   deleteDoc,
   collection,
   addDoc,
+  writeBatch,
 } from 'firebase/firestore';
 
 const PROJECT_ID = 'kidzone-rules-test';
@@ -123,6 +124,7 @@ describe('Users collection', () => {
         name: 'Test User',
         role: 'user',
         email: 'private@example.com',
+        fcmTokens: ['token-1'],
         placesAddedCount: 0,
       }),
     );
@@ -140,6 +142,64 @@ describe('Users collection', () => {
       }),
     );
     await assertSucceeds(getDoc(doc(db, 'users', 'user1', 'private', 'profile')));
+  });
+
+  it('allows owner to read and write own private messaging document', async () => {
+    const db = authedDb('user1');
+    await assertSucceeds(
+      setDoc(doc(db, 'users', 'user1', 'private', 'messaging'), {
+        userId: 'user1',
+        fcmTokens: ['token-1'],
+        updatedAtMillis: Date.now(),
+      }),
+    );
+    await assertSucceeds(getDoc(doc(db, 'users', 'user1', 'private', 'messaging')));
+  });
+
+  it('denies another user from reading private messaging document', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'users', 'user1', 'private', 'messaging'), {
+        userId: 'user1',
+        fcmTokens: ['token-1'],
+      });
+    });
+    const db = authedDb('user2');
+    await assertFails(getDoc(doc(db, 'users', 'user1', 'private', 'messaging')));
+  });
+
+  it('denies owner from changing private messaging userId', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'users', 'user1', 'private', 'messaging'), {
+        userId: 'user1',
+        fcmTokens: ['token-1'],
+      });
+    });
+    const db = authedDb('user1');
+    await assertFails(
+      updateDoc(doc(db, 'users', 'user1', 'private', 'messaging'), { userId: 'user2' }),
+    );
+  });
+
+  it('allows registration batch to create public user and private messaging docs', async () => {
+    const db = authedDb('user1');
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'users', 'user1'), {
+      id: 'user1',
+      name: 'Test User',
+      role: 'user',
+      placesAddedCount: 0,
+      reviewsCount: 0,
+      createdAtMillis: Date.now(),
+    });
+    batch.set(doc(db, 'users', 'user1', 'private', 'messaging'), {
+      userId: 'user1',
+      fcmTokens: ['token-1'],
+      updatedAtMillis: Date.now(),
+    });
+
+    await assertSucceeds(batch.commit());
   });
 
   it('denies another user from reading private profile', async () => {
@@ -171,6 +231,10 @@ describe('Users collection', () => {
     const db = authedDb('user1');
     await assertFails(
       updateDoc(doc(db, 'users', 'user1'), { role: 'admin' }),
+    );
+
+    await assertFails(
+      updateDoc(doc(db, 'users', 'user1'), { fcmTokens: ['token-1'] }),
     );
   });
 
