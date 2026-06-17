@@ -8,12 +8,16 @@ import com.kidzone.domain.model.User
  * Pusty konstruktor jest wymagany przez Firestore do deserializacji.
  *
  * Wszystkie pola mają domyślne wartości – dzięki temu dokumenty zapisane
- * w starszej wersji schematu (np. bez `firstName`/`lastName`) nadal się
- * poprawnie deserializują, a brakujące pola po prostu mają wartość pustą.
+ * w starszej wersji schematu nadal się poprawnie deserializują.
+ *
+ * Prywatne pola (`email`, `firstName`, `lastName`,
+ * `emailNotificationsEnabled`) zostają tu tylko jako legacy fallback. Nowe
+ * zapisy powinny trafiać do `users/{uid}/private/profile`.
  */
 data class UserDto(
     val id: String = "",
     val name: String = "",
+    val role: String = "user",
     val email: String = "",
     val firstName: String = "",
     val lastName: String = "",
@@ -42,12 +46,15 @@ data class UserDto(
     val banReason: String = "",
     val emailNotificationsEnabled: Boolean = true
 ) {
-    fun toDomain(): User = User(
+    fun toDomain(
+        privateProfile: UserPrivateDto? = null,
+        includeLegacyPrivateFallback: Boolean = privateProfile == null
+    ): User = User(
         id = id,
         name = name,
-        email = email,
-        firstName = firstName,
-        lastName = lastName,
+        email = privateProfile?.email ?: email.takeIf { includeLegacyPrivateFallback }.orEmpty(),
+        firstName = privateProfile?.firstName ?: firstName.takeIf { includeLegacyPrivateFallback }.orEmpty(),
+        lastName = privateProfile?.lastName ?: lastName.takeIf { includeLegacyPrivateFallback }.orEmpty(),
         avatarUrl = avatarUrl,
         placesAddedCount = placesAddedCount,
         reviewsCount = reviewsCount,
@@ -56,16 +63,31 @@ data class UserDto(
         badgeEarnedAt = badgeEarnedAt,
         bannedUntilMillis = bannedUntilMillis,
         banReason = banReason,
-        emailNotificationsEnabled = emailNotificationsEnabled
+        emailNotificationsEnabled = privateProfile?.emailNotificationsEnabled
+            ?: emailNotificationsEnabled.takeIf { includeLegacyPrivateFallback }
+            ?: true
+    )
+
+    fun toPublicDomain(): User = toDomain(includeLegacyPrivateFallback = false)
+
+    fun toPublicFirestoreMap(): Map<String, Any?> = mapOf(
+        "id" to id,
+        "name" to name,
+        "role" to role,
+        "avatarUrl" to avatarUrl,
+        "placesAddedCount" to placesAddedCount,
+        "reviewsCount" to reviewsCount,
+        "createdAtMillis" to createdAtMillis,
+        "nameLowercase" to nameLowercase,
+        "badgeEarnedAt" to badgeEarnedAt,
+        "bannedUntilMillis" to bannedUntilMillis,
+        "banReason" to banReason
     )
 
     companion object {
         fun fromDomain(user: User): UserDto = UserDto(
             id = user.id,
             name = user.name,
-            email = user.email,
-            firstName = user.firstName,
-            lastName = user.lastName,
             avatarUrl = user.avatarUrl,
             placesAddedCount = user.placesAddedCount,
             reviewsCount = user.reviewsCount,
@@ -73,8 +95,7 @@ data class UserDto(
             nameLowercase = user.nameLowercase,
             badgeEarnedAt = user.badgeEarnedAt,
             bannedUntilMillis = user.bannedUntilMillis,
-            banReason = user.banReason,
-            emailNotificationsEnabled = user.emailNotificationsEnabled
+            banReason = user.banReason
         )
     }
 }

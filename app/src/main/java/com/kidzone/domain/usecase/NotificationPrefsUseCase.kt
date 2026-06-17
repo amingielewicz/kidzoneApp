@@ -20,7 +20,8 @@ class NotificationPrefsUseCase @Inject constructor(
 ) {
 
     /**
-     * Pobiera aktualne preferencje z dokumentu `users/{uid}`.
+     * Pobiera aktualne preferencje z `users/{uid}` oraz prywatną zgodę email
+     * z `users/{uid}/private/profile`.
      * Zwraca domyślne wartości jeśli pole nie istnieje lub fetch padnie.
      */
     suspend fun load(): NotificationPrefs {
@@ -28,9 +29,16 @@ class NotificationPrefsUseCase @Inject constructor(
         return try {
             val snap = firestore
                 .collection("users").document(uid).get().await()
+            val privateSnap = firestore
+                .collection("users").document(uid)
+                .collection("private").document("profile")
+                .get()
+                .await()
             @Suppress("UNCHECKED_CAST")
             val prefsMap = snap.get("notificationPreferences") as? Map<String, Boolean>
-            val emailEnabled = snap.getBoolean("emailNotificationsEnabled") ?: true
+            val emailEnabled = privateSnap.getBoolean("emailNotificationsEnabled")
+                ?: snap.getBoolean("emailNotificationsEnabled")
+                ?: true
             if (prefsMap != null) {
                 NotificationPrefs(
                     newReviewOnMyPlace = prefsMap["newReviewOnMyPlace"] ?: true,
@@ -53,20 +61,29 @@ class NotificationPrefsUseCase @Inject constructor(
      */
     suspend fun save(prefs: NotificationPrefs): Boolean {
         val uid = authRepository.currentUser.first()?.id ?: return false
-        val data = mapOf(
+        val publicData = mapOf(
             "notificationPreferences" to mapOf(
                 "newReviewOnMyPlace" to prefs.newReviewOnMyPlace,
                 "newBadgeEarned" to prefs.newBadgeEarned,
                 "newPhotoOnMyPlace" to prefs.newPhotoOnMyPlace,
                 "rankings" to prefs.rankings
-            ),
-            "emailNotificationsEnabled" to prefs.emailNotificationsEnabled
+            )
+        )
+        val privateData = mapOf(
+            "userId" to uid,
+            "emailNotificationsEnabled" to prefs.emailNotificationsEnabled,
+            "updatedAtMillis" to System.currentTimeMillis()
         )
         return try {
-            firestore
-                .collection("users").document(uid)
-                .set(data, SetOptions.merge())
-                .await()
+            val userRef = firestore.collection("users").document(uid)
+            val batch = firestore.batch()
+            batch.set(userRef, publicData, SetOptions.merge())
+            batch.set(
+                userRef.collection("private").document("profile"),
+                privateData,
+                SetOptions.merge()
+            )
+            batch.commit().await()
             true
         } catch (_: Exception) {
             false

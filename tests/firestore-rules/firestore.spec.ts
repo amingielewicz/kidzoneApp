@@ -84,7 +84,6 @@ async function seedUser(uid: string, data?: Record<string, unknown>) {
     const db = ctx.firestore();
     await setDoc(doc(db, 'users', uid), {
       name: 'Test User',
-      email: 'test@example.com',
       placesAddedCount: 0,
       reviewsCount: 0,
       role: 'user',
@@ -115,6 +114,56 @@ describe('Users collection', () => {
     await assertSucceeds(
       updateDoc(doc(db, 'users', 'user1'), { name: 'New Name' }),
     );
+  });
+
+  it('denies private fields on public user document create', async () => {
+    const db = authedDb('user1');
+    await assertFails(
+      setDoc(doc(db, 'users', 'user1'), {
+        name: 'Test User',
+        role: 'user',
+        email: 'private@example.com',
+        placesAddedCount: 0,
+      }),
+    );
+  });
+
+  it('allows owner to read and write own private profile', async () => {
+    const db = authedDb('user1');
+    await assertSucceeds(
+      setDoc(doc(db, 'users', 'user1', 'private', 'profile'), {
+        userId: 'user1',
+        email: 'private@example.com',
+        firstName: 'Jan',
+        lastName: 'Kowalski',
+        emailNotificationsEnabled: true,
+      }),
+    );
+    await assertSucceeds(getDoc(doc(db, 'users', 'user1', 'private', 'profile')));
+  });
+
+  it('denies another user from reading private profile', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'users', 'user1', 'private', 'profile'), {
+        userId: 'user1',
+        email: 'private@example.com',
+      });
+    });
+    const db = authedDb('user2');
+    await assertFails(getDoc(doc(db, 'users', 'user1', 'private', 'profile')));
+  });
+
+  it('allows admin to read private profile', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'users', 'user1', 'private', 'profile'), {
+        userId: 'user1',
+        email: 'private@example.com',
+      });
+    });
+    const db = authedDb('admin1', { admin: true });
+    await assertSucceeds(getDoc(doc(db, 'users', 'user1', 'private', 'profile')));
   });
 
   it('denies owner from changing own role', async () => {

@@ -15,6 +15,7 @@ import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
 import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.UserDto
+import com.kidzone.data.remote.dto.UserPrivateDto
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.SignInProvider
@@ -66,21 +67,44 @@ class FirebaseAuthRepository @Inject constructor(
             return@callbackFlow
         }
         val docRef = firestore.collection(FirestoreCollections.USERS).document(userId)
+        val shouldObservePrivateProfile = firebaseAuth.currentUser?.uid == userId
+        val privateRef = privateProfileRef(userId).takeIf { shouldObservePrivateProfile }
+        var publicDto: UserDto? = null
+        var privateDto: UserPrivateDto? = null
+
+        fun emitCurrent() {
+            val user = publicDto?.toDomain(
+                privateProfile = privateDto,
+                includeLegacyPrivateFallback = shouldObservePrivateProfile
+            )
+            if (user != null && user.isBanned) {
+                firebaseAuth.signOut()
+                trySend(null)
+            } else {
+                trySend(user)
+            }
+        }
+
         val registration = docRef.addSnapshotListener { snapshot, error ->
             if (error != null) {
                 close(error)
                 return@addSnapshotListener
             }
-            val user = snapshot?.toObject(UserDto::class.java)?.toDomain()
-            // Auto-wyloguj jeśli konto zostało zablokowane w trakcie sesji
-            if (user != null && user.isBanned) {
-                firebaseAuth.signOut()
-                trySend(null)
+            publicDto = snapshot?.toObject(UserDto::class.java)
+            emitCurrent()
+        }
+        val privateRegistration = privateRef?.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
                 return@addSnapshotListener
             }
-            trySend(user)
+            privateDto = snapshot?.toObject(UserPrivateDto::class.java)
+            emitCurrent()
         }
-        awaitClose { registration.remove() }
+        awaitClose {
+            registration.remove()
+            privateRegistration?.remove()
+        }
     }
 
     override suspend fun signInWithEmail(email: String, password: String): OpResult<User> =
@@ -134,26 +158,35 @@ class FirebaseAuthRepository @Inject constructor(
                 userProfileChangeRequest { displayName = name }
             ).await()
 
-            // Zapisz pelen profil do kolekcji `users` (zrodlo prawdy o statystykach itp.).
+            // Zapisz publiczny profil i prywatny subdokument z danymi osobowymi.
+            val createdAtMillis = System.currentTimeMillis()
             val userDto = UserDto(
                 id = firebaseUser.uid,
                 name = name,
                 nameLowercase = nameLowercase,
-                email = email,
                 avatarUrl = firebaseUser.photoUrl?.toString(),
-                createdAtMillis = System.currentTimeMillis(),
+                createdAtMillis = createdAtMillis,
                 badgeEarnedAt = emptyMap()
             )
-            firestore.collection(FirestoreCollections.USERS)
+            val privateDto = UserPrivateDto(
+                userId = firebaseUser.uid,
+                email = email,
+                createdAtMillis = createdAtMillis,
+                updatedAtMillis = createdAtMillis
+            )
+            val userRef = firestore.collection(FirestoreCollections.USERS)
                 .document(firebaseUser.uid)
-                .set(userDto)
+            val batch = firestore.batch()
+            batch.set(userRef, userDto.toPublicFirestoreMap())
+            batch.set(privateProfileRef(firebaseUser.uid), privateDto)
+            batch.commit()
                 .await()
 
             // Wyślij email weryfikacyjny – link do potwierdzenia konta.
             // Nie blokujemy rejestracji jeśli się nie uda (best-effort).
             runCatching { firebaseUser.sendEmailVerification().await() }
 
-            userDto.toDomain()
+            userDto.toDomain(privateDto)
         } catch (e: Throwable) {
             // Awaria po createUser - sprzątamy konto Auth, by user mógł
             // spróbować ponownie z innymi danymi bez "duchów" w Auth.
@@ -221,7 +254,7 @@ class FirebaseAuthRepository @Inject constructor(
             .await()
         val dto = snapshot.toObject(UserDto::class.java)
         if (dto != null) {
-            OpResult.success(dto.toDomain())
+            OpResult.success(dto.toPublicDomain())
         } else {
             OpResult.failure(NoSuchElementException("Brak użytkownika o id=$userId"))
         }
@@ -240,7 +273,7 @@ class FirebaseAuthRepository @Inject constructor(
             .get()
             .await()
         val users = snapshot.documents
-            .mapNotNull { it.toObject(UserDto::class.java)?.toDomain() }
+            .mapNotNull { it.toObject(UserDto::class.java)?.toPublicDomain() }
             .sortedWith(
                 compareByDescending<User> { it.placesAddedCount }
                     .thenByDescending { it.reviewsCount }
@@ -273,20 +306,28 @@ class FirebaseAuthRepository @Inject constructor(
         }
 
         // 1) Zapis do Firestore – merge, żeby nie nadpisać `placesAddedCount`,
-        //    `reviewsCount`, `createdAtMillis` ani `email` (które tu nie są
-        //    edytowane przez usera). Mapa zamiast pełnego DTO, bo merge na
-        //    DTO też by działał, ale wprost mapa lepiej dokumentuje, co
+        //    `reviewsCount` ani `createdAtMillis`. Mapa zamiast pełnego DTO,
+        //    bo merge na DTO też by działał, ale wprost mapa lepiej dokumentuje, co
         //    faktycznie zmieniamy.
-        val updates = mapOf(
+        val publicUpdates = mapOf(
             "name" to displayName,
             "nameLowercase" to nameLowercase,
-            "firstName" to firstName,
-            "lastName" to lastName,
             "avatarUrl" to avatarUrl
         )
         firestore.collection(FirestoreCollections.USERS)
             .document(firebaseUser.uid)
-            .set(updates, SetOptions.merge())
+            .set(publicUpdates, SetOptions.merge())
+            .await()
+
+        val privateUpdates = mapOf(
+            "userId" to firebaseUser.uid,
+            "email" to firebaseUser.email.orEmpty(),
+            "firstName" to firstName,
+            "lastName" to lastName,
+            "updatedAtMillis" to System.currentTimeMillis()
+        )
+        privateProfileRef(firebaseUser.uid)
+            .set(privateUpdates, SetOptions.merge())
             .await()
 
         // 2) Aktualizacja FirebaseAuth – żeby strumień [currentUser] (oparty
@@ -502,6 +543,10 @@ class FirebaseAuthRepository @Inject constructor(
         }
 
         // 3) Doc /users/{uid}
+        privateProfileRef(uid)
+            .delete()
+            .await()
+
         firestore.collection(FirestoreCollections.USERS)
             .document(uid)
             .delete()
@@ -652,19 +697,29 @@ class FirebaseAuthRepository @Inject constructor(
     private suspend fun ensureUserDoc(firebaseUser: FirebaseUser) {
         val docRef = firestore.collection(FirestoreCollections.USERS)
             .document(firebaseUser.uid)
+        val privateRef = privateProfileRef(firebaseUser.uid)
         try {
             val snap = docRef.get().await()
+            val now = System.currentTimeMillis()
             if (!snap.exists()) {
                 val displayName = firebaseUser.displayName.orEmpty()
                 val userDto = UserDto(
                     id = firebaseUser.uid,
                     name = displayName,
                     nameLowercase = displayName.toUserNameLowercase(),
-                    email = firebaseUser.email.orEmpty(),
                     avatarUrl = firebaseUser.photoUrl?.toString(),
-                    createdAtMillis = System.currentTimeMillis()
+                    createdAtMillis = now
                 )
-                docRef.set(userDto).await()
+                val privateDto = UserPrivateDto(
+                    userId = firebaseUser.uid,
+                    email = firebaseUser.email.orEmpty(),
+                    createdAtMillis = now,
+                    updatedAtMillis = now
+                )
+                val batch = firestore.batch()
+                batch.set(docRef, userDto.toPublicFirestoreMap())
+                batch.set(privateRef, privateDto)
+                batch.commit().await()
             } else {
                 // Backfill `nameLowercase` jeśli stary doc go nie ma (a jest
                 // niepuste `name`). Idempotentne - jak już jest wypełnione,
@@ -677,6 +732,7 @@ class FirebaseAuthRepository @Inject constructor(
                         SetOptions.merge()
                     ).await()
                 }
+                ensurePrivateProfile(firebaseUser, snap)
             }
         } catch (_: Exception) {
             // Świadomie tłumimy: brak doca w users to *nie* powód, by uniemożliwić
@@ -686,6 +742,45 @@ class FirebaseAuthRepository @Inject constructor(
             // uzupełnić ponownie.
         }
     }
+
+    private suspend fun ensurePrivateProfile(
+        firebaseUser: FirebaseUser,
+        publicSnap: com.google.firebase.firestore.DocumentSnapshot
+    ) {
+        val privateRef = privateProfileRef(firebaseUser.uid)
+        val privateSnap = privateRef.get().await()
+        val authEmail = firebaseUser.email.orEmpty()
+        if (privateSnap.exists()) {
+            if (authEmail.isNotBlank() && privateSnap.getString("email") != authEmail) {
+                privateRef.set(
+                    mapOf(
+                        "email" to authEmail,
+                        "updatedAtMillis" to System.currentTimeMillis()
+                    ),
+                    SetOptions.merge()
+                ).await()
+            }
+            return
+        }
+
+        val createdAtMillis = publicSnap.getLong("createdAtMillis") ?: System.currentTimeMillis()
+        val privateDto = UserPrivateDto(
+            userId = firebaseUser.uid,
+            email = authEmail.ifBlank { publicSnap.getString("email").orEmpty() },
+            firstName = publicSnap.getString("firstName").orEmpty(),
+            lastName = publicSnap.getString("lastName").orEmpty(),
+            emailNotificationsEnabled = publicSnap.getBoolean("emailNotificationsEnabled") ?: true,
+            createdAtMillis = createdAtMillis,
+            updatedAtMillis = System.currentTimeMillis()
+        )
+        privateRef.set(privateDto).await()
+    }
+
+    private fun privateProfileRef(userId: String) =
+        firestore.collection(FirestoreCollections.USERS)
+            .document(userId)
+            .collection("private")
+            .document("profile")
 
     private fun FirebaseUser.toDomain(): User = User(
         id = uid,

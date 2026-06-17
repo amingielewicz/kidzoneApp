@@ -54,6 +54,19 @@ describe('users rules', () => {
         role: 'user',
         placesAddedCount: 0,
         reviewsCount: 0,
+      })
+    );
+  });
+
+  it('rejects private fields on public user document create', async () => {
+    const db = authedDb(OWNER_UID);
+
+    await assertFails(
+      db.doc(`users/${OWNER_UID}`).set({
+        name: 'Owner',
+        role: 'user',
+        placesAddedCount: 0,
+        reviewsCount: 0,
         email: 'owner@example.com',
       })
     );
@@ -116,7 +129,6 @@ describe('users rules', () => {
   it('allows signed in users to read user documents under current rules', async () => {
     await seed(`users/${OWNER_UID}`, {
       name: 'Owner',
-      email: 'owner@example.com',
       fcmTokens: ['token-1'],
     });
 
@@ -129,6 +141,43 @@ describe('users rules', () => {
     await seed(`users/${OWNER_UID}`, { name: 'Owner' });
 
     await assertFails(publicDb().doc(`users/${OWNER_UID}`).get());
+  });
+
+  it('allows owner to read and write own private profile', async () => {
+    const db = authedDb(OWNER_UID);
+
+    await assertSucceeds(
+      db.doc(`users/${OWNER_UID}/private/profile`).set({
+        userId: OWNER_UID,
+        email: 'owner@example.com',
+        firstName: 'Jan',
+        lastName: 'Kowalski',
+        emailNotificationsEnabled: true,
+      })
+    );
+    await assertSucceeds(db.doc(`users/${OWNER_UID}/private/profile`).get());
+  });
+
+  it('rejects another user reading private profile', async () => {
+    await seed(`users/${OWNER_UID}/private/profile`, {
+      userId: OWNER_UID,
+      email: 'owner@example.com',
+    });
+
+    const db = authedDb(OTHER_UID);
+
+    await assertFails(db.doc(`users/${OWNER_UID}/private/profile`).get());
+  });
+
+  it('allows admin reading private profile', async () => {
+    await seed(`users/${OWNER_UID}/private/profile`, {
+      userId: OWNER_UID,
+      email: 'owner@example.com',
+    });
+
+    const db = authedDb(ADMIN_UID, { admin: true });
+
+    await assertSucceeds(db.doc(`users/${OWNER_UID}/private/profile`).get());
   });
 });
 
