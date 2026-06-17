@@ -104,8 +104,14 @@ class KidZoneMessagingService : FirebaseMessagingService() {
         FirebaseFirestore.getInstance()
             .collection("users")
             .document(uid)
+            .collection("private")
+            .document("messaging")
             .set(
-                mapOf("fcmTokens" to FieldValue.arrayUnion(token)),
+                mapOf(
+                    "userId" to uid,
+                    "fcmTokens" to FieldValue.arrayUnion(token),
+                    "updatedAtMillis" to System.currentTimeMillis()
+                ),
                 SetOptions.merge()
             )
     }
@@ -136,8 +142,14 @@ class KidZoneMessagingService : FirebaseMessagingService() {
                     FirebaseFirestore.getInstance()
                         .collection("users")
                         .document(uid)
+                        .collection("private")
+                        .document("messaging")
                         .set(
-                            mapOf("fcmTokens" to FieldValue.arrayUnion(token)),
+                            mapOf(
+                                "userId" to uid,
+                                "fcmTokens" to FieldValue.arrayUnion(token),
+                                "updatedAtMillis" to System.currentTimeMillis()
+                            ),
                             SetOptions.merge()
                         )
                 }
@@ -150,6 +162,8 @@ class KidZoneMessagingService : FirebaseMessagingService() {
                     FirebaseFirestore.getInstance()
                         .collection("users")
                         .document(uid)
+                        .collection("private")
+                        .document("messaging")
                         .update("fcmTokens", FieldValue.arrayRemove(token))
                 }
         }

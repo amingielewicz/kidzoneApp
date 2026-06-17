@@ -9,6 +9,36 @@ admin.initializeApp();
 
 const db = admin.firestore();
 
+function privateMessagingRef(userId: string) {
+  return db.collection("users").doc(userId).collection("private").doc("messaging");
+}
+
+async function getFcmTokens(
+  userId: string,
+  legacyUserData?: admin.firestore.DocumentData
+): Promise<string[]> {
+  const messagingDoc = await privateMessagingRef(userId).get();
+  const privateTokens = messagingDoc.data()?.fcmTokens;
+  if (Array.isArray(privateTokens) && privateTokens.length > 0) {
+    return privateTokens;
+  }
+  const legacyTokens = legacyUserData?.fcmTokens;
+  if (!Array.isArray(legacyTokens) || legacyTokens.length === 0) {
+    return [];
+  }
+
+  await privateMessagingRef(userId).set({
+    userId,
+    fcmTokens: admin.firestore.FieldValue.arrayUnion(...legacyTokens),
+    updatedAtMillis: Date.now(),
+  }, {merge: true});
+  await db.collection("users").doc(userId).set({
+    fcmTokens: admin.firestore.FieldValue.delete(),
+  }, {merge: true});
+
+  return legacyTokens;
+}
+
 /**
  * Weryfikuje czy request pochodzi od zalogowanego admina.
  * Zwraca UID admina lub null (+ wysyła error response).
@@ -1209,7 +1239,7 @@ export const onReviewCreatedPush = onDocumentCreated(
     const ownerDoc = await db.collection("users").doc(ownerUserId).get();
     if (!ownerDoc.exists) return;
     const ownerData = ownerDoc.data();
-    const fcmTokens: string[] = ownerData?.fcmTokens || [];
+    const fcmTokens = await getFcmTokens(ownerUserId, ownerData);
 
     if (fcmTokens.length === 0) return;
 
@@ -1241,26 +1271,7 @@ export const onReviewCreatedPush = onDocumentCreated(
         `${response.successCount} success, ${response.failureCount} failure`
       );
 
-      // Wyczyść nieaktualne tokeny
-      const tokensToRemove: string[] = [];
-      response.responses.forEach((resp, idx) => {
-        if (resp.error) {
-          const errorCode = resp.error.code;
-          if (
-            errorCode === "messaging/invalid-registration-token" ||
-            errorCode === "messaging/registration-token-not-registered"
-          ) {
-            tokensToRemove.push(fcmTokens[idx]);
-          }
-        }
-      });
-
-      if (tokensToRemove.length > 0) {
-        await db.collection("users").doc(ownerUserId).update({
-          fcmTokens: admin.firestore.FieldValue.arrayRemove(...tokensToRemove),
-        });
-        console.log(`Removed ${tokensToRemove.length} stale tokens for user ${ownerUserId}`);
-      }
+      await cleanStaleTokens(response, fcmTokens, ownerUserId);
     } catch (err) {
       console.error("Push notification error:", err);
     }
@@ -1337,7 +1348,7 @@ export const onBadgeEarned = onDocumentUpdated(
       return;
     }
 
-    const fcmTokens: string[] = afterData.fcmTokens || [];
+    const fcmTokens = await getFcmTokens(userId, afterData);
     if (fcmTokens.length === 0) return;
     const notifPrefs = afterData.notificationPreferences || {};
     if (notifPrefs.newBadgeEarned === false) return;
@@ -1418,7 +1429,7 @@ export const onPhotoAddedToPlace = onDocumentUpdated(
     const ownerDoc = await db.collection("users").doc(ownerUserId).get();
     if (!ownerDoc.exists) return;
     const ownerData = ownerDoc.data();
-    const fcmTokens: string[] = ownerData?.fcmTokens || [];
+    const fcmTokens = await getFcmTokens(ownerUserId, ownerData);
     if (fcmTokens.length === 0) return;
 
     const notifPrefs = ownerData?.notificationPreferences || {};
@@ -1467,9 +1478,14 @@ async function cleanStaleTokens(
     }
   });
   if (tokensToRemove.length > 0) {
-    await db.collection("users").doc(userId).update({
+    await privateMessagingRef(userId).set({
       fcmTokens: admin.firestore.FieldValue.arrayRemove(...tokensToRemove),
-    });
+      updatedAtMillis: Date.now(),
+    }, {merge: true});
+
+    await db.collection("users").doc(userId).set({
+      fcmTokens: admin.firestore.FieldValue.delete(),
+    }, {merge: true});
   }
 }
 
@@ -1505,7 +1521,7 @@ export const dailyRankingCheck = onSchedule(
 
       if (milestone !== null && milestone !== lastMilestone) {
         // Awans na nowy milestone!
-        const fcmTokens: string[] = userData.fcmTokens || [];
+        const fcmTokens = await getFcmTokens(userId, userData);
         const notifPrefs = userData.notificationPreferences || {};
 
         if (fcmTokens.length > 0 && notifPrefs.rankings !== false) {
@@ -1562,7 +1578,7 @@ export const dailyRankingCheck = onSchedule(
         const ownerDoc = await db.collection("users").doc(ownerUserId).get();
         if (ownerDoc.exists) {
           const ownerData = ownerDoc.data();
-          const fcmTokens: string[] = ownerData?.fcmTokens || [];
+          const fcmTokens = await getFcmTokens(ownerUserId, ownerData);
           const notifPrefs = ownerData?.notificationPreferences || {};
 
           if (fcmTokens.length > 0 && notifPrefs.rankings !== false) {
@@ -1757,9 +1773,15 @@ export const onUserBanned = onDocumentUpdated(
 
     const userId = event.params.userId;
     const userName = afterData.name || "Użytkowniku";
-    const userEmail = afterData.email || "";
+    const privateProfileDoc = await db.collection("users")
+      .doc(userId)
+      .collection("private")
+      .doc("profile")
+      .get();
+    const privateProfile = privateProfileDoc.data() || {};
+    const userEmail = privateProfile.email || afterData.email || "";
     const banReason = afterData.banReason || "Naruszenie regulaminu";
-    const fcmTokens: string[] = afterData.fcmTokens || [];
+    const fcmTokens = await getFcmTokens(userId, afterData);
 
     let banInfo: string;
     if (afterBanned === -1) {
@@ -1801,7 +1823,9 @@ export const onUserBanned = onDocumentUpdated(
     // --- Email ---
     if (userEmail) {
       // Check email opt-in (user can opt out of notification emails)
-      const emailEnabled = afterData.emailNotificationsEnabled !== false; // default true
+      const emailEnabled = privateProfile.emailNotificationsEnabled ??
+        afterData.emailNotificationsEnabled ??
+        true;
       if (!emailEnabled) {
         console.log(`Ban email skipped for ${userId} - opted out of email notifications`);
         return;

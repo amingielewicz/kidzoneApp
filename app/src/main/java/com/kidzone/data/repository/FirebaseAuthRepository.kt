@@ -239,6 +239,8 @@ class FirebaseAuthRepository @Inject constructor(
                     .token.await()
                 firestore.collection(FirestoreCollections.USERS)
                     .document(uid)
+                    .collection("private")
+                    .document("messaging")
                     .update("fcmTokens", com.google.firebase.firestore.FieldValue.arrayRemove(token))
                     .await()
             } catch (_: Exception) { /* best-effort */ }
@@ -547,6 +549,10 @@ class FirebaseAuthRepository @Inject constructor(
             .delete()
             .await()
 
+        privateMessagingRef(uid)
+            .delete()
+            .await()
+
         firestore.collection(FirestoreCollections.USERS)
             .document(uid)
             .delete()
@@ -781,6 +787,12 @@ class FirebaseAuthRepository @Inject constructor(
             .document(userId)
             .collection("private")
             .document("profile")
+
+    private fun privateMessagingRef(userId: String) =
+        firestore.collection(FirestoreCollections.USERS)
+            .document(userId)
+            .collection("private")
+            .document("messaging")
 
     private fun FirebaseUser.toDomain(): User = User(
         id = uid,

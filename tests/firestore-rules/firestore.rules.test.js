@@ -68,6 +68,7 @@ describe('users rules', () => {
         placesAddedCount: 0,
         reviewsCount: 0,
         email: 'owner@example.com',
+        fcmTokens: ['token-1'],
       })
     );
   });
@@ -110,6 +111,10 @@ describe('users rules', () => {
     await assertFails(
       db.doc(`users/${OWNER_UID}`).update({ role: 'admin' })
     );
+
+    await assertFails(
+      db.doc(`users/${OWNER_UID}`).update({ fcmTokens: ['token-1'] })
+    );
   });
 
   it('allows admin claim to update protected user fields', async () => {
@@ -129,7 +134,6 @@ describe('users rules', () => {
   it('allows signed in users to read user documents under current rules', async () => {
     await seed(`users/${OWNER_UID}`, {
       name: 'Owner',
-      fcmTokens: ['token-1'],
     });
 
     const db = authedDb(OTHER_UID);
@@ -178,6 +182,63 @@ describe('users rules', () => {
     const db = authedDb(ADMIN_UID, { admin: true });
 
     await assertSucceeds(db.doc(`users/${OWNER_UID}/private/profile`).get());
+  });
+
+  it('allows owner to register FCM token in private messaging document', async () => {
+    const db = authedDb(OWNER_UID);
+
+    await assertSucceeds(
+      db.doc(`users/${OWNER_UID}/private/messaging`).set({
+        userId: OWNER_UID,
+        fcmTokens: ['token-1'],
+        updatedAtMillis: Date.now(),
+      })
+    );
+    await assertSucceeds(db.doc(`users/${OWNER_UID}/private/messaging`).get());
+  });
+
+  it('rejects another user reading private messaging document', async () => {
+    await seed(`users/${OWNER_UID}/private/messaging`, {
+      userId: OWNER_UID,
+      fcmTokens: ['token-1'],
+    });
+
+    const db = authedDb(OTHER_UID);
+
+    await assertFails(db.doc(`users/${OWNER_UID}/private/messaging`).get());
+  });
+
+  it('rejects owner changing private messaging userId', async () => {
+    await seed(`users/${OWNER_UID}/private/messaging`, {
+      userId: OWNER_UID,
+      fcmTokens: ['token-1'],
+    });
+
+    const db = authedDb(OWNER_UID);
+
+    await assertFails(
+      db.doc(`users/${OWNER_UID}/private/messaging`).update({ userId: OTHER_UID })
+    );
+  });
+
+  it('allows registration batch to create public user and private messaging docs', async () => {
+    const db = authedDb(OWNER_UID);
+    const batch = db.batch();
+    batch.set(db.doc(`users/${OWNER_UID}`), {
+      id: OWNER_UID,
+      name: 'Owner',
+      role: 'user',
+      placesAddedCount: 0,
+      reviewsCount: 0,
+      createdAtMillis: Date.now(),
+    });
+    batch.set(db.doc(`users/${OWNER_UID}/private/messaging`), {
+      userId: OWNER_UID,
+      fcmTokens: ['token-1'],
+      updatedAtMillis: Date.now(),
+    });
+
+    await assertSucceeds(batch.commit());
   });
 });
 
