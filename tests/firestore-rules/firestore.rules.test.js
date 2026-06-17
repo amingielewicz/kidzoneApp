@@ -240,6 +240,60 @@ describe('users rules', () => {
 
     await assertSucceeds(batch.commit());
   });
+
+  it('allows owner to delete legacy public FCM tokens only', async () => {
+    await seed(`users/${OWNER_UID}`, {
+      name: 'Owner',
+      role: 'user',
+      placesAddedCount: 0,
+      reviewsCount: 0,
+      fcmTokens: ['token-1'],
+    });
+
+    const db = authedDb(OWNER_UID);
+
+    await assertSucceeds(
+      db.doc(`users/${OWNER_UID}`).set({
+        name: 'Owner',
+        role: 'user',
+        placesAddedCount: 0,
+        reviewsCount: 0,
+      })
+    );
+  });
+
+  it('allows login migration batch to write private token and delete public legacy field', async () => {
+    await seed(`users/${OWNER_UID}`, {
+      name: 'Owner',
+      role: 'user',
+      placesAddedCount: 0,
+      reviewsCount: 0,
+      fcmTokens: ['legacy-token'],
+    });
+
+    const db = authedDb(OWNER_UID);
+    const batch = db.batch();
+    batch.set(
+      db.doc(`users/${OWNER_UID}/private/messaging`),
+      {
+        userId: OWNER_UID,
+        fcmTokens: ['legacy-token'],
+        updatedAtMillis: Date.now(),
+      },
+      { merge: true }
+    );
+    batch.set(
+      db.doc(`users/${OWNER_UID}`),
+      {
+        name: 'Owner',
+        role: 'user',
+        placesAddedCount: 0,
+        reviewsCount: 0,
+      }
+    );
+
+    await assertSucceeds(batch.commit());
+  });
 });
 
 describe('places rules', () => {
