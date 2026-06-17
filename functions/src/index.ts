@@ -44,8 +44,8 @@ async function getFcmTokens(
  * Zwraca UID admina lub null (+ wysyła error response).
  */
 async function verifyAdminRequest(
-  req: any,
-  res: any
+  req: import("express").Request,
+  res: import("express").Response
 ): Promise<string | null> {
   const authHeader = req.headers.authorization || "";
   if (!authHeader.startsWith("Bearer ")) {
@@ -81,7 +81,7 @@ async function verifyAdminRequest(
 /**
  * Loguje akcje administracyjne do kolekcji audit_logs.
  */
-async function logAudit(adminUid: string, action: string, details: any) {
+async function logAudit(adminUid: string, action: string, details: Record<string, unknown>) {
   try {
     await db.collection("audit_logs").add({
       adminUid,
@@ -213,7 +213,9 @@ function mapPhotoReason(reason: string): string {
   return `${label} [${reason}]`;
 }
 
-async function getReviewInfo(reviewId: string): Promise<{comment: string; rating: number; authorName: string; placeId: string}> {
+async function getReviewInfo(
+  reviewId: string
+): Promise<{comment: string; rating: number; authorName: string; placeId: string}> {
   try {
     const doc = await db.collection("reviews").doc(reviewId).get();
     if (!doc.exists) return {comment: "", rating: 0, authorName: "Nieznany", placeId: ""};
@@ -1336,7 +1338,7 @@ export const onBadgeEarned = onDocumentUpdated(
 
     if (toGrant.length === 0 && toRevoke.length === 0) return;
 
-    const updates: Record<string, any> = {};
+    const updates: Record<string, number | admin.firestore.FieldValue> = {};
     const now = Date.now();
     for (const badge of toGrant) updates[`badgeEarnedAt.${badge}`] = now;
     for (const badge of toRevoke) updates[`badgeEarnedAt.${badge}`] = admin.firestore.FieldValue.delete();
@@ -2062,16 +2064,17 @@ export const adminUpdateUserEmail = onRequest(
         "Email zaktualizowany",
         `Email użytkownika ${userId} zmieniony na ${newEmail} (Auth + Firestore).`
       ));
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const firebaseErr = err as {code?: string; message?: string};
       console.error("adminUpdateUserEmail error:", err);
-      if (err.code === "auth/email-already-exists") {
+      if (firebaseErr.code === "auth/email-already-exists") {
         res.status(409).send(renderAdminResponse("Konflikt", "Ten adres email jest już używany przez inne konto."));
-      } else if (err.code === "auth/invalid-email") {
+      } else if (firebaseErr.code === "auth/invalid-email") {
         res.status(400).send(renderAdminResponse("Błąd", "Nieprawidłowy format adresu email."));
-      } else if (err.code === "auth/user-not-found") {
+      } else if (firebaseErr.code === "auth/user-not-found") {
         res.status(404).send(renderAdminResponse("Nie znaleziono", "Użytkownik nie istnieje w Firebase Auth."));
       } else {
-        res.status(500).send(renderAdminResponse("Błąd serwera", `${err.message || err}`));
+        res.status(500).send(renderAdminResponse("Błąd serwera", `${firebaseErr.message || err}`));
       }
     }
   }
