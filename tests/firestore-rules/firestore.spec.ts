@@ -31,6 +31,7 @@ import {
   writeBatch,
   arrayUnion,
   deleteField,
+  setLogLevel,
 } from 'firebase/firestore';
 
 const PROJECT_ID = 'kidzone-rules-test';
@@ -40,6 +41,7 @@ let testEnv: RulesTestEnvironment;
 beforeAll(async () => {
   const rulesPath = resolve(__dirname, '../../firestore.rules');
   const rules = readFileSync(rulesPath, 'utf-8');
+  setLogLevel('silent');
 
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,

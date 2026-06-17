@@ -4,6 +4,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
+import { setLogLevel } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -30,6 +31,7 @@ async function seed(path, data) {
 
 beforeAll(async () => {
   const rulesPath = resolve(__dirname, '../../firestore.rules');
+  setLogLevel('silent');
 
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
