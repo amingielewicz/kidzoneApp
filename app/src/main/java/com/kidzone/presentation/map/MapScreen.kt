@@ -54,7 +54,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -71,24 +70,20 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.mapNotNull
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap as GoogleMapSdk
-import com.google.android.gms.maps.model.BitmapDescriptor
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.maps.android.clustering.Cluster
-import com.google.maps.android.clustering.ClusterItem
-import com.google.maps.android.clustering.ClusterManager
 import com.google.maps.android.clustering.view.ClusterRenderer
 import com.google.maps.android.clustering.view.DefaultClusterRenderer
+import com.google.maps.android.clustering.ClusterManager
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.GoogleMapComposable
@@ -111,26 +106,9 @@ import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.fetchCurrentLocation
 import com.kidzone.presentation.place.add.hasLocationPermission
 
-/**
- * Domyślny target kamery – Warszawa, Pl. Defilad. Zoom 11 daje pełny widok
- * miasta, więc gdy mamy parę miejsc dodanych w okolicy stolicy, user widzi
- * je od razu bez ręcznego odsuwania.
- *
- * W przyszłości można fitować kamerę do bounding boxu wszystkich pinezek
- * (`LatLngBounds.Builder` + `CameraUpdateFactory.newLatLngBounds(...)`),
- * ale tylko gdy `places` jest niepuste i nie zacieni to UX dla pierwszego
- * uruchomienia, gdy lista jest pusta.
- */
 private val DEFAULT_CAMERA_TARGET = LatLng(52.2297, 21.0122)
 private const val DEFAULT_CAMERA_ZOOM = 11f
-
-/** Zoom kamery po wciśnięciu "Blisko mnie" – poziom dzielnicy. */
 private const val NEAR_ME_ZOOM = 14f
-
-/**
- * Zoom kamery po dodaniu nowego miejsca – bliżej niż "Blisko mnie", żeby
- * świeży pin był wyraźnie widoczny pośrodku ekranu z otoczeniem ulicznym.
- */
 private const val FOCUS_PLACE_ZOOM = 16f
 private const val MIN_CLUSTER_SIZE = 2
 private const val CLUSTER_FIT_BOUNDS_PADDING_PX = 96
@@ -139,29 +117,6 @@ private const val SPIDERFY_RADIUS_DEGREES = 0.00012
 private const val SPIDERFY_RADIUS_STEP_DEGREES = 0.000015
 private const val SPIDERFY_MAX_EXTRA = 8
 
-/**
- * Ekran mapy z pinezkami miejsc.
- *
- *  - Pinezki i klastry obsługuje maps-compose-utils [Clustering] z własnym
- *    lekkim rendererem bitmapowym. Dzięki temu algorytm klastrowania działa
- *    poza UI, a mapa nie renderuje setek composable do bitmap przy zoomie.
- *  - Filtry na overlayu nad mapą: kategoria + przełącznik "Najlepiej oceniane".
- *  - Natywne kontrolki Maps SDK: przycisk "Moja lokalizacja" (top-right) i
- *    zoom +/- (bottom-right) – żeby mapa wyglądała "po Google'owemu".
- *    Kontrolki są przesunięte przez `contentPadding`, żeby nie wpadały pod
- *    globalny `+` FAB z [com.kidzone.presentation.main.MainScreen].
- *  - Permission ACCESS_FINE_LOCATION jest proszona automatycznie przy
- *    pierwszym wejściu na ekran ([LaunchedEffect]) – natywny crosshair
- *    pokaże się dopiero gdy `isMyLocationEnabled == true`.
- *  - Klik pinezki otwiera [ModalBottomSheet] z miniaturą + nazwą + adresem
- *    + przyciskiem "Zobacz szczegóły".
- *
- * Adnotacja [SuppressLint] – Lint nie potrafi prześledzić, że
- * `MapProperties.isMyLocationEnabled = locationPermissionGranted` jest
- * ustawiane tylko gdy uprawnienie faktycznie zostało nadane (sprawdzamy
- * w runtime). [MapsComposeExperimentalApi] – wymagane przez
- * maps-compose-utils [Clustering].
- */
 @SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -176,10 +131,6 @@ fun MapScreen(
     val scope = rememberCoroutineScope()
     val gpsEnabled = rememberLocationServiceEnabled()
 
-    // Trzymamy lokalnie, bo musimy reagować na nadanie uprawnienia bez
-    // restartu ekranu. Wartość początkowa = stan systemowy w chwili pierwszej
-    // kompozycji (gdy user już raz zezwolił, native crosshair od razu jest
-    // widoczny bez dodatkowego dialogu).
     var locationPermissionGranted by remember { mutableStateOf(hasLocationPermission(context)) }
 
     val cameraPositionState = rememberCameraPositionState {
@@ -198,11 +149,6 @@ fun MapScreen(
         onViewportChanged = viewModel::onViewportChanged
     )
 
-    // Po pomyślnym `addPlace` parent przekazuje współrzędne nowego miejsca
-    // przez [focusOn] – animujemy kamerę na ten punkt na poziomie
-    // [FOCUS_PLACE_ZOOM] (bliżej niż domyślny widok miasta, żeby nowy pin
-    // był wyraźnie widoczny). Po skończonej animacji konsumujemy sygnał,
-    // żeby przy zmianie konfiguracji / rekompozycji nie nawigować ponownie.
     LaunchedEffect(focusOn) {
         focusOn?.let { target ->
             cameraPositionState.animate(
@@ -217,9 +163,6 @@ fun MapScreen(
     ) { granted ->
         locationPermissionGranted = granted
         if (granted) {
-            // Nadanie uprawnienia = jasny sygnał "chcę się znaleźć", więc
-            // sami centrujemy kamerę. Native crosshair user może później
-            // używać do "wróć do mnie" po przewinięciu mapy.
             scope.launch {
                 recenterOnUser(
                     context = context,
@@ -230,16 +173,6 @@ fun MapScreen(
         }
     }
 
-    // Auto-prośba o uprawnienie tylko jeśli go jeszcze nie mamy. Wchodząc
-    // na zakładkę "Mapa" user wyraża jasną intencję chęci zobaczenia siebie
-    // na mapie – timing dialogu jest naturalny. Jeśli wcześniej trwale
-    // odmówił, system po cichu zwróci `granted=false` bez UI.
-    //
-    // Jeśli uprawnienie JUŻ jest – od razu centrujemy kamerę na bieżącej
-    // lokalizacji, żeby user widział najbliższe miejsca bez ręcznego
-    // klikania natywnego "Moja lokalizacja". Pomijamy to gdy nadszedł
-    // sygnał `focusOn` (przyszliśmy tu z "właśnie dodałem miejsce") –
-    // tam kamera ma jechać na nowy pin, nie na usera.
     LaunchedEffect(Unit) {
         if (!locationPermissionGranted) {
             locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -252,10 +185,6 @@ fun MapScreen(
         }
     }
 
-    // Gdy user wraca z systemowych ustawień appki (gdzie ręcznie nadał lub
-    // odebrał uprawnienie), Activity wraca w stan RESUMED. Wtedy odświeżamy
-    // `locationPermissionGranted` z systemu, żeby banner automatycznie
-    // zniknął bez potrzeby restartu zakładki Mapa.
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -279,21 +208,14 @@ fun MapScreen(
                 isMyLocationEnabled = locationPermissionGranted
             ),
             uiSettings = MapUiSettings(
-                // Wyłączamy natywny przycisk lokalizacji – zamiast niego
-                // wyświetlamy własny Compose FAB (`MapMyLocationButton`) w
-                // prawym górnym rogu, co daje pełną kontrolę nad stylem i
-                // zachowaniem (np. wyzwalanie permission launchera).
                 myLocationButtonEnabled = false,
-                // Wyłączamy natywne +/- i implementujemy własne w Compose, 
-                // aby móc pozycjonować je niezależnie od logo Google.
                 zoomControlsEnabled = false,
                 mapToolbarEnabled = false,
                 compassEnabled = true
             ),
-            // Ustawiamy mały padding, aby logo Google było nisko (zgodnie z życzeniem 4-6dp).
+            // Logo Google nisko na krawędzi (6dp)
             contentPadding = PaddingValues(bottom = 6.dp),
             onMapLoaded = { mapLoaded = true },
-            // Tap w pustą część mapy = zamykamy bottom sheet (jeśli otwarty).
             onMapClick = {
                 userTouchedMap = true
                 viewModel.onPlaceSelected(null)
@@ -306,8 +228,6 @@ fun MapScreen(
             )
 
             if (clusterManager != null && clusterRenderer != null) {
-                // KLUCZOWE: Konfiguracja renderera i listenerów. 
-                // Usunięcie key() i SideEffect zapobiega znikaniu markerów przy zoomie.
                 LaunchedEffect(clusterManager, clusterRenderer) {
                     clusterManager.renderer = clusterRenderer
                     clusterManager.setOnClusterClickListener { cluster ->
@@ -325,14 +245,15 @@ fun MapScreen(
                     }
                 }
 
-                Clustering(
-                    items = clusterItems,
-                    clusterManager = clusterManager
-                )
+                androidx.compose.runtime.key(clusterItems) {
+                    Clustering(
+                        items = clusterItems,
+                        clusterManager = clusterManager
+                    )
+                }
             }
         }
 
-        // --- Overlay z filtrami + (opcjonalnie) banner permission u góry ---
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -346,9 +267,6 @@ fun MapScreen(
                         locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                     },
                     onOpenSettingsClick = {
-                        // Fallback dla "permanently denied" – w tym stanie launcher.launch()
-                        // nic nie zrobi (callback wraca z false bez UI). Przerzucamy usera
-                        // do systemowych Ustawień appki, gdzie zawsze może włączyć Location.
                         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                             data = Uri.fromParts("package", context.packageName, null)
                         }
@@ -372,17 +290,12 @@ fun MapScreen(
             )
         }
 
-        // --- Stany pomocnicze: spinner przy pierwszym ładowaniu i błąd ---
         if (state.isLoading && state.places.isEmpty()) {
             CircularProgressIndicator(
                 modifier = Modifier.align(Alignment.Center)
             )
         }
 
-        // --- Custom "Moja lokalizacja" FAB ---
-        // Zastępuje natywny przycisk Maps SDK, żeby mieć pełną kontrolę
-        // nad wyglądem, pozycjonowaniem i zachowaniem (np. automatyczne
-        // wyzwalanie permission launchera gdy uprawnienie nie jest nadane).
         MapMyLocationButton(
             onClick = {
                 if (locationPermissionGranted) {
@@ -395,17 +308,14 @@ fun MapScreen(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(top = 8.dp, end = 8.dp)
-                // Offset w dół, żeby nie kolidować z filtrami overlay
                 .offset(y = 160.dp)
         )
 
-        // --- Custom Zoom Controls ---
-        // Pozwalają na podniesienie przycisków +/- wyżej, podczas gdy logo 
-        // Google (atrybucja) pozostaje nisko na ekranie.
+        // Customowe przyciski zoom +/- na stałej, dobrej wysokości (180dp)
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 12.dp, bottom = 180.dp), // Przyciski +/- na poprzedniej, dobrej wysokości
+                .padding(end = 12.dp, bottom = 180.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             MapIconButton(
@@ -432,8 +342,6 @@ fun MapScreen(
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    // Bottom padding > FAB + bottom nav, żeby błąd nie
-                    // chował się pod kontrolkami.
                     .padding(start = 16.dp, end = 88.dp, bottom = 96.dp),
                 color = MaterialTheme.colorScheme.errorContainer,
                 shape = MaterialTheme.shapes.medium,
@@ -449,7 +357,6 @@ fun MapScreen(
         }
     }
 
-    // --- Bottom sheet z podglądem klikniętej pinezki ---
     if (selectedPlace != null) {
         ModalBottomSheet(
             onDismissRequest = { viewModel.onPlaceSelected(null) },
@@ -459,9 +366,6 @@ fun MapScreen(
                 place = selectedPlace,
                 onOpenDetails = {
                     onOpenPlaceDetails(selectedPlace.id)
-                    // Zamykamy zaznaczenie tu, żeby po powrocie z details
-                    // sheet nie wyświetlił się ponownie (bo selectedPlaceId
-                    // jest trzymany w VM i przeżyje config change).
                     viewModel.onPlaceSelected(null)
                 }
             )
@@ -472,13 +376,11 @@ fun MapScreen(
 internal data class PlaceClusterItem(
     val place: Place,
     private val markerPosition: LatLng
-) : ClusterItem {
+) : com.google.maps.android.clustering.ClusterItem {
     override fun getPosition(): LatLng = markerPosition
     override fun getTitle(): String = place.name
     override fun getSnippet(): String? = place.address.takeIf { it.isNotBlank() }
     override fun getZIndex(): Float? = null
-    
-    // KLUCZOWE: hashCode i equals oparte na id miejsca, aby Clustering nie migał
     override fun hashCode(): Int = place.id.hashCode()
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -577,8 +479,8 @@ private class PlaceClusterRenderer(
     override fun shouldRenderAsCluster(cluster: Cluster<PlaceClusterItem>): Boolean {
         val zoom = googleMap.cameraPosition.zoom
         return when {
-            zoom > 15f -> cluster.size >= 10 // Przy dużym zbliżeniu (ulica) - wolimy osobne ikony pinezek
-            else -> cluster.size >= MIN_CLUSTER_SIZE // Przy oddaleniu (miasto/kraj) - wolimy kółeczka z cyframi
+            zoom > 15f -> cluster.size >= 10
+            else -> cluster.size >= MIN_CLUSTER_SIZE
         }
     }
 
@@ -611,12 +513,6 @@ private class PlaceClusterRenderer(
     }
 }
 
-internal fun clusterCountLabel(count: Int): String = when {
-    count >= 100 -> "100+"
-    count > 10 -> "${(count / 10) * 10}+"
-    else -> count.toString()
-}
-
 @OptIn(kotlinx.coroutines.FlowPreview::class)
 @Composable
 private fun ReportSettledViewport(
@@ -645,19 +541,6 @@ private fun ReportSettledViewport(
     }
 }
 
-/**
- * Banner widoczny gdy user nie ma jeszcze nadanego uprawnienia
- * [Manifest.permission.ACCESS_FINE_LOCATION] – tłumaczy dlaczego niebieska
- * kropka "gdzie jestem" się nie pojawia, i daje dwie ścieżki naprawy:
- *
- *  - **"Pozwól"** – ponawia systemowy dialog uprawnień. Działa, gdy user
- *    odmówił raz (Don't allow). Jeśli wybrał "Don't ask again" /
- *    "permanently denied", dialog się nie pokaże – wtedy zostaje przycisk
- *    "Ustawienia".
- *  - **"Ustawienia"** – otwiera stronę ustawień appki w systemie, gdzie
- *    user zawsze może ręcznie włączyć Location. Po powrocie banner
- *    znika automatycznie dzięki `DisposableEffect` na ON_RESUME w callsite.
- */
 @Composable
 private fun LocationPermissionBanner(
     onAllowClick: () -> Unit,
@@ -709,15 +592,6 @@ private fun LocationPermissionBanner(
     }
 }
 
-/**
- * Pasek z chipami filtrów nad mapą – wystylowany jako lekko podniesiona
- * powierzchnia, żeby był czytelny zarówno na jasnym, jak i ciemnym tle mapy.
- *
- * Drugi rząd zawiera dodatkowe filtry boolean:
- *  - "Najlepiej oceniane" – zawsze widoczny,
- *  - "Dodane przez Ciebie" – tylko gdy [showAddedByMeChip] = true (czyli
- *    user jest zalogowany; dla wylogowanego chip nie ma sensu).
- */
 @Composable
 private fun FiltersOverlay(
     selectedCategory: PlaceCategory?,
@@ -729,9 +603,6 @@ private fun FiltersOverlay(
     onToggleAddedByMe: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Kolejność jak w enum PlaceCategory (świadomie nie alfabetycznie –
-    // logiczne grupowanie: place zabaw → sale → kawiarnia/restauracja →
-    // park → atrakcje → inne). Spójnie z PlaceListScreen.
     val orderedCategories = PlaceCategory.entries
 
     Surface(
@@ -742,7 +613,6 @@ private fun FiltersOverlay(
         shadowElevation = 4.dp
     ) {
         Column(modifier = Modifier.padding(vertical = 6.dp)) {
-            // Rząd 1: kategoria (single-select, "Wszystkie" na początku jako reset).
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -772,9 +642,6 @@ private fun FiltersOverlay(
                 }
             }
 
-            // Rząd 2: dodatkowe toggle. Scrollowany horyzontalnie, żeby
-            // przy włączeniu obu chipów + węższym ekranie nic się nie chowało
-            // za krawędź.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -799,7 +666,7 @@ private fun FiltersOverlay(
                 if (showAddedByMeChip) {
                     FilterChip(
                         selected = addedByMeOnly,
-                        onClick = onToggleAddedByMe,
+                        onClick = { onToggleAddedByMe() },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Filled.Person,
@@ -816,17 +683,6 @@ private fun FiltersOverlay(
     }
 }
 
-/**
- * Treść `ModalBottomSheet` – wystarczająco bogata, żeby user mógł zdecydować
- * "klikam dalej czy nie", ale na tyle zwięzła, żeby nie konkurować z pełnym
- * ekranem szczegółów.
- *
- * Zawiera:
- *  - miniaturkę (pierwsze zdjęcie z `photoUrls`, przez Coil) – jeżeli jest,
- *  - nazwę + chip kategorii + ocenę,
- *  - adres,
- *  - CTA "Zobacz szczegóły".
- */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun PlacePreviewContent(
@@ -841,8 +697,6 @@ private fun PlacePreviewContent(
             .padding(horizontal = 16.dp)
             .padding(bottom = 16.dp)
     ) {
-        // Miniaturka pojawia się tylko wtedy, gdy faktycznie jest – inaczej
-        // sheet się "kurczy" do samego tekstu i nie ma pustego prostokąta.
         if (place.photoUrls.isNotEmpty()) {
             AsyncImage(
                 model = place.photoUrls.first(),
@@ -966,20 +820,6 @@ private fun MapIconButton(
     }
 }
 
-/**
- * Custom "Moja lokalizacja" FAB – zamiennik natywnego przycisku Maps SDK.
- *
- * Zalety vs natywny:
- *  - Pełna kontrola nad wyglądem (Material 3, brand colors).
- *  - Możliwość wyzwolenia permission launchera z poziomu onClick (natywny
- *    button wymaga `isMyLocationEnabled = true`, więc nie działa bez
- *    uprawnienia).
- *  - Swobodne pozycjonowanie w layoutcie Compose (bez walki z
- *    `contentPadding` mapy).
- *
- * Wizualnie: mała okrągła powierzchnia z ikoną crosshair-a, lekko
- * podniesiona (shadow), żeby odcinać się od tła mapy.
- */
 @Composable
 private fun MapMyLocationButton(
     onClick: () -> Unit,
@@ -1004,17 +844,6 @@ private fun MapMyLocationButton(
     }
 }
 
-/**
- * Centruje kamerę na bieżącej lokalizacji użytkownika z [NEAR_ME_ZOOM].
- *
- * Best-effort – jeżeli urządzenie nie ma fixu (np. emulator bez ustawionej
- * lokalizacji), nie robimy nic. Świadomie nie pokazujemy w tym miejscu
- * Toastu, żeby nie blokować threadu UI; user widzi po prostu, że nic się
- * nie zmieniło – w kolejnej iteracji można dorzucić Snackbar.
- *
- * Wymaga [Manifest.permission.ACCESS_FINE_LOCATION] – callsite musi to
- * zweryfikować przez [hasLocationPermission].
- */
 private suspend fun recenterOnUser(
     context: Context,
     cameraPositionState: CameraPositionState,
