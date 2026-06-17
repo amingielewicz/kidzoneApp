@@ -29,6 +29,8 @@ import {
   collection,
   addDoc,
   writeBatch,
+  arrayUnion,
+  deleteField,
 } from 'firebase/firestore';
 
 const PROJECT_ID = 'kidzone-rules-test';
@@ -236,6 +238,47 @@ describe('Users collection', () => {
     await assertFails(
       updateDoc(doc(db, 'users', 'user1'), { fcmTokens: ['token-1'] }),
     );
+  });
+
+  it('allows owner to delete legacy public FCM tokens only', async () => {
+    const createdAtMillis = Date.now();
+    await seedUser('user1', { createdAtMillis, fcmTokens: ['token-1'] });
+    const db = authedDb('user1');
+
+    await assertSucceeds(
+      setDoc(doc(db, 'users', 'user1'), {
+        name: 'Test User',
+        placesAddedCount: 0,
+        reviewsCount: 0,
+        role: 'user',
+        createdAtMillis,
+      }),
+    );
+  });
+
+  it('allows token registration batch to write private token and delete public legacy field', async () => {
+    const createdAtMillis = Date.now();
+    await seedUser('user1', { createdAtMillis, fcmTokens: ['legacy-token'] });
+    const db = authedDb('user1');
+    const batch = writeBatch(db);
+    batch.set(
+      doc(db, 'users', 'user1', 'private', 'messaging'),
+      {
+        userId: 'user1',
+        fcmTokens: arrayUnion('new-token'),
+        updatedAtMillis: Date.now(),
+      },
+      { merge: true },
+    );
+    batch.set(
+      doc(db, 'users', 'user1'),
+      {
+        fcmTokens: deleteField(),
+      },
+      { merge: true },
+    );
+
+    await assertSucceeds(batch.commit());
   });
 
   it('allows admin to update any user', async () => {

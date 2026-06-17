@@ -101,19 +101,7 @@ class KidZoneMessagingService : FirebaseMessagingService() {
 
     private fun saveTokenToFirestore(token: String) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        FirebaseFirestore.getInstance()
-            .collection("users")
-            .document(uid)
-            .collection("private")
-            .document("messaging")
-            .set(
-                mapOf(
-                    "userId" to uid,
-                    "fcmTokens" to FieldValue.arrayUnion(token),
-                    "updatedAtMillis" to System.currentTimeMillis()
-                ),
-                SetOptions.merge()
-            )
+        saveTokenToPrivateMessaging(uid, token)
     }
 
     /**
@@ -139,19 +127,7 @@ class KidZoneMessagingService : FirebaseMessagingService() {
             com.google.firebase.messaging.FirebaseMessaging.getInstance().token
                 .addOnSuccessListener { token ->
                     val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@addOnSuccessListener
-                    FirebaseFirestore.getInstance()
-                        .collection("users")
-                        .document(uid)
-                        .collection("private")
-                        .document("messaging")
-                        .set(
-                            mapOf(
-                                "userId" to uid,
-                                "fcmTokens" to FieldValue.arrayUnion(token),
-                                "updatedAtMillis" to System.currentTimeMillis()
-                            ),
-                            SetOptions.merge()
-                        )
+                    saveTokenToPrivateMessaging(uid, token)
                 }
         }
 
@@ -166,6 +142,27 @@ class KidZoneMessagingService : FirebaseMessagingService() {
                         .document("messaging")
                         .update("fcmTokens", FieldValue.arrayRemove(token))
                 }
+        }
+
+        private fun saveTokenToPrivateMessaging(uid: String, token: String) {
+            val firestore = FirebaseFirestore.getInstance()
+            val userRef = firestore.collection("users").document(uid)
+            val batch = firestore.batch()
+            batch.set(
+                userRef.collection("private").document("messaging"),
+                mapOf(
+                    "userId" to uid,
+                    "fcmTokens" to FieldValue.arrayUnion(token),
+                    "updatedAtMillis" to System.currentTimeMillis()
+                ),
+                SetOptions.merge()
+            )
+            batch.set(
+                userRef,
+                mapOf("fcmTokens" to FieldValue.delete()),
+                SetOptions.merge()
+            )
+            batch.commit()
         }
     }
 }
