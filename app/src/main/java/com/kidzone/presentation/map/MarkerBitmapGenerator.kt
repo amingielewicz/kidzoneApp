@@ -59,7 +59,6 @@ fun rememberMarkerIcons(): MarkerIconCache {
     LaunchedEffect(cache, painters) {
         PlaceCategory.entries.forEach { category ->
             val painter = painters[category] ?: return@forEach
-            // Zmniejszony rozmiar (36dp) dla lepszej czytelności i braku kolizji
             val sizePx = with(density) { 36.dp.toPx() }.toInt()
             val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
@@ -124,7 +123,6 @@ class MarkerIconCache(
     }
 
     private fun createClusterBitmap(label: String): BitmapDescriptor {
-        // Zmniejszony klaster (40dp)
         val sizePx = with(density) { 40.dp.toPx() }.toInt()
         val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -157,4 +155,10 @@ class MarkerIconCache(
 
         return BitmapDescriptorFactory.fromBitmap(bitmap)
     }
+}
+
+internal fun clusterCountLabel(count: Int): String = when {
+    count < 10 -> count.toString()
+    count >= 100 -> "100+"
+    else -> "${(count / 10) * 10}+"
 }
