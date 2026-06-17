@@ -12,11 +12,31 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && request.auth.token.admin == true;
+      return isSignedIn()
+        && request.auth.token.keys().hasAny(['admin'])
+        && request.auth.token.admin == true;
     }
 
     function isNotUpdating(fields) {
       return !(request.resource.data.diff(resource.data).affectedKeys().hasAny(fields));
+    }
+
+    function hasNoPrivateUserFields() {
+      return !request.resource.data.keys().hasAny([
+        'email',
+        'firstName',
+        'lastName',
+        'emailNotificationsEnabled'
+      ]);
+    }
+
+    function isReportCollection(collectionName) {
+      return collectionName in [
+        'place_reports',
+        'review_reports',
+        'photo_reports',
+        'place_change_requests'
+      ];
     }
 
     match /users/{userId} {
@@ -24,7 +44,8 @@ service cloud.firestore {
 
       allow create: if isOwner(userId)
         && request.resource.data.role == 'user'
-        && request.resource.data.placesAddedCount == 0;
+        && request.resource.data.placesAddedCount == 0
+        && hasNoPrivateUserFields();
 
       allow update: if (isOwner(userId)
           && isNotUpdating([
@@ -74,6 +95,7 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.rating >= 1
         && request.resource.data.rating <= 5
+        && exists(/databases/$(database)/documents/places/$(request.resource.data.placeId))
         && get(/databases/$(database)/documents/places/$(request.resource.data.placeId)).data.ownerUserId != request.auth.uid;
 
       allow update: if isAdmin() || (isOwner(resource.data.userId) && isNotUpdating(['userId', 'placeId']));
@@ -82,12 +104,15 @@ service cloud.firestore {
     }
 
     match /{reportCollection}/{reportId} {
-      allow create: if isSignedIn() && request.resource.data.reporterId == request.auth.uid;
-      allow read: if isAdmin() || (isSignedIn() && resource.data.reporterId == request.auth.uid);
-      allow update, delete: if isAdmin();
+      allow create: if isReportCollection(reportCollection)
+        && isSignedIn()
+        && request.resource.data.reporterId == request.auth.uid;
+      allow read: if isReportCollection(reportCollection)
+        && (isAdmin() || (isSignedIn() && resource.data.reporterId == request.auth.uid));
+      allow update, delete: if isReportCollection(reportCollection) && isAdmin();
 
       match /placeholder {
-        allow read: if reportCollection in ['place_reports', 'review_reports', 'photo_reports', 'place_change_requests'];
+        allow read: if isReportCollection(reportCollection);
       }
     }
   }
