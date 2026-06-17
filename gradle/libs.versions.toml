@@ -21,6 +21,7 @@ hiltNavigationCompose = "1.2.0"
 # Firebase
 firebaseBom = "33.4.0"
 firebaseCrashlyticsPlugin = "3.0.2"
+firebasePerfPlugin = "2.0.2"
 
 # Google Maps
 mapsCompose = "4.4.1"
@@ -186,4 +187,5 @@ hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }
+firebase-perf = { id = "com.google.firebase.firebase-perf", version.ref = "firebasePerfPlugin" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
