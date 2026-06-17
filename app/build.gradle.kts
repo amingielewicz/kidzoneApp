@@ -224,6 +224,7 @@ dependencies {
 
     // Google Maps
     implementation(libs.maps.compose)
+    implementation("com.google.maps.android:maps-compose-utils:4.4.1")
     implementation(libs.play.services.maps)
     implementation(libs.play.services.location)
 

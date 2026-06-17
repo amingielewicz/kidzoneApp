@@ -289,8 +289,8 @@ class MapViewModel @Inject constructor(
          * gdy bazka miejsc urośnie.
          */
         const val TOP_RATED_THRESHOLD = 4.0
-        const val MAP_MARKERS_LIMIT = 200
-        const val VIEWPORT_DEBOUNCE_MS = 450L
+        const val MAP_MARKERS_LIMIT = 1000
+        const val VIEWPORT_DEBOUNCE_MS = 300L
         const val VIEWPORT_CACHE_TTL_MS = 5 * 60 * 1000L
         const val VIEWPORT_CACHE_SIZE = 12
         const val MAP_ERROR_FALLBACK = "Nie udało się wczytać miejsc na mapie"
