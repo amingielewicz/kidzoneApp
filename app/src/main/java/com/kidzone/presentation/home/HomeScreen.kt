@@ -36,7 +36,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -74,6 +73,8 @@ import com.kidzone.presentation.common.GpsDisabledBanner
 import com.kidzone.presentation.common.KidZoneCard
 import com.kidzone.presentation.common.KidZoneRadii
 import com.kidzone.presentation.common.KidZoneSpacing
+import com.kidzone.presentation.common.NewPlaceBadge
+import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.shimmerEffect
 
@@ -81,8 +82,6 @@ private val PLACE_ROW_HEIGHT = 136.dp
 private val PLACE_CARD_WIDTH = 164.dp
 private val PLACE_CARD_ICON_SIZE = 28.dp
 private val PLACE_CARD_CONTENT_PADDING = 12.dp
-private const val NEW_PLACE_WINDOW_DAYS = 14L
-private const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
 
 private data class HomePlaceItem(
     val place: Place,
@@ -583,29 +582,6 @@ private fun formatDistance(km: Double): String = when {
     }
     km < 100.0 -> "%.1f km".format(km)
     else -> "%d km".format(km.toInt())
-}
-
-private fun Place.isNewWithoutReviews(nowMillis: Long = System.currentTimeMillis()): Boolean {
-    if (reviewsCount > 0 || createdAtMillis <= 0L) return false
-
-    val ageMillis = nowMillis - createdAtMillis
-    return ageMillis in 0..(NEW_PLACE_WINDOW_DAYS * MILLIS_PER_DAY)
-}
-
-@Composable
-private fun NewPlaceBadge() {
-    Surface(
-        shape = RoundedCornerShape(KidZoneRadii.Badge),
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-    ) {
-        Text(
-            text = "Nowe",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-        )
-    }
 }
 
 /**
