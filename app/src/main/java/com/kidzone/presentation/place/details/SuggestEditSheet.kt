@@ -39,6 +39,7 @@ import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.presentation.common.style
+import com.kidzone.presentation.place.add.PLACE_NAME_MAX_LENGTH
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -82,9 +83,12 @@ fun SuggestEditSheet(
 
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it },
+                onValueChange = { name = it.take(PLACE_NAME_MAX_LENGTH) },
                 label = { Text("Nazwa miejsca") },
                 singleLine = true,
+                supportingText = {
+                    Text("${name.length}/$PLACE_NAME_MAX_LENGTH")
+                },
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                 modifier = Modifier.fillMaxWidth()
             )

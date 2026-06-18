@@ -179,6 +179,16 @@ class AddPlaceViewModelTest {
         }
 
         @Test
+        fun `onNameChange limits name to max length`() = runTest {
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.onNameChange("A".repeat(PLACE_NAME_MAX_LENGTH + 1))
+
+            assertEquals(PLACE_NAME_MAX_LENGTH, viewModel.uiState.value.name.length)
+        }
+
+        @Test
         fun `onDescriptionChange updates description`() = runTest {
             val viewModel = createViewModel()
             advanceUntilIdle()

@@ -11,6 +11,7 @@ import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.repository.ReviewRepository
 import com.kidzone.domain.service.ImageCompressorPort
 import com.kidzone.navigation.Route
+import com.kidzone.presentation.place.add.PLACE_NAME_MAX_LENGTH
 import com.kidzone.review.InAppReviewManager
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.PhotoUploader
@@ -838,7 +839,8 @@ class PlaceDetailsViewModel @Inject constructor(
         val place = _uiState.value.place ?: return
         val user = currentUser.value ?: return
         val changes = mutableMapOf<String, Any>()
-        if (name.trim() != place.name) changes["name"] = name.trim()
+        val trimmedName = name.trim().take(PLACE_NAME_MAX_LENGTH).trim()
+        if (trimmedName != place.name) changes["name"] = trimmedName
         if (description.trim() != place.description) changes["description"] = description.trim()
         if (category != place.category.name) changes["category"] = category
         if (amenities != place.amenities.map { it.name }.toSet()) {

@@ -721,7 +721,8 @@ private fun PlacePreviewContent(
                 Text(
                     text = place.name,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2
                 )
                 Text(
                     text = stringResource(place.category.labelRes),

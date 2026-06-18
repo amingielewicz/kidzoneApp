@@ -272,6 +272,9 @@ fun AddPlaceScreen(
                 onValueChange = viewModel::onNameChange,
                 label = { RequiredFieldLabel("Nazwa miejsca") },
                 singleLine = true,
+                supportingText = {
+                    Text("${state.name.length}/$PLACE_NAME_MAX_LENGTH")
+                },
                 isError = state.name.isNotEmpty() && state.name.isBlank(),
                 enabled = !state.isSaving,
                 keyboardOptions = KeyboardOptions(

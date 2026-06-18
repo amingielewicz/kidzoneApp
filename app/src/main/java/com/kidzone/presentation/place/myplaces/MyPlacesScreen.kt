@@ -189,7 +189,8 @@ private fun MyPlaceCard(
                     Text(
                         text = place.name,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2
                     )
                     Spacer(Modifier.height(KidZoneSpacing.GapTiny))
                     CategoryBadge(category = place.category)

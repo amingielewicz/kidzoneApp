@@ -232,7 +232,9 @@ class AddPlaceViewModel @Inject constructor(
     }
 
     fun onNameChange(value: String) =
-        _uiState.update { it.copy(name = value, errorMessage = null) }
+        _uiState.update {
+            it.copy(name = value.take(PLACE_NAME_MAX_LENGTH), errorMessage = null)
+        }
 
     fun onDescriptionChange(value: String) =
         _uiState.update { it.copy(description = value, errorMessage = null) }
@@ -544,8 +546,11 @@ class AddPlaceViewModel @Inject constructor(
 
             val result = if (state.isEditMode && editingOriginal != null) {
                 val original = editingOriginal!!
+                val normalizedName = TextNormalization.toTitleCase(state.name)
+                    .take(PLACE_NAME_MAX_LENGTH)
+                    .trim()
                 val updated = original.copy(
-                    name = TextNormalization.toTitleCase(state.name),
+                    name = normalizedName,
                     description = TextNormalization.toSentenceCase(state.description),
                     category = state.category,
                     address = TextNormalization.toTitleCase(state.address),
@@ -558,10 +563,13 @@ class AddPlaceViewModel @Inject constructor(
                 )
                 placeRepository.updatePlace(updated)
             } else {
+                val normalizedName = TextNormalization.toTitleCase(state.name)
+                    .take(PLACE_NAME_MAX_LENGTH)
+                    .trim()
                 val newPlace = Place(
                     id = "",
                     ownerUserId = currentUser.id,
-                    name = TextNormalization.toTitleCase(state.name),
+                    name = normalizedName,
                     description = TextNormalization.toSentenceCase(state.description),
                     category = state.category,
                     latitude = state.latitude!!,
@@ -635,6 +643,9 @@ private const val DUPLICATE_RADIUS_METERS = 100
 
 /** Maksymalna liczba zdjęć na jedno miejsce. */
 const val MAX_PLACE_PHOTOS = 5
+
+/** Maksymalna długość nazwy miejsca widoczna w formularzach i zapisie. */
+const val PLACE_NAME_MAX_LENGTH = 100
 
 /** Odległość w km między dwoma punktami (formuła haversine). */
 private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
