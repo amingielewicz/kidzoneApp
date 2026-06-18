@@ -74,6 +74,7 @@ import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.SignInProvider
 import com.kidzone.presentation.common.BadgeRowItem
 import com.kidzone.presentation.common.BadgesRow
+import com.kidzone.presentation.common.KidZoneCard
 import com.kidzone.presentation.common.RankBadge
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.rememberHapticFeedback
@@ -361,10 +362,7 @@ private fun ProfileHeaderCard(
     userRank: Int?,
     onEdit: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
+    KidZoneCard(modifier = Modifier.fillMaxWidth()) {
         // Box zamiast samej Column - potrzebujemy warstwy do nakładki
         // (plakietka TOP w prawym górnym rogu) niezależnej od centralnej
         // kolumny z avatarem / nazwą / akcją "Edytuj profil".
@@ -1040,10 +1038,7 @@ private fun SectionCard(
     trailing: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
+    KidZoneCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (leadingIcon != null) {

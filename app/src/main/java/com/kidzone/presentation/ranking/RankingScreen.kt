@@ -1,8 +1,11 @@
+@file:Suppress("FunctionNaming", "TooManyFunctions")
+
 package com.kidzone.presentation.ranking
 
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,10 +25,13 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -63,10 +69,17 @@ import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.EmptyState
 import com.kidzone.presentation.common.KidZoneCard
+import com.kidzone.presentation.common.KidZoneRadii
 import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.chronologicalOrder
 import com.kidzone.presentation.common.shimmerEffect
+
+private const val PODIUM_FIRST_CONTAINER = 0xFFFFF8E1
+private const val PODIUM_FIRST_BORDER = 0xFFFFD54F
+private const val PODIUM_THIRD_CONTAINER = 0xFFFFF3E0
+private const val PODIUM_THIRD_BORDER = 0xFFD7A86E
+private const val PODIUM_SECOND_BORDER = 0xFFB0BEC5
 
 /**
  * Ranking miejsc i użytkowników.
@@ -186,7 +199,7 @@ private fun TopPlacesList(
         state = lazyListState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         items(items = places, key = { "ranking_${it.id}" }) { place ->
             val position = places.indexOf(place) + 1
@@ -220,7 +233,7 @@ private fun TopUsersList(
         state = lazyListState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
             Text(
@@ -250,9 +263,23 @@ private fun TopPlaceCard(
 ) {
     val categoryLabel = stringResource(place.category.labelRes)
     val addressLabel = place.address.takeIf { it.isNotBlank() }?.let { ", adres: $it" }.orEmpty()
+    val highlight = when (position) {
+        1 -> PodiumHighlight(
+            containerColor = Color(PODIUM_FIRST_CONTAINER),
+            borderColor = Color(PODIUM_FIRST_BORDER)
+        )
+        2 -> PodiumHighlight(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            borderColor = Color(PODIUM_SECOND_BORDER)
+        )
+        3 -> PodiumHighlight(
+            containerColor = Color(PODIUM_THIRD_CONTAINER),
+            borderColor = Color(PODIUM_THIRD_BORDER)
+        )
+        else -> null
+    }
 
-    KidZoneCard(
-        modifier = Modifier
+    val cardModifier = Modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
                 contentDescription = "Pozycja $position, ${place.name}, $categoryLabel$addressLabel, " +
@@ -263,9 +290,44 @@ private fun TopPlaceCard(
                 role = Role.Button,
                 onClick = onClick
             )
-    ) {
+
+    if (highlight == null) {
+        KidZoneCard(modifier = cardModifier) {
+            TopPlaceCardContent(
+                position = position,
+                place = place,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedContentScope = animatedContentScope
+            )
+        }
+    } else {
+        Card(
+            modifier = cardModifier,
+            shape = RoundedCornerShape(KidZoneRadii.Card),
+            colors = CardDefaults.cardColors(containerColor = highlight.containerColor),
+            border = BorderStroke(1.dp, highlight.borderColor),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            TopPlaceCardContent(
+                position = position,
+                place = place,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedContentScope = animatedContentScope
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun TopPlaceCardContent(
+    position: Int,
+    place: Place,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedContentScope: AnimatedContentScope? = null
+) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             PositionMedal(position = position)
@@ -286,7 +348,7 @@ private fun TopPlaceCard(
                     text = place.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 1
+                    maxLines = 2
                 )
                 if (place.address.isNotBlank()) {
                     Spacer(Modifier.height(KidZoneSpacing.GapTiny))
@@ -294,7 +356,7 @@ private fun TopPlaceCard(
                         text = place.address,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
+                        maxLines = 2
                     )
                 }
                 Spacer(Modifier.height(KidZoneSpacing.GapSmall))
@@ -323,7 +385,6 @@ private fun TopPlaceCard(
                 )
             }
         }
-    }
 }
 
 @Composable
@@ -339,15 +400,53 @@ private fun TopUserCard(
         "liczba odznak ${badges.size}"
     }
 
-    KidZoneCard(
-        modifier = Modifier
+    val highlight = when (position) {
+        1 -> PodiumHighlight(
+            containerColor = Color(PODIUM_FIRST_CONTAINER),
+            borderColor = Color(PODIUM_FIRST_BORDER)
+        )
+        2 -> PodiumHighlight(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            borderColor = Color(PODIUM_SECOND_BORDER)
+        )
+        3 -> PodiumHighlight(
+            containerColor = Color(PODIUM_THIRD_CONTAINER),
+            borderColor = Color(PODIUM_THIRD_BORDER)
+        )
+        else -> null
+    }
+
+    val cardModifier = Modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
                 contentDescription = "Pozycja $position, $userName, " +
                     "${user.placesAddedCount} miejsc, ${user.reviewsCount} opinii, $badgesLabel"
             }
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+
+    if (highlight == null) {
+        KidZoneCard(modifier = cardModifier) {
+            TopUserCardContent(position = position, user = user, badges = badges)
+        }
+    } else {
+        Card(
+            modifier = cardModifier,
+            shape = RoundedCornerShape(KidZoneRadii.Card),
+            colors = CardDefaults.cardColors(containerColor = highlight.containerColor),
+            border = BorderStroke(1.dp, highlight.borderColor),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            TopUserCardContent(position = position, user = user, badges = badges)
+        }
+    }
+}
+
+@Composable
+private fun TopUserCardContent(
+    position: Int,
+    user: User,
+    badges: List<UserBadge>
+) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PositionMedal(position = position)
                 Spacer(Modifier.width(12.dp))
@@ -358,7 +457,7 @@ private fun TopUserCard(
                         text = user.name.ifBlank { "U\u017Cytkownik" },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        maxLines = 1
+                        maxLines = 2
                     )
                     Text(
                         text = "${user.placesAddedCount} miejsc \u00B7 ${user.reviewsCount} opinii",
@@ -374,8 +473,12 @@ private fun TopUserCard(
                 )
             }
         }
-    }
 }
+
+private data class PodiumHighlight(
+    val containerColor: Color,
+    val borderColor: Color
+)
 
 @Composable
 private fun UserAvatar(user: User) {

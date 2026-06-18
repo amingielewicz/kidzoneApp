@@ -758,7 +758,8 @@ private fun PlaceCard(
                     Text(
                         text = place.name,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2
                     )
                     Spacer(Modifier.height(KidZoneSpacing.GapTiny))
                     CategoryBadge(category = place.category)
@@ -799,6 +800,7 @@ private fun PlaceCard(
                         text = place.address,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
                         modifier = Modifier.weight(1f)
                     )
                     // Odległość pokazujemy tylko gdy aktywne sortowanie po

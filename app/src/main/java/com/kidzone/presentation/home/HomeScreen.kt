@@ -564,7 +564,7 @@ private fun PlaceCard(
                         text = place.name,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
-                        maxLines = 1
+                        maxLines = 2
                     )
                     item.distanceKm?.let {
                         Spacer(Modifier.height(KidZoneSpacing.GapTiny))
