@@ -65,18 +65,20 @@ import com.google.android.gms.location.Priority
 import kotlinx.coroutines.tasks.await
 import com.kidzone.R
 import com.kidzone.domain.model.Place
+import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.GpsAcquiringBanner
 import com.kidzone.presentation.common.GpsDisabledBanner
+import com.kidzone.presentation.common.KidZoneCard
+import com.kidzone.presentation.common.KidZoneRadii
+import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.shimmerEffect
-import com.kidzone.presentation.common.style
 
-private val PLACE_ROW_HEIGHT = 148.dp
+private val PLACE_ROW_HEIGHT = 136.dp
 private val PLACE_CARD_WIDTH = 164.dp
-private val PLACE_CARD_HEADER_HEIGHT = 56.dp
 private val PLACE_CARD_ICON_SIZE = 28.dp
-private val PLACE_CARD_CONTENT_PADDING = 10.dp
+private val PLACE_CARD_CONTENT_PADDING = 12.dp
 
 /**
  * Ekran "Start" – pierwsza zakładka po zalogowaniu.
@@ -456,9 +458,8 @@ private fun HorizontalPlacesRow(
 }
 
 /**
- * Karta pojedynczego miejsca w sekcji – kafelek z kolorowym headerem
- * (kolor i ikona z [com.kidzone.presentation.common.style] dla danej
- * kategorii), nazwą, kategorią i oceną.
+ * Karta pojedynczego miejsca w sekcji – lekki kafelek z badge kategorii,
+ * nazwą i oceną.
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -472,33 +473,34 @@ private fun PlaceCard(
     // Prefix keys to avoid duplicates on the same screen (e.g. Nearby vs Top)
     val animationKey = if (keyPrefix.isBlank()) "" else "${keyPrefix}_"
 
-    Card(
+    KidZoneCard(
         modifier = Modifier
             .width(PLACE_CARD_WIDTH)
             .height(PLACE_ROW_HEIGHT)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            .clickable(onClick = onClick)
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            CategoryIcon(
-                category = place.category,
-                animationKey = "${animationKey}place_icon_${place.id}",
-                sharedTransitionScope = sharedTransitionScope,
-                animatedContentScope = animatedContentScope,
-                size = PLACE_CARD_HEADER_HEIGHT,
-                iconSize = PLACE_CARD_ICON_SIZE,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(PLACE_CARD_CONTENT_PADDING),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(PLACE_CARD_CONTENT_PADDING),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(KidZoneSpacing.GapSmall)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CategoryIcon(
+                        category = place.category,
+                        animationKey = "${animationKey}place_icon_${place.id}",
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedContentScope = animatedContentScope,
+                        size = PLACE_CARD_ICON_SIZE,
+                        iconSize = 18.dp
+                    )
+                    Spacer(Modifier.width(KidZoneSpacing.GapSmall))
+                    CategoryBadge(
+                        category = place.category,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
                 Column {
                     Text(
                         text = place.name,
@@ -506,31 +508,24 @@ private fun PlaceCard(
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1
                     )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = stringResource(place.category.labelRes),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.Star,
-                        contentDescription = "Ocena",
-                        tint = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = if (place.reviewsCount == 0) {
-                            "—"
-                        } else {
-                            "%.1f (%d)".format(place.averageRating, place.reviewsCount)
-                        },
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = "Ocena",
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(KidZoneSpacing.GapTiny))
+                Text(
+                    text = if (place.reviewsCount == 0) {
+                        "—"
+                    } else {
+                        "%.1f (%d)".format(place.averageRating, place.reviewsCount)
+                    },
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }
@@ -541,21 +536,18 @@ private fun PlaceCard(
  */
 @Composable
 private fun PlaceCardSkeleton() {
-    Card(
+    KidZoneCard(
         modifier = Modifier
             .width(PLACE_CARD_WIDTH)
-            .height(PLACE_ROW_HEIGHT),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            .height(PLACE_ROW_HEIGHT)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(PLACE_CARD_HEADER_HEIGHT)
+                    .height(44.dp)
+                    .padding(PLACE_CARD_CONTENT_PADDING)
+                    .clip(RoundedCornerShape(KidZoneRadii.Control))
                     .shimmerEffect()
             )
             Column(

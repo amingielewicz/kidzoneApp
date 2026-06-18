@@ -26,8 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -57,11 +55,13 @@ import coil.compose.AsyncImage
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.User
 import com.kidzone.presentation.common.BadgesIconRow
+import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
+import com.kidzone.presentation.common.KidZoneCard
+import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.chronologicalOrder
 import com.kidzone.presentation.common.shimmerEffect
-import com.kidzone.presentation.common.style
 
 /**
  * Ranking miejsc i użytkowników.
@@ -247,11 +247,10 @@ private fun TopPlaceCard(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedContentScope: AnimatedContentScope? = null
 ) {
-    Card(
+    KidZoneCard(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            .clickable(onClick = onClick)
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -278,6 +277,7 @@ private fun TopPlaceCard(
                     maxLines = 1
                 )
                 if (place.address.isNotBlank()) {
+                    Spacer(Modifier.height(KidZoneSpacing.GapTiny))
                     Text(
                         text = place.address,
                         style = MaterialTheme.typography.bodySmall,
@@ -285,6 +285,8 @@ private fun TopPlaceCard(
                         maxLines = 1
                     )
                 }
+                Spacer(Modifier.height(KidZoneSpacing.GapSmall))
+                CategoryBadge(category = place.category)
             }
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End) {
@@ -318,9 +320,8 @@ private fun TopUserCard(
     user: User,
     badges: List<UserBadge>
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    KidZoneCard(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -414,9 +415,8 @@ private fun RankingSkeleton() {
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         repeat(8) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            KidZoneCard(
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     modifier = Modifier.padding(12.dp),

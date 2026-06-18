@@ -23,8 +23,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -38,13 +36,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.domain.model.Place
+import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
-import com.kidzone.presentation.common.style
+import com.kidzone.presentation.common.KidZoneCard
+import com.kidzone.presentation.common.KidZoneSpacing
 
 /**
  * Lista miejsc dodanych przez aktualnie zalogowanego usera.
@@ -170,13 +169,10 @@ private fun MyPlaceCard(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedContentScope: AnimatedContentScope? = null
 ) {
-    val categoryStyle = place.category.style
-
-    Card(
+    KidZoneCard(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            .clickable(onClick = onClick)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -188,18 +184,15 @@ private fun MyPlaceCard(
                     size = 28.dp,
                     iconSize = 18.dp
                 )
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(KidZoneSpacing.Gap))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = place.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Text(
-                        text = stringResource(place.category.labelRes),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Spacer(Modifier.height(KidZoneSpacing.GapTiny))
+                    CategoryBadge(category = place.category)
                 }
                 if (place.reviewsCount > 0) {
                     Row(verticalAlignment = Alignment.CenterVertically) {

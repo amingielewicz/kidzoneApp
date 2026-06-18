@@ -39,8 +39,6 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -81,8 +79,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.GpsDisabledBanner
+import com.kidzone.presentation.common.KidZoneCard
+import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.style
@@ -683,11 +684,10 @@ private fun PlaceCard(
     animatedContentScope: AnimatedContentScope? = null,
     animationSource: String? = "list"
 ) {
-    Card(
+    KidZoneCard(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            .clickable(onClick = onClick)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -699,18 +699,15 @@ private fun PlaceCard(
                     size = 28.dp,
                     iconSize = 18.dp
                 )
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(KidZoneSpacing.Gap))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = place.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Text(
-                        text = stringResource(place.category.labelRes),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Spacer(Modifier.height(KidZoneSpacing.GapTiny))
+                    CategoryBadge(category = place.category)
                 }
                 if (place.reviewsCount > 0) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -803,9 +800,8 @@ private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double):
 
 @Composable
 private fun PlaceRowSkeleton() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    KidZoneCard(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
