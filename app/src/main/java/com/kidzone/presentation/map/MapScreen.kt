@@ -806,7 +806,7 @@ private fun MapIconButton(
 ) {
     FloatingActionButton(
         onClick = onClick,
-        modifier = modifier.size(40.dp),
+        modifier = modifier.size(48.dp),
         shape = CircleShape,
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -827,7 +827,7 @@ private fun MapMyLocationButton(
 ) {
     FloatingActionButton(
         onClick = onClick,
-        modifier = modifier.size(44.dp),
+        modifier = modifier.size(48.dp),
         shape = CircleShape,
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.primary,

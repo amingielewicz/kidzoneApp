@@ -53,6 +53,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -362,7 +365,14 @@ private fun OpenMapCta(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Otwórz mapę i zobacz miejsca w okolicy"
+            }
+            .clickable(
+                onClickLabel = "Otwórz mapę",
+                role = Role.Button,
+                onClick = onClick
+            ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer
@@ -484,6 +494,9 @@ private fun PlaceCard(
     keyPrefix: String = ""
 ) {
     val place = item.place
+    val categoryLabel = stringResource(place.category.labelRes)
+    val distanceLabel = item.distanceKm?.let { ", ${formatDistance(it)} od Ciebie" }.orEmpty()
+    val ratingLabel = place.ratingAccessibilityLabel()
     // Prefix keys to avoid duplicates on the same screen (e.g. Nearby vs Top)
     val animationKey = if (keyPrefix.isBlank()) "" else "${keyPrefix}_"
 
@@ -491,7 +504,14 @@ private fun PlaceCard(
         modifier = Modifier
             .width(PLACE_CARD_WIDTH)
             .height(PLACE_ROW_HEIGHT)
-            .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "${place.name}, $categoryLabel$distanceLabel, $ratingLabel"
+            }
+            .clickable(
+                onClickLabel = "Otwórz szczegóły miejsca",
+                role = Role.Button,
+                onClick = onClick
+            )
     ) {
         Column(
             modifier = Modifier
@@ -582,6 +602,12 @@ private fun formatDistance(km: Double): String = when {
     }
     km < 100.0 -> "%.1f km".format(km)
     else -> "%d km".format(km.toInt())
+}
+
+private fun Place.ratingAccessibilityLabel(): String = when {
+    reviewsCount > 0 -> "ocena %.1f, liczba opinii %d".format(averageRating, reviewsCount)
+    isNewWithoutReviews() -> "nowe miejsce bez opinii"
+    else -> "brak opinii"
 }
 
 /**

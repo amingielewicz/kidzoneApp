@@ -46,6 +46,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -247,10 +251,21 @@ private fun TopPlaceCard(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedContentScope: AnimatedContentScope? = null
 ) {
+    val categoryLabel = stringResource(place.category.labelRes)
+    val addressLabel = place.address.takeIf { it.isNotBlank() }?.let { ", adres: $it" }.orEmpty()
+
     KidZoneCard(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Pozycja $position, ${place.name}, $categoryLabel$addressLabel, " +
+                    "ocena %.1f, liczba opinii %d".format(place.averageRating, place.reviewsCount)
+            }
+            .clickable(
+                onClickLabel = "Otwórz szczegóły miejsca",
+                role = Role.Button,
+                onClick = onClick
+            )
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -320,8 +335,20 @@ private fun TopUserCard(
     user: User,
     badges: List<UserBadge>
 ) {
+    val userName = user.name.ifBlank { "Użytkownik" }
+    val badgesLabel = if (badges.isEmpty()) {
+        "brak odznak"
+    } else {
+        "liczba odznak ${badges.size}"
+    }
+
     KidZoneCard(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Pozycja $position, $userName, " +
+                    "${user.placesAddedCount} miejsc, ${user.reviewsCount} opinii, $badgesLabel"
+            }
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
