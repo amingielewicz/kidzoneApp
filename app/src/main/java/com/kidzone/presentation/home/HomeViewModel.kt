@@ -38,6 +38,12 @@ private const val TOP_PLACES_LIMIT = 20
  */
 private const val NEARBY_LIMIT = 20
 
+/** Ile nowych miejsc maksymalnie pokazujemy w sekcji "Ostatnio dodane". */
+private const val RECENTLY_ADDED_LIMIT = 10
+
+/** Zakres czasu dla sekcji "Ostatnio dodane w okolicy". */
+private const val RECENTLY_ADDED_WINDOW_MILLIS = 14L * 24L * 60L * 60L * 1000L
+
 /** Promień lokalnego rankingu "Top miejsca" (km). */
 private const val TOP_PLACES_RADIUS_KM = 10.0
 
@@ -52,13 +58,14 @@ private const val HOME_PLACES_FETCH_RADIUS_KM = 50.0
 /**
  * ViewModel ekranu Home (zakładka "Start" w bottom navigation).
  *
- * Trzyma dwa zestawy danych zależne od aktualnej lokalizacji:
+ * Trzyma zestawy danych zależne od aktualnej lokalizacji:
+ *  - **Ostatnio dodane w okolicy** – nowe miejsca z ostatnich 14 dni.
  *  - **Top miejsca** – 20 najlepiej ocenianych miejsc w promieniu
  *    [TOP_PLACES_RADIUS_KM] od użytkownika (lokalny ranking).
  *  - **Blisko Ciebie** – 20 najbliższych miejsc, bez względu na ocenę i liczbę
  *    opinii.
  *
- * Obie sekcje korzystają z jednego pobrania lokalizacji i jednego fetcha miejsc,
+ * Sekcje korzystają z jednego pobrania lokalizacji i jednego fetcha miejsc,
  * żeby nie dublować pracy FusedLocationProviderClient / Firestore.
  */
 @HiltViewModel
@@ -76,8 +83,10 @@ class HomeViewModel @Inject constructor(
     /**
      * @property topPlaces lokalny ranking najlepiej ocenianych miejsc w pobliżu
      * @property nearbyPlaces lista najbliższych miejsc bez względu na ocenę
+     * @property recentlyAddedPlaces nowe miejsca w okolicy z ostatnich 14 dni
      * @property isTopLoading true do zakończenia pierwszego fetcha topu
      * @property isNearbyLoading true gdy lecimy fetchem "blisko Ciebie"
+     * @property isRecentlyAddedLoading true gdy ładujemy sekcję nowych miejsc
      * @property isRefreshing true podczas pull-to-refresh (kręci spinner)
      * @property locationGranted true gdy user nadał ACCESS_*_LOCATION
      * @property errorMessage błąd ostatniego fetcha (top lub nearby)
@@ -85,8 +94,10 @@ class HomeViewModel @Inject constructor(
     data class UiState(
         val topPlaces: List<PlaceWithDistance> = emptyList(),
         val nearbyPlaces: List<PlaceWithDistance> = emptyList(),
+        val recentlyAddedPlaces: List<PlaceWithDistance> = emptyList(),
         val isTopLoading: Boolean = false,
         val isNearbyLoading: Boolean = false,
+        val isRecentlyAddedLoading: Boolean = false,
         val isRefreshing: Boolean = false,
         val locationGranted: Boolean = false,
         val errorMessage: String? = null,
@@ -114,7 +125,8 @@ class HomeViewModel @Inject constructor(
             it.copy(
                 locationGranted = granted,
                 isTopLoading = if (granted) it.isTopLoading else false,
-                isNearbyLoading = if (granted) it.isNearbyLoading else false
+                isNearbyLoading = if (granted) it.isNearbyLoading else false,
+                isRecentlyAddedLoading = if (granted) it.isRecentlyAddedLoading else false
             )
         }
         if (shouldLoad) loadLocationBasedPlaces()
@@ -160,27 +172,13 @@ class HomeViewModel @Inject constructor(
                     val placesWithDistance = result.data
                         .map { it to haversineKm(lat, lng, it.latitude, it.longitude) }
 
-                    val nearby = placesWithDistance
-                        .sortedBy { it.second }
-                        .take(NEARBY_LIMIT)
-                        .map { (place, distanceKm) -> PlaceWithDistance(place, distanceKm) }
-
-                    val topNearby = placesWithDistance
-                        .filter { (place, distanceKm) ->
-                            place.reviewsCount > 0 && distanceKm <= TOP_PLACES_RADIUS_KM
-                        }
-                        .sortedWith(
-                            compareByDescending<Pair<Place, Double>> { it.first.averageRating }
-                                .thenByDescending { it.first.reviewsCount }
-                                .thenBy { it.second }
-                        )
-                        .take(TOP_PLACES_LIMIT)
-                        .map { (place, distanceKm) -> PlaceWithDistance(place, distanceKm) }
+                    val homeSections = buildHomeSections(placesWithDistance)
 
                     _uiState.update {
                         it.copy(
-                            topPlaces = topNearby,
-                            nearbyPlaces = nearby,
+                            topPlaces = homeSections.topPlaces,
+                            nearbyPlaces = homeSections.nearbyPlaces,
+                            recentlyAddedPlaces = homeSections.recentlyAddedPlaces,
                             isRefreshing = false,
                             errorMessage = null
                         )
@@ -204,6 +202,7 @@ class HomeViewModel @Inject constructor(
                     locationGranted = false,
                     isTopLoading = false,
                     isNearbyLoading = false,
+                    isRecentlyAddedLoading = false,
                     isAcquiringLocation = false
                 )
             }
@@ -211,7 +210,12 @@ class HomeViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _uiState.update {
-                it.copy(isTopLoading = true, isNearbyLoading = true, errorMessage = null)
+                it.copy(
+                    isTopLoading = true,
+                    isNearbyLoading = true,
+                    isRecentlyAddedLoading = true,
+                    errorMessage = null
+                )
             }
 
             // Retry up to 3 times when GPS fix fails (weak signal, cold start).
@@ -233,8 +237,10 @@ class HomeViewModel @Inject constructor(
                     it.copy(
                         isTopLoading = false,
                         isNearbyLoading = false,
+                        isRecentlyAddedLoading = false,
                         topPlaces = emptyList(),
                         nearbyPlaces = emptyList(),
+                        recentlyAddedPlaces = emptyList(),
                         errorMessage = LOCATION_TIMEOUT_USER_MESSAGE
                     )
                 }
@@ -252,29 +258,16 @@ class HomeViewModel @Inject constructor(
                     val placesWithDistance = result.data
                         .map { it to haversineKm(lat, lng, it.latitude, it.longitude) }
 
-                    val nearby = placesWithDistance
-                        .sortedBy { it.second }
-                        .take(NEARBY_LIMIT)
-                        .map { (place, distanceKm) -> PlaceWithDistance(place, distanceKm) }
-
-                    val topNearby = placesWithDistance
-                        .filter { (place, distanceKm) ->
-                            place.reviewsCount > 0 && distanceKm <= TOP_PLACES_RADIUS_KM
-                        }
-                        .sortedWith(
-                            compareByDescending<Pair<Place, Double>> { it.first.averageRating }
-                                .thenByDescending { it.first.reviewsCount }
-                                .thenBy { it.second }
-                        )
-                        .take(TOP_PLACES_LIMIT)
-                        .map { (place, distanceKm) -> PlaceWithDistance(place, distanceKm) }
+                    val homeSections = buildHomeSections(placesWithDistance)
 
                     _uiState.update {
                         it.copy(
-                            topPlaces = topNearby,
-                            nearbyPlaces = nearby,
+                            topPlaces = homeSections.topPlaces,
+                            nearbyPlaces = homeSections.nearbyPlaces,
+                            recentlyAddedPlaces = homeSections.recentlyAddedPlaces,
                             isTopLoading = false,
-                            isNearbyLoading = false
+                            isNearbyLoading = false,
+                            isRecentlyAddedLoading = false
                         )
                     }
                 }
@@ -282,6 +275,7 @@ class HomeViewModel @Inject constructor(
                     it.copy(
                         isTopLoading = false,
                         isNearbyLoading = false,
+                        isRecentlyAddedLoading = false,
                         errorMessage = result.error.message
                             ?: "Nie udało się wczytać miejsc w pobliżu"
                     )
@@ -298,6 +292,52 @@ class HomeViewModel @Inject constructor(
             .putFloat(NearbyPlacesWidget.KEY_LAST_LNG, lng.toFloat())
             .apply()
     }
+}
+
+internal data class HomeSections(
+    val topPlaces: List<HomeViewModel.PlaceWithDistance>,
+    val nearbyPlaces: List<HomeViewModel.PlaceWithDistance>,
+    val recentlyAddedPlaces: List<HomeViewModel.PlaceWithDistance>
+)
+
+internal fun buildHomeSections(
+    placesWithDistance: List<Pair<Place, Double>>,
+    nowMillis: Long = System.currentTimeMillis()
+): HomeSections {
+    val nearby = placesWithDistance
+        .sortedBy { it.second }
+        .take(NEARBY_LIMIT)
+        .map { (place, distanceKm) -> HomeViewModel.PlaceWithDistance(place, distanceKm) }
+
+    val topNearby = placesWithDistance
+        .filter { (place, distanceKm) ->
+            place.reviewsCount > 0 && distanceKm <= TOP_PLACES_RADIUS_KM
+        }
+        .sortedWith(
+            compareByDescending<Pair<Place, Double>> { it.first.averageRating }
+                .thenByDescending { it.first.reviewsCount }
+                .thenBy { it.second }
+        )
+        .take(TOP_PLACES_LIMIT)
+        .map { (place, distanceKm) -> HomeViewModel.PlaceWithDistance(place, distanceKm) }
+
+    val recentThresholdMillis = nowMillis - RECENTLY_ADDED_WINDOW_MILLIS
+    val recentlyAdded = placesWithDistance
+        .filter { (place, _) ->
+            place.createdAtMillis >= recentThresholdMillis && place.createdAtMillis <= nowMillis
+        }
+        .sortedWith(
+            compareByDescending<Pair<Place, Double>> { it.first.createdAtMillis }
+                .thenBy { it.second }
+        )
+        .take(RECENTLY_ADDED_LIMIT)
+        .map { (place, distanceKm) -> HomeViewModel.PlaceWithDistance(place, distanceKm) }
+
+    return HomeSections(
+        topPlaces = topNearby,
+        nearbyPlaces = nearby,
+        recentlyAddedPlaces = recentlyAdded
+    )
 }
 
 /** Odległość w km między dwoma punktami (formuła haversine). */

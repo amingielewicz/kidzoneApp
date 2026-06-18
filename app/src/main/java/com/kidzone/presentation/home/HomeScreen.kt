@@ -106,6 +106,7 @@ private data class PlaceCardAnimation(
  *  3. Systemowy dialog Androida o lokalizację, jeśli permission nie jest jeszcze nadany.
  *  4. "Blisko Ciebie" – LazyRow z miejscami w okolicy.
  *  5. "Top miejsca" – LazyRow z najwyżej ocenianymi miejscami w pobliżu.
+ *  6. "Ostatnio dodane w okolicy" – nowe miejsca z ostatnich 14 dni.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -283,6 +284,29 @@ fun HomeScreen(
                             onPlaceClick = { onOpenPlaceDetails(it, "top") },
                             animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
                             keyPrefix = "top"
+                        )
+                    }
+                }
+
+                if (state.locationGranted &&
+                    (state.isRecentlyAddedLoading || state.recentlyAddedPlaces.isNotEmpty())
+                ) {
+                    item {
+                        SectionHeader(
+                            title = stringResource(R.string.home_recent_nearby_places),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                    item {
+                        HorizontalPlacesRow(
+                            items = state.recentlyAddedPlaces.map {
+                                HomePlaceItem(it.place, it.distanceKm)
+                            },
+                            isLoading = state.isRecentlyAddedLoading,
+                            emptyMessage = stringResource(R.string.home_no_recent_nearby_places),
+                            onPlaceClick = { onOpenPlaceDetails(it, "recent") },
+                            animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
+                            keyPrefix = "recent"
                         )
                     }
                 }
