@@ -4,6 +4,7 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -15,12 +16,18 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Toys
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.kidzone.domain.model.PlaceCategory
 
@@ -105,6 +112,30 @@ fun CategoryIcon(
             contentDescription = null,
             tint = Color.White,
             modifier = Modifier.size(iconSize)
+        )
+    }
+}
+
+@Composable
+fun CategoryBadge(
+    category: PlaceCategory,
+    modifier: Modifier = Modifier
+) {
+    val style = category.style
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(KidZoneRadii.Badge),
+        color = style.color.copy(alpha = 0.12f),
+        contentColor = style.color
+    ) {
+        Text(
+            text = stringResource(category.labelRes),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
         )
     }
 }
