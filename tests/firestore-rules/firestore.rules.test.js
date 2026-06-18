@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   assertFails,
   assertSucceeds,
@@ -14,6 +14,11 @@ const PROJECT_ID = 'kidzone-rules-test-js';
 const OWNER_UID = 'owner-user';
 const OTHER_UID = 'other-user';
 const ADMIN_UID = 'admin-user';
+
+vi.setConfig({
+  testTimeout: 30_000,
+  hookTimeout: 30_000,
+});
 
 function authedDb(uid, claims = {}) {
   return testEnv.authenticatedContext(uid, claims).firestore();

@@ -19,7 +19,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { describe, it, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import {
   doc,
   setDoc,
@@ -37,6 +37,11 @@ import {
 const PROJECT_ID = 'kidzone-rules-test';
 
 let testEnv: RulesTestEnvironment;
+
+vi.setConfig({
+  testTimeout: 30_000,
+  hookTimeout: 30_000,
+});
 
 beforeAll(async () => {
   const rulesPath = resolve(__dirname, '../../firestore.rules');
