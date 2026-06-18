@@ -56,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.presentation.common.CategoryIcon
+import com.kidzone.presentation.common.EmptyState as KidZoneEmptyState
 import com.kidzone.presentation.common.style
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -159,32 +160,11 @@ fun MyReviewsScreen(
 
 @Composable
 private fun EmptyState() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Filled.RateReview,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(56.dp)
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = "Nie napisałaś/eś jeszcze żadnej opinii",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = "Otwórz dowolne miejsce na liście i dodaj swoją pierwszą opinię.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
+    KidZoneEmptyState(
+        icon = Icons.Filled.RateReview,
+        title = "Nie masz jeszcze opinii",
+        message = "Otwórz dowolne miejsce z listy lub mapy i dodaj swoją pierwszą opinię."
+    )
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)

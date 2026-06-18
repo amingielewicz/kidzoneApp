@@ -19,6 +19,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.ChildCare
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.RateReview
@@ -59,10 +60,11 @@ private data class OnboardingPage(
 )
 
 /**
- * 3 slajdy onboardingu kidZone:
+ * 4 slajdy onboardingu kidZone:
  *  1. Powitanie – czym jest apka (BrandBlue)
  *  2. Odkrywaj miejsca na mapie (BrandGreen)
- *  3. Dziel sie opiniami (BrandYellow)
+ *  3. Przegladaj liste i ranking
+ *  4. Dziel sie opiniami (BrandYellow)
  */
 private val onboardingPages = listOf(
     OnboardingPage(
@@ -78,6 +80,14 @@ private val onboardingPages = listOf(
         title = "Odkrywaj na mapie",
         description = "Przeglądaj miejsca na interaktywnej mapie. Filtruj po kategorii, odległości i ocenach innych rodziców.",
         backgroundColor = Color(0xFFE8F5E9) // light green tint
+    ),
+    OnboardingPage(
+        icon = Icons.AutoMirrored.Filled.List,
+        iconTint = BrandBlue,
+        title = "Porównuj miejsca",
+        description = "Użyj listy, gdy chcesz szybko filtrować wyniki. " +
+            "Ranking pokaże najlepiej oceniane miejsca i najbardziej aktywnych użytkowników.",
+        backgroundColor = Color(0xFFE3F2FD) // light blue tint
     ),
     OnboardingPage(
         icon = Icons.Filled.RateReview,

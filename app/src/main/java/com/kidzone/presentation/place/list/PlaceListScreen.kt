@@ -85,6 +85,8 @@ import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
+import com.kidzone.presentation.common.EmptyState
+import com.kidzone.presentation.common.EmptyStateAction
 import com.kidzone.presentation.common.GpsDisabledBanner
 import com.kidzone.presentation.common.KidZoneCard
 import com.kidzone.presentation.common.KidZoneSpacing
@@ -316,18 +318,26 @@ fun PlaceListScreen(
             }
 
             state.places.isEmpty() -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = emptyMessageFor(state.sortOrder, state.currentUserId != null),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                val canClearFilters = state.searchQuery.isNotBlank() ||
+                    state.selectedCategory != null ||
+                    state.selectedAmenities.isNotEmpty()
+                EmptyState(
+                    icon = Icons.Filled.Search,
+                    title = emptyTitleFor(state),
+                    message = emptyMessageFor(state),
+                    action = if (canClearFilters) {
+                        EmptyStateAction(
+                            label = "Wyczyść filtry",
+                            onClick = {
+                                viewModel.onSearchQueryChange("")
+                                viewModel.onCategorySelected(null)
+                                viewModel.onAmenitiesCleared()
+                            }
+                        )
+                    } else {
+                        null
+                    }
+                )
             }
 
             else -> {
@@ -420,14 +430,28 @@ fun PlaceListScreen(
 }
 
 private fun emptyMessageFor(
-    sortOrder: PlaceListViewModel.SortOrder,
-    isSignedIn: Boolean
+    state: PlaceListViewModel.UiState
 ): String = when {
-    sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME && !isSignedIn ->
-        "Zaloguj się, by zobaczyć swoje miejsca"
-    sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME ->
-        "Nie dodałaś/eś jeszcze żadnego miejsca"
-    else -> "Brak miejsc pasujących do filtrów"
+    state.sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME && state.currentUserId == null ->
+        "Po zalogowaniu zobaczysz tu miejsca dodane przez Ciebie."
+    state.sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME ->
+        "Gdy dodasz miejsce, pojawi się tutaj razem z opiniami i statusem."
+    state.searchQuery.isNotBlank() ->
+        "Spróbuj krótszej frazy albo wyczyść filtry, żeby wrócić do pełnej listy."
+    state.selectedCategory != null || state.selectedAmenities.isNotEmpty() ->
+        "Zmień kategorię lub udogodnienia, jeśli chcesz poszerzyć wyniki."
+    else -> "Dodaj pierwsze miejsce z ekranu głównego albo sprawdź ponownie później."
+}
+
+private fun emptyTitleFor(state: PlaceListViewModel.UiState): String = when {
+    state.sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME && state.currentUserId == null ->
+        "Zaloguj się, żeby zobaczyć swoje miejsca"
+    state.sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME ->
+        "Nie masz jeszcze dodanych miejsc"
+    state.searchQuery.isNotBlank() -> "Brak wyników wyszukiwania"
+    state.selectedCategory != null || state.selectedAmenities.isNotEmpty() ->
+        "Brak miejsc dla wybranych filtrów"
+    else -> "Nie znaleźliśmy miejsc"
 }
 
 /**
