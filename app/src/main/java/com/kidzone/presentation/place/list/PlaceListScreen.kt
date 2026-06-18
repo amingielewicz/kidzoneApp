@@ -71,6 +71,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -543,6 +547,14 @@ private fun FilterAndSortBar(
     ) {
         // 1. Button "Filtry" (ikona Tune z badge liczbą aktywnych filtrów)
         BadgedBox(
+            modifier = Modifier.semantics {
+                contentDescription = "Filtry"
+                stateDescription = if (advancedFiltersCount > 0) {
+                    "Aktywne filtry: $advancedFiltersCount"
+                } else {
+                    "Brak aktywnych filtrów"
+                }
+            },
             badge = {
                 if (advancedFiltersCount > 0) {
                     Badge { Text(advancedFiltersCount.toString()) }
@@ -686,10 +698,26 @@ private fun PlaceCard(
     animatedContentScope: AnimatedContentScope? = null,
     animationSource: String? = "list"
 ) {
+    val categoryLabel = stringResource(place.category.labelRes)
+    val distanceLabel = if (showDistance && distanceKm != null) {
+        ", ${formatDistance(distanceKm)} od Ciebie"
+    } else {
+        ""
+    }
+    val addressLabel = place.address.takeIf { it.isNotBlank() }?.let { ", adres: $it" }.orEmpty()
+    val ratingLabel = place.ratingAccessibilityLabel()
+
     KidZoneCard(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "${place.name}, $categoryLabel$distanceLabel$addressLabel, $ratingLabel"
+            }
+            .clickable(
+                onClickLabel = "Otwórz szczegóły miejsca",
+                role = Role.Button,
+                onClick = onClick
+            )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -791,6 +819,12 @@ private fun formatDistance(km: Double): String = when {
     }
     km < 100.0 -> "%.1f km".format(km)
     else -> "%d km".format(km.toInt())
+}
+
+private fun Place.ratingAccessibilityLabel(): String = when {
+    reviewsCount > 0 -> "ocena %.1f, liczba opinii %d".format(averageRating, reviewsCount)
+    isNewWithoutReviews() -> "nowe miejsce bez opinii"
+    else -> "brak opinii"
 }
 
 /** Odległość w km między dwoma punktami (formuła haversine). */
