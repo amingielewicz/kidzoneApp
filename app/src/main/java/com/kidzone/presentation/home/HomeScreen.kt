@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
@@ -240,7 +241,10 @@ fun HomeScreen(
                 if (state.locationGranted) {
                     item {
                         HorizontalPlacesRow(
-                            places = state.nearbyPlaces,
+                            places = state.nearbyPlaces.map { it.place },
+                            distancesByPlaceId = state.nearbyPlaces.associate {
+                                it.place.id to it.distanceKm
+                            },
                             isLoading = state.isNearbyLoading,
                             emptyMessage = stringResource(R.string.home_no_nearby_places),
                             onPlaceClick = { onOpenPlaceDetails(it, "nearby") },
@@ -404,6 +408,7 @@ private fun SectionHeader(
 @Composable
 private fun HorizontalPlacesRow(
     places: List<Place>,
+    distancesByPlaceId: Map<String, Double> = emptyMap(),
     isLoading: Boolean,
     emptyMessage: String,
     onPlaceClick: (placeId: String) -> Unit,
@@ -449,6 +454,7 @@ private fun HorizontalPlacesRow(
                 items(places, key = { "${keyPrefix}_${it.id}" }) { place ->
                     PlaceCard(
                         place = place,
+                        distanceKm = distancesByPlaceId[place.id],
                         onClick = { onPlaceClick(place.id) },
                         sharedTransitionScope = sharedTransitionScope,
                         animatedContentScope = animatedContentScope,
@@ -468,6 +474,7 @@ private fun HorizontalPlacesRow(
 @Composable
 private fun PlaceCard(
     place: Place,
+    distanceKm: Double? = null,
     onClick: () -> Unit,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedContentScope: AnimatedContentScope? = null,
@@ -513,9 +520,15 @@ private fun PlaceCard(
                     )
                 }
             }
-            when {
-                place.reviewsCount > 0 -> {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(KidZoneSpacing.GapSmall),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                distanceKm?.let {
+                    DistanceLabel(distanceKm = it)
+                }
+                when {
+                    place.reviewsCount > 0 -> {
                         Icon(
                             imageVector = Icons.Filled.Star,
                             contentDescription = "Ocena",
@@ -528,13 +541,42 @@ private fun PlaceCard(
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
-                }
-                place.isNewWithoutReviews() -> {
-                    NewPlaceBadge()
+                    place.isNewWithoutReviews() -> {
+                        NewPlaceBadge()
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun DistanceLabel(distanceKm: Double) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = Icons.Filled.LocationOn,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(14.dp)
+        )
+        Spacer(Modifier.width(2.dp))
+        Text(
+            text = formatDistance(distanceKm),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1
+        )
+    }
+}
+
+private fun formatDistance(km: Double): String = when {
+    km < 1.0 -> {
+        val meters = (km * 1000).toInt()
+        val rounded = ((meters + 25) / 50) * 50
+        "$rounded m"
+    }
+    km < 100.0 -> "%.1f km".format(km)
+    else -> "%d km".format(km.toInt())
 }
 
 private fun Place.isNewWithoutReviews(nowMillis: Long = System.currentTimeMillis()): Boolean {

@@ -68,6 +68,11 @@ class HomeViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
+    data class NearbyPlace(
+        val place: Place,
+        val distanceKm: Double
+    )
+
     /**
      * @property topPlaces lokalny ranking najlepiej ocenianych miejsc w pobliżu
      * @property nearbyPlaces lista najbliższych miejsc bez względu na ocenę
@@ -79,7 +84,7 @@ class HomeViewModel @Inject constructor(
      */
     data class UiState(
         val topPlaces: List<Place> = emptyList(),
-        val nearbyPlaces: List<Place> = emptyList(),
+        val nearbyPlaces: List<NearbyPlace> = emptyList(),
         val isTopLoading: Boolean = false,
         val isNearbyLoading: Boolean = false,
         val isRefreshing: Boolean = false,
@@ -158,7 +163,7 @@ class HomeViewModel @Inject constructor(
                     val nearby = placesWithDistance
                         .sortedBy { it.second }
                         .take(NEARBY_LIMIT)
-                        .map { it.first }
+                        .map { (place, distanceKm) -> NearbyPlace(place, distanceKm) }
 
                     val topNearby = placesWithDistance
                         .filter { (place, distanceKm) ->
@@ -250,7 +255,7 @@ class HomeViewModel @Inject constructor(
                     val nearby = placesWithDistance
                         .sortedBy { it.second }
                         .take(NEARBY_LIMIT)
-                        .map { it.first }
+                        .map { (place, distanceKm) -> NearbyPlace(place, distanceKm) }
 
                     val topNearby = placesWithDistance
                         .filter { (place, distanceKm) ->
