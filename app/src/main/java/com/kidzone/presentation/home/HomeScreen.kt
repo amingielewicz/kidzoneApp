@@ -35,6 +35,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -79,6 +80,8 @@ private val PLACE_ROW_HEIGHT = 136.dp
 private val PLACE_CARD_WIDTH = 164.dp
 private val PLACE_CARD_ICON_SIZE = 28.dp
 private val PLACE_CARD_CONTENT_PADDING = 12.dp
+private const val NEW_PLACE_WINDOW_DAYS = 14L
+private const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
 
 /**
  * Ekran "Start" – pierwsza zakładka po zalogowaniu.
@@ -510,24 +513,50 @@ private fun PlaceCard(
                     )
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.Star,
-                    contentDescription = "Ocena",
-                    tint = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(Modifier.width(KidZoneSpacing.GapTiny))
-                Text(
-                    text = if (place.reviewsCount == 0) {
-                        "—"
-                    } else {
-                        "%.1f (%d)".format(place.averageRating, place.reviewsCount)
-                    },
-                    style = MaterialTheme.typography.bodySmall
-                )
+            when {
+                place.reviewsCount > 0 -> {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = "Ocena",
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(KidZoneSpacing.GapTiny))
+                        Text(
+                            text = "%.1f (%d)".format(place.averageRating, place.reviewsCount),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+                place.isNewWithoutReviews() -> {
+                    NewPlaceBadge()
+                }
             }
         }
+    }
+}
+
+private fun Place.isNewWithoutReviews(nowMillis: Long = System.currentTimeMillis()): Boolean {
+    if (reviewsCount > 0 || createdAtMillis <= 0L) return false
+
+    val ageMillis = nowMillis - createdAtMillis
+    return ageMillis in 0..(NEW_PLACE_WINDOW_DAYS * MILLIS_PER_DAY)
+}
+
+@Composable
+private fun NewPlaceBadge() {
+    Surface(
+        shape = RoundedCornerShape(KidZoneRadii.Badge),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+    ) {
+        Text(
+            text = "Nowe",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        )
     }
 }
 
