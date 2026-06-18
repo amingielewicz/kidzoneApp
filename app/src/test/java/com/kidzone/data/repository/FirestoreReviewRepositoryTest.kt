@@ -1,6 +1,14 @@
+@file:Suppress("WildcardImport")
+
 package com.kidzone.data.repository
 
-import com.google.firebase.firestore.*
+import com.google.android.gms.tasks.Task
+import com.google.firebase.firestore.CollectionReference
+import com.google.firebase.firestore.DocumentReference
+import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.QuerySnapshot
 import com.kidzone.data.local.ReviewDao
 import com.kidzone.data.local.ReviewEntity
 import com.kidzone.data.remote.FirestoreCollections
@@ -10,10 +18,9 @@ import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.OpResult
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import com.google.android.gms.tasks.Task
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested

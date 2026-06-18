@@ -1,0 +1,568 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:PlaceDetailsViewModel.kt$PlaceDetailsViewModel$reviewDuplicatesSkipped &gt; 0 &amp;&amp; newUploadedUrls.isEmpty() &amp;&amp; photoUris.isNotEmpty() &amp;&amp; rating == existing.rating &amp;&amp; comment.trim() == existing.comment</ID>
+    <ID>CyclomaticComplexMethod:AddPlaceScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun AddPlaceScreen( onSaved: (newPlaceLat: Double?, newPlaceLng: Double?) -&gt; Unit, onBack: () -&gt; Unit, viewModel: AddPlaceViewModel = hiltViewModel() )</ID>
+    <ID>CyclomaticComplexMethod:AddPlaceViewModel.kt$AddPlaceViewModel$private fun performSave()</ID>
+    <ID>CyclomaticComplexMethod:AddReviewSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun AddReviewSheet( placeName: String, isSubmitting: Boolean, errorMessage: String?, onDismiss: () -&gt; Unit, onSubmit: (rating: Int, comment: String, photoUris: List&lt;Uri&gt;, retainedPhotoUrls: List&lt;String&gt;) -&gt; Unit, initialRating: Int = 0, initialComment: String = "", initialPhotoUrls: List&lt;String&gt; = emptyList(), isEditing: Boolean = false )</ID>
+    <ID>CyclomaticComplexMethod:ChangeEmailDialog.kt$@Composable fun ChangeEmailDialog( currentEmail: String, isInProgress: Boolean, errorMessage: String?, onDismiss: () -&gt; Unit, onConfirm: (currentPassword: String, newEmail: String) -&gt; Unit )</ID>
+    <ID>CyclomaticComplexMethod:HomeScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class) @Composable fun HomeScreen( onOpenPlaceDetails: (placeId: String, source: String?) -&gt; Unit, onOpenMap: () -&gt; Unit, viewModel: HomeViewModel = hiltViewModel(), sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null )</ID>
+    <ID>CyclomaticComplexMethod:LoginScreen.kt$@Composable fun LoginScreen( onLoginSuccess: () -&gt; Unit, onNavigateToRegister: () -&gt; Unit, viewModel: LoginViewModel = hiltViewModel() )</ID>
+    <ID>CyclomaticComplexMethod:MapScreen.kt$@SuppressLint("MissingPermission") @OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class) @Composable fun MapScreen( onOpenPlaceDetails: (placeId: String) -&gt; Unit, focusOn: LatLng? = null, onFocusConsumed: () -&gt; Unit = {}, viewModel: MapViewModel = hiltViewModel() )</ID>
+    <ID>CyclomaticComplexMethod:NavGraph.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable fun KidZoneNavGraph( navController: NavHostController = rememberNavController(), intent: android.content.Intent? = null )</ID>
+    <ID>CyclomaticComplexMethod:PlaceDetailsScreen.kt$@OptIn(ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class) @Composable private fun PlaceDetailsContent( place: Place, author: User?, reviews: List&lt;Review&gt;, currentUserId: String?, topRank: Int?, sortOrder: PlaceDetailsViewModel.ReviewSortOrder, reportedReviewIds: Set&lt;String&gt; = emptySet(), onSortOrderChange: (PlaceDetailsViewModel.ReviewSortOrder) -&gt; Unit, onAddReview: () -&gt; Unit, onEditReview: (Review) -&gt; Unit, onDeleteReview: (Review) -&gt; Unit, onReportReview: (Review) -&gt; Unit, onOpenPhotoViewer: (photos: List&lt;String&gt;, startIndex: Int, areMine: Boolean) -&gt; Unit = { _, _, _ -&gt; }, onAddPlacePhoto: (() -&gt; Unit)? = null, onAddPlaceCamera: (() -&gt; Unit)? = null, isUploadingPlacePhoto: Boolean = false, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, animationSource: String? = null )</ID>
+    <ID>CyclomaticComplexMethod:PlaceDetailsScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class) @Composable fun PlaceDetailsScreen( onBack: () -&gt; Unit, onEditPlace: (placeId: String) -&gt; Unit, onDeleted: () -&gt; Unit, placeId: String = "", // Added placeId to ensure skeleton can use it for transitions viewModel: PlaceDetailsViewModel = hiltViewModel(), sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, animationSource: String? = null )</ID>
+    <ID>CyclomaticComplexMethod:PlaceDetailsViewModel.kt$PlaceDetailsViewModel$private suspend fun submitEditedReview( place: Place, existing: Review, rating: Int, comment: String, photoUris: List&lt;android.net.Uri&gt;, retainedPhotoUrls: List&lt;String&gt; )</ID>
+    <ID>CyclomaticComplexMethod:PlaceListScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class) @Composable fun PlaceListScreen( onOpenPlaceDetails: (placeId: String, source: String?) -&gt; Unit, viewModel: PlaceListViewModel = hiltViewModel(), sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null )</ID>
+    <ID>CyclomaticComplexMethod:ProfileScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ProfileScreen( onSignOut: () -&gt; Unit, onOpenMyPlaces: () -&gt; Unit, onOpenMyReviews: () -&gt; Unit, scrollToSection: String = "", viewModel: ProfileViewModel = hiltViewModel() )</ID>
+    <ID>CyclomaticComplexMethod:RegisterScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun RegisterScreen( onRegisterSuccess: () -&gt; Unit, onBack: () -&gt; Unit, viewModel: RegisterViewModel = hiltViewModel() )</ID>
+    <ID>CyclomaticComplexMethod:UserBadges.kt$fun User.computeBadges(context: BadgeContext = BadgeContext()): List&lt;UserBadge&gt;</ID>
+    <ID>ForEachOnRange:AddReviewSheet.kt$1..5</ID>
+    <ID>ForEachOnRange:PlaceDetailsScreen.kt$5 downTo 1</ID>
+    <ID>ForbiddenComment:SyncWorker.kt$SyncWorker$// TODO: Deserialize Place from payload and call placeRepository.addPlace()</ID>
+    <ID>ForbiddenComment:SyncWorker.kt$SyncWorker$// TODO: Deserialize Review and call reviewRepository.addReview()</ID>
+    <ID>ForbiddenComment:SyncWorker.kt$SyncWorker$// TODO: Deserialize full Place and call placeRepository.updatePlace()</ID>
+    <ID>ForbiddenComment:SyncWorker.kt$SyncWorker$// TODO: Deserialize full Review and call reviewRepository.updateReview()</ID>
+    <ID>ForbiddenComment:SyncWorker.kt$SyncWorker$// TODO: Extract placeId and call placeRepository.deletePlace()</ID>
+    <ID>ForbiddenComment:SyncWorker.kt$SyncWorker$// TODO: Extract reviewId and call reviewRepository.deleteReview()</ID>
+    <ID>FunctionNaming:AddPlaceScreen.kt$@Composable private fun DuplicateWarningDialog( candidate: AddPlaceViewModel.NearbyPlace, onConfirm: () -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:AddPlaceScreen.kt$@Composable private fun LocationSection( latitude: Double?, longitude: Double?, isFetching: Boolean, onClickFetch: () -&gt; Unit, enabled: Boolean )</ID>
+    <ID>FunctionNaming:AddPlaceScreen.kt$@Composable private fun NearbyPlacesList(places: List&lt;AddPlaceViewModel.NearbyPlace&gt;)</ID>
+    <ID>FunctionNaming:AddPlaceScreen.kt$@Composable private fun PhotoThumbnail( model: Any, // Uri lub String URL onRemove: () -&gt; Unit, enabled: Boolean = true )</ID>
+    <ID>FunctionNaming:AddPlaceScreen.kt$@Composable private fun RequiredFieldLabel(text: String)</ID>
+    <ID>FunctionNaming:AddPlaceScreen.kt$@OptIn(ExperimentalLayoutApi::class) @Composable private fun AmenitiesGrid( selected: Set&lt;Amenity&gt;, category: PlaceCategory, amenityFrequency: Map&lt;Amenity, Int&gt;, onToggle: (Amenity) -&gt; Unit, enabled: Boolean )</ID>
+    <ID>FunctionNaming:AddPlaceScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun AddPlaceScreen( onSaved: (newPlaceLat: Double?, newPlaceLng: Double?) -&gt; Unit, onBack: () -&gt; Unit, viewModel: AddPlaceViewModel = hiltViewModel() )</ID>
+    <ID>FunctionNaming:AddPlaceScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun CategoryDropdown( selected: PlaceCategory, onSelected: (PlaceCategory) -&gt; Unit, enabled: Boolean )</ID>
+    <ID>FunctionNaming:AddReviewSheet.kt$@Composable private fun PhotoThumbnail( model: Any, onRemove: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:AddReviewSheet.kt$@Composable private fun StarRatingInput( rating: Int, onChange: (Int) -&gt; Unit, enabled: Boolean = true, starSize: Dp = 40.dp )</ID>
+    <ID>FunctionNaming:AddReviewSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun AddReviewSheet( placeName: String, isSubmitting: Boolean, errorMessage: String?, onDismiss: () -&gt; Unit, onSubmit: (rating: Int, comment: String, photoUris: List&lt;Uri&gt;, retainedPhotoUrls: List&lt;String&gt;) -&gt; Unit, initialRating: Int = 0, initialComment: String = "", initialPhotoUrls: List&lt;String&gt; = emptyList(), isEditing: Boolean = false )</ID>
+    <ID>FunctionNaming:AmenityFilterSheet.kt$@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class) @Composable private fun SectionItem( section: AmenitySection, expanded: Boolean, onToggleExpand: () -&gt; Unit, selectedAmenities: Set&lt;Amenity&gt;, onAmenityToggled: (Amenity) -&gt; Unit )</ID>
+    <ID>FunctionNaming:AmenityFilterSheet.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable fun AmenityFilterSheet( sheetState: SheetState, selectedCategory: PlaceCategory?, selectedAmenities: Set&lt;Amenity&gt;, totalResultsCount: Int, onAmenityToggled: (Amenity) -&gt; Unit, onClearAll: () -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:CategoryStyle.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable fun CategoryIcon( category: PlaceCategory, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 32.dp, iconSize: androidx.compose.ui.unit.Dp = 20.dp, animationKey: String? = null, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: androidx.compose.animation.AnimatedVisibilityScope? = null )</ID>
+    <ID>FunctionNaming:ChangeEmailDialog.kt$@Composable fun ChangeEmailDialog( currentEmail: String, isInProgress: Boolean, errorMessage: String?, onDismiss: () -&gt; Unit, onConfirm: (currentPassword: String, newEmail: String) -&gt; Unit )</ID>
+    <ID>FunctionNaming:ChangePasswordDialog.kt$@Composable fun ChangePasswordDialog( isInProgress: Boolean, errorMessage: String?, onDismiss: () -&gt; Unit, onConfirm: (currentPassword: String, newPassword: String) -&gt; Unit )</ID>
+    <ID>FunctionNaming:ChangePasswordDialog.kt$@Composable private fun PasswordField( value: String, onValueChange: (String) -&gt; Unit, label: String, showText: Boolean, onToggleVisibility: () -&gt; Unit, enabled: Boolean, isError: Boolean = false, supportingText: String? = null )</ID>
+    <ID>FunctionNaming:ChangePasswordDialog.kt$@Composable private fun PasswordRequirements(password: String)</ID>
+    <ID>FunctionNaming:DeleteAccountDialog.kt$@Composable fun DeleteAccountDialog( placesCount: Int, reviewsCount: Int, isInProgress: Boolean, errorMessage: String?, isGoogleUser: Boolean = false, onDismiss: () -&gt; Unit, onConfirm: (currentPassword: String) -&gt; Unit = {}, onConfirmGoogle: (idToken: String) -&gt; Unit = {} )</ID>
+    <ID>FunctionNaming:DeleteAccountDialog.kt$@Composable private fun BulletLine(text: String)</ID>
+    <ID>FunctionNaming:EditProfileSheet.kt$@Composable private fun AvatarPicker( pendingUri: Uri?, fallbackUrl: String?, enabled: Boolean, onClick: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:EditProfileSheet.kt$@Composable private fun RequiredFieldLabel(text: String)</ID>
+    <ID>FunctionNaming:EditProfileSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun EditProfileSheet( initialDisplayName: String, initialFirstName: String, initialLastName: String, currentAvatarUrl: String?, isSaving: Boolean, errorMessage: String?, onDismiss: () -&gt; Unit, onSave: (displayName: String, firstName: String, lastName: String, newAvatarUri: Uri?) -&gt; Unit )</ID>
+    <ID>FunctionNaming:ExperimentCompose.kt$@Composable fun ExperimentSwitch( experimentManager: ExperimentManager, experiment: Experiment, control: @Composable () -&gt; Unit, treatment: @Composable () -&gt; Unit )</ID>
+    <ID>FunctionNaming:ExperimentCompose.kt$@Composable fun ExperimentVariant( experimentManager: ExperimentManager, experiment: Experiment, content: @Composable (variant: String) -&gt; Unit )</ID>
+    <ID>FunctionNaming:FullscreenPhotoViewer.kt$@Composable fun FullscreenPhotoViewer( photoUrls: List&lt;String&gt;, initialIndex: Int = 0, onDismiss: () -&gt; Unit, onReportPhoto: ((photoUrl: String) -&gt; Unit)? = null, canReportPhoto: (photoUrl: String) -&gt; Boolean = { true }, onDeletePhoto: ((photoUrl: String) -&gt; Unit)? = null, canDeletePhoto: (photoUrl: String) -&gt; Boolean = { false } )</ID>
+    <ID>FunctionNaming:FullscreenPhotoViewer.kt$@Composable private fun ZoomableImage( imageUrl: String, onTap: () -&gt; Unit = {}, onZoomChange: (Boolean) -&gt; Unit = {} )</ID>
+    <ID>FunctionNaming:HomeScreen.kt$@Composable private fun HeroSection()</ID>
+    <ID>FunctionNaming:HomeScreen.kt$@Composable private fun OpenMapCta( modifier: Modifier = Modifier, onClick: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:HomeScreen.kt$@Composable private fun PlaceCardSkeleton()</ID>
+    <ID>FunctionNaming:HomeScreen.kt$@Composable private fun SectionHeader( title: String, modifier: Modifier = Modifier )</ID>
+    <ID>FunctionNaming:HomeScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class) @Composable fun HomeScreen( onOpenPlaceDetails: (placeId: String, source: String?) -&gt; Unit, onOpenMap: () -&gt; Unit, viewModel: HomeViewModel = hiltViewModel(), sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null )</ID>
+    <ID>FunctionNaming:HomeScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun HorizontalPlacesRow( places: List&lt;Place&gt;, isLoading: Boolean, emptyMessage: String, onPlaceClick: (placeId: String) -&gt; Unit, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, keyPrefix: String = "" )</ID>
+    <ID>FunctionNaming:HomeScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun PlaceCard( place: Place, onClick: () -&gt; Unit, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, keyPrefix: String = "" )</ID>
+    <ID>FunctionNaming:KidZonePullRefresh.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun KidZonePullRefresh( isRefreshing: Boolean, onRefresh: () -&gt; Unit, modifier: Modifier = Modifier, content: @Composable () -&gt; Unit )</ID>
+    <ID>FunctionNaming:LocationCorrectionDialog.kt$@Composable fun LocationCorrectionDialog( onSubmit: (latitude: Double, longitude: Double, address: String?) -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:LoginScreen.kt$@Composable fun LoginScreen( onLoginSuccess: () -&gt; Unit, onNavigateToRegister: () -&gt; Unit, viewModel: LoginViewModel = hiltViewModel() )</ID>
+    <ID>FunctionNaming:LoginScreen.kt$@Composable private fun GoogleGlyph()</ID>
+    <ID>FunctionNaming:LoginScreen.kt$@Composable private fun MessageBanner(text: String, isError: Boolean)</ID>
+    <ID>FunctionNaming:LoginScreen.kt$@Composable private fun OrDivider()</ID>
+    <ID>FunctionNaming:LoginScreen.kt$@Composable private fun RequiredFieldLabel(text: String)</ID>
+    <ID>FunctionNaming:MainScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class) @Composable fun MainScreen( onOpenPlaceDetails: (placeId: String, source: String?) -&gt; Unit, onOpenAddPlace: () -&gt; Unit, onOpenMyPlaces: () -&gt; Unit, onOpenMyReviews: () -&gt; Unit, onSignOut: () -&gt; Unit, focusLatitude: Double? = null, focusLongitude: Double? = null, focusTab: String = "", rankingTab: String = "", profileSection: String = "", onFocusConsumed: () -&gt; Unit = {}, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null )</ID>
+    <ID>FunctionNaming:MaintenanceScreen.kt$@Composable fun MaintenanceScreen(message: String)</ID>
+    <ID>FunctionNaming:MapScreen.kt$@Composable private fun FiltersOverlay( selectedCategory: PlaceCategory?, topRatedOnly: Boolean, addedByMeOnly: Boolean, showAddedByMeChip: Boolean, onCategorySelected: (PlaceCategory?) -&gt; Unit, onToggleTopRated: () -&gt; Unit, onToggleAddedByMe: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>FunctionNaming:MapScreen.kt$@Composable private fun LocationPermissionBanner( onAllowClick: () -&gt; Unit, onOpenSettingsClick: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>FunctionNaming:MapScreen.kt$@Composable private fun MapIconButton( icon: androidx.compose.ui.graphics.vector.ImageVector, contentDescription: String, onClick: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>FunctionNaming:MapScreen.kt$@Composable private fun MapMyLocationButton( onClick: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>FunctionNaming:MapScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun PlacePreviewContent( place: Place, onOpenDetails: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:MapScreen.kt$@OptIn(kotlinx.coroutines.FlowPreview::class) @Composable private fun ReportSettledViewport( cameraPositionState: CameraPositionState, mapLoaded: Boolean, onViewportChanged: (GeoBounds) -&gt; Unit )</ID>
+    <ID>FunctionNaming:MapScreen.kt$@SuppressLint("MissingPermission") @OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class) @Composable fun MapScreen( onOpenPlaceDetails: (placeId: String) -&gt; Unit, focusOn: LatLng? = null, onFocusConsumed: () -&gt; Unit = {}, viewModel: MapViewModel = hiltViewModel() )</ID>
+    <ID>FunctionNaming:MyPlacesScreen.kt$@Composable private fun EmptyState()</ID>
+    <ID>FunctionNaming:MyPlacesScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class) @Composable fun MyPlacesScreen( onBack: () -&gt; Unit, onOpenPlaceDetails: (placeId: String, source: String?) -&gt; Unit, viewModel: MyPlacesViewModel = hiltViewModel(), sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null )</ID>
+    <ID>FunctionNaming:MyPlacesScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun MyPlaceCard( place: Place, onClick: () -&gt; Unit, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null )</ID>
+    <ID>FunctionNaming:MyReviewsScreen.kt$@Composable private fun ConfirmDeleteReviewDialog( isDeleting: Boolean, errorMessage: String?, onConfirm: () -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:MyReviewsScreen.kt$@Composable private fun EmptyState()</ID>
+    <ID>FunctionNaming:MyReviewsScreen.kt$@Composable private fun StarRow(rating: Int)</ID>
+    <ID>FunctionNaming:MyReviewsScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class) @Composable fun MyReviewsScreen( onBack: () -&gt; Unit, onOpenPlaceDetails: (placeId: String, source: String?) -&gt; Unit, viewModel: MyReviewsViewModel = hiltViewModel(), sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedVisibilityScope? = null )</ID>
+    <ID>FunctionNaming:MyReviewsScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun MyReviewCard( item: MyReviewItem, onClick: () -&gt; Unit, onDelete: () -&gt; Unit, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedVisibilityScope? = null )</ID>
+    <ID>FunctionNaming:NavGraph.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable fun KidZoneNavGraph( navController: NavHostController = rememberNavController(), intent: android.content.Intent? = null )</ID>
+    <ID>FunctionNaming:NearbyPlacesWidget.kt$@Composable private fun NearbyPlacesContent(places: List&lt;WidgetPlace&gt;)</ID>
+    <ID>FunctionNaming:NearbyPlacesWidget.kt$@Composable private fun PlaceRow(place: WidgetPlace)</ID>
+    <ID>FunctionNaming:NotificationPermission.kt$@Composable fun RequestNotificationPermission()</ID>
+    <ID>FunctionNaming:NotificationPreferencesDialog.kt$@Composable fun NotificationPreferencesDialog( currentPrefs: NotificationPrefs, onSave: (NotificationPrefs) -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:NotificationPreferencesDialog.kt$@Composable private fun NotificationToggle( title: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -&gt; Unit )</ID>
+    <ID>FunctionNaming:OnboardingScreen.kt$@Composable fun OnboardingScreen( onComplete: () -&gt; Unit, onStarted: () -&gt; Unit = {}, onSkipped: (lastPage: Int) -&gt; Unit = {} )</ID>
+    <ID>FunctionNaming:OnboardingScreen.kt$@Composable private fun OnboardingPageContent(page: OnboardingPage)</ID>
+    <ID>FunctionNaming:PendingSyncBadge.kt$@Composable fun PendingSyncBadge( syncManager: SyncManager, modifier: Modifier = Modifier )</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@Composable private fun DeleteConfirmationDialog( placeName: String, isDeleting: Boolean, onConfirm: () -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@Composable private fun DistributionRow( star: Int, count: Int, fraction: Float )</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@Composable private fun MyReviewBadge()</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@Composable private fun PlacePhotoGallery( photoUrls: List&lt;String&gt;, onPhotoClick: (index: Int) -&gt; Unit = {} )</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@Composable private fun ReportPhotoDialog( onSubmit: (reason: String, comment: String) -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@Composable private fun ReportPlaceDialog( onSubmit: (reason: String, comment: String) -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@Composable private fun ReportReviewDialog( authorName: String, onSubmit: (reason: String, comment: String) -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@Composable private fun ReviewCard( review: Review, isMine: Boolean = false, onEdit: (() -&gt; Unit)? = null, onDelete: (() -&gt; Unit)? = null, onReport: (() -&gt; Unit)? = null, onPhotoClick: ((index: Int) -&gt; Unit)? = null )</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@Composable private fun ReviewDistributionChart(reviews: List&lt;Review&gt;)</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@Composable private fun ReviewPhotoRow( photoUrls: List&lt;String&gt;, onPhotoClick: (index: Int) -&gt; Unit = {} )</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@Composable private fun ReviewSortDropdown( current: PlaceDetailsViewModel.ReviewSortOrder, onChange: (PlaceDetailsViewModel.ReviewSortOrder) -&gt; Unit )</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@Composable private fun ReviewTimestampRow( createdAtMillis: Long, updatedAtMillis: Long )</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@Composable private fun SectionCard( title: String, trailing: (@Composable () -&gt; Unit)? = null, content: @Composable () -&gt; Unit )</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@Composable private fun SoftDivider()</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@OptIn(ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class) @Composable private fun PlaceDetailsContent( place: Place, author: User?, reviews: List&lt;Review&gt;, currentUserId: String?, topRank: Int?, sortOrder: PlaceDetailsViewModel.ReviewSortOrder, reportedReviewIds: Set&lt;String&gt; = emptySet(), onSortOrderChange: (PlaceDetailsViewModel.ReviewSortOrder) -&gt; Unit, onAddReview: () -&gt; Unit, onEditReview: (Review) -&gt; Unit, onDeleteReview: (Review) -&gt; Unit, onReportReview: (Review) -&gt; Unit, onOpenPhotoViewer: (photos: List&lt;String&gt;, startIndex: Int, areMine: Boolean) -&gt; Unit = { _, _, _ -&gt; }, onAddPlacePhoto: (() -&gt; Unit)? = null, onAddPlaceCamera: (() -&gt; Unit)? = null, isUploadingPlacePhoto: Boolean = false, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, animationSource: String? = null )</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class) @Composable fun PlaceDetailsScreen( onBack: () -&gt; Unit, onEditPlace: (placeId: String) -&gt; Unit, onDeleted: () -&gt; Unit, placeId: String = "", // Added placeId to ensure skeleton can use it for transitions viewModel: PlaceDetailsViewModel = hiltViewModel(), sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, animationSource: String? = null )</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun PlaceDetailsSkeleton( sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, animationSource: String? = null, placeId: String = "" )</ID>
+    <ID>FunctionNaming:PlaceDetailsScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun PlaceMainCard( place: Place, author: User?, currentUserId: String?, topRank: Int?, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, animationSource: String? = null )</ID>
+    <ID>FunctionNaming:PlaceListScreen.kt$@Composable private fun EnableLocationForSortingBanner(onAllowClick: () -&gt; Unit)</ID>
+    <ID>FunctionNaming:PlaceListScreen.kt$@Composable private fun PlaceRowSkeleton()</ID>
+    <ID>FunctionNaming:PlaceListScreen.kt$@Composable private fun SearchBar( query: String, onQueryChange: (String) -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>FunctionNaming:PlaceListScreen.kt$@Composable private fun SortChip( current: PlaceListViewModel.SortOrder, currentUserSignedIn: Boolean, onChange: (PlaceListViewModel.SortOrder) -&gt; Unit )</ID>
+    <ID>FunctionNaming:PlaceListScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun CategoryFilterBar( selectedCategory: PlaceCategory?, onCategorySelected: (PlaceCategory?) -&gt; Unit )</ID>
+    <ID>FunctionNaming:PlaceListScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun FilterAndSortBar( advancedFiltersCount: Int, sortOrder: PlaceListViewModel.SortOrder, currentUserSignedIn: Boolean, onOpenFilterSheet: () -&gt; Unit, onSortOrderChange: (PlaceListViewModel.SortOrder) -&gt; Unit )</ID>
+    <ID>FunctionNaming:PlaceListScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class) @Composable fun PlaceListScreen( onOpenPlaceDetails: (placeId: String, source: String?) -&gt; Unit, viewModel: PlaceListViewModel = hiltViewModel(), sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null )</ID>
+    <ID>FunctionNaming:PlaceListScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun PlaceCard( place: Place, distanceKm: Double?, showDistance: Boolean, onClick: () -&gt; Unit, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, animationSource: String? = "list" )</ID>
+    <ID>FunctionNaming:PrivacyPolicyDialog.kt$@Composable fun PrivacyPolicyDialog(onDismiss: () -&gt; Unit)</ID>
+    <ID>FunctionNaming:PrivacyPolicyDialog.kt$@Composable private fun SectionTitle(text: String)</ID>
+    <ID>FunctionNaming:ProfileScreen.kt$@Composable private fun AccountSecurityCard( showPasswordAndEmail: Boolean = true, onChangePassword: () -&gt; Unit, onChangeEmail: () -&gt; Unit, onDeleteAccount: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:ProfileScreen.kt$@Composable private fun BadgeEarnedDialog( badges: List&lt;UserBadge&gt;, onDismiss: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:ProfileScreen.kt$@Composable private fun BadgesCard( obtainedBadges: List&lt;UserBadge&gt;, onOpenInfo: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:ProfileScreen.kt$@Composable private fun BadgesInfoDialog( obtained: Set&lt;UserBadge&gt;, onDismiss: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:ProfileScreen.kt$@Composable private fun InfoRow(label: String, value: String)</ID>
+    <ID>FunctionNaming:ProfileScreen.kt$@Composable private fun MyContentCard( placesCount: Int, reviewsCount: Int, onOpenMyPlaces: () -&gt; Unit, onOpenMyReviews: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:ProfileScreen.kt$@Composable private fun NavRow( icon: ImageVector, label: String, onClick: () -&gt; Unit, trailingText: String? = null, iconTint: Color = MaterialTheme.colorScheme.primary, labelColor: Color = MaterialTheme.colorScheme.onSurface )</ID>
+    <ID>FunctionNaming:ProfileScreen.kt$@Composable private fun PersonalInfoCard(user: User)</ID>
+    <ID>FunctionNaming:ProfileScreen.kt$@Composable private fun ProfileAvatar( avatarUrl: String?, size: androidx.compose.ui.unit.Dp )</ID>
+    <ID>FunctionNaming:ProfileScreen.kt$@Composable private fun ProfileContent( user: User, signInProvider: SignInProvider, obtainedBadges: List&lt;UserBadge&gt;, userRank: Int?, scrollToSection: String = "", onEdit: () -&gt; Unit, onOpenMyPlaces: () -&gt; Unit, onOpenMyReviews: () -&gt; Unit, onOpenBadgesInfo: () -&gt; Unit, onChangePassword: () -&gt; Unit, onChangeEmail: () -&gt; Unit, onDeleteAccount: () -&gt; Unit, onTermsOfService: () -&gt; Unit, onPrivacyPolicy: () -&gt; Unit, onNotificationPrefs: () -&gt; Unit, onSignOut: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:ProfileScreen.kt$@Composable private fun ProfileHeaderCard( user: User, userRank: Int?, onEdit: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:ProfileScreen.kt$@Composable private fun ProfileSkeleton()</ID>
+    <ID>FunctionNaming:ProfileScreen.kt$@Composable private fun SectionCard( title: String, leadingIcon: ImageVector? = null, trailing: (@Composable () -&gt; Unit)? = null, content: @Composable () -&gt; Unit )</ID>
+    <ID>FunctionNaming:ProfileScreen.kt$@Composable private fun SettingsCard( onTermsOfService: () -&gt; Unit, onPrivacyPolicy: () -&gt; Unit, onNotificationPrefs: () -&gt; Unit, onSignOut: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:ProfileScreen.kt$@Composable private fun StatItem( icon: ImageVector, value: String, label: String )</ID>
+    <ID>FunctionNaming:ProfileScreen.kt$@Composable private fun StatsCard(user: User)</ID>
+    <ID>FunctionNaming:ProfileScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ProfileScreen( onSignOut: () -&gt; Unit, onOpenMyPlaces: () -&gt; Unit, onOpenMyReviews: () -&gt; Unit, scrollToSection: String = "", viewModel: ProfileViewModel = hiltViewModel() )</ID>
+    <ID>FunctionNaming:RankBadge.kt$@Composable fun RankBadge( rank: Int, label: String, modifier: Modifier = Modifier, starSize: Dp = 40.dp )</ID>
+    <ID>FunctionNaming:RankingScreen.kt$@Composable private fun FullScreenCentered(content: @Composable () -&gt; Unit)</ID>
+    <ID>FunctionNaming:RankingScreen.kt$@Composable private fun PositionMedal(position: Int)</ID>
+    <ID>FunctionNaming:RankingScreen.kt$@Composable private fun RankingSkeleton()</ID>
+    <ID>FunctionNaming:RankingScreen.kt$@Composable private fun TopUserCard( position: Int, user: User, badges: List&lt;UserBadge&gt; )</ID>
+    <ID>FunctionNaming:RankingScreen.kt$@Composable private fun TopUsersList( users: List&lt;User&gt;, badgesByUserId: Map&lt;String, List&lt;UserBadge&gt;&gt;, lazyListState: LazyListState = rememberLazyListState() )</ID>
+    <ID>FunctionNaming:RankingScreen.kt$@Composable private fun UserAvatar(user: User)</ID>
+    <ID>FunctionNaming:RankingScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class) @Composable fun RankingScreen( onOpenPlaceDetails: (placeId: String, source: String?) -&gt; Unit, viewModel: RankingViewModel = hiltViewModel(), sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null )</ID>
+    <ID>FunctionNaming:RankingScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun TopPlaceCard( position: Int, place: Place, onClick: () -&gt; Unit, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null )</ID>
+    <ID>FunctionNaming:RankingScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun TopPlacesList( places: List&lt;Place&gt;, onOpenPlaceDetails: (placeId: String) -&gt; Unit, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, lazyListState: LazyListState = rememberLazyListState() )</ID>
+    <ID>FunctionNaming:RegisterScreen.kt$@Composable internal fun PasswordRequirementsChecklist(password: String)</ID>
+    <ID>FunctionNaming:RegisterScreen.kt$@Composable private fun ErrorMessageBanner(text: String)</ID>
+    <ID>FunctionNaming:RegisterScreen.kt$@Composable private fun RequiredFieldLabel(text: String)</ID>
+    <ID>FunctionNaming:RegisterScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun RegisterScreen( onRegisterSuccess: () -&gt; Unit, onBack: () -&gt; Unit, viewModel: RegisterViewModel = hiltViewModel() )</ID>
+    <ID>FunctionNaming:SplashScreen.kt$@Composable fun SplashScreen( viewModel: SplashViewModel = hiltViewModel(), onSignedIn: () -&gt; Unit, onSignedOut: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:StatusBanners.kt$@Composable fun GpsAcquiringBanner(modifier: Modifier = Modifier)</ID>
+    <ID>FunctionNaming:StatusBanners.kt$@Composable fun GpsDisabledBanner(modifier: Modifier = Modifier)</ID>
+    <ID>FunctionNaming:StatusBanners.kt$@Composable fun NoInternetBanner(modifier: Modifier = Modifier)</ID>
+    <ID>FunctionNaming:SuggestEditSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun CategoryDropdownSuggest( selected: PlaceCategory, onSelected: (PlaceCategory) -&gt; Unit )</ID>
+    <ID>FunctionNaming:SuggestEditSheet.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable fun SuggestEditSheet( place: Place, onSubmit: (name: String, description: String, category: String, amenities: Set&lt;String&gt;) -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:TermsOfServiceDialog.kt$@Composable fun TermsOfServiceDialog(onDismiss: () -&gt; Unit)</ID>
+    <ID>FunctionNaming:TermsOfServiceDialog.kt$@Composable private fun BulletPoint2(text: String)</ID>
+    <ID>FunctionNaming:TermsOfServiceDialog.kt$@Composable private fun SectionTitle2(text: String)</ID>
+    <ID>FunctionNaming:Theme.kt$@Composable fun KidZoneTheme( darkTheme: Boolean = isSystemInDarkTheme(), dynamicColor: Boolean = true, content: @Composable () -&gt; Unit )</ID>
+    <ID>FunctionNaming:UserBadges.kt$@Composable fun BadgeRowItem( badge: UserBadge, highlighted: Boolean, modifier: Modifier = Modifier )</ID>
+    <ID>FunctionNaming:UserBadges.kt$@OptIn(ExperimentalLayoutApi::class) @Composable fun BadgesIconRow( badges: List&lt;UserBadge&gt;, modifier: Modifier = Modifier, iconSize: Dp = 24.dp )</ID>
+    <ID>FunctionNaming:UserBadges.kt$@OptIn(ExperimentalLayoutApi::class) @Composable fun BadgesRow( badges: List&lt;UserBadge&gt;, modifier: Modifier = Modifier )</ID>
+    <ID>FunctionNaming:UserBadges.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun BadgeIconTile(badge: UserBadge, iconSize: Dp)</ID>
+    <ID>InstanceOfCheckForException:FirebaseAuthRepository.kt$FirebaseAuthRepository$e !is AuthException.UsernameAlreadyTaken</ID>
+    <ID>InstanceOfCheckForException:HomeScreen.kt$e is ResolvableApiException</ID>
+    <ID>LongMethod:AddPlaceScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun AddPlaceScreen( onSaved: (newPlaceLat: Double?, newPlaceLng: Double?) -&gt; Unit, onBack: () -&gt; Unit, viewModel: AddPlaceViewModel = hiltViewModel() )</ID>
+    <ID>LongMethod:AddPlaceViewModel.kt$AddPlaceViewModel$private fun performSave()</ID>
+    <ID>LongMethod:AddReviewSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun AddReviewSheet( placeName: String, isSubmitting: Boolean, errorMessage: String?, onDismiss: () -&gt; Unit, onSubmit: (rating: Int, comment: String, photoUris: List&lt;Uri&gt;, retainedPhotoUrls: List&lt;String&gt;) -&gt; Unit, initialRating: Int = 0, initialComment: String = "", initialPhotoUrls: List&lt;String&gt; = emptyList(), isEditing: Boolean = false )</ID>
+    <ID>LongMethod:AmenityFilterSheet.kt$@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class) @Composable private fun SectionItem( section: AmenitySection, expanded: Boolean, onToggleExpand: () -&gt; Unit, selectedAmenities: Set&lt;Amenity&gt;, onAmenityToggled: (Amenity) -&gt; Unit )</ID>
+    <ID>LongMethod:AmenityFilterSheet.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable fun AmenityFilterSheet( sheetState: SheetState, selectedCategory: PlaceCategory?, selectedAmenities: Set&lt;Amenity&gt;, totalResultsCount: Int, onAmenityToggled: (Amenity) -&gt; Unit, onClearAll: () -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongMethod:ChangeEmailDialog.kt$@Composable fun ChangeEmailDialog( currentEmail: String, isInProgress: Boolean, errorMessage: String?, onDismiss: () -&gt; Unit, onConfirm: (currentPassword: String, newEmail: String) -&gt; Unit )</ID>
+    <ID>LongMethod:ChangePasswordDialog.kt$@Composable fun ChangePasswordDialog( isInProgress: Boolean, errorMessage: String?, onDismiss: () -&gt; Unit, onConfirm: (currentPassword: String, newPassword: String) -&gt; Unit )</ID>
+    <ID>LongMethod:DeleteAccountDialog.kt$@Composable fun DeleteAccountDialog( placesCount: Int, reviewsCount: Int, isInProgress: Boolean, errorMessage: String?, isGoogleUser: Boolean = false, onDismiss: () -&gt; Unit, onConfirm: (currentPassword: String) -&gt; Unit = {}, onConfirmGoogle: (idToken: String) -&gt; Unit = {} )</ID>
+    <ID>LongMethod:EditProfileSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun EditProfileSheet( initialDisplayName: String, initialFirstName: String, initialLastName: String, currentAvatarUrl: String?, isSaving: Boolean, errorMessage: String?, onDismiss: () -&gt; Unit, onSave: (displayName: String, firstName: String, lastName: String, newAvatarUri: Uri?) -&gt; Unit )</ID>
+    <ID>LongMethod:FullscreenPhotoViewer.kt$@Composable fun FullscreenPhotoViewer( photoUrls: List&lt;String&gt;, initialIndex: Int = 0, onDismiss: () -&gt; Unit, onReportPhoto: ((photoUrl: String) -&gt; Unit)? = null, canReportPhoto: (photoUrl: String) -&gt; Boolean = { true }, onDeletePhoto: ((photoUrl: String) -&gt; Unit)? = null, canDeletePhoto: (photoUrl: String) -&gt; Boolean = { false } )</ID>
+    <ID>LongMethod:FullscreenPhotoViewer.kt$@Composable private fun ZoomableImage( imageUrl: String, onTap: () -&gt; Unit = {}, onZoomChange: (Boolean) -&gt; Unit = {} )</ID>
+    <ID>LongMethod:HomeScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class) @Composable fun HomeScreen( onOpenPlaceDetails: (placeId: String, source: String?) -&gt; Unit, onOpenMap: () -&gt; Unit, viewModel: HomeViewModel = hiltViewModel(), sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null )</ID>
+    <ID>LongMethod:HomeScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun PlaceCard( place: Place, onClick: () -&gt; Unit, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, keyPrefix: String = "" )</ID>
+    <ID>LongMethod:HomeViewModel.kt$HomeViewModel$fun refresh()</ID>
+    <ID>LongMethod:HomeViewModel.kt$HomeViewModel$private fun loadLocationBasedPlaces()</ID>
+    <ID>LongMethod:LocationCorrectionDialog.kt$@Composable fun LocationCorrectionDialog( onSubmit: (latitude: Double, longitude: Double, address: String?) -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongMethod:LoginScreen.kt$@Composable fun LoginScreen( onLoginSuccess: () -&gt; Unit, onNavigateToRegister: () -&gt; Unit, viewModel: LoginViewModel = hiltViewModel() )</ID>
+    <ID>LongMethod:MainScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class) @Composable fun MainScreen( onOpenPlaceDetails: (placeId: String, source: String?) -&gt; Unit, onOpenAddPlace: () -&gt; Unit, onOpenMyPlaces: () -&gt; Unit, onOpenMyReviews: () -&gt; Unit, onSignOut: () -&gt; Unit, focusLatitude: Double? = null, focusLongitude: Double? = null, focusTab: String = "", rankingTab: String = "", profileSection: String = "", onFocusConsumed: () -&gt; Unit = {}, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null )</ID>
+    <ID>LongMethod:MapScreen.kt$@Composable private fun FiltersOverlay( selectedCategory: PlaceCategory?, topRatedOnly: Boolean, addedByMeOnly: Boolean, showAddedByMeChip: Boolean, onCategorySelected: (PlaceCategory?) -&gt; Unit, onToggleTopRated: () -&gt; Unit, onToggleAddedByMe: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>LongMethod:MapScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun PlacePreviewContent( place: Place, onOpenDetails: () -&gt; Unit )</ID>
+    <ID>LongMethod:MapScreen.kt$@SuppressLint("MissingPermission") @OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class) @Composable fun MapScreen( onOpenPlaceDetails: (placeId: String) -&gt; Unit, focusOn: LatLng? = null, onFocusConsumed: () -&gt; Unit = {}, viewModel: MapViewModel = hiltViewModel() )</ID>
+    <ID>LongMethod:MarkerBitmapGenerator.kt$@Composable fun rememberMarkerIcons(): MarkerIconCache</ID>
+    <ID>LongMethod:MyPlacesScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class) @Composable fun MyPlacesScreen( onBack: () -&gt; Unit, onOpenPlaceDetails: (placeId: String, source: String?) -&gt; Unit, viewModel: MyPlacesViewModel = hiltViewModel(), sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null )</ID>
+    <ID>LongMethod:MyPlacesScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun MyPlaceCard( place: Place, onClick: () -&gt; Unit, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null )</ID>
+    <ID>LongMethod:MyReviewsScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class) @Composable fun MyReviewsScreen( onBack: () -&gt; Unit, onOpenPlaceDetails: (placeId: String, source: String?) -&gt; Unit, viewModel: MyReviewsViewModel = hiltViewModel(), sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedVisibilityScope? = null )</ID>
+    <ID>LongMethod:MyReviewsScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun MyReviewCard( item: MyReviewItem, onClick: () -&gt; Unit, onDelete: () -&gt; Unit, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedVisibilityScope? = null )</ID>
+    <ID>LongMethod:NavGraph.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable fun KidZoneNavGraph( navController: NavHostController = rememberNavController(), intent: android.content.Intent? = null )</ID>
+    <ID>LongMethod:NotificationPreferencesDialog.kt$@Composable fun NotificationPreferencesDialog( currentPrefs: NotificationPrefs, onSave: (NotificationPrefs) -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongMethod:OnboardingScreen.kt$@Composable fun OnboardingScreen( onComplete: () -&gt; Unit, onStarted: () -&gt; Unit = {}, onSkipped: (lastPage: Int) -&gt; Unit = {} )</ID>
+    <ID>LongMethod:PlaceDetailsScreen.kt$@Composable private fun ReportPhotoDialog( onSubmit: (reason: String, comment: String) -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongMethod:PlaceDetailsScreen.kt$@Composable private fun ReportPlaceDialog( onSubmit: (reason: String, comment: String) -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongMethod:PlaceDetailsScreen.kt$@Composable private fun ReportReviewDialog( authorName: String, onSubmit: (reason: String, comment: String) -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongMethod:PlaceDetailsScreen.kt$@Composable private fun ReviewCard( review: Review, isMine: Boolean = false, onEdit: (() -&gt; Unit)? = null, onDelete: (() -&gt; Unit)? = null, onReport: (() -&gt; Unit)? = null, onPhotoClick: ((index: Int) -&gt; Unit)? = null )</ID>
+    <ID>LongMethod:PlaceDetailsScreen.kt$@OptIn(ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class) @Composable private fun PlaceDetailsContent( place: Place, author: User?, reviews: List&lt;Review&gt;, currentUserId: String?, topRank: Int?, sortOrder: PlaceDetailsViewModel.ReviewSortOrder, reportedReviewIds: Set&lt;String&gt; = emptySet(), onSortOrderChange: (PlaceDetailsViewModel.ReviewSortOrder) -&gt; Unit, onAddReview: () -&gt; Unit, onEditReview: (Review) -&gt; Unit, onDeleteReview: (Review) -&gt; Unit, onReportReview: (Review) -&gt; Unit, onOpenPhotoViewer: (photos: List&lt;String&gt;, startIndex: Int, areMine: Boolean) -&gt; Unit = { _, _, _ -&gt; }, onAddPlacePhoto: (() -&gt; Unit)? = null, onAddPlaceCamera: (() -&gt; Unit)? = null, isUploadingPlacePhoto: Boolean = false, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, animationSource: String? = null )</ID>
+    <ID>LongMethod:PlaceDetailsScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class) @Composable fun PlaceDetailsScreen( onBack: () -&gt; Unit, onEditPlace: (placeId: String) -&gt; Unit, onDeleted: () -&gt; Unit, placeId: String = "", // Added placeId to ensure skeleton can use it for transitions viewModel: PlaceDetailsViewModel = hiltViewModel(), sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, animationSource: String? = null )</ID>
+    <ID>LongMethod:PlaceDetailsScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun PlaceDetailsSkeleton( sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, animationSource: String? = null, placeId: String = "" )</ID>
+    <ID>LongMethod:PlaceDetailsScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun PlaceMainCard( place: Place, author: User?, currentUserId: String?, topRank: Int?, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, animationSource: String? = null )</ID>
+    <ID>LongMethod:PlaceDetailsViewModel.kt$PlaceDetailsViewModel$private suspend fun submitEditedReview( place: Place, existing: Review, rating: Int, comment: String, photoUris: List&lt;android.net.Uri&gt;, retainedPhotoUrls: List&lt;String&gt; )</ID>
+    <ID>LongMethod:PlaceDetailsViewModel.kt$PlaceDetailsViewModel$private suspend fun submitNewReview( place: Place, user: User, rating: Int, comment: String, photoUris: List&lt;android.net.Uri&gt; )</ID>
+    <ID>LongMethod:PlaceListScreen.kt$@Composable private fun PlaceRowSkeleton()</ID>
+    <ID>LongMethod:PlaceListScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class) @Composable fun PlaceListScreen( onOpenPlaceDetails: (placeId: String, source: String?) -&gt; Unit, viewModel: PlaceListViewModel = hiltViewModel(), sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null )</ID>
+    <ID>LongMethod:PlaceListScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun PlaceCard( place: Place, distanceKm: Double?, showDistance: Boolean, onClick: () -&gt; Unit, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, animationSource: String? = "list" )</ID>
+    <ID>LongMethod:PrivacyPolicyDialog.kt$@Composable fun PrivacyPolicyDialog(onDismiss: () -&gt; Unit)</ID>
+    <ID>LongMethod:ProfileScreen.kt$@Composable private fun BadgeEarnedDialog( badges: List&lt;UserBadge&gt;, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongMethod:ProfileScreen.kt$@Composable private fun ProfileHeaderCard( user: User, userRank: Int?, onEdit: () -&gt; Unit )</ID>
+    <ID>LongMethod:ProfileScreen.kt$@Composable private fun ProfileSkeleton()</ID>
+    <ID>LongMethod:ProfileScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ProfileScreen( onSignOut: () -&gt; Unit, onOpenMyPlaces: () -&gt; Unit, onOpenMyReviews: () -&gt; Unit, scrollToSection: String = "", viewModel: ProfileViewModel = hiltViewModel() )</ID>
+    <ID>LongMethod:RankingScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class) @Composable fun RankingScreen( onOpenPlaceDetails: (placeId: String, source: String?) -&gt; Unit, viewModel: RankingViewModel = hiltViewModel(), sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null )</ID>
+    <ID>LongMethod:RankingScreen.kt$@OptIn(ExperimentalSharedTransitionApi::class) @Composable private fun TopPlaceCard( position: Int, place: Place, onClick: () -&gt; Unit, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null )</ID>
+    <ID>LongMethod:RegisterScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun RegisterScreen( onRegisterSuccess: () -&gt; Unit, onBack: () -&gt; Unit, viewModel: RegisterViewModel = hiltViewModel() )</ID>
+    <ID>LongMethod:SuggestEditSheet.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable fun SuggestEditSheet( place: Place, onSubmit: (name: String, description: String, category: String, amenities: Set&lt;String&gt;) -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongMethod:TermsOfServiceDialog.kt$@Composable fun TermsOfServiceDialog(onDismiss: () -&gt; Unit)</ID>
+    <ID>LongParameterList:AddReviewSheet.kt$( placeName: String, isSubmitting: Boolean, errorMessage: String?, onDismiss: () -&gt; Unit, onSubmit: (rating: Int, comment: String, photoUris: List&lt;Uri&gt;, retainedPhotoUrls: List&lt;String&gt;) -&gt; Unit, initialRating: Int = 0, initialComment: String = "", initialPhotoUrls: List&lt;String&gt; = emptyList(), isEditing: Boolean = false )</ID>
+    <ID>LongParameterList:AmenityFilterSheet.kt$( sheetState: SheetState, selectedCategory: PlaceCategory?, selectedAmenities: Set&lt;Amenity&gt;, totalResultsCount: Int, onAmenityToggled: (Amenity) -&gt; Unit, onClearAll: () -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongParameterList:CategoryStyle.kt$( category: PlaceCategory, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 32.dp, iconSize: androidx.compose.ui.unit.Dp = 20.dp, animationKey: String? = null, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: androidx.compose.animation.AnimatedVisibilityScope? = null )</ID>
+    <ID>LongParameterList:ChangePasswordDialog.kt$( value: String, onValueChange: (String) -&gt; Unit, label: String, showText: Boolean, onToggleVisibility: () -&gt; Unit, enabled: Boolean, isError: Boolean = false, supportingText: String? = null )</ID>
+    <ID>LongParameterList:DeleteAccountDialog.kt$( placesCount: Int, reviewsCount: Int, isInProgress: Boolean, errorMessage: String?, isGoogleUser: Boolean = false, onDismiss: () -&gt; Unit, onConfirm: (currentPassword: String) -&gt; Unit = {}, onConfirmGoogle: (idToken: String) -&gt; Unit = {} )</ID>
+    <ID>LongParameterList:EditProfileSheet.kt$( initialDisplayName: String, initialFirstName: String, initialLastName: String, currentAvatarUrl: String?, isSaving: Boolean, errorMessage: String?, onDismiss: () -&gt; Unit, onSave: (displayName: String, firstName: String, lastName: String, newAvatarUri: Uri?) -&gt; Unit )</ID>
+    <ID>LongParameterList:FullscreenPhotoViewer.kt$( photoUrls: List&lt;String&gt;, initialIndex: Int = 0, onDismiss: () -&gt; Unit, onReportPhoto: ((photoUrl: String) -&gt; Unit)? = null, canReportPhoto: (photoUrl: String) -&gt; Boolean = { true }, onDeletePhoto: ((photoUrl: String) -&gt; Unit)? = null, canDeletePhoto: (photoUrl: String) -&gt; Boolean = { false } )</ID>
+    <ID>LongParameterList:HomeScreen.kt$( places: List&lt;Place&gt;, isLoading: Boolean, emptyMessage: String, onPlaceClick: (placeId: String) -&gt; Unit, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, keyPrefix: String = "" )</ID>
+    <ID>LongParameterList:MainScreen.kt$( onOpenPlaceDetails: (placeId: String, source: String?) -&gt; Unit, onOpenAddPlace: () -&gt; Unit, onOpenMyPlaces: () -&gt; Unit, onOpenMyReviews: () -&gt; Unit, onSignOut: () -&gt; Unit, focusLatitude: Double? = null, focusLongitude: Double? = null, focusTab: String = "", rankingTab: String = "", profileSection: String = "", onFocusConsumed: () -&gt; Unit = {}, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null )</ID>
+    <ID>LongParameterList:MapScreen.kt$( selectedCategory: PlaceCategory?, topRatedOnly: Boolean, addedByMeOnly: Boolean, showAddedByMeChip: Boolean, onCategorySelected: (PlaceCategory?) -&gt; Unit, onToggleTopRated: () -&gt; Unit, onToggleAddedByMe: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>LongParameterList:PlaceDetailsScreen.kt$( onBack: () -&gt; Unit, onEditPlace: (placeId: String) -&gt; Unit, onDeleted: () -&gt; Unit, placeId: String = "", // Added placeId to ensure skeleton can use it for transitions viewModel: PlaceDetailsViewModel = hiltViewModel(), sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, animationSource: String? = null )</ID>
+    <ID>LongParameterList:PlaceDetailsScreen.kt$( place: Place, author: User?, currentUserId: String?, topRank: Int?, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, animationSource: String? = null )</ID>
+    <ID>LongParameterList:PlaceDetailsScreen.kt$( place: Place, author: User?, reviews: List&lt;Review&gt;, currentUserId: String?, topRank: Int?, sortOrder: PlaceDetailsViewModel.ReviewSortOrder, reportedReviewIds: Set&lt;String&gt; = emptySet(), onSortOrderChange: (PlaceDetailsViewModel.ReviewSortOrder) -&gt; Unit, onAddReview: () -&gt; Unit, onEditReview: (Review) -&gt; Unit, onDeleteReview: (Review) -&gt; Unit, onReportReview: (Review) -&gt; Unit, onOpenPhotoViewer: (photos: List&lt;String&gt;, startIndex: Int, areMine: Boolean) -&gt; Unit = { _, _, _ -&gt; }, onAddPlacePhoto: (() -&gt; Unit)? = null, onAddPlaceCamera: (() -&gt; Unit)? = null, isUploadingPlacePhoto: Boolean = false, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, animationSource: String? = null )</ID>
+    <ID>LongParameterList:PlaceDetailsScreen.kt$( review: Review, isMine: Boolean = false, onEdit: (() -&gt; Unit)? = null, onDelete: (() -&gt; Unit)? = null, onReport: (() -&gt; Unit)? = null, onPhotoClick: ((index: Int) -&gt; Unit)? = null )</ID>
+    <ID>LongParameterList:PlaceDetailsViewModel.kt$PlaceDetailsViewModel$( place: Place, existing: Review, rating: Int, comment: String, photoUris: List&lt;android.net.Uri&gt;, retainedPhotoUrls: List&lt;String&gt; )</ID>
+    <ID>LongParameterList:PlaceDetailsViewModel.kt$PlaceDetailsViewModel$( savedStateHandle: SavedStateHandle, private val placeRepository: PlaceRepository, private val authRepository: AuthRepository, private val reviewRepository: ReviewRepository, private val photoUploader: PhotoUploader, private val imageCompressor: ImageCompressorPort, private val inAppReviewManager: InAppReviewManager )</ID>
+    <ID>LongParameterList:PlaceListScreen.kt$( place: Place, distanceKm: Double?, showDistance: Boolean, onClick: () -&gt; Unit, sharedTransitionScope: SharedTransitionScope? = null, animatedContentScope: AnimatedContentScope? = null, animationSource: String? = "list" )</ID>
+    <ID>LongParameterList:ProfileScreen.kt$( icon: ImageVector, label: String, onClick: () -&gt; Unit, trailingText: String? = null, iconTint: Color = MaterialTheme.colorScheme.primary, labelColor: Color = MaterialTheme.colorScheme.onSurface )</ID>
+    <ID>LongParameterList:ProfileScreen.kt$( user: User, signInProvider: SignInProvider, obtainedBadges: List&lt;UserBadge&gt;, userRank: Int?, scrollToSection: String = "", onEdit: () -&gt; Unit, onOpenMyPlaces: () -&gt; Unit, onOpenMyReviews: () -&gt; Unit, onOpenBadgesInfo: () -&gt; Unit, onChangePassword: () -&gt; Unit, onChangeEmail: () -&gt; Unit, onDeleteAccount: () -&gt; Unit, onTermsOfService: () -&gt; Unit, onPrivacyPolicy: () -&gt; Unit, onNotificationPrefs: () -&gt; Unit, onSignOut: () -&gt; Unit )</ID>
+    <ID>LongParameterList:TestHelpers.kt$TestFixtures$( id: String = "place-1", ownerUserId: String = "user-1", name: String = "Plac Zabaw Kasztanowa", description: String = "Fajny plac zabaw", category: PlaceCategory = PlaceCategory.PLAYGROUND, latitude: Double = 52.2297, longitude: Double = 21.0122, address: String = "ul. Kasztanowa 1", averageRating: Double = 4.5, reviewsCount: Int = 10, amenities: Set&lt;Amenity&gt; = emptySet(), photoUrls: List&lt;String&gt; = emptyList(), createdAtMillis: Long = 1_700_000_000_000L )</ID>
+    <ID>LongParameterList:TestHelpers.kt$TestFixtures$( id: String = "review-1", placeId: String = "place-1", userId: String = "user-1", authorName: String = "Test User", rating: Int = 4, comment: String = "Świetne miejsce!", createdAtMillis: Long = 1_700_000_000_000L )</ID>
+    <ID>LongParameterList:TestHelpers.kt$TestFixtures$( id: String = "user-1", name: String = "Test User", email: String = "test@example.com", firstName: String = "", lastName: String = "", avatarUrl: String? = null, placesAddedCount: Int = 0, reviewsCount: Int = 0, createdAtMillis: Long = 1_700_000_000_000L, nameLowercase: String = name.lowercase(), bannedUntilMillis: Long = 0L, banReason: String = "" )</ID>
+    <ID>LoopWithTooManyJumpStatements:AddReviewSheet.kt$for</ID>
+    <ID>MagicNumber:AddPlaceScreen.kt$10_000</ID>
+    <ID>MagicNumber:AddPlaceScreen.kt$5</ID>
+    <ID>MagicNumber:AddPlaceScreen.kt$8192</ID>
+    <ID>MagicNumber:AddPlaceViewModel.kt$6371.0</ID>
+    <ID>MagicNumber:AddPlaceViewModel.kt$AddPlaceViewModel$1000</ID>
+    <ID>MagicNumber:AddReviewSheet.kt$10_000</ID>
+    <ID>MagicNumber:AddReviewSheet.kt$5</ID>
+    <ID>MagicNumber:AddReviewSheet.kt$8192</ID>
+    <ID>MagicNumber:AmenityFilterSheet.kt$180f</ID>
+    <ID>MagicNumber:AnalyticsHelper.kt$AnalyticsHelper$100</ID>
+    <ID>MagicNumber:CategoryStyle.kt$0xFF2E7D32</ID>
+    <ID>MagicNumber:CategoryStyle.kt$0xFF43A047</ID>
+    <ID>MagicNumber:CategoryStyle.kt$0xFF5D4037</ID>
+    <ID>MagicNumber:CategoryStyle.kt$0xFF616161</ID>
+    <ID>MagicNumber:CategoryStyle.kt$0xFF7B1FA2</ID>
+    <ID>MagicNumber:CategoryStyle.kt$0xFFC2185B</ID>
+    <ID>MagicNumber:CategoryStyle.kt$0xFFE65100</ID>
+    <ID>MagicNumber:Color.kt$0xFF121212</ID>
+    <ID>MagicNumber:Color.kt$0xFF1565C0</ID>
+    <ID>MagicNumber:Color.kt$0xFF1A1A1A</ID>
+    <ID>MagicNumber:Color.kt$0xFF1E1E1E</ID>
+    <ID>MagicNumber:Color.kt$0xFF1E88E5</ID>
+    <ID>MagicNumber:Color.kt$0xFF2C2C2C</ID>
+    <ID>MagicNumber:Color.kt$0xFF2E7D32</ID>
+    <ID>MagicNumber:Color.kt$0xFF43A047</ID>
+    <ID>MagicNumber:Color.kt$0xFF444444</ID>
+    <ID>MagicNumber:Color.kt$0xFF64B5F6</ID>
+    <ID>MagicNumber:Color.kt$0xFF81C784</ID>
+    <ID>MagicNumber:Color.kt$0xFFB0B0B0</ID>
+    <ID>MagicNumber:Color.kt$0xFFE0A800</ID>
+    <ID>MagicNumber:Color.kt$0xFFEDEDED</ID>
+    <ID>MagicNumber:Color.kt$0xFFFAFAFA</ID>
+    <ID>MagicNumber:Color.kt$0xFFFFC93C</ID>
+    <ID>MagicNumber:Color.kt$0xFFFFD54F</ID>
+    <ID>MagicNumber:Color.kt$0xFFFFFFFF</ID>
+    <ID>MagicNumber:DeleteAccountDialog.kt$10</ID>
+    <ID>MagicNumber:DeleteAccountDialog.kt$100</ID>
+    <ID>MagicNumber:DeleteAccountDialog.kt$12</ID>
+    <ID>MagicNumber:DeleteAccountDialog.kt$14</ID>
+    <ID>MagicNumber:DeleteAccountDialog.kt$4</ID>
+    <ID>MagicNumber:FirestorePlaceRepository.kt$FirestorePlaceRepository$10</ID>
+    <ID>MagicNumber:FirestorePlaceRepository.kt$FirestorePlaceRepository$180.0</ID>
+    <ID>MagicNumber:FirestorePlaceRepository.kt$FirestorePlaceRepository$3</ID>
+    <ID>MagicNumber:FirestorePlaceRepository.kt$FirestorePlaceRepository$360.0</ID>
+    <ID>MagicNumber:FirestorePlaceRepository.kt$FirestorePlaceRepository$4</ID>
+    <ID>MagicNumber:FirestorePlaceRepository.kt$FirestorePlaceRepository$5</ID>
+    <ID>MagicNumber:FirestorePlaceRepository.kt$FirestorePlaceRepository$50</ID>
+    <ID>MagicNumber:FirestoreReviewRepository.kt$FirestoreReviewRepository$5</ID>
+    <ID>MagicNumber:FullscreenPhotoViewer.kt$5f</ID>
+    <ID>MagicNumber:GeoHash.kt$GeoHash$0.5</ID>
+    <ID>MagicNumber:GeoHash.kt$GeoHash$100.0</ID>
+    <ID>MagicNumber:GeoHash.kt$GeoHash$180.0</ID>
+    <ID>MagicNumber:GeoHash.kt$GeoHash$20.0</ID>
+    <ID>MagicNumber:GeoHash.kt$GeoHash$3</ID>
+    <ID>MagicNumber:GeoHash.kt$GeoHash$4</ID>
+    <ID>MagicNumber:GeoHash.kt$GeoHash$5</ID>
+    <ID>MagicNumber:GeoHash.kt$GeoHash$5.0</ID>
+    <ID>MagicNumber:GeoHash.kt$GeoHash$6</ID>
+    <ID>MagicNumber:GeoHash.kt$GeoHash$90.0</ID>
+    <ID>MagicNumber:GoogleSignInLauncher.kt$12501</ID>
+    <ID>MagicNumber:HomeScreen.kt$0.88f</ID>
+    <ID>MagicNumber:HomeScreen.kt$10_000L</ID>
+    <ID>MagicNumber:HomeScreen.kt$5</ID>
+    <ID>MagicNumber:HomeViewModel.kt$6371.0</ID>
+    <ID>MagicNumber:HomeViewModel.kt$HomeViewModel$3</ID>
+    <ID>MagicNumber:HomeViewModel.kt$HomeViewModel$300</ID>
+    <ID>MagicNumber:HomeViewModel.kt$HomeViewModel$3_000L</ID>
+    <ID>MagicNumber:ImageCompressor.kt$ImageCompressor$180f</ID>
+    <ID>MagicNumber:ImageCompressor.kt$ImageCompressor$270f</ID>
+    <ID>MagicNumber:ImageCompressor.kt$ImageCompressor$90f</ID>
+    <ID>MagicNumber:LoginScreen.kt$0.6f</ID>
+    <ID>MagicNumber:LoginScreen.kt$0xFFF5F8FB</ID>
+    <ID>MagicNumber:LoginScreen.kt$0xFFFFFFFF</ID>
+    <ID>MagicNumber:MapScreen.kt$21.0122</ID>
+    <ID>MagicNumber:MapScreen.kt$52.2297</ID>
+    <ID>MagicNumber:MapScreen.kt$PlaceClusterRenderer$10</ID>
+    <ID>MagicNumber:MapScreen.kt$PlaceClusterRenderer$15f</ID>
+    <ID>MagicNumber:MapViewModel.kt$MapViewModel$1000</ID>
+    <ID>MagicNumber:MapViewModel.kt$MapViewModel$180.0</ID>
+    <ID>MagicNumber:MapViewModel.kt$MapViewModel$5_000</ID>
+    <ID>MagicNumber:MapViewModel.kt$MapViewModel.&lt;no name provided&gt;$0.75f</ID>
+    <ID>MagicNumber:MarkerBitmapGenerator.kt$0x22000000</ID>
+    <ID>MagicNumber:MarkerBitmapGenerator.kt$10</ID>
+    <ID>MagicNumber:MarkerBitmapGenerator.kt$100</ID>
+    <ID>MagicNumber:MarkerBitmapGenerator.kt$MarkerIconCache$0x22000000</ID>
+    <ID>MagicNumber:MyPlacesViewModel.kt$MyPlacesViewModel$5_000</ID>
+    <ID>MagicNumber:MyReviewsScreen.kt$5</ID>
+    <ID>MagicNumber:MyReviewsViewModel.kt$MyReviewsViewModel$5_000</ID>
+    <ID>MagicNumber:NearbyPlacesWidget.kt$1000</ID>
+    <ID>MagicNumber:NearbyPlacesWidget.kt$1000.0</ID>
+    <ID>MagicNumber:NearbyPlacesWidget.kt$NearbyPlacesWidget$3</ID>
+    <ID>MagicNumber:NearbyPlacesWidget.kt$NearbyPlacesWidget$4</ID>
+    <ID>MagicNumber:NearbyPlacesWidget.kt$NearbyPlacesWidget$5</ID>
+    <ID>MagicNumber:OnboardingScreen.kt$0xFFE3F2FD</ID>
+    <ID>MagicNumber:OnboardingScreen.kt$0xFFE8F5E9</ID>
+    <ID>MagicNumber:OnboardingScreen.kt$0xFFFFF8E1</ID>
+    <ID>MagicNumber:PlaceDetailsScreen.kt$10</ID>
+    <ID>MagicNumber:PlaceDetailsScreen.kt$100</ID>
+    <ID>MagicNumber:PlaceDetailsScreen.kt$12</ID>
+    <ID>MagicNumber:PlaceDetailsScreen.kt$14</ID>
+    <ID>MagicNumber:PlaceDetailsScreen.kt$3</ID>
+    <ID>MagicNumber:PlaceDetailsScreen.kt$4</ID>
+    <ID>MagicNumber:PlaceDetailsScreen.kt$5</ID>
+    <ID>MagicNumber:PlaceDetailsViewModel.kt$PlaceDetailsViewModel$10_000</ID>
+    <ID>MagicNumber:PlaceDetailsViewModel.kt$PlaceDetailsViewModel$5</ID>
+    <ID>MagicNumber:PlaceListScreen.kt$0.7f</ID>
+    <ID>MagicNumber:PlaceListScreen.kt$0.9f</ID>
+    <ID>MagicNumber:PlaceListScreen.kt$10</ID>
+    <ID>MagicNumber:PlaceListScreen.kt$100.0</ID>
+    <ID>MagicNumber:PlaceListScreen.kt$1000</ID>
+    <ID>MagicNumber:PlaceListScreen.kt$150</ID>
+    <ID>MagicNumber:PlaceListScreen.kt$25</ID>
+    <ID>MagicNumber:PlaceListScreen.kt$3</ID>
+    <ID>MagicNumber:PlaceListScreen.kt$50</ID>
+    <ID>MagicNumber:PlaceListScreen.kt$6371.0</ID>
+    <ID>MagicNumber:PlaceListViewModel.kt$6371.0</ID>
+    <ID>MagicNumber:PlaceListViewModel.kt$PlaceListViewModel$3</ID>
+    <ID>MagicNumber:PlaceListViewModel.kt$PlaceListViewModel$300</ID>
+    <ID>MagicNumber:PlaceListViewModel.kt$PlaceListViewModel$4</ID>
+    <ID>MagicNumber:PlaceListViewModel.kt$PlaceListViewModel$400</ID>
+    <ID>MagicNumber:PlaceListViewModel.kt$PlaceListViewModel$5</ID>
+    <ID>MagicNumber:PlaceListViewModel.kt$PlaceListViewModel$500</ID>
+    <ID>MagicNumber:PlaceListViewModel.kt$PlaceListViewModel$5_000</ID>
+    <ID>MagicNumber:PlaceListViewModel.kt$PlaceListViewModel$6</ID>
+    <ID>MagicNumber:PlaceListViewModel.kt$PlaceListViewModel$7</ID>
+    <ID>MagicNumber:PlaceListViewModel.kt$PlaceListViewModel$8</ID>
+    <ID>MagicNumber:PlaceListViewModel.kt$PlaceListViewModel$9</ID>
+    <ID>MagicNumber:ProfileScreen.kt$0.1</ID>
+    <ID>MagicNumber:ProfileScreen.kt$0.4</ID>
+    <ID>MagicNumber:ProfileScreen.kt$0.5</ID>
+    <ID>MagicNumber:ProfileScreen.kt$0.9f</ID>
+    <ID>MagicNumber:ProfileScreen.kt$25</ID>
+    <ID>MagicNumber:ProfileScreen.kt$3</ID>
+    <ID>MagicNumber:ProfileScreen.kt$4</ID>
+    <ID>MagicNumber:ProfileScreen.kt$40</ID>
+    <ID>MagicNumber:RankBadge.kt$0xFF757575</ID>
+    <ID>MagicNumber:RankBadge.kt$0xFFBDBDBD</ID>
+    <ID>MagicNumber:RankBadge.kt$0xFFFFB300</ID>
+    <ID>MagicNumber:RankBadge.kt$10</ID>
+    <ID>MagicNumber:RankBadge.kt$3</ID>
+    <ID>MagicNumber:RankBadge.kt$4</ID>
+    <ID>MagicNumber:RankingScreen.kt$0xFF263238</ID>
+    <ID>MagicNumber:RankingScreen.kt$0xFF3E2723</ID>
+    <ID>MagicNumber:RankingScreen.kt$0xFFB0BEC5</ID>
+    <ID>MagicNumber:RankingScreen.kt$0xFFD7A86E</ID>
+    <ID>MagicNumber:RankingScreen.kt$0xFFFFD54F</ID>
+    <ID>MagicNumber:RankingScreen.kt$3</ID>
+    <ID>MagicNumber:RankingScreen.kt$8</ID>
+    <ID>MagicNumber:RankingViewModel.kt$RankingViewModel$3</ID>
+    <ID>MagicNumber:RegisterScreen.kt$0.4f</ID>
+    <ID>MagicNumber:RegisterScreen.kt$0xFFF5F8FB</ID>
+    <ID>MagicNumber:RegisterScreen.kt$0xFFFFFFFF</ID>
+    <ID>MagicNumber:RegisterViewModel.kt$RegisterViewModel.UiState$5</ID>
+    <ID>MagicNumber:RemoteConfigService.kt$RemoteConfigService$10L</ID>
+    <ID>MagicNumber:RemoteConfigService.kt$RemoteConfigService$3600</ID>
+    <ID>MagicNumber:RemoteConfigService.kt$RemoteConfigService$500L</ID>
+    <ID>MagicNumber:ShimmerEffects.kt$0xFFB8B8B8</ID>
+    <ID>MagicNumber:ShimmerEffects.kt$0xFFDDDDDD</ID>
+    <ID>MagicNumber:ShimmerEffects.kt$1000</ID>
+    <ID>MagicNumber:SplashScreen.kt$0.75f</ID>
+    <ID>MagicNumber:SplashScreen.kt$0xFFF5F8FB</ID>
+    <ID>MagicNumber:SyncManager.kt$SyncManager$10</ID>
+    <ID>MagicNumber:SyncWorker.kt$SyncWorker$100</ID>
+    <ID>MagicNumber:TextNormalization.kt$TextNormalization$3</ID>
+    <ID>MagicNumber:TextNormalization.kt$TextNormalization$4</ID>
+    <ID>MagicNumber:TextNormalization.kt$TextNormalization$5</ID>
+    <ID>MagicNumber:Theme.kt$0xFF0E0E0E</ID>
+    <ID>MagicNumber:Theme.kt$0xFF1A1A1A</ID>
+    <ID>MagicNumber:Theme.kt$0xFF252525</ID>
+    <ID>MagicNumber:Theme.kt$0xFF383838</ID>
+    <ID>MagicNumber:Theme.kt$0xFF93000A</ID>
+    <ID>MagicNumber:Theme.kt$0xFFEF5350</ID>
+    <ID>MagicNumber:Theme.kt$0xFFFFDAD6</ID>
+    <ID>MagicNumber:UserBadges.kt$0.6f</ID>
+    <ID>MagicNumber:UserBadges.kt$10</ID>
+    <ID>MagicNumber:UserBadges.kt$15</ID>
+    <ID>MagicNumber:UserBadges.kt$20</ID>
+    <ID>MagicNumber:UserBadges.kt$25</ID>
+    <ID>MagicNumber:UserBadges.kt$3</ID>
+    <ID>MagicNumber:UserBadges.kt$30</ID>
+    <ID>MagicNumber:UserBadges.kt$5</ID>
+    <ID>MagicNumber:UserBadges.kt$50</ID>
+    <ID>MagicNumber:UserBadges.kt$UserBadge.CARTOGRAPHER$0xFF388E3C</ID>
+    <ID>MagicNumber:UserBadges.kt$UserBadge.COMMUNITY_PILLAR$0xFF6D4C41</ID>
+    <ID>MagicNumber:UserBadges.kt$UserBadge.CRITIC$0xFF1565C0</ID>
+    <ID>MagicNumber:UserBadges.kt$UserBadge.EXPLORER$0xFF43A047</ID>
+    <ID>MagicNumber:UserBadges.kt$UserBadge.FAMILY_EXPERT$0xFF8E24AA</ID>
+    <ID>MagicNumber:UserBadges.kt$UserBadge.FIRST_PLACE$0xFFEF6C00</ID>
+    <ID>MagicNumber:UserBadges.kt$UserBadge.FIRST_REVIEW$0xFFEF6C00</ID>
+    <ID>MagicNumber:UserBadges.kt$UserBadge.LEADER_BRONZE$0xFFB87333</ID>
+    <ID>MagicNumber:UserBadges.kt$UserBadge.LEADER_GOLD$0xFFFFB300</ID>
+    <ID>MagicNumber:UserBadges.kt$UserBadge.LEADER_SILVER$0xFF9E9E9E</ID>
+    <ID>MagicNumber:UserBadges.kt$UserBadge.PATHFINDER$0xFF2E7D32</ID>
+    <ID>MagicNumber:UserBadges.kt$UserBadge.PLACE_TOP1$0xFFFFB300</ID>
+    <ID>MagicNumber:UserBadges.kt$UserBadge.PLACE_TOP3$0xFFB87333</ID>
+    <ID>MagicNumber:UserBadges.kt$UserBadge.REVIEWER$0xFF1E88E5</ID>
+    <ID>MagicNumber:UserBadges.kt$UserBadge.SENIOR_REVIEWER$0xFF0D47A1</ID>
+    <ID>MatchingDeclarationName:GoogleSignInLauncher.kt$GoogleSignInResult</ID>
+    <ID>MatchingDeclarationName:HapticFeedback.kt$KidZoneHaptic</ID>
+    <ID>MatchingDeclarationName:NetworkObserver.kt$NetworkStatus</ID>
+    <ID>MatchingDeclarationName:NotificationPreferencesDialog.kt$NotificationPrefs</ID>
+    <ID>MatchingDeclarationName:Result.kt$OpResult&lt;out T&gt;</ID>
+    <ID>MatchingDeclarationName:Routes.kt$Route</ID>
+    <ID>MatchingDeclarationName:TestHelpers.kt$TestFixtures</ID>
+    <ID>MaxLineLength:AddPlaceScreen.kt$Icon(Icons.Filled.AddAPhoto, contentDescription = "Dodaj zdjęcie z galerii", modifier = Modifier.size(18.dp))</ID>
+    <ID>MaxLineLength:AddPlaceScreen.kt$Icon(Icons.Filled.CameraAlt, contentDescription = "Zrób zdjęcie", modifier = Modifier.size(18.dp))</ID>
+    <ID>MaxLineLength:AddReviewSheet.kt$Icon(Icons.Filled.AddAPhoto, contentDescription = "Dodaj zdjęcie z galerii", modifier = Modifier.size(16.dp))</ID>
+    <ID>MaxLineLength:AddReviewSheet.kt$Icon(Icons.Filled.CameraAlt, contentDescription = "Zrób zdjęcie", modifier = Modifier.size(16.dp))</ID>
+    <ID>MaxLineLength:ChangeEmailDialog.kt$visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation()</ID>
+    <ID>MaxLineLength:DeleteAccountDialog.kt$imageVector = if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility</ID>
+    <ID>MaxLineLength:DeleteAccountDialog.kt$visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation()</ID>
+    <ID>MaxLineLength:FirestorePlaceRepository.kt$FirestorePlaceRepository$override suspend</ID>
+    <ID>MaxLineLength:FirestorePlaceRepository.kt$FirestorePlaceRepository$override suspend fun reportPhoto(p: String, r: String, re: String, c: String): OpResult&lt;Unit&gt;</ID>
+    <ID>MaxLineLength:FirestorePlaceRepository.kt$FirestorePlaceRepository$override suspend fun reportPlace(p: String, r: String, re: String, c: String): OpResult&lt;Unit&gt;</ID>
+    <ID>MaxLineLength:FirestorePlaceRepository.kt$FirestorePlaceRepository$override suspend fun submitChangeRequest(p: String, r: String, ch: Map&lt;String, Any&gt;, t: String): OpResult&lt;Unit&gt;</ID>
+    <ID>MaxLineLength:FirestorePlaceRepository.kt$FirestorePlaceRepository$private suspend</ID>
+    <ID>MaxLineLength:FirestorePlaceRepository.kt$FirestorePlaceRepository$q = if (!query.isNullOrBlank()) q.orderBy("name") else q.orderBy("createdAtMillis", com.google.firebase.firestore.Query.Direction.DESCENDING)</ID>
+    <ID>MaxLineLength:FirestorePlaceRepository.kt$FirestorePlaceRepository$return lats.flatMap { la -&gt; lngs.map { lo -&gt; GeoHash.encode(la, lo, precision) } }.distinct().take(MAP_GEOHASH_PREFIX_LIMIT)</ID>
+    <ID>MaxLineLength:FirestorePlaceRepository.kt$FirestorePlaceRepository$val radiusKm = max(latSpan * KM_PER_DEGREE, lngSpan * KM_PER_DEGREE * cos(Math.toRadians(bounds.centerLatitude)).coerceAtLeast(MIN_LONGITUDE_COSINE)) / 2.0</ID>
+    <ID>MaxLineLength:LocationCorrectionDialog.kt$Text(text = address!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
+    <ID>MaxLineLength:LocationCorrectionDialog.kt$Text(text = msg, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)</ID>
+    <ID>MaxLineLength:LocationCorrectionDialog.kt$latitude = lat; longitude = lng; address = addr; errorMessage = err; isFetching = false</ID>
+    <ID>MaxLineLength:LoginViewModel.kt$LoginViewModel$banMessage = if (isBanned) (result.error as AuthException.AccountBanned).banMessage else null</ID>
+    <ID>MaxLineLength:NotificationPreferencesDialog.kt$Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
+    <ID>MaxLineLength:NotificationPreferencesDialog.kt$description = "Kto\u015B doda\u0142 lub usun\u0105\u0142 zdj\u0119cie z miejsca, kt\u00F3re doda\u0142e\u015B"</ID>
+    <ID>MaxLineLength:OnboardingScreen.kt$description = "Dodawaj miejsca, wystawiaj opinie i pomagaj innym rodzicom w wyborze. Zdobywaj odznaki za aktywność!"</ID>
+    <ID>MaxLineLength:OnboardingScreen.kt$description = "Przeglądaj miejsca na interaktywnej mapie. Filtruj po kategorii, odległości i ocenach innych rodziców."</ID>
+    <ID>MaxLineLength:OnboardingScreen.kt$description = "Znajdź najlepsze miejsca dla dzieci w Twojej okolicy. Place zabaw, parki, atrakcje \u2013 wszystko w jednym miejscu."</ID>
+    <ID>MaxLineLength:PendingOperationDao.kt$PendingOperationDao$@Query("SELECT * FROM pending_operations WHERE status = 'failed' AND retryCount &lt; :maxRetries ORDER BY createdAtMillis ASC")</ID>
+    <ID>MaxLineLength:PlaceDetailsScreen.kt$androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly</ID>
+    <ID>MaxLineLength:PlaceDetailsScreen.kt$contentDescription = if (index &lt; review.rating) "Gwiazdka ${index + 1} zaznaczona" else "Gwiazdka ${index + 1}"</ID>
+    <ID>MaxLineLength:PlaceDetailsScreen.kt$leadingIcon = { Icon(Icons.Filled.LocationOn, contentDescription = "Koryguj lokalizację") }</ID>
+    <ID>MaxLineLength:PlaceDetailsViewModel.kt$PlaceDetailsViewModel$fun</ID>
+    <ID>MaxLineLength:RankingScreen.kt$text = "Brak aktywnych u\u017Cytkownik\u00F3w. B\u0105d\u017A pierwszy - dodaj miejsce lub opini\u0119!"</ID>
+    <ID>MaxLineLength:RankingScreen.kt$var previousNetworkStatus by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(networkStatus) }</ID>
+    <ID>MaxLineLength:RankingViewModel.kt$RankingViewModel.UiState$*</ID>
+    <ID>MaxLineLength:RegisterViewModel.kt$RegisterViewModel$successMessage = "Konto utworzone! Sprawdź skrzynkę e-mail i kliknij link weryfikacyjny, aby się zalogować."</ID>
+    <ID>MaxLineLength:User.kt$User$val date = java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale("pl")).format(java.util.Date(bannedUntilMillis))</ID>
+    <ID>ReturnCount:AmenityFilterSheet.kt$private fun AmenitySection.shouldAutoExpand(selectedCategory: PlaceCategory?): Boolean</ID>
+    <ID>ReturnCount:FirebaseAuthRepository.kt$FirebaseAuthRepository$private suspend fun checkBanStatus(userId: String)</ID>
+    <ID>ReturnCount:ImageCompressor.kt$ImageCompressor$fun compressToWebp(context: Context, uri: Uri): ByteArray?</ID>
+    <ID>ReturnCount:ImageCompressor.kt$ImageCompressor$private fun autoRotate(context: Context, uri: Uri, bitmap: Bitmap): Bitmap</ID>
+    <ID>ReturnCount:NavigationArgumentValidator.kt$NavigationArgumentValidator$fun isValidPlaceId(placeId: String?): Boolean</ID>
+    <ID>ReturnCount:NetworkObserver.kt$fun isNetworkAvailable(context: Context): Boolean</ID>
+    <ID>ReturnCount:PlaceDetailsViewModel.kt$PlaceDetailsViewModel$fun addPhotoToPlace(photoUri: android.net.Uri)</ID>
+    <ID>ReturnCount:PlaceDetailsViewModel.kt$PlaceDetailsViewModel$fun deletePhotoFromPlace(photoUrl: String)</ID>
+    <ID>ReturnCount:PlaceDetailsViewModel.kt$PlaceDetailsViewModel$fun submitReview(rating: Int, comment: String, photoUris: List&lt;android.net.Uri&gt; = emptyList(), retainedPhotoUrls: List&lt;String&gt; = emptyList())</ID>
+    <ID>ReturnCount:PlaceDetailsViewModel.kt$PlaceDetailsViewModel$fun submitSuggestedEdit( name: String, description: String, category: String, amenities: Set&lt;String&gt; )</ID>
+    <ID>ReturnCount:PlaceListViewModel.kt$PlaceListViewModel$fun loadMore()</ID>
+    <ID>ReturnCount:RegisterViewModel.kt$RegisterViewModel$fun register()</ID>
+    <ID>ReturnCount:SyncWorker.kt$SyncWorker$private suspend fun processPendingUpdatePlace(payload: String): Boolean</ID>
+    <ID>ReturnCount:SyncWorker.kt$SyncWorker$private suspend fun processPendingUpdateReview(payload: String): Boolean</ID>
+    <ID>ReturnCount:TextNormalization.kt$TextNormalization$fun toSentenceCase(input: String): String</ID>
+    <ID>ReturnCount:TextNormalization.kt$TextNormalization$private fun capitalizeWord(word: String): String</ID>
+    <ID>SafeCast:GoogleSignInLauncher.kt$if (ctx is Activity) ctx else null</ID>
+    <ID>SpreadOperator:FirebaseAuthRepository.kt$FirebaseAuthRepository$(*legacyTokens.toTypedArray())</ID>
+    <ID>SwallowedException:AddPlaceScreen.kt$e: Exception</ID>
+    <ID>SwallowedException:FirebaseAuthRepository.kt$FirebaseAuthRepository$e: FirebaseAuthInvalidCredentialsException</ID>
+    <ID>SwallowedException:FirebaseAuthRepository.kt$FirebaseAuthRepository$e: FirebaseAuthInvalidUserException</ID>
+    <ID>SwallowedException:FirebaseAuthRepository.kt$FirebaseAuthRepository$e: FirebaseAuthUserCollisionException</ID>
+    <ID>SwallowedException:FirebaseAuthRepository.kt$FirebaseAuthRepository$e: FirebaseAuthWeakPasswordException</ID>
+    <ID>SwallowedException:FirestorePlaceRepository.kt$FirestorePlaceRepository$e: Exception</ID>
+    <ID>SwallowedException:GoogleSignInLauncher.kt$e: GetCredentialCancellationException</ID>
+    <ID>SwallowedException:LocationCorrectionDialog.kt$e: Exception</ID>
+    <ID>ThrowsCount:FirebaseAuthRepository.kt$FirebaseAuthRepository$private suspend fun checkBanStatus(userId: String)</ID>
+    <ID>TooGenericExceptionCaught:AddPlaceScreen.kt$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:AddPlaceViewModel.kt$AddPlaceViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:FirebaseAuthRepository.kt$FirebaseAuthRepository$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:FirebaseAuthRepository.kt$FirebaseAuthRepository$e: Throwable</ID>
+    <ID>TooGenericExceptionCaught:FirestorePlaceRepository.kt$FirestorePlaceRepository$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:FirestoreReviewRepository.kt$FirestoreReviewRepository$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:GoogleSignInLauncher.kt$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:HomeScreen.kt$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:InAppReviewManager.kt$InAppReviewManager$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:LocationCorrectionDialog.kt$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:PerformanceTraces.kt$PerformanceTraces$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:PhotoUploader.kt$PhotoUploader$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RemoteConfigService.kt$RemoteConfigService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:SyncWorker.kt$SyncWorker$e: Exception</ID>
+    <ID>TooManyFunctions:AddPlaceScreen.kt$com.kidzone.presentation.place.add.AddPlaceScreen.kt</ID>
+    <ID>TooManyFunctions:AddPlaceViewModel.kt$AddPlaceViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:AnalyticsHelper.kt$AnalyticsHelper</ID>
+    <ID>TooManyFunctions:AuthRepository.kt$AuthRepository</ID>
+    <ID>TooManyFunctions:FirebaseAuthRepository.kt$FirebaseAuthRepository : AuthRepository</ID>
+    <ID>TooManyFunctions:FirestorePlaceRepository.kt$FirestorePlaceRepository : PlaceRepository</ID>
+    <ID>TooManyFunctions:MapScreen.kt$com.kidzone.presentation.map.MapScreen.kt</ID>
+    <ID>TooManyFunctions:PendingOperationDao.kt$PendingOperationDao</ID>
+    <ID>TooManyFunctions:PlaceDao.kt$PlaceDao</ID>
+    <ID>TooManyFunctions:PlaceDetailsScreen.kt$com.kidzone.presentation.place.details.PlaceDetailsScreen.kt</ID>
+    <ID>TooManyFunctions:PlaceDetailsViewModel.kt$PlaceDetailsViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:PlaceListScreen.kt$com.kidzone.presentation.place.list.PlaceListScreen.kt</ID>
+    <ID>TooManyFunctions:PlaceListViewModel.kt$PlaceListViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:PlaceRepository.kt$PlaceRepository</ID>
+    <ID>TooManyFunctions:ProfileScreen.kt$com.kidzone.presentation.profile.ProfileScreen.kt</ID>
+    <ID>TooManyFunctions:ProfileViewModel.kt$ProfileViewModel : ViewModel</ID>
+    <ID>UnusedParameter:AddPlaceViewModel.kt$AddPlaceViewModel$urls: List&lt;String&gt;</ID>
+    <ID>UnusedParameter:KidZoneMessagingService.kt$KidZoneMessagingService.Companion$context: Context</ID>
+    <ID>UnusedParameter:MainScreen.kt$rankingTab: String = ""</ID>
+    <ID>UnusedParameter:PlaceListScreen.kt$animationSource: String? = "list"</ID>
+    <ID>UnusedPrivateMember:DeleteAccountDialog.kt$private fun pluralize(count: Int, one: String, few: String, many: String): String</ID>
+    <ID>UnusedPrivateMember:PlaceListScreen.kt$@Composable private fun EnableLocationForSortingBanner(onAllowClick: () -&gt; Unit)</ID>
+    <ID>UnusedPrivateProperty:DeleteAccountDialog.kt$val context = androidx.compose.ui.platform.LocalContext.current</ID>
+    <ID>UnusedPrivateProperty:FirestorePlaceRepository.kt$FirestorePlaceRepository$private val syncManager: SyncManager</ID>
+    <ID>UnusedPrivateProperty:FirestorePlaceRepository.kt$FirestorePlaceRepository.Companion$private const val PAGE_SIZE_SNAPSHOT = 20</ID>
+    <ID>UnusedPrivateProperty:FirestoreReviewRepository.kt$FirestoreReviewRepository$val syncJob = launch { val firestoreFlow = callbackFlow { val registration = reviewsCollection() .whereEqualTo("placeId", placeId) .addSnapshotListener { snapshot, error -&gt; if (error != null) { close(error) return@addSnapshotListener } val reviews = snapshot?.documents ?.mapNotNull { it.toObject(ReviewDto::class.java) } ?.filterNot { it.reportedAsSpam } ?.map { it.toDomain() } .orEmpty() trySend(reviews) } awaitClose { registration.remove() } } firestoreFlow.collect { reviews -&gt; // Sync do Room: nadpisz cache dla tego placeId reviewDao.deleteByPlace(placeId) reviewDao.upsertAll(reviews.map(ReviewEntity::fromDomain)) } }</ID>
+    <ID>UnusedPrivateProperty:FirestoreReviewRepository.kt$FirestoreReviewRepository$val syncJob = launch { val firestoreFlow = callbackFlow { val registration = reviewsCollection() .whereEqualTo("userId", userId) .addSnapshotListener { snapshot, error -&gt; if (error != null) { close(error) return@addSnapshotListener } val reviews = snapshot?.documents ?.mapNotNull { it.toObject(ReviewDto::class.java)?.toDomain() } ?.sortedByDescending { it.createdAtMillis } .orEmpty() trySend(reviews) } awaitClose { registration.remove() } } firestoreFlow.collect { reviews -&gt; // Upsert all – nie czyścimy tu bo user może mieć opinie // w różnych miejscach, a observeByUser zwraca wszystkie. reviewDao.upsertAll(reviews.map(ReviewEntity::fromDomain)) } }</ID>
+    <ID>UnusedPrivateProperty:MyPlacesScreen.kt$val categoryStyle = place.category.style</ID>
+    <ID>UnusedPrivateProperty:PlaceListScreen.kt$val locationPermissionLauncher = rememberLauncherForActivityResult( contract = ActivityResultContracts.RequestMultiplePermissions() ) { result -&gt; if (result.values.any { it }) { viewModel.refreshLocation() } }</ID>
+    <ID>UnusedPrivateProperty:SyncWorker.kt$SyncWorker$private val placeRepository: PlaceRepository</ID>
+    <ID>UnusedPrivateProperty:SyncWorker.kt$SyncWorker$private val reviewRepository: ReviewRepository</ID>
+    <ID>UseCheckOrError:FirebaseAuthRepository.kt$FirebaseAuthRepository$throw IllegalStateException("Brak zalogowanego uzytkownika")</ID>
+    <ID>UseCheckOrError:FirebaseAuthRepository.kt$FirebaseAuthRepository$throw IllegalStateException("Brak zalogowanego użytkownika")</ID>
+    <ID>UseCheckOrError:FirebaseAuthRepository.kt$FirebaseAuthRepository$throw IllegalStateException("Konto bez e-maila – nie można zmienić e-maila")</ID>
+    <ID>UseCheckOrError:FirebaseAuthRepository.kt$FirebaseAuthRepository$throw IllegalStateException("Konto bez e-maila – nie można zmienić hasła")</ID>
+    <ID>UseCheckOrError:FirebaseAuthRepository.kt$FirebaseAuthRepository$throw IllegalStateException("Logowanie Google się powiodło, ale Firebase nie zwrócił użytkownika")</ID>
+    <ID>UseCheckOrError:FirebaseAuthRepository.kt$FirebaseAuthRepository$throw IllegalStateException("Logowanie się powiodło, ale Firebase nie zwrócił użytkownika")</ID>
+    <ID>UseCheckOrError:FirebaseAuthRepository.kt$FirebaseAuthRepository$throw IllegalStateException("Nie udało się zalogować w celu wysłania weryfikacji")</ID>
+    <ID>UseCheckOrError:FirebaseAuthRepository.kt$FirebaseAuthRepository$throw IllegalStateException("Rejestracja się powiodła, ale Firebase nie zwrócił użytkownika")</ID>
+    <ID>UseCheckOrError:FirestoreReviewRepository.kt$FirestoreReviewRepository$throw IllegalStateException("Już zgłosiłeś tę opinię")</ID>
+    <ID>WildcardImport:FirestorePlaceRepository.kt$import kotlin.math.*</ID>
+    <ID>WildcardImport:FirestorePlaceRepository.kt$import kotlinx.coroutines.flow.*</ID>
+  </CurrentIssues>
+</SmellBaseline>

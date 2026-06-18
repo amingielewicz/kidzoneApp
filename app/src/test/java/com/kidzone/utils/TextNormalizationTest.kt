@@ -1,6 +1,6 @@
 package com.kidzone.utils
 
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -100,7 +100,10 @@ class TextNormalizationTest {
 
         @Test
         fun `trims and collapses whitespace`() {
-            assertEquals("Tekst z wieloma spacjami", TextNormalization.toSentenceCase("  tekst  z  wieloma  spacjami  "))
+            assertEquals(
+                "Tekst z wieloma spacjami",
+                TextNormalization.toSentenceCase("  tekst  z  wieloma  spacjami  ")
+            )
         }
 
         @Test
@@ -128,7 +131,10 @@ class TextNormalizationTest {
         @Test
         fun `preserves proper nouns in middle`() {
             // This is the desired behavior - only first char uppercased, rest untouched
-            assertEquals("Spotkanie w McDonald's o 15:00", TextNormalization.toSentenceCase("spotkanie w McDonald's o 15:00"))
+            assertEquals(
+                "Spotkanie w McDonald's o 15:00",
+                TextNormalization.toSentenceCase("spotkanie w McDonald's o 15:00")
+            )
         }
 
         @Test
