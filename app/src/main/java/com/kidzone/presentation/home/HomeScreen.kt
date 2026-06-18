@@ -84,6 +84,17 @@ private val PLACE_CARD_CONTENT_PADDING = 12.dp
 private const val NEW_PLACE_WINDOW_DAYS = 14L
 private const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
 
+private data class HomePlaceItem(
+    val place: Place,
+    val distanceKm: Double? = null
+)
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+private data class PlaceCardAnimation(
+    val sharedTransitionScope: SharedTransitionScope?,
+    val animatedContentScope: AnimatedContentScope?
+)
+
 /**
  * Ekran "Start" – pierwsza zakładka po zalogowaniu.
  *
@@ -241,15 +252,13 @@ fun HomeScreen(
                 if (state.locationGranted) {
                     item {
                         HorizontalPlacesRow(
-                            places = state.nearbyPlaces.map { it.place },
-                            distancesByPlaceId = state.nearbyPlaces.associate {
-                                it.place.id to it.distanceKm
+                            items = state.nearbyPlaces.map {
+                                HomePlaceItem(it.place, it.distanceKm)
                             },
                             isLoading = state.isNearbyLoading,
                             emptyMessage = stringResource(R.string.home_no_nearby_places),
                             onPlaceClick = { onOpenPlaceDetails(it, "nearby") },
-                            sharedTransitionScope = sharedTransitionScope,
-                            animatedContentScope = animatedContentScope,
+                            animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
                             keyPrefix = "nearby"
                         )
                     }
@@ -264,12 +273,13 @@ fun HomeScreen(
                 if (state.locationGranted) {
                     item {
                         HorizontalPlacesRow(
-                            places = state.topPlaces,
+                            items = state.topPlaces.map {
+                                HomePlaceItem(it.place, it.distanceKm)
+                            },
                             isLoading = state.isTopLoading,
                             emptyMessage = stringResource(R.string.home_no_top_places),
                             onPlaceClick = { onOpenPlaceDetails(it, "top") },
-                            sharedTransitionScope = sharedTransitionScope,
-                            animatedContentScope = animatedContentScope,
+                            animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
                             keyPrefix = "top"
                         )
                     }
@@ -407,13 +417,11 @@ private fun SectionHeader(
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun HorizontalPlacesRow(
-    places: List<Place>,
-    distancesByPlaceId: Map<String, Double> = emptyMap(),
+    items: List<HomePlaceItem>,
     isLoading: Boolean,
     emptyMessage: String,
     onPlaceClick: (placeId: String) -> Unit,
-    sharedTransitionScope: SharedTransitionScope? = null,
-    animatedContentScope: AnimatedContentScope? = null,
+    animation: PlaceCardAnimation,
     keyPrefix: String = ""
 ) {
     val rowHeight = PLACE_ROW_HEIGHT
@@ -430,7 +438,7 @@ private fun HorizontalPlacesRow(
                 }
             }
         }
-        places.isEmpty() -> {
+        items.isEmpty() -> {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -451,13 +459,11 @@ private fun HorizontalPlacesRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(places, key = { "${keyPrefix}_${it.id}" }) { place ->
+                items(items, key = { "${keyPrefix}_${it.place.id}" }) { item ->
                     PlaceCard(
-                        place = place,
-                        distanceKm = distancesByPlaceId[place.id],
-                        onClick = { onPlaceClick(place.id) },
-                        sharedTransitionScope = sharedTransitionScope,
-                        animatedContentScope = animatedContentScope,
+                        item = item,
+                        onClick = { onPlaceClick(item.place.id) },
+                        animation = animation,
                         keyPrefix = keyPrefix
                     )
                 }
@@ -473,13 +479,12 @@ private fun HorizontalPlacesRow(
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun PlaceCard(
-    place: Place,
-    distanceKm: Double? = null,
+    item: HomePlaceItem,
     onClick: () -> Unit,
-    sharedTransitionScope: SharedTransitionScope? = null,
-    animatedContentScope: AnimatedContentScope? = null,
+    animation: PlaceCardAnimation,
     keyPrefix: String = ""
 ) {
+    val place = item.place
     // Prefix keys to avoid duplicates on the same screen (e.g. Nearby vs Top)
     val animationKey = if (keyPrefix.isBlank()) "" else "${keyPrefix}_"
 
@@ -500,8 +505,8 @@ private fun PlaceCard(
                     CategoryIcon(
                         category = place.category,
                         animationKey = "${animationKey}place_icon_${place.id}",
-                        sharedTransitionScope = sharedTransitionScope,
-                        animatedContentScope = animatedContentScope,
+                        sharedTransitionScope = animation.sharedTransitionScope,
+                        animatedContentScope = animation.animatedContentScope,
                         size = PLACE_CARD_ICON_SIZE,
                         iconSize = 18.dp
                     )
@@ -518,15 +523,16 @@ private fun PlaceCard(
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1
                     )
+                    item.distanceKm?.let {
+                        Spacer(Modifier.height(KidZoneSpacing.GapTiny))
+                        DistanceLabel(distanceKm = it)
+                    }
                 }
             }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(KidZoneSpacing.GapSmall),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                distanceKm?.let {
-                    DistanceLabel(distanceKm = it)
-                }
                 when {
                     place.reviewsCount > 0 -> {
                         Icon(

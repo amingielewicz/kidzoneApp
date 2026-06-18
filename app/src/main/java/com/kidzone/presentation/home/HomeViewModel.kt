@@ -68,7 +68,7 @@ class HomeViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
-    data class NearbyPlace(
+    data class PlaceWithDistance(
         val place: Place,
         val distanceKm: Double
     )
@@ -83,8 +83,8 @@ class HomeViewModel @Inject constructor(
      * @property errorMessage błąd ostatniego fetcha (top lub nearby)
      */
     data class UiState(
-        val topPlaces: List<Place> = emptyList(),
-        val nearbyPlaces: List<NearbyPlace> = emptyList(),
+        val topPlaces: List<PlaceWithDistance> = emptyList(),
+        val nearbyPlaces: List<PlaceWithDistance> = emptyList(),
         val isTopLoading: Boolean = false,
         val isNearbyLoading: Boolean = false,
         val isRefreshing: Boolean = false,
@@ -163,7 +163,7 @@ class HomeViewModel @Inject constructor(
                     val nearby = placesWithDistance
                         .sortedBy { it.second }
                         .take(NEARBY_LIMIT)
-                        .map { (place, distanceKm) -> NearbyPlace(place, distanceKm) }
+                        .map { (place, distanceKm) -> PlaceWithDistance(place, distanceKm) }
 
                     val topNearby = placesWithDistance
                         .filter { (place, distanceKm) ->
@@ -175,7 +175,7 @@ class HomeViewModel @Inject constructor(
                                 .thenBy { it.second }
                         )
                         .take(TOP_PLACES_LIMIT)
-                        .map { it.first }
+                        .map { (place, distanceKm) -> PlaceWithDistance(place, distanceKm) }
 
                     _uiState.update {
                         it.copy(
@@ -255,7 +255,7 @@ class HomeViewModel @Inject constructor(
                     val nearby = placesWithDistance
                         .sortedBy { it.second }
                         .take(NEARBY_LIMIT)
-                        .map { (place, distanceKm) -> NearbyPlace(place, distanceKm) }
+                        .map { (place, distanceKm) -> PlaceWithDistance(place, distanceKm) }
 
                     val topNearby = placesWithDistance
                         .filter { (place, distanceKm) ->
@@ -267,7 +267,7 @@ class HomeViewModel @Inject constructor(
                                 .thenBy { it.second }
                         )
                         .take(TOP_PLACES_LIMIT)
-                        .map { it.first }
+                        .map { (place, distanceKm) -> PlaceWithDistance(place, distanceKm) }
 
                     _uiState.update {
                         it.copy(
