@@ -24,9 +24,10 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -102,6 +103,11 @@ fun MainScreen(
     val currentRoute = backStackEntry?.destination?.route
     val context = LocalContext.current
     val networkStatus by rememberNetworkStatus()
+    val showExtendedAddPlaceFab = currentRoute in setOf(
+        Route.Home.path,
+        Route.Map.path,
+        Route.PlaceList.path
+    )
 
     // --- Uprawnienia: POST_NOTIFICATIONS + ACCESS_FINE_LOCATION ---
     // Wymuszamy oba uprawnienia po kolei przy pierwszym wejściu do MainScreen.
@@ -247,8 +253,20 @@ fun MainScreen(
             }
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onOpenAddPlace) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add_place))
+            if (showExtendedAddPlaceFab) {
+                ExtendedFloatingActionButton(
+                    onClick = onOpenAddPlace,
+                    icon = {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                    },
+                    text = {
+                        Text(stringResource(R.string.add_place))
+                    }
+                )
+            } else {
+                FloatingActionButton(onClick = onOpenAddPlace) {
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add_place))
+                }
             }
         }
     ) { padding ->

@@ -61,6 +61,7 @@ import com.kidzone.domain.model.User
 import com.kidzone.presentation.common.BadgesIconRow
 import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
+import com.kidzone.presentation.common.EmptyState
 import com.kidzone.presentation.common.KidZoneCard
 import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.UserBadge
@@ -173,13 +174,11 @@ private fun TopPlacesList(
     lazyListState: LazyListState = rememberLazyListState()
 ) {
     if (places.isEmpty()) {
-        FullScreenCentered {
-            Text(
-                text = "\u017Badne miejsce nie ma jeszcze opinii. Wystaw pierwsz\u0105!",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        EmptyState(
+            icon = Icons.Filled.EmojiEvents,
+            title = "Ranking miejsc jest jeszcze pusty",
+            message = "Dodaj opinię do miejsca, a najwyżej oceniane lokalizacje pojawią się tutaj."
+        )
         return
     }
 
@@ -209,13 +208,11 @@ private fun TopUsersList(
     lazyListState: LazyListState = rememberLazyListState()
 ) {
     if (users.isEmpty()) {
-        FullScreenCentered {
-            Text(
-                text = "Brak aktywnych u\u017Cytkownik\u00F3w. B\u0105d\u017A pierwszy - dodaj miejsce lub opini\u0119!",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        EmptyState(
+            icon = Icons.Filled.Person,
+            title = "Ranking użytkowników jest jeszcze pusty",
+            message = "Aktywność pojawi się po dodaniu pierwszych miejsc, opinii lub zdjęć."
+        )
         return
     }
 

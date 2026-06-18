@@ -154,7 +154,7 @@ private fun EmptyState() {
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "Użyj guzika + na ekranie głównym, by dodać pierwsze miejsce.",
+            text = "Użyj przycisku „Dodaj miejsce” na ekranie głównym, by dodać pierwszą lokalizację.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
