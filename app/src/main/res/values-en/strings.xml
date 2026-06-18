@@ -19,10 +19,12 @@
 
     <!-- Home -->
     <string name="home_welcome">Hi!</string>
+    <string name="home_recent_nearby_places">Recently added nearby</string>
     <string name="home_top_places">TOP near you</string>
     <string name="home_nearby_places">Near you</string>
     <string name="home_open_map">Open map</string>
     <string name="home_open_map_subtitle">See all nearby places</string>
+    <string name="home_no_recent_nearby_places">No new places nearby</string>
     <string name="home_no_top_places">No rated places nearby</string>
     <string name="home_no_nearby_places">No places found nearby</string>
     <string name="home_enable_location">Enable location</string>

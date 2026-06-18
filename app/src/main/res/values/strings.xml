@@ -19,10 +19,12 @@
 
     <!-- Home (zakładka Start) -->
     <string name="home_welcome">Cześć!</string>
+    <string name="home_recent_nearby_places">Ostatnio dodane w okolicy</string>
     <string name="home_top_places">TOP blisko Ciebie</string>
     <string name="home_nearby_places">Blisko Ciebie</string>
     <string name="home_open_map">Otwórz mapę</string>
     <string name="home_open_map_subtitle">Zobacz wszystkie miejsca w okolicy</string>
+    <string name="home_no_recent_nearby_places">Brak nowych miejsc w okolicy</string>
     <string name="home_no_top_places">Brak ocenionych miejsc w pobliżu</string>
     <string name="home_no_nearby_places">Nie znaleźliśmy miejsc w pobliżu</string>
     <string name="home_enable_location">Włącz lokalizację</string>
