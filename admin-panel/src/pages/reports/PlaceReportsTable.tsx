@@ -73,7 +73,11 @@ export function PlaceReportsTable({
                     </Typography>
                   </Tooltip>
                   <Tooltip title="Kopiuj ID">
-                    <IconButton size="small" onClick={() => copyToClipboard(report.placeId)}>
+                    <IconButton
+                      size="small"
+                      aria-label={`Kopiuj ID miejsca ${report.placeId}`}
+                      onClick={() => copyToClipboard(report.placeId)}
+                    >
                       <ContentCopyIcon sx={{ fontSize: 14 }} />
                     </IconButton>
                   </Tooltip>
@@ -93,20 +97,30 @@ export function PlaceReportsTable({
               <TableCell>
                 <Box display="flex" flexDirection="row" alignItems="flex-start">
                   <Tooltip title="Szczegóły">
-                    <IconButton size="small" onClick={() => onViewDetail(report)}>
+                    <IconButton
+                      size="small"
+                      aria-label={`Pokaż szczegóły zgłoszenia miejsca ${report.id}`}
+                      onClick={() => onViewDetail(report)}
+                    >
                       <VisibilityIcon />
                     </IconButton>
                   </Tooltip>
                   {report.status === 'pending' && (
                     <Box display="flex" flexDirection="column">
                       <Tooltip title="Usun miejsce">
-                        <IconButton color="error" size="small" onClick={() => onDelete(report)}>
+                        <IconButton
+                          color="error"
+                          size="small"
+                          aria-label={`Usuń miejsce ze zgłoszenia ${report.id}`}
+                          onClick={() => onDelete(report)}
+                        >
                           <DeleteIcon />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Odrzuc">
                         <IconButton
                           size="small"
+                          aria-label={`Odrzuć zgłoszenie miejsca ${report.id}`}
                           sx={{ color: '#1976D2' }}
                           onClick={() => onDismiss(report)}
                         >

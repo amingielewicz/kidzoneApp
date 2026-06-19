@@ -339,6 +339,7 @@ export function ChangeRequestsPage() {
                     <Tooltip title="Kopiuj ID">
                       <IconButton
                         size="small"
+                        aria-label={`Kopiuj ID miejsca ${request.placeId}`}
                         onClick={() => navigator.clipboard.writeText(request.placeId)}
                       >
                         <ContentCopyIcon sx={{ fontSize: 14 }} />
@@ -360,7 +361,11 @@ export function ChangeRequestsPage() {
                 <TableCell>
                   <Box display="flex" flexDirection="row" alignItems="flex-start">
                     <Tooltip title="Szczegóły">
-                      <IconButton size="small" onClick={() => openDetail(request)}>
+                      <IconButton
+                        size="small"
+                        aria-label={`Pokaż szczegóły propozycji zmian ${request.id}`}
+                        onClick={() => openDetail(request)}
+                      >
                         <VisibilityIcon />
                       </IconButton>
                     </Tooltip>
@@ -370,6 +375,7 @@ export function ChangeRequestsPage() {
                           <IconButton
                             color="success"
                             size="small"
+                            aria-label={`Zatwierdź propozycję zmian ${request.id}`}
                             onClick={() =>
                               confirm('Zatwierdzić i zastosować zmiany do miejsca?', () =>
                                 approveRequest(request),
@@ -382,6 +388,7 @@ export function ChangeRequestsPage() {
                         <Tooltip title="Odrzuć">
                           <IconButton
                             size="small"
+                            aria-label={`Odrzuć propozycję zmian ${request.id}`}
                             sx={{ color: '#1976D2' }}
                             onClick={() =>
                               confirm('Odrzucić propozycję zmian?', () =>
@@ -419,7 +426,11 @@ export function ChangeRequestsPage() {
               <span>
                 {detailRequest.type === 'LOCATION' ? 'Korekta lokalizacji' : 'Propozycja zmian'}
               </span>
-              <IconButton size="small" onClick={() => setDetailRequest(null)}>
+              <IconButton
+                size="small"
+                aria-label="Zamknij szczegóły propozycji zmian"
+                onClick={() => setDetailRequest(null)}
+              >
                 <CancelIcon />
               </IconButton>
             </DialogTitle>
@@ -436,6 +447,7 @@ export function ChangeRequestsPage() {
                   <Tooltip title="Kopiuj Place ID">
                     <IconButton
                       size="small"
+                      aria-label={`Kopiuj ID miejsca ${detailRequest.placeId}`}
                       onClick={() => navigator.clipboard.writeText(detailRequest.placeId)}
                     >
                       <ContentCopyIcon sx={{ fontSize: 14 }} />
@@ -453,6 +465,7 @@ export function ChangeRequestsPage() {
                     <Tooltip title="Kopiuj UID">
                       <IconButton
                         size="small"
+                        aria-label={`Kopiuj UID zgłaszającego ${detailRequest.requesterId}`}
                         onClick={() => navigator.clipboard.writeText(detailRequest.requesterId)}
                       >
                         <ContentCopyIcon sx={{ fontSize: 14 }} />

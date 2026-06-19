@@ -48,12 +48,10 @@ import {
   getDocs,
   doc,
   updateDoc,
-  deleteDoc,
   deleteField,
   limit,
 } from 'firebase/firestore';
 import { db, auth } from '../services/firebase';
-import { adminFetch } from '../services/api';
 import { callFunction } from '../services/cloudFunctions';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { useAuth } from '../hooks/useAuth';
@@ -462,6 +460,7 @@ export function UsersPage() {
                         <Tooltip title="Kopiuj UID">
                           <IconButton
                             size="small"
+                            aria-label={`Kopiuj UID użytkownika ${user.id}`}
                             onClick={() => navigator.clipboard.writeText(user.id)}
                           >
                             <ContentCopyIcon sx={{ fontSize: 14 }} />
@@ -493,7 +492,11 @@ export function UsersPage() {
                 <TableCell>{formatDate(user.createdAtMillis)}</TableCell>
                 <TableCell>
                   <Tooltip title="Akcje">
-                    <IconButton size="small" onClick={(e) => openMenu(e, user)}>
+                    <IconButton
+                      size="small"
+                      aria-label={`Otwórz akcje użytkownika ${user.email || user.name || user.id}`}
+                      onClick={(e) => openMenu(e, user)}
+                    >
                       <MoreVertIcon />
                     </IconButton>
                   </Tooltip>
@@ -624,7 +627,11 @@ export function UsersPage() {
               sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
             >
               <span>Edytuj użytkownika</span>
-              <IconButton size="small" onClick={() => setEditUser(null)}>
+              <IconButton
+                size="small"
+                aria-label="Zamknij edycję użytkownika"
+                onClick={() => setEditUser(null)}
+              >
                 <CancelIcon />
               </IconButton>
             </DialogTitle>
@@ -681,7 +688,11 @@ export function UsersPage() {
               sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
             >
               <span>Zablokuj: {banTargetUser.name || banTargetUser.email}</span>
-              <IconButton size="small" onClick={() => setBanDialogOpen(false)}>
+              <IconButton
+                size="small"
+                aria-label="Zamknij dialog blokady użytkownika"
+                onClick={() => setBanDialogOpen(false)}
+              >
                 <CancelIcon />
               </IconButton>
             </DialogTitle>

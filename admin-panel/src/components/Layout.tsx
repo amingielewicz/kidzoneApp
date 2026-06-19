@@ -44,18 +44,19 @@ export function Layout({ children }: LayoutProps) {
   const { signOut, user } = useAuth();
 
   const drawer = (
-    <Box>
+    <Box component="nav" aria-label="Nawigacja panelu administracyjnego">
       <Toolbar>
         <Typography variant="h6" fontWeight={700} color="primary">
           kidZone Admin
         </Typography>
       </Toolbar>
       <Divider />
-      <List>
+      <List aria-label="Sekcje panelu administracyjnego">
         {menuItems.map((item) => (
           <ListItemButton
             key={item.path}
             selected={location.pathname === item.path}
+            aria-current={location.pathname === item.path ? 'page' : undefined}
             onClick={() => {
               navigate(item.path);
               setMobileOpen(false);
@@ -82,6 +83,9 @@ export function Layout({ children }: LayoutProps) {
           <IconButton
             color="inherit"
             edge="start"
+            aria-label={mobileOpen ? 'Zamknij menu nawigacji' : 'Otwórz menu nawigacji'}
+            aria-controls="admin-mobile-navigation"
+            aria-expanded={mobileOpen}
             onClick={() => setMobileOpen(!mobileOpen)}
             sx={{ mr: 2, display: { md: 'none' } }}
           >
@@ -99,9 +103,14 @@ export function Layout({ children }: LayoutProps) {
 
       {/* Mobile drawer */}
       <Drawer
+        id="admin-mobile-navigation"
         variant="temporary"
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
+        ModalProps={{ keepMounted: true }}
+        PaperProps={{
+          'aria-label': 'Mobilna nawigacja panelu administracyjnego',
+        }}
         sx={{
           display: { xs: 'block', md: 'none' },
           '& .MuiDrawer-paper': { width: DRAWER_WIDTH },
@@ -113,6 +122,9 @@ export function Layout({ children }: LayoutProps) {
       {/* Desktop drawer */}
       <Drawer
         variant="permanent"
+        PaperProps={{
+          'aria-label': 'Nawigacja panelu administracyjnego',
+        }}
         sx={{
           display: { xs: 'none', md: 'block' },
           '& .MuiDrawer-paper': { width: DRAWER_WIDTH, boxSizing: 'border-box' },
@@ -124,6 +136,7 @@ export function Layout({ children }: LayoutProps) {
 
       <Box
         component="main"
+        aria-label="Główna treść panelu administracyjnego"
         sx={{
           flexGrow: 1,
           p: 3,

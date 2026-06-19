@@ -65,7 +65,11 @@ export function ReviewReportsTable({
                     </Typography>
                   </Tooltip>
                   <Tooltip title="Kopiuj ID">
-                    <IconButton size="small" onClick={() => copyToClipboard(report.reviewId)}>
+                    <IconButton
+                      size="small"
+                      aria-label={`Kopiuj ID opinii ${report.reviewId}`}
+                      onClick={() => copyToClipboard(report.reviewId)}
+                    >
                       <ContentCopyIcon sx={{ fontSize: 14 }} />
                     </IconButton>
                   </Tooltip>
@@ -85,20 +89,30 @@ export function ReviewReportsTable({
               <TableCell>
                 <Box display="flex" flexDirection="row" alignItems="flex-start">
                   <Tooltip title="Szczegóły">
-                    <IconButton size="small" onClick={() => onViewDetail(report)}>
+                    <IconButton
+                      size="small"
+                      aria-label={`Pokaż szczegóły zgłoszenia opinii ${report.id}`}
+                      onClick={() => onViewDetail(report)}
+                    >
                       <VisibilityIcon />
                     </IconButton>
                   </Tooltip>
                   {report.status === 'pending' && (
                     <Box display="flex" flexDirection="column">
                       <Tooltip title="Usun opinię">
-                        <IconButton color="error" size="small" onClick={() => onDelete(report)}>
+                        <IconButton
+                          color="error"
+                          size="small"
+                          aria-label={`Usuń opinię ze zgłoszenia ${report.id}`}
+                          onClick={() => onDelete(report)}
+                        >
                           <DeleteIcon />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Odrzuc">
                         <IconButton
                           size="small"
+                          aria-label={`Odrzuć zgłoszenie opinii ${report.id}`}
                           sx={{ color: '#1976D2' }}
                           onClick={() => onDismiss(report)}
                         >
