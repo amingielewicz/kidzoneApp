@@ -409,7 +409,11 @@ fun AddReviewSheet(
                         enabled = !isSubmitting && hashesReady,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Filled.AddAPhoto, contentDescription = "Dodaj zdjęcie z galerii", modifier = Modifier.size(16.dp))
+                        Icon(
+                            Icons.Filled.AddAPhoto,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(Modifier.width(6.dp))
                         Text("Galeria (${totalPhotoCount}/$MAX_REVIEW_PHOTOS)")
                     }
@@ -427,7 +431,11 @@ fun AddReviewSheet(
                         enabled = !isSubmitting && hashesReady,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Filled.CameraAlt, contentDescription = "Zrób zdjęcie", modifier = Modifier.size(16.dp))
+                        Icon(
+                            Icons.Filled.CameraAlt,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(Modifier.width(6.dp))
                         Text("Aparat")
                     }

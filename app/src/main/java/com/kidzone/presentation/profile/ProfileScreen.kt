@@ -64,6 +64,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -579,14 +581,14 @@ private fun MyContentCard(
     onOpenMyReviews: () -> Unit
 ) {
     SectionCard(title = "Moje treści") {
-        NavRow(
+        ProfileNavRow(
             icon = Icons.Filled.Place,
             label = "Moje miejsca",
             trailingText = placesCount.toString(),
             onClick = onOpenMyPlaces
         )
         Spacer(Modifier.height(4.dp))
-        NavRow(
+        ProfileNavRow(
             icon = Icons.Filled.RateReview,
             label = "Moje opinie",
             trailingText = reviewsCount.toString(),
@@ -895,13 +897,13 @@ private fun AccountSecurityCard(
 ) {
     SectionCard(title = "Konto i bezpieczeństwo") {
         if (showPasswordAndEmail) {
-            NavRow(
+            ProfileNavRow(
                 icon = Icons.Filled.Lock,
                 label = "Zmień hasło",
                 onClick = onChangePassword
             )
             Spacer(Modifier.height(4.dp))
-            NavRow(
+            ProfileNavRow(
                 icon = Icons.Filled.AlternateEmail,
                 label = "Zmień adres e-mail",
                 onClick = onChangeEmail
@@ -911,7 +913,7 @@ private fun AccountSecurityCard(
         // "Usuń konto" jest celowo wyróżnione kolorem error – działanie
         // nieodwracalne, użytkownik powinien świadomie się zatrzymać przed
         // kliknięciem. Konsekwencje pokażemy w dialogu potwierdzenia.
-        NavRow(
+        ProfileNavRow(
             icon = Icons.Filled.DeleteForever,
             label = "Usuń konto",
             iconTint = MaterialTheme.colorScheme.error,
@@ -931,19 +933,19 @@ private fun SettingsCard(
     onSignOut: () -> Unit
 ) {
     SectionCard(title = "Ustawienia") {
-        NavRow(
+        ProfileNavRow(
             icon = Icons.Filled.Notifications,
             label = "Powiadomienia email i push",
             onClick = onNotificationPrefs
         )
         Spacer(Modifier.height(4.dp))
-        NavRow(
+        ProfileNavRow(
             icon = Icons.Filled.Gavel,
             label = "Regulamin użytkowania",
             onClick = onTermsOfService
         )
         Spacer(Modifier.height(4.dp))
-        NavRow(
+        ProfileNavRow(
             icon = Icons.Filled.PrivacyTip,
             label = "Polityka prywatności",
             onClick = onPrivacyPolicy
@@ -984,7 +986,8 @@ private fun SettingsCard(
  *   Gdy null – pokazujemy chevron `>` jako sygnał "kliknij i zobacz".
  */
 @Composable
-private fun NavRow(
+@Suppress("FunctionNaming")
+internal fun ProfileNavRow(
     icon: ImageVector,
     label: String,
     onClick: () -> Unit,
@@ -995,7 +998,13 @@ private fun NavRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .heightIn(min = 48.dp)
+            .clickable(
+                onClickLabel = label,
+                role = Role.Button,
+                onClick = onClick
+            )
+            .semantics(mergeDescendants = true) {}
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

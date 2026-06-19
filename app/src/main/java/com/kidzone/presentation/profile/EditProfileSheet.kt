@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -288,7 +289,7 @@ private fun AvatarPicker(
                 .size(avatarSize)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primaryContainer)
-                .clickable(enabled = enabled, onClick = onClick),
+                .clickable(enabled = enabled, onClickLabel = "Zmień avatar", role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center
         ) {
             when {
