@@ -1,10 +1,5 @@
 package com.kidzone.presentation.home
 
-import android.Manifest
-import android.app.Activity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.IntentSenderRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
@@ -50,7 +45,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -61,12 +55,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.google.android.gms.common.api.ResolvableApiException
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.LocationSettingsRequest
-import com.google.android.gms.location.Priority
-import kotlinx.coroutines.tasks.await
 import com.kidzone.R
 import com.kidzone.domain.model.Place
 import com.kidzone.presentation.common.CategoryBadge
@@ -103,16 +91,17 @@ private data class PlaceCardAnimation(
  * Sekcje (w kolejności):
  *  1. Hero – kolorowe powitanie z taglinem.
  *  2. CTA do mapy – pełnoszerokościowa karta zachęcająca do otwarcia mapy.
- *  3. Systemowy dialog Androida o lokalizację, jeśli permission nie jest jeszcze nadany.
- *  4. "Blisko Ciebie" – LazyRow z miejscami w okolicy.
- *  5. "Top miejsca" – LazyRow z najwyżej ocenianymi miejscami w pobliżu.
- *  6. "Ostatnio dodane w okolicy" – nowe miejsca z ostatnich 14 dni.
+ *  3. "Blisko Ciebie" – LazyRow z miejscami w okolicy.
+ *  4. "Top miejsca" – LazyRow z najwyżej ocenianymi miejscami w pobliżu.
+ *  5. "Ostatnio dodane w okolicy" – nowe miejsca z ostatnich 14 dni.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
 fun HomeScreen(
     onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
     onOpenMap: () -> Unit,
+    locationPermissionGranted: Boolean = false,
     viewModel: HomeViewModel = hiltViewModel(),
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedContentScope: AnimatedContentScope? = null
@@ -132,6 +121,12 @@ fun HomeScreen(
         previousNetworkStatus = networkStatus
     }
 
+    LaunchedEffect(locationPermissionGranted) {
+        if (locationPermissionGranted) {
+            viewModel.onLocationPermissionGranted()
+        }
+    }
+
     // Refresh permission flag gdy ekran wraca na pierwszy plan – user mógł
     // pójść do Settings i włączyć/wyłączyć lokalizację, a my chcemy mieć
     // aktualny stan w UI bez restartu.
@@ -143,76 +138,6 @@ fun HomeScreen(
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-    }
-
-    var hasAskedForLocationPermission by remember { mutableStateOf(false) }
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { result ->
-        // Wystarczy zgoda na coarse, żeby pokazać miejsca w pobliżu –
-        // dokładność z grubsza jest tu OK (radius 10km).
-        if (result.values.any { it }) {
-            viewModel.onLocationPermissionGranted()
-        }
-    }
-
-    // --- SettingsClient: systemowy dialog "Włącz GPS" bez wychodzenia z apki ---
-    val context = LocalContext.current
-    val gpsSettingsLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartIntentSenderForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            // User włączył GPS w systemowym dialogu – odśwież dane
-            viewModel.refresh()
-        }
-    }
-
-    // Automatycznie wyświetl dialog SettingsClient gdy GPS jest wyłączony
-    // a permission jest nadany. Używamy LaunchedEffect z kluczem gpsEnabled,
-    // żeby dialog pokazał się raz (nie w kółko).
-    var hasRequestedGpsDialog by remember { mutableStateOf(false) }
-    LaunchedEffect(state.locationGranted, gpsEnabled) {
-        if (state.locationGranted && !gpsEnabled && !hasRequestedGpsDialog) {
-            hasRequestedGpsDialog = true
-            try {
-                val locationRequest = LocationRequest.Builder(
-                    Priority.PRIORITY_HIGH_ACCURACY,
-                    10_000L
-                ).build()
-                val settingsRequest = LocationSettingsRequest.Builder()
-                    .addLocationRequest(locationRequest)
-                    .setAlwaysShow(true) // force show dialog even if previously dismissed
-                    .build()
-                val settingsClient = LocationServices.getSettingsClient(context)
-                settingsClient.checkLocationSettings(settingsRequest).await()
-                // GPS jest już włączony (edge case – zmieniono w tle)
-            } catch (e: Exception) {
-                if (e is ResolvableApiException) {
-                    // Pokazuje systemowy dialog "Włącz lokalizację"
-                    val intentSender = e.resolution.intentSender
-                    gpsSettingsLauncher.launch(
-                        IntentSenderRequest.Builder(intentSender).build()
-                    )
-                }
-            }
-        }
-        // Reset flagi gdy GPS zostanie włączony (żeby następne wyłączenie
-        // znów wyzwoliło dialog)
-        if (gpsEnabled) {
-            hasRequestedGpsDialog = false
-        }
-    }
-
-    LaunchedEffect(state.locationGranted) {
-        if (!state.locationGranted && !hasAskedForLocationPermission) {
-            hasAskedForLocationPermission = true
-            locationPermissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
-        }
     }
 
     PullToRefreshBox(

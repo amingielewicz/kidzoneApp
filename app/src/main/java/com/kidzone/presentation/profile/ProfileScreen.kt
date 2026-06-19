@@ -82,6 +82,7 @@ import com.kidzone.presentation.common.KidZoneCard
 import com.kidzone.presentation.common.RankBadge
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.rememberHapticFeedback
+import com.kidzone.presentation.common.rememberReducedMotionEnabled
 import com.kidzone.presentation.common.shimmerEffect
 import nl.dionsegijn.konfetti.compose.KonfettiView
 import nl.dionsegijn.konfetti.core.Party
@@ -127,6 +128,7 @@ fun ProfileScreen(
 
     // Haptic feedback for newly earned badges
     val haptic = rememberHapticFeedback()
+    val reducedMotionEnabled = rememberReducedMotionEnabled()
     LaunchedEffect(ui.newlyEarnedBadges) {
         if (ui.newlyEarnedBadges.isNotEmpty()) haptic.reward()
     }
@@ -277,6 +279,7 @@ fun ProfileScreen(
     if (ui.newlyEarnedBadges.isNotEmpty()) {
         BadgeEarnedDialog(
             badges = ui.newlyEarnedBadges,
+            reducedMotionEnabled = reducedMotionEnabled,
             onDismiss = viewModel::consumeNewlyEarnedBadge
         )
     }
@@ -725,8 +728,10 @@ private fun BadgesInfoDialog(
  * pozytywne wydarzenie powinno się wyróżnić względem zwykłej nawigacji.
  */
 @Composable
+@Suppress("FunctionNaming", "LongMethod")
 private fun BadgeEarnedDialog(
     badges: List<UserBadge>,
+    reducedMotionEnabled: Boolean,
     onDismiss: () -> Unit
 ) {
     // Używamy podstawowego Dialogu z wyłączoną domyślną szerokością,
@@ -849,45 +854,57 @@ private fun BadgeEarnedDialog(
                 }
             }
 
-            // --- SPEKTAKULARNE KONFETTI NA WIERZCHU ---
-            KonfettiView(
-                modifier = Modifier.fillMaxSize(),
-                parties = listOf(
-                    // Burst from left
-                    Party(
-                        speed = 10f,
-                        maxSpeed = 35f,
-                        damping = 0.9f,
-                        angle = 330,
-                        spread = 60,
-                        colors = listOf(0xFFFFC93C.toInt(), 0xFF1E88E5.toInt(), 0xFF43A047.toInt(), 0xFFFFFFFF.toInt()),
-                        emitter = Emitter(duration = 2, TimeUnit.SECONDS).perSecond(40),
-                        position = Position.Relative(0.0, 0.4)
-                    ),
-                    // Burst from right
-                    Party(
-                        speed = 10f,
-                        maxSpeed = 35f,
-                        damping = 0.9f,
-                        angle = 210,
-                        spread = 60,
-                        colors = listOf(0xFFFFC93C.toInt(), 0xFF1E88E5.toInt(), 0xFF43A047.toInt(), 0xFFFFFFFF.toInt()),
-                        emitter = Emitter(duration = 2, TimeUnit.SECONDS).perSecond(40),
-                        position = Position.Relative(1.0, 0.4)
-                    ),
-                    // Rain from top
-                    Party(
-                        speed = 0f,
-                        maxSpeed = 20f,
-                        damping = 0.9f,
-                        angle = 90,
-                        spread = 360,
-                        colors = listOf(0xFFFFC93C.toInt(), 0xFFFFFFFF.toInt()),
-                        emitter = Emitter(duration = 3, TimeUnit.SECONDS).perSecond(25),
-                        position = Position.Relative(0.5, -0.1)
+            if (!reducedMotionEnabled) {
+                // --- SPEKTAKULARNE KONFETTI NA WIERZCHU ---
+                KonfettiView(
+                    modifier = Modifier.fillMaxSize(),
+                    parties = listOf(
+                        // Burst from left
+                        Party(
+                            speed = 10f,
+                            maxSpeed = 35f,
+                            damping = 0.9f,
+                            angle = 330,
+                            spread = 60,
+                            colors = listOf(
+                                0xFFFFC93C.toInt(),
+                                0xFF1E88E5.toInt(),
+                                0xFF43A047.toInt(),
+                                0xFFFFFFFF.toInt()
+                            ),
+                            emitter = Emitter(duration = 2, TimeUnit.SECONDS).perSecond(40),
+                            position = Position.Relative(0.0, 0.4)
+                        ),
+                        // Burst from right
+                        Party(
+                            speed = 10f,
+                            maxSpeed = 35f,
+                            damping = 0.9f,
+                            angle = 210,
+                            spread = 60,
+                            colors = listOf(
+                                0xFFFFC93C.toInt(),
+                                0xFF1E88E5.toInt(),
+                                0xFF43A047.toInt(),
+                                0xFFFFFFFF.toInt()
+                            ),
+                            emitter = Emitter(duration = 2, TimeUnit.SECONDS).perSecond(40),
+                            position = Position.Relative(1.0, 0.4)
+                        ),
+                        // Rain from top
+                        Party(
+                            speed = 0f,
+                            maxSpeed = 20f,
+                            damping = 0.9f,
+                            angle = 90,
+                            spread = 360,
+                            colors = listOf(0xFFFFC93C.toInt(), 0xFFFFFFFF.toInt()),
+                            emitter = Emitter(duration = 3, TimeUnit.SECONDS).perSecond(25),
+                            position = Position.Relative(0.5, -0.1)
+                        )
                     )
                 )
-            )
+            }
         }
     }
 }
