@@ -128,10 +128,12 @@ private const val SPIDERFY_MAX_EXTRA = 8
 
 @SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class)
+@Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
 @Composable
 fun MapScreen(
     onOpenPlaceDetails: (placeId: String) -> Unit,
     focusOn: LatLng? = null,
+    locationPermissionGrantedSignal: Boolean = false,
     onFocusConsumed: () -> Unit = {},
     viewModel: MapViewModel = hiltViewModel()
 ) {
@@ -184,14 +186,25 @@ fun MapScreen(
     }
 
     LaunchedEffect(Unit) {
-        if (!locationPermissionGranted) {
-            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-        } else if (focusOn == null) {
+        if (locationPermissionGranted && focusOn == null) {
             recenterOnUser(
                 context = context,
                 cameraPositionState = cameraPositionState,
                 shouldAnimate = { !userTouchedMap }
             )
+        }
+    }
+
+    LaunchedEffect(locationPermissionGrantedSignal) {
+        if (locationPermissionGrantedSignal && !locationPermissionGranted) {
+            locationPermissionGranted = true
+            if (focusOn == null) {
+                recenterOnUser(
+                    context = context,
+                    cameraPositionState = cameraPositionState,
+                    shouldAnimate = { !userTouchedMap }
+                )
+            }
         }
     }
 

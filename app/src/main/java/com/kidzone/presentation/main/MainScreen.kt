@@ -1,6 +1,12 @@
 package com.kidzone.presentation.main
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.AnimatedVisibility
@@ -9,10 +15,12 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,6 +31,7 @@ import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
@@ -31,7 +40,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,8 +56,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -58,7 +73,6 @@ import com.kidzone.R
 import com.kidzone.navigation.Route
 import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.NoInternetBanner
-import com.kidzone.presentation.common.RequestNotificationPermission
 import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.home.HomeScreen
 import com.kidzone.presentation.map.MapScreen
@@ -109,57 +123,33 @@ fun MainScreen(
         Route.PlaceList.path
     )
 
-    // --- Uprawnienia: POST_NOTIFICATIONS + ACCESS_FINE_LOCATION ---
-    // Wymuszamy oba uprawnienia po kolei przy pierwszym wejściu do MainScreen.
-    // Notification → Location (sekwencyjnie, żeby system dialogi nie walczyły).
+    var locationPermissionGranted by remember {
+        mutableStateOf(hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION))
+    }
+    var notificationPermissionGranted by remember {
+        mutableStateOf(hasNotificationPermission(context))
+    }
+    var locationRationaleDismissed by remember { mutableStateOf(false) }
+    var notificationRationaleDismissed by remember { mutableStateOf(false) }
 
-    val locationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
-    ) { /* granted or denied — MapScreen zareaguje sam */ }
-
-    val notificationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
-    ) { _ ->
-        // Po zakończeniu dialogu powiadomień → od razu prosimy o lokalizację
-        val locPermission = android.Manifest.permission.ACCESS_FINE_LOCATION
-        val locGranted = androidx.core.content.ContextCompat.checkSelfPermission(
-            context, locPermission
-        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        if (!locGranted) {
-            locationPermissionLauncher.launch(locPermission)
-        }
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        locationPermissionGranted = granted
+        locationRationaleDismissed = granted
     }
 
-    LaunchedEffect(Unit) {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            val notifPermission = android.Manifest.permission.POST_NOTIFICATIONS
-            val notifGranted = androidx.core.content.ContextCompat.checkSelfPermission(
-                context, notifPermission
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            if (!notifGranted) {
-                notificationPermissionLauncher.launch(notifPermission)
-            } else {
-                // Powiadomienia już nadane → proś od razu o lokalizację
-                val locPermission = android.Manifest.permission.ACCESS_FINE_LOCATION
-                val locGranted = androidx.core.content.ContextCompat.checkSelfPermission(
-                    context, locPermission
-                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                if (!locGranted) {
-                    locationPermissionLauncher.launch(locPermission)
-                }
-            }
-        } else {
-            // Android < 13: powiadomienia nie wymagają runtime permission,
-            // ale lokalizacja dalej wymaga.
-            val locPermission = android.Manifest.permission.ACCESS_FINE_LOCATION
-            val locGranted = androidx.core.content.ContextCompat.checkSelfPermission(
-                context, locPermission
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            if (!locGranted) {
-                locationPermissionLauncher.launch(locPermission)
-            }
-        }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        notificationPermissionGranted = granted
+        notificationRationaleDismissed = granted
     }
+
+    val showNotificationRationale = !notificationPermissionGranted && !notificationRationaleDismissed
+    val showLocationRationale = !showNotificationRationale &&
+        !locationPermissionGranted &&
+        !locationRationaleDismissed
 
     // Lokalny stan przekazywany dalej do MapScreen. Trzymamy go obok sygnału
     // z parent NavGraph, bo `onFocusConsumed()` od razu wyczyści savedStateHandle,
@@ -172,9 +162,6 @@ fun MainScreen(
     LaunchedEffect(Unit) {
         com.kidzone.messaging.KidZoneMessagingService.registerCurrentToken(context)
     }
-
-    // Uprawnienie POST_NOTIFICATIONS (Android 13+) — reusable composable utility.
-    RequestNotificationPermission()
 
     // Deep link: przełączenie na konkretną zakładkę (profile, ranking, map)
     LaunchedEffect(focusTab) {
@@ -278,6 +265,34 @@ fun MainScreen(
             ) {
                 NoInternetBanner()
             }
+            if (showNotificationRationale) {
+                PermissionRationaleBanner(
+                    rationale = PermissionRationale(
+                        title = "Włącz powiadomienia",
+                        message = "Damy znać o nowych odznakach, odpowiedziach i ważnych zmianach w Twoich miejscach.",
+                        primaryActionLabel = "Włącz"
+                    ),
+                    onPrimaryAction = {
+                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    },
+                    onDismiss = { notificationRationaleDismissed = true },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            if (showLocationRationale) {
+                PermissionRationaleBanner(
+                    rationale = PermissionRationale(
+                        title = "Udostępnij lokalizację",
+                        message = "Pokażemy miejsca blisko Ciebie, odległości na Start i wygodniej wycentrujemy mapę.",
+                        primaryActionLabel = "Pozwól"
+                    ),
+                    onPrimaryAction = {
+                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                    },
+                    onDismiss = { locationRationaleDismissed = true },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             NavHost(
                 navController = navController,
                 startDestination = Route.Home.path,
@@ -295,6 +310,7 @@ fun MainScreen(
                                 restoreState = true
                             }
                         },
+                        locationPermissionGranted = locationPermissionGranted,
                         sharedTransitionScope = sharedTransitionScope,
                         animatedContentScope = animatedContentScope
                     )
@@ -303,6 +319,7 @@ fun MainScreen(
                     MapScreen(
                         onOpenPlaceDetails = { onOpenPlaceDetails(it, null) },
                         focusOn = pendingMapFocus,
+                        locationPermissionGrantedSignal = locationPermissionGranted,
                         onFocusConsumed = { pendingMapFocus = null }
                     )
                 }
@@ -344,3 +361,63 @@ private enum class BottomTab(
     Ranking(Route.Ranking, Icons.Filled.EmojiEvents, R.string.nav_ranking),
     Profile(Route.Profile, Icons.Filled.Person, R.string.nav_profile);
 }
+
+private data class PermissionRationale(
+    val title: String,
+    val message: String,
+    val primaryActionLabel: String
+)
+
+@Suppress("FunctionNaming")
+@Composable
+private fun PermissionRationaleBanner(
+    rationale: PermissionRationale,
+    onPrimaryAction: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.semantics {
+            liveRegion = LiveRegionMode.Polite
+        },
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        tonalElevation = 2.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = rationale.title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = rationale.message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("Później")
+                }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = onPrimaryAction) {
+                    Text(rationale.primaryActionLabel)
+                }
+            }
+        }
+    }
+}
+
+private fun hasRuntimePermission(context: Context, permission: String): Boolean =
+    ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+private fun hasNotificationPermission(context: Context): Boolean =
+    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+        hasRuntimePermission(context, Manifest.permission.POST_NOTIFICATIONS)
