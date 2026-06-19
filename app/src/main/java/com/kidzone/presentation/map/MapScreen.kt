@@ -9,6 +9,7 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,10 +20,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -63,6 +67,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -138,6 +147,7 @@ fun MapScreen(
     }
     var mapLoaded by remember { mutableStateOf(false) }
     var userTouchedMap by remember { mutableStateOf(false) }
+    var showPlacesList by remember { mutableStateOf(false) }
     val markerIconCache = rememberMarkerIcons()
     val clusterItems = remember(state.places) {
         buildPlaceClusterItems(state.places)
@@ -292,7 +302,12 @@ fun MapScreen(
 
         if (state.isLoading && state.places.isEmpty()) {
             CircularProgressIndicator(
-                modifier = Modifier.align(Alignment.Center)
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .semantics {
+                        contentDescription = "Ładowanie miejsc na mapie"
+                        liveRegion = LiveRegionMode.Polite
+                    }
             )
         }
 
@@ -338,11 +353,23 @@ fun MapScreen(
             )
         }
 
+        Button(
+            onClick = { showPlacesList = true },
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 12.dp, bottom = 180.dp)
+        ) {
+            Text("Lista miejsc (${state.places.size})")
+        }
+
         state.errorMessage?.let { msg ->
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(start = 16.dp, end = 88.dp, bottom = 96.dp),
+                    .padding(start = 16.dp, end = 88.dp, bottom = 96.dp)
+                    .semantics {
+                        liveRegion = LiveRegionMode.Assertive
+                    },
                 color = MaterialTheme.colorScheme.errorContainer,
                 shape = MaterialTheme.shapes.medium,
                 tonalElevation = 4.dp
@@ -367,6 +394,21 @@ fun MapScreen(
                 onOpenDetails = {
                     onOpenPlaceDetails(selectedPlace.id)
                     viewModel.onPlaceSelected(null)
+                }
+            )
+        }
+    }
+
+    if (showPlacesList) {
+        ModalBottomSheet(
+            onDismissRequest = { showPlacesList = false }
+        ) {
+            MapPlacesListSheet(
+                places = state.places,
+                onOpenDetails = { placeId ->
+                    showPlacesList = false
+                    viewModel.onPlaceSelected(null)
+                    onOpenPlaceDetails(placeId)
                 }
             )
         }
@@ -548,7 +590,9 @@ private fun LocationPermissionBanner(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier,
+        modifier = modifier.semantics {
+            liveRegion = LiveRegionMode.Polite
+        },
         color = MaterialTheme.colorScheme.tertiaryContainer,
         shape = MaterialTheme.shapes.medium,
         tonalElevation = 4.dp,
@@ -797,6 +841,134 @@ private fun PlacePreviewContent(
         }
     }
 }
+
+@Composable
+@Suppress("FunctionNaming")
+private fun MapPlacesListSheet(
+    places: List<Place>,
+    onOpenDetails: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 16.dp)
+    ) {
+        Text(
+            text = "Miejsca na mapie",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = "Lista pokazuje aktualnie załadowane miejsca z mapy.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(12.dp))
+
+        if (places.isEmpty()) {
+            Text(
+                text = "Brak miejsc do wyświetlenia.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 24.dp)
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 520.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(
+                    items = places,
+                    key = { it.id }
+                ) { place ->
+                    MapPlaceListItem(
+                        place = place,
+                        onOpenDetails = { onOpenDetails(place.id) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming", "LongMethod")
+private fun MapPlaceListItem(
+    place: Place,
+    onOpenDetails: () -> Unit
+) {
+    val categoryLabel = stringResource(place.category.labelRes)
+    val ratingLabel = mapPlaceRatingLabel(place)
+    val addressLabel = place.address.takeIf { it.isNotBlank() }
+    val accessibilityLabel = buildString {
+        append(place.name)
+        append(", ")
+        append(categoryLabel)
+        append(", ")
+        append(ratingLabel)
+        addressLabel?.let {
+            append(", ")
+            append(it)
+        }
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) {
+                contentDescription = accessibilityLabel
+            }
+            .clickable(
+                onClickLabel = "Otwórz szczegóły miejsca",
+                role = Role.Button,
+                onClick = onOpenDetails
+            ),
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 1.dp,
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = place.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = categoryLabel,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = ratingLabel,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            addressLabel?.let {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2
+                )
+            }
+        }
+    }
+}
+
+private fun mapPlaceRatingLabel(place: Place): String =
+    if (place.reviewsCount > 0) {
+        "Ocena %.1f, liczba opinii: %d".format(place.averageRating, place.reviewsCount)
+    } else {
+        "Brak opinii"
+    }
 
 @Composable
 private fun MapIconButton(

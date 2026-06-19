@@ -55,6 +55,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -494,7 +497,15 @@ private fun MessageBanner(text: String, isError: Boolean) {
     Surface(
         shape = RoundedCornerShape(10.dp),
         color = containerColor,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                liveRegion = if (isError) {
+                    LiveRegionMode.Assertive
+                } else {
+                    LiveRegionMode.Polite
+                }
+            }
     ) {
         Text(
             text = text,
