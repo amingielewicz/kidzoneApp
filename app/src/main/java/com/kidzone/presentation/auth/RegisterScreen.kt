@@ -201,11 +201,15 @@ fun RegisterScreen(
                             shape = RoundedCornerShape(12.dp),
                             isError = state.name.isNotEmpty() && !state.isNameValid,
                             supportingText = {
-                                Text(
-                                    text = "Widoczna w opiniach, miejscach i rankingu",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                )
+                                if (state.name.isBlank()) {
+                                    Text("Pole wymagane")
+                                } else {
+                                    Text(
+                                        text = "Widoczna w opiniach, miejscach i rankingu",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
+                                }
                             },
                             enabled = !state.isLoading,
                             modifier = Modifier.fillMaxWidth()
@@ -232,8 +236,9 @@ fun RegisterScreen(
                             shape = RoundedCornerShape(12.dp),
                             isError = state.email.isNotEmpty() && !state.isEmailValid,
                             supportingText = {
-                                if (state.email.isNotEmpty() && !state.isEmailValid) {
-                                    Text("Niepoprawny format e-maila")
+                                when {
+                                    state.email.isBlank() -> Text("Pole wymagane")
+                                    !state.isEmailValid -> Text("Niepoprawny format e-maila")
                                 }
                             },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -278,6 +283,11 @@ fun RegisterScreen(
                                 }
                             },
                             enabled = !state.isLoading,
+                            supportingText = {
+                                if (state.password.isBlank()) {
+                                    Text("Pole wymagane")
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth()
                         )
 
