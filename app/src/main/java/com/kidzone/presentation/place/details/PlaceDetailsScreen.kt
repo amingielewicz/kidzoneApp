@@ -268,7 +268,7 @@ fun PlaceDetailsScreen(
                             if (isOwner) {
                                 DropdownMenuItem(
                                     text = { Text("Edytuj") },
-                                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = "Edytuj") },
+                                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
                                     onClick = {
                                         showOverflow = false
                                         state.place?.let { onEditPlace(it.id) }
@@ -279,7 +279,7 @@ fun PlaceDetailsScreen(
                                     leadingIcon = {
                                         Icon(
                                             Icons.Filled.Delete,
-                                            contentDescription = "Usuń",
+                                            contentDescription = null,
                                             tint = MaterialTheme.colorScheme.error
                                         )
                                     },
@@ -292,7 +292,7 @@ fun PlaceDetailsScreen(
                             // --- Udostępnij (dla wszystkich) ---
                             DropdownMenuItem(
                                 text = { Text("Udost\u0119pnij") },
-                                leadingIcon = { Icon(Icons.Filled.Share, contentDescription = "Udostępnij") },
+                                leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
                                 onClick = {
                                     showOverflow = false
                                     state.place?.let { place ->
@@ -320,7 +320,7 @@ fun PlaceDetailsScreen(
                             if (!isOwner) {
                                 DropdownMenuItem(
                                     text = { Text("Zaproponuj zmian\u0119") },
-                                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = "Zaproponuj zmianę") },
+                                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
                                     onClick = {
                                         showOverflow = false
                                         showSuggestEditSheet = true
@@ -328,7 +328,7 @@ fun PlaceDetailsScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Koryguj lokalizacj\u0119") },
-                                    leadingIcon = { Icon(Icons.Filled.LocationOn, contentDescription = "Koryguj lokalizację") },
+                                    leadingIcon = { Icon(Icons.Filled.LocationOn, contentDescription = null) },
                                     onClick = {
                                         showOverflow = false
                                         showLocationCorrectionDialog = true
@@ -340,7 +340,7 @@ fun PlaceDetailsScreen(
                                         leadingIcon = {
                                             Icon(
                                                 Icons.Filled.Flag,
-                                                contentDescription = "Zgłoś",
+                                                contentDescription = null,
                                                 tint = MaterialTheme.colorScheme.error
                                             )
                                         },
@@ -703,7 +703,7 @@ private fun PlaceDetailsContent(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.AddAPhoto,
-                                contentDescription = "Dodaj zdjęcie z galerii",
+                                contentDescription = null,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(Modifier.width(6.dp))
@@ -716,7 +716,7 @@ private fun PlaceDetailsContent(
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.CameraAlt,
-                                    contentDescription = "Zrób zdjęcie",
+                                    contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(Modifier.width(6.dp))
@@ -998,7 +998,7 @@ private fun PlaceMainCard(
             ) {
                 Icon(
                     imageVector = Icons.Filled.LocationOn,
-                    contentDescription = "Zobacz na mapie Google",
+                    contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(6.dp))
@@ -1014,7 +1014,7 @@ private fun PlaceMainCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.Person,
-                    contentDescription = "Autor",
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
                 )
@@ -1479,14 +1479,14 @@ private fun ReviewSortDropdown(
         TextButton(onClick = { expanded = true }) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.Sort,
-                contentDescription = "Sortuj",
+                contentDescription = null,
                 modifier = Modifier.size(18.dp)
             )
             Spacer(Modifier.width(6.dp))
             Text(text = current.label)
             Icon(
                 imageVector = Icons.Filled.ArrowDropDown,
-                contentDescription = "Rozwiń listę sortowania"
+                contentDescription = null
             )
         }
         DropdownMenu(
@@ -1535,7 +1535,7 @@ private fun DeleteConfirmationDialog(
         icon = {
             Icon(
                 imageVector = Icons.Filled.Delete,
-                contentDescription = "Usuń",
+                contentDescription = null,
                 tint = MaterialTheme.colorScheme.error
             )
         },

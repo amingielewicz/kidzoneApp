@@ -456,7 +456,11 @@ fun AddPlaceScreen(
                         enabled = !state.isSaving && placeHashesReady,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Filled.AddAPhoto, contentDescription = "Dodaj zdjęcie z galerii", modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Filled.AddAPhoto,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(Modifier.width(6.dp))
                         Text("Galeria")
                     }
@@ -474,7 +478,11 @@ fun AddPlaceScreen(
                         enabled = !state.isSaving && placeHashesReady,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Filled.CameraAlt, contentDescription = "Zrób zdjęcie", modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Filled.CameraAlt,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(Modifier.width(6.dp))
                         Text("Aparat")
                     }
@@ -582,7 +590,7 @@ private fun CategoryDropdown(
             leadingIcon = {
                 Icon(
                     imageVector = selectedStyle.icon,
-                    contentDescription = "Ikona kategorii",
+                    contentDescription = null,
                     tint = selectedStyle.color
                 )
             },
@@ -603,7 +611,7 @@ private fun CategoryDropdown(
                     leadingIcon = {
                         Icon(
                             imageVector = style.icon,
-                            contentDescription = stringResource(category.labelRes),
+                            contentDescription = null,
                             tint = style.color
                         )
                     },

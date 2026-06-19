@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kidzone.domain.model.Amenity
@@ -305,7 +306,16 @@ private fun SectionItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onToggleExpand)
+                .heightIn(min = 48.dp)
+                .clickable(
+                    onClickLabel = if (expanded) {
+                        "Zwiń ${section.title}"
+                    } else {
+                        "Rozwiń ${section.title}"
+                    },
+                    role = Role.Button,
+                    onClick = onToggleExpand
+                )
                 .padding(vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -335,7 +345,7 @@ private fun SectionItem(
             }
             Icon(
                 imageVector = Icons.Filled.ExpandMore,
-                contentDescription = if (expanded) "Zwiń" else "Rozwiń",
+                contentDescription = null,
                 modifier = Modifier.rotate(rotation)
             )
         }

@@ -633,7 +633,7 @@ private fun FiltersOverlay(
                         leadingIcon = {
                             Icon(
                                 imageVector = style.icon,
-                                contentDescription = stringResource(category.labelRes),
+                                contentDescription = null,
                                 tint = style.color
                             )
                         },
@@ -656,7 +656,7 @@ private fun FiltersOverlay(
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Filled.Star,
-                            contentDescription = "Najlepiej oceniane",
+                            contentDescription = null,
                             tint = if (topRatedOnly) MaterialTheme.colorScheme.secondary
                             else MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -670,7 +670,7 @@ private fun FiltersOverlay(
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Filled.Person,
-                                contentDescription = "Dodane przez Ciebie",
+                                contentDescription = null,
                                 tint = if (addedByMeOnly) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -789,7 +789,7 @@ private fun PlacePreviewContent(
         ) {
             Icon(
                 imageVector = Icons.Filled.LocationOn,
-                contentDescription = "Pokaż na mapie Google",
+                contentDescription = null,
                 modifier = Modifier.size(18.dp)
             )
             Spacer(Modifier.width(4.dp))
