@@ -273,7 +273,12 @@ fun AddPlaceScreen(
                 label = { RequiredFieldLabel("Nazwa miejsca") },
                 singleLine = true,
                 supportingText = {
-                    Text("${state.name.length}/$PLACE_NAME_MAX_LENGTH")
+                    val requiredText = if (state.name.isBlank()) {
+                        "Pole wymagane. "
+                    } else {
+                        ""
+                    }
+                    Text("$requiredText${state.name.length}/$PLACE_NAME_MAX_LENGTH")
                 },
                 isError = state.name.isNotEmpty() && state.name.isBlank(),
                 enabled = !state.isSaving,
@@ -333,9 +338,17 @@ fun AddPlaceScreen(
             // Info pod przyciskiem GPS
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "Możesz dodać miejsce, w którym aktualnie się znajdujesz.",
+                text = if (state.latitude == null || state.longitude == null) {
+                    "Lokalizacja jest wymagana. Pobierz GPS w miejscu, które dodajesz."
+                } else {
+                    "Lokalizacja pobrana. Możesz zapisać miejsce."
+                },
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (state.latitude == null || state.longitude == null) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
                 modifier = Modifier.padding(horizontal = 4.dp)
             )
 
@@ -353,6 +366,9 @@ fun AddPlaceScreen(
                 value = state.address,
                 onValueChange = { /* read-only */ },
                 label = { Text("Adres") },
+                supportingText = {
+                    Text("Uzupełnia się automatycznie po pobraniu lokalizacji")
+                },
                 singleLine = true,
                 readOnly = true,
                 enabled = false,

@@ -72,6 +72,7 @@ fun ChangePasswordDialog(
 
     val isNewPasswordValid = PasswordPolicy.isValid(newPassword)
     val passwordsMismatch = confirmPassword.isNotEmpty() && confirmPassword != newPassword
+    val confirmPasswordHelp = confirmPasswordSupportingText(confirmPassword, passwordsMismatch)
     val isFormValid = currentPassword.isNotBlank() &&
         isNewPasswordValid &&
         confirmPassword == newPassword
@@ -85,6 +86,7 @@ fun ChangePasswordDialog(
                     value = currentPassword,
                     onValueChange = { currentPassword = it },
                     label = "Aktualne hasło",
+                    supportingText = if (currentPassword.isBlank()) "Pole wymagane" else null,
                     showText = showPasswords,
                     onToggleVisibility = { showPasswords = !showPasswords },
                     enabled = !isInProgress
@@ -95,6 +97,7 @@ fun ChangePasswordDialog(
                     onValueChange = { newPassword = it },
                     label = "Nowe hasło",
                     isError = newPassword.isNotEmpty() && !isNewPasswordValid,
+                    supportingText = if (newPassword.isBlank()) "Pole wymagane" else null,
                     showText = showPasswords,
                     onToggleVisibility = { showPasswords = !showPasswords },
                     enabled = !isInProgress
@@ -109,7 +112,7 @@ fun ChangePasswordDialog(
                     onValueChange = { confirmPassword = it },
                     label = "Powtórz nowe hasło",
                     isError = passwordsMismatch,
-                    supportingText = if (passwordsMismatch) "Hasła nie są takie same" else null,
+                    supportingText = confirmPasswordHelp,
                     showText = showPasswords,
                     onToggleVisibility = { showPasswords = !showPasswords },
                     enabled = !isInProgress
@@ -148,6 +151,15 @@ fun ChangePasswordDialog(
             }
         }
     )
+}
+
+private fun confirmPasswordSupportingText(
+    confirmPassword: String,
+    passwordsMismatch: Boolean
+): String? = when {
+    confirmPassword.isBlank() -> "Pole wymagane"
+    passwordsMismatch -> "Hasła nie są takie same"
+    else -> null
 }
 
 /**

@@ -87,6 +87,7 @@ fun ChangeEmailDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     supportingText = {
                         when {
+                            newEmail.isBlank() -> Text("Pole wymagane")
                             emailFormatInvalid -> Text("Niepoprawny format adresu")
                             sameAsCurrent -> Text("To jest Twój aktualny adres")
                             else -> Text("Wyślemy link weryfikacyjny na nowy adres")
@@ -103,6 +104,11 @@ fun ChangeEmailDialog(
                     enabled = !isInProgress,
                     visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    supportingText = {
+                        if (currentPassword.isBlank()) {
+                            Text("Pole wymagane")
+                        }
+                    },
                     trailingIcon = {
                         IconButton(
                             onClick = { showPassword = !showPassword },

@@ -1,5 +1,6 @@
 package com.kidzone.presentation.auth
 
+import android.util.Patterns
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -94,6 +95,8 @@ fun LoginScreen(
     // Lokalny stan UI - widoczność hasła. Nie należy do ViewModelu, bo to
     // czysto sprawa renderowania, niezależna od logiki auth.
     var isPasswordVisible by remember { mutableStateOf(false) }
+    val emailFormatInvalid = state.email.isNotBlank() &&
+        !Patterns.EMAIL_ADDRESS.matcher(state.email.trim()).matches()
 
     // Do uruchamiania Google Sign-In z poziomu UI (Credential Manager
     // wymaga Activity context).
@@ -218,6 +221,13 @@ fun LoginScreen(
                             },
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
+                            isError = emailFormatInvalid,
+                            supportingText = {
+                                when {
+                                    state.email.isBlank() -> Text("Pole wymagane")
+                                    emailFormatInvalid -> Text("Wpisz poprawny adres e-mail")
+                                }
+                            },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                             enabled = !state.isLoading,
                             modifier = Modifier.fillMaxWidth()
@@ -243,6 +253,11 @@ fun LoginScreen(
                                 PasswordVisualTransformation()
                             },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            supportingText = {
+                                if (state.password.isBlank()) {
+                                    Text("Pole wymagane")
+                                }
+                            },
                             trailingIcon = {
                                 IconButton(
                                     onClick = { isPasswordVisible = !isPasswordVisible },
@@ -312,7 +327,7 @@ fun LoginScreen(
 
                         Button(
                             onClick = viewModel::signIn,
-                            enabled = !state.isLoading && state.isFormValid,
+                            enabled = !state.isLoading && state.isFormValid && !emailFormatInvalid,
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
                                 .fillMaxWidth()

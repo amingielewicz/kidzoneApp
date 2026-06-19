@@ -177,7 +177,11 @@ fun EditProfileSheet(
                 onValueChange = { displayName = it },
                 label = { RequiredFieldLabel("Login (publiczny nick)") },
                 supportingText = {
-                    Text("Widoczny w opiniach, miejscach i rankingu")
+                    if (displayName.isBlank()) {
+                        Text("Pole wymagane")
+                    } else {
+                        Text("Widoczny w opiniach, miejscach i rankingu")
+                    }
                 },
                 singleLine = true,
                 isError = displayName.isNotEmpty() && displayName.isBlank(),
