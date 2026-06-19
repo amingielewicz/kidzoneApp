@@ -33,18 +33,8 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import TableSortLabel from '@mui/material/TableSortLabel';
-import {
-  collection,
-  query,
-  orderBy,
-  getDocs,
-  doc,
-  updateDoc,
-  deleteDoc,
-  getDoc,
-} from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { adminFetch } from '../services/api';
 import { callFunction } from '../services/cloudFunctions';
 import {
   PlaceReport,
@@ -403,7 +393,11 @@ export function ReportsPage() {
                         </Typography>
                       </Tooltip>
                       <Tooltip title="Kopiuj ID">
-                        <IconButton size="small" onClick={() => copyToClipboard(report.placeId)}>
+                        <IconButton
+                          size="small"
+                          aria-label={`Kopiuj ID miejsca ${report.placeId}`}
+                          onClick={() => copyToClipboard(report.placeId)}
+                        >
                           <ContentCopyIcon sx={{ fontSize: 14 }} />
                         </IconButton>
                       </Tooltip>
@@ -424,7 +418,11 @@ export function ReportsPage() {
                   <TableCell>
                     <Box display="flex" flexDirection="row" alignItems="flex-start">
                       <Tooltip title="Szczegóły">
-                        <IconButton size="small" onClick={() => openDetailPlaceReport(report)}>
+                        <IconButton
+                          size="small"
+                          aria-label={`Pokaż szczegóły zgłoszenia miejsca ${report.id}`}
+                          onClick={() => openDetailPlaceReport(report)}
+                        >
                           <VisibilityIcon />
                         </IconButton>
                       </Tooltip>
@@ -434,6 +432,7 @@ export function ReportsPage() {
                             <IconButton
                               color="error"
                               size="small"
+                              aria-label={`Usuń miejsce ze zgłoszenia ${report.id}`}
                               onClick={() => {
                                 setDeleteReason('');
                                 setDeleteDialog({
@@ -451,6 +450,7 @@ export function ReportsPage() {
                           <Tooltip title="Odrzuć">
                             <IconButton
                               size="small"
+                              aria-label={`Odrzuć zgłoszenie miejsca ${report.id}`}
                               sx={{ color: '#1976D2' }}
                               onClick={() =>
                                 confirm('Odrzucić?', () =>
@@ -512,7 +512,11 @@ export function ReportsPage() {
                         </Typography>
                       </Tooltip>
                       <Tooltip title="Kopiuj ID">
-                        <IconButton size="small" onClick={() => copyToClipboard(report.reviewId)}>
+                        <IconButton
+                          size="small"
+                          aria-label={`Kopiuj ID opinii ${report.reviewId}`}
+                          onClick={() => copyToClipboard(report.reviewId)}
+                        >
                           <ContentCopyIcon sx={{ fontSize: 14 }} />
                         </IconButton>
                       </Tooltip>
@@ -533,7 +537,11 @@ export function ReportsPage() {
                   <TableCell>
                     <Box display="flex" flexDirection="row" alignItems="flex-start">
                       <Tooltip title="Szczegóły">
-                        <IconButton size="small" onClick={() => openDetailReviewReport(report)}>
+                        <IconButton
+                          size="small"
+                          aria-label={`Pokaż szczegóły zgłoszenia opinii ${report.id}`}
+                          onClick={() => openDetailReviewReport(report)}
+                        >
                           <VisibilityIcon />
                         </IconButton>
                       </Tooltip>
@@ -543,6 +551,7 @@ export function ReportsPage() {
                             <IconButton
                               color="error"
                               size="small"
+                              aria-label={`Usuń opinię ze zgłoszenia ${report.id}`}
                               onClick={() => {
                                 setDeleteReason('');
                                 setDeleteDialog({
@@ -560,6 +569,7 @@ export function ReportsPage() {
                           <Tooltip title="Odrzuć">
                             <IconButton
                               size="small"
+                              aria-label={`Odrzuć zgłoszenie opinii ${report.id}`}
                               sx={{ color: '#1976D2' }}
                               onClick={() =>
                                 confirm('Odrzucić?', () =>
@@ -654,7 +664,11 @@ export function ReportsPage() {
                     <TableCell>
                       <Box display="flex" flexDirection="row" alignItems="flex-start">
                         <Tooltip title="Szczegóły">
-                          <IconButton size="small" onClick={() => openDetailPhotoReport(report)}>
+                          <IconButton
+                            size="small"
+                            aria-label={`Pokaż szczegóły zgłoszenia zdjęcia ${report.id}`}
+                            onClick={() => openDetailPhotoReport(report)}
+                          >
                             <VisibilityIcon />
                           </IconButton>
                         </Tooltip>
@@ -664,6 +678,7 @@ export function ReportsPage() {
                               <IconButton
                                 color="error"
                                 size="small"
+                                aria-label={`Usuń zdjęcie ze zgłoszenia ${report.id}`}
                                 disabled={photoMissing}
                                 onClick={() => {
                                   setDeleteReason('');
@@ -682,6 +697,7 @@ export function ReportsPage() {
                             <Tooltip title="Odrzuć">
                               <IconButton
                                 size="small"
+                                aria-label={`Odrzuć zgłoszenie zdjęcia ${report.id}`}
                                 sx={{ color: photoMissing ? undefined : '#1976D2' }}
                                 disabled={photoMissing}
                                 onClick={() =>
@@ -727,7 +743,11 @@ export function ReportsPage() {
             {detailDialog.type === 'review' && 'Szczegóły zgłoszenia opinii'}
             {detailDialog.type === 'photo' && 'Szczegóły zgłoszenia zdjęcia'}
           </span>
-          <IconButton size="small" onClick={() => setDetailDialog((p) => ({ ...p, open: false }))}>
+          <IconButton
+            size="small"
+            aria-label="Zamknij szczegóły zgłoszenia"
+            onClick={() => setDetailDialog((p) => ({ ...p, open: false }))}
+          >
             <CancelIcon />
           </IconButton>
         </DialogTitle>
@@ -762,6 +782,7 @@ export function ReportsPage() {
                     <Tooltip title="Kopiuj">
                       <IconButton
                         size="small"
+                        aria-label={`Kopiuj ID miejsca ${(detailDialog.report as PlaceReport).placeId}`}
                         onClick={() =>
                           copyToClipboard((detailDialog.report as PlaceReport).placeId)
                         }
@@ -803,6 +824,7 @@ export function ReportsPage() {
                     <Tooltip title="Kopiuj">
                       <IconButton
                         size="small"
+                        aria-label={`Kopiuj ID opinii ${(detailDialog.report as ReviewReport).reviewId}`}
                         onClick={() =>
                           copyToClipboard((detailDialog.report as ReviewReport).reviewId)
                         }

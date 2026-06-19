@@ -27,6 +27,8 @@ export function LoginPage() {
 
   return (
     <Box
+      component="main"
+      aria-labelledby="admin-login-title"
       display="flex"
       justifyContent="center"
       alignItems="center"
@@ -42,7 +44,7 @@ export function LoginPage() {
               alt="kidZone"
               sx={{ width: 64, height: 64, mb: 2 }}
             />
-            <Typography variant="h5" fontWeight={700}>
+            <Typography id="admin-login-title" variant="h5" fontWeight={700}>
               kidZone Admin
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -51,13 +53,13 @@ export function LoginPage() {
           </Box>
 
           {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
+            <Alert id="login-error" role="alert" severity="error" sx={{ mb: 2 }}>
               {error}
             </Alert>
           )}
 
           {showAccessDenied && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
+            <Alert id="login-access-denied" role="alert" severity="warning" sx={{ mb: 2 }}>
               To konto nie ma uprawnień administratora.
             </Alert>
           )}
@@ -69,6 +71,10 @@ export function LoginPage() {
             size="large"
             startIcon={<GoogleIcon />}
             disabled={loading}
+            aria-busy={loading}
+            aria-describedby={
+              error ? 'login-error' : showAccessDenied ? 'login-access-denied' : undefined
+            }
             onClick={signInWithGoogle}
             sx={{
               mb: 2,
@@ -82,7 +88,14 @@ export function LoginPage() {
               },
             }}
           >
-            {loading ? <CircularProgress size={24} /> : 'Zaloguj się przez Google'}
+            {loading ? (
+              <>
+                <CircularProgress size={20} aria-hidden="true" sx={{ mr: 1 }} />
+                Logowanie...
+              </>
+            ) : (
+              'Zaloguj się przez Google'
+            )}
           </Button>
 
           <Divider sx={{ my: 2 }}>
@@ -91,11 +104,17 @@ export function LoginPage() {
             </Typography>
           </Divider>
 
-          <form onSubmit={handleSubmit}>
+          <form
+            onSubmit={handleSubmit}
+            aria-describedby={
+              error ? 'login-error' : showAccessDenied ? 'login-access-denied' : undefined
+            }
+          >
             <TextField
               fullWidth
               label="Email"
               type="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               margin="normal"
@@ -105,6 +124,7 @@ export function LoginPage() {
               fullWidth
               label="Hasło"
               type="password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               margin="normal"
@@ -116,9 +136,17 @@ export function LoginPage() {
               variant="contained"
               size="large"
               disabled={loading}
+              aria-busy={loading}
               sx={{ mt: 2 }}
             >
-              {loading ? <CircularProgress size={24} /> : 'Zaloguj się'}
+              {loading ? (
+                <>
+                  <CircularProgress size={20} color="inherit" aria-hidden="true" sx={{ mr: 1 }} />
+                  Logowanie...
+                </>
+              ) : (
+                'Zaloguj się'
+              )}
             </Button>
           </form>
         </CardContent>

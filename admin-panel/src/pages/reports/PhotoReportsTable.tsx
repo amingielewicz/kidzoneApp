@@ -97,7 +97,11 @@ export function PhotoReportsTable({
                 <TableCell>
                   <Box display="flex" flexDirection="row" alignItems="flex-start">
                     <Tooltip title="Szczegóły">
-                      <IconButton size="small" onClick={() => onViewDetail(report)}>
+                      <IconButton
+                        size="small"
+                        aria-label={`Pokaż szczegóły zgłoszenia zdjęcia ${report.id}`}
+                        onClick={() => onViewDetail(report)}
+                      >
                         <VisibilityIcon />
                       </IconButton>
                     </Tooltip>
@@ -107,6 +111,7 @@ export function PhotoReportsTable({
                           <IconButton
                             color="error"
                             size="small"
+                            aria-label={`Usuń zdjęcie ze zgłoszenia ${report.id}`}
                             disabled={photoMissing}
                             onClick={() => onDelete(report)}
                           >
@@ -116,6 +121,7 @@ export function PhotoReportsTable({
                         <Tooltip title="Odrzuc">
                           <IconButton
                             size="small"
+                            aria-label={`Odrzuć zgłoszenie zdjęcia ${report.id}`}
                             sx={{ color: photoMissing ? undefined : '#1976D2' }}
                             disabled={photoMissing}
                             onClick={() => onDismiss(report)}

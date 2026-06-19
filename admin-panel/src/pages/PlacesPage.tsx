@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Box,
   Typography,
@@ -42,7 +42,6 @@ import {
   getDocs,
   getDoc,
   doc,
-  deleteDoc,
   updateDoc,
   limit,
   where,
@@ -50,7 +49,6 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../services/firebase';
-import { adminFetch } from '../services/api';
 import { callFunction } from '../services/cloudFunctions';
 import { Place, PLACE_CATEGORY_LABELS, PlaceCategory } from '../types';
 
@@ -123,9 +121,6 @@ export function PlacesPage() {
   const [deleteReviewReason, setDeleteReviewReason] = useState('');
 
   // Confirm
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmTitle, setConfirmTitle] = useState('');
-  const confirmActionRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     fetchPlaces();
@@ -345,18 +340,6 @@ export function PlacesPage() {
     }
   }
 
-  function confirm(title: string, action: () => Promise<void>) {
-    confirmActionRef.current = action;
-    setConfirmTitle(title);
-    setConfirmOpen(true);
-  }
-
-  async function handleConfirm() {
-    if (confirmActionRef.current) await confirmActionRef.current();
-    setConfirmOpen(false);
-    confirmActionRef.current = null;
-  }
-
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" py={6}>
@@ -474,12 +457,21 @@ export function PlacesPage() {
                 <TableCell>{formatDate(place.createdAtMillis)}</TableCell>
                 <TableCell>
                   <Tooltip title="Szczegóły / Edycja">
-                    <IconButton size="small" onClick={() => openDetail(place)}>
+                    <IconButton
+                      size="small"
+                      aria-label={`Otwórz szczegóły i edycję miejsca ${place.name}`}
+                      onClick={() => openDetail(place)}
+                    >
                       <EditIcon />
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Usuń miejsce">
-                    <IconButton size="small" color="error" onClick={() => openDeleteDialog(place)}>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      aria-label={`Usuń miejsce ${place.name}`}
+                      onClick={() => openDeleteDialog(place)}
+                    >
                       <DeleteIcon />
                     </IconButton>
                   </Tooltip>
@@ -510,7 +502,11 @@ export function PlacesPage() {
                   ID: {detailPlace.id}
                 </Typography>
               </Box>
-              <IconButton size="small" onClick={() => setDetailPlace(null)}>
+              <IconButton
+                size="small"
+                aria-label={`Zamknij szczegóły miejsca ${detailPlace.name}`}
+                onClick={() => setDetailPlace(null)}
+              >
                 <CancelIcon />
               </IconButton>
             </DialogTitle>
@@ -600,6 +596,7 @@ export function PlacesPage() {
                         <Tooltip title="Kopiuj UID">
                           <IconButton
                             size="small"
+                            aria-label={`Kopiuj UID właściciela ${detailPlace.ownerUserId}`}
                             onClick={() =>
                               navigator.clipboard.writeText(detailPlace.ownerUserId || '')
                             }
@@ -692,6 +689,7 @@ export function PlacesPage() {
                           <IconButton
                             size="small"
                             color="error"
+                            aria-label={`Usuń zdjęcie ${i + 1} z miejsca ${detailPlace.name}`}
                             sx={{
                               position: 'absolute',
                               top: -8,
@@ -749,6 +747,7 @@ export function PlacesPage() {
                                 <IconButton
                                   size="small"
                                   color="error"
+                                  aria-label={`Usuń opinię ${review.id}`}
                                   onClick={() => {
                                     setDeleteReviewDialog({ open: true, review });
                                     setDeleteReviewReason('');
@@ -791,6 +790,7 @@ export function PlacesPage() {
               <span>Usuń opinię</span>
               <IconButton
                 size="small"
+                aria-label="Zamknij dialog usuwania opinii"
                 onClick={() => setDeleteReviewDialog({ open: false, review: null })}
               >
                 <CancelIcon />
@@ -913,20 +913,6 @@ export function PlacesPage() {
             }}
           >
             {saving ? <CircularProgress size={20} color="inherit" /> : 'Usuń'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Confirm Dialog */}
-      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-        <DialogTitle>Potwierdzenie</DialogTitle>
-        <DialogContent>
-          <Typography>{confirmTitle}</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmOpen(false)}>Anuluj</Button>
-          <Button variant="contained" color="error" onClick={handleConfirm}>
-            Potwierdź
           </Button>
         </DialogActions>
       </Dialog>
