@@ -27,6 +27,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -64,7 +67,11 @@ fun rememberLocationServiceEnabled(): Boolean {
 @Composable
 fun NoInternetBanner(modifier: Modifier = Modifier) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics {
+                liveRegion = LiveRegionMode.Assertive
+            },
         color = MaterialTheme.colorScheme.errorContainer,
         tonalElevation = 2.dp
     ) {
@@ -93,7 +100,11 @@ fun NoInternetBanner(modifier: Modifier = Modifier) {
 fun GpsDisabledBanner(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics {
+                liveRegion = LiveRegionMode.Polite
+            },
         color = MaterialTheme.colorScheme.tertiaryContainer,
         tonalElevation = 2.dp
     ) {
@@ -133,7 +144,11 @@ fun GpsDisabledBanner(modifier: Modifier = Modifier) {
 @Composable
 fun GpsAcquiringBanner(modifier: Modifier = Modifier) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics {
+                liveRegion = LiveRegionMode.Polite
+            },
         color = MaterialTheme.colorScheme.secondaryContainer,
         tonalElevation = 2.dp
     ) {
