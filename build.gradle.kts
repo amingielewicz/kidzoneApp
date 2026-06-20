@@ -8,4 +8,27 @@ plugins {
     alias(libs.plugins.google.services) apply false
     alias(libs.plugins.firebase.crashlytics) apply false
     alias(libs.plugins.firebase.perf) apply false
+    alias(libs.plugins.dependencycheck)
+}
+
+dependencyCheck {
+    val nvdApiKey = System.getenv("NVD_API_KEY").orEmpty()
+
+    formats = listOf("HTML", "JSON", "SARIF")
+    failBuildOnCVSS = 9.0f
+    failOnError = true
+    scanProjects = listOf(":app")
+    scanSet.from(
+        "admin-panel/package-lock.json",
+        "functions/package-lock.json"
+    )
+
+    nvd {
+        apiKey = nvdApiKey
+        delay = if (nvdApiKey.isBlank()) 16_000 else 3_500
+    }
+
+    analyzers {
+        assemblyEnabled = false
+    }
 }
