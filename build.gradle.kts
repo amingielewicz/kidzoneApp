@@ -25,7 +25,8 @@ dependencyCheck {
 
     nvd {
         apiKey = nvdApiKey
-        delay = if (nvdApiKey.isBlank()) 16_000 else 3_500
+        delay = if (nvdApiKey.isBlank()) 20_000 else 6_000
+        maxRetryCount = 10
     }
 
     analyzers {

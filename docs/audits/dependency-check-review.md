@@ -21,6 +21,8 @@ The scan covers:
 - Build failure threshold: CVSS `9.0` and above.
 - NVD access: set GitHub secret `NVD_API_KEY` for reliable scheduled scans. Without it, NVD can return `429` rate limits and the scan may not complete.
 - Workflow: `.github/workflows/dependency-check.yml`.
+- CI cache: `~/.gradle/dependency-check-data` is cached between workflow runs to avoid rebuilding the NVD database from scratch every time.
+- CI timeout: the workflow allows up to 90 minutes because the first NVD database update can be slow.
 
 ## Review procedure
 
@@ -41,7 +43,7 @@ If the report finds vulnerabilities:
 
 ## GitHub Actions procedure
 
-Use the `Dependency Check` workflow manually after dependency updates. The scheduled run executes weekly and uploads reports as workflow artifacts. If SARIF is generated, it is also uploaded to GitHub code scanning.
+Use the `Dependency Check` workflow manually after dependency updates. The scheduled run executes weekly and uploads reports as workflow artifacts. If SARIF is generated, it is also uploaded to GitHub code scanning. The first successful run can take much longer because it has to populate the Dependency Check database; later runs should reuse the GitHub Actions cache. Dependency Check runs are not auto-cancelled by newer runs on the same branch, because cancelling during NVD sync wastes the partially populated database.
 
 ## Current result
 
