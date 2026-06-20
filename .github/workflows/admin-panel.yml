@@ -43,6 +43,9 @@ jobs:
       - name: Prettier check
         run: npx prettier --check "src/**/*.{ts,tsx}"
 
+      - name: Accessibility checks
+        run: npm run a11y:check
+
       - name: TypeScript check
         run: npx tsc --noEmit
 

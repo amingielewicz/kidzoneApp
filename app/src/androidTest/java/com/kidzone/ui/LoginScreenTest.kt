@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -91,5 +92,17 @@ class LoginScreenTest {
         Assume.assumeTrue("Login screen not reachable (CI placeholder config)", loginScreenVisible)
 
         composeTestRule.onNodeWithText("Zapomniałeś hasła?").assertIsDisplayed()
+    }
+
+    @Test
+    fun passwordVisibilityToggle_hasAccessibleStateLabel() {
+        Assume.assumeTrue("Login screen not reachable (CI placeholder config)", loginScreenVisible)
+
+        composeTestRule.onNodeWithContentDescription("Pokaż hasło")
+            .assertIsDisplayed()
+            .performClick()
+
+        composeTestRule.onNodeWithContentDescription("Ukryj hasło")
+            .assertIsDisplayed()
     }
 }

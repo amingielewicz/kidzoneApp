@@ -318,7 +318,7 @@ fun MapScreen(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .semantics {
-                        contentDescription = "Ładowanie miejsc na mapie"
+                        contentDescription = MapAccessibilityLabels.LOADING_PLACES
                         liveRegion = LiveRegionMode.Polite
                     }
             )
@@ -348,7 +348,7 @@ fun MapScreen(
         ) {
             MapIconButton(
                 icon = Icons.Filled.Add,
-                contentDescription = "Powiększ",
+                contentDescription = MapAccessibilityLabels.ZOOM_IN,
                 onClick = {
                     scope.launch {
                         cameraPositionState.animate(CameraUpdateFactory.zoomIn())
@@ -357,7 +357,7 @@ fun MapScreen(
             )
             MapIconButton(
                 icon = Icons.Filled.Remove,
-                contentDescription = "Pomniejsz",
+                contentDescription = MapAccessibilityLabels.ZOOM_OUT,
                 onClick = {
                     scope.launch {
                         cameraPositionState.animate(CameraUpdateFactory.zoomOut())
