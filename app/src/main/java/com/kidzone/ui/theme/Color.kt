@@ -1,3 +1,5 @@
+@file:Suppress("MagicNumber")
+
 package com.kidzone.ui.theme
 
 import androidx.compose.ui.graphics.Color
@@ -14,6 +16,9 @@ internal val BrandDark = Color(0xFF1A1A1A)
 internal val BrandYellowDark = Color(0xFFE0A800)
 internal val BrandBlueDark = Color(0xFF1565C0)
 internal val BrandGreenDark = Color(0xFF2E7D32)
+internal val BrandYellowAccessible = Color(0xFF8A5A00)
+internal val BrandBlueAccessible = Color(0xFF1565C0)
+internal val BrandGreenAccessible = Color(0xFF2E7D32)
 
 // Light mode surfaces
 internal val SurfaceLight = Color(0xFFFAFAFA)

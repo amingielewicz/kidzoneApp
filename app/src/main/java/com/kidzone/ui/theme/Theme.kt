@@ -19,20 +19,20 @@ import androidx.compose.ui.platform.LocalContext
  *  - tertiary = żółty (akcenty, ranking, odznaki)
  */
 private val LightColors = lightColorScheme(
-    primary = BrandBlue,
+    primary = BrandBlueAccessible,
     onPrimary = BrandWhite,
     primaryContainer = BrandBlueDark,
     onPrimaryContainer = BrandWhite,
 
-    secondary = BrandGreen,
+    secondary = BrandGreenAccessible,
     onSecondary = BrandWhite,
     secondaryContainer = BrandGreenDark,
     onSecondaryContainer = BrandWhite,
 
     tertiary = BrandYellow,
     onTertiary = BrandDark,
-    tertiaryContainer = BrandYellowDark,
-    onTertiaryContainer = BrandDark,
+    tertiaryContainer = BrandYellowAccessible,
+    onTertiaryContainer = BrandWhite,
 
     background = BrandWhite,
     onBackground = OnSurfaceLight,

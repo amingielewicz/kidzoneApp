@@ -1,3 +1,5 @@
+@file:Suppress("MagicNumber")
+
 package com.kidzone.presentation.common
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -44,11 +46,11 @@ val PlaceCategory.style: CategoryStyle
     get() = when (this) {
         PlaceCategory.PLAYGROUND -> CategoryStyle(
             icon = Icons.Filled.Toys,
-            color = Color(0xFF43A047)
+            color = Color(0xFF2E7D32)
         )
         PlaceCategory.RESTAURANT -> CategoryStyle(
             icon = Icons.Filled.Restaurant,
-            color = Color(0xFFE65100)
+            color = Color(0xFFBF360C)
         )
         PlaceCategory.PLAY_ROOM -> CategoryStyle(
             icon = Icons.Filled.SmartToy,
@@ -60,7 +62,7 @@ val PlaceCategory.style: CategoryStyle
         )
         PlaceCategory.PARK -> CategoryStyle(
             icon = Icons.Filled.Park,
-            color = Color(0xFF2E7D32)
+            color = Color(0xFF1B5E20)
         )
         PlaceCategory.ATTRACTION -> CategoryStyle(
             icon = Icons.Filled.Attractions,

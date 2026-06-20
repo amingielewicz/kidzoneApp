@@ -1,3 +1,5 @@
+@file:Suppress("MagicNumber")
+
 package com.kidzone.presentation.common
 
 import androidx.compose.foundation.background
@@ -96,7 +98,7 @@ enum class UserBadge(
     FIRST_PLACE(
         label = "Pierwszy ślad",
         icon = Icons.Filled.AddLocationAlt,
-        color = Color(0xFFEF6C00), // pomarańcz – akcent "świeżego" startu
+        color = Color(0xFFBF360C), // dostępny pomarańcz – akcent "świeżego" startu
         description = "Dodaj swoje pierwsze miejsce na mapie"
     ),
     FIRST_REVIEW(
@@ -106,7 +108,7 @@ enum class UserBadge(
         // od "10 opinii". RateReview to kartka z gwiazdką (jak REVIEWER),
         // ChatBubble to dymek - inne sylwetki, łatwo rozróżnialne.
         icon = Icons.Filled.ChatBubble,
-        color = Color(0xFFEF6C00),
+        color = Color(0xFFBF360C),
         description = "Wystaw swoją pierwszą opinię"
     ),
 
@@ -114,7 +116,7 @@ enum class UserBadge(
     EXPLORER(
         label = "Odkrywca",
         icon = Icons.Filled.Explore,
-        color = Color(0xFF43A047),
+        color = Color(0xFF2E7D32),
         description = "Dodaj co najmniej 5 miejsc"
     ),
     CARTOGRAPHER(
@@ -137,7 +139,7 @@ enum class UserBadge(
     REVIEWER(
         label = "Recenzent",
         icon = Icons.Filled.RateReview,
-        color = Color(0xFF1E88E5),
+        color = Color(0xFF1565C0),
         description = "Wystaw co najmniej 10 opinii"
     ),
     CRITIC(
@@ -174,19 +176,19 @@ enum class UserBadge(
     LEADER_BRONZE(
         label = "Brązowy lider",
         icon = Icons.Filled.MilitaryTech,
-        color = Color(0xFFB87333), // brąz
+        color = Color(0xFF8D5524), // brąz
         description = "Zajmij 3. miejsce w rankingu użytkowników"
     ),
     LEADER_SILVER(
         label = "Srebrny lider",
         icon = Icons.Filled.MilitaryTech,
-        color = Color(0xFF9E9E9E), // srebrny
+        color = Color(0xFF616161), // srebrny
         description = "Zajmij 2. miejsce w rankingu użytkowników"
     ),
     LEADER_GOLD(
         label = "Złoty lider",
         icon = Icons.Filled.EmojiEvents,
-        color = Color(0xFFFFB300), // złoty
+        color = Color(0xFF8A5A00), // złoty
         description = "Zajmij 1. miejsce w rankingu użytkowników"
     ),
 
@@ -198,13 +200,13 @@ enum class UserBadge(
     PLACE_TOP3(
         label = "Lokalny faworyt",
         icon = Icons.Filled.Whatshot,
-        color = Color(0xFFB87333),
+        color = Color(0xFF8D5524),
         description = "Twoje miejsce trafiło do TOP 3 najlepiej ocenianych"
     ),
     PLACE_TOP1(
         label = "Architekt zabawy",
         icon = Icons.Filled.WorkspacePremium,
-        color = Color(0xFFFFB300),
+        color = Color(0xFF8A5A00),
         description = "Twoje miejsce jest #1 w rankingu najlepiej ocenianych"
     )
 }
