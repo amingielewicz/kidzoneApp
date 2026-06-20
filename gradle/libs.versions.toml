@@ -5,6 +5,7 @@ kotlin = "2.0.20"
 ksp = "2.0.20-1.0.25"
 googleServices = "4.4.2"
 detekt = "1.23.8"
+dependencyCheck = "12.2.2"
 
 # AndroidX
 coreKtx = "1.13.1"
@@ -189,3 +190,4 @@ google-services = { id = "com.google.gms.google-services", version.ref = "google
 firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }
 firebase-perf = { id = "com.google.firebase.firebase-perf", version.ref = "firebasePerfPlugin" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+dependencycheck = { id = "org.owasp.dependencycheck", version.ref = "dependencyCheck" }
