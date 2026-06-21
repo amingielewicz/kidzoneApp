@@ -26,6 +26,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import java.net.UnknownHostException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FirestoreReviewRepositoryTest {
@@ -38,7 +39,6 @@ class FirestoreReviewRepositoryTest {
 
     private lateinit var firestore: FirebaseFirestore
     private lateinit var reviewDao: ReviewDao
-    private lateinit var syncManager: com.kidzone.sync.SyncManager
     private lateinit var repository: FirestoreReviewRepository
 
     private lateinit var reviewsCollection: CollectionReference
@@ -48,14 +48,13 @@ class FirestoreReviewRepositoryTest {
     fun setUp() {
         firestore = mockk(relaxed = true)
         reviewDao = mockk(relaxed = true)
-        syncManager = mockk(relaxed = true)
         reviewsCollection = mockk(relaxed = true)
         reviewReportsCollection = mockk(relaxed = true)
 
         every { firestore.collection(FirestoreCollections.REVIEWS) } returns reviewsCollection
         every { firestore.collection(FirestoreCollections.REVIEW_REPORTS) } returns reviewReportsCollection
 
-        repository = FirestoreReviewRepository(firestore, reviewDao, syncManager)
+        repository = FirestoreReviewRepository(firestore, reviewDao)
     }
 
     // =========================================================================
@@ -184,6 +183,22 @@ class FirestoreReviewRepositoryTest {
 
             coVerify { reviewDao.upsert(match { it.id == "new-id" }) }
         }
+
+        @Test
+        fun `network failure does not enqueue optimistic offline add`() = runTest {
+            val review = TestFixtures.review()
+
+            val docRef = mockk<DocumentReference>(relaxed = true)
+            every { docRef.id } returns "new-id"
+            every { reviewsCollection.document() } returns docRef
+            every { reviewsCollection.document("new-id") } returns docRef
+            every { docRef.set(any()) } throws UnknownHostException("offline")
+
+            val result = repository.addReview(review)
+
+            assertTrue(result is OpResult.Failure)
+            coVerify(exactly = 0) { reviewDao.upsert(any()) }
+        }
     }
 
     // =========================================================================
@@ -246,6 +261,20 @@ class FirestoreReviewRepositoryTest {
             assertTrue(updated.updatedAtMillis > 0)
             coVerify { reviewDao.upsert(any()) }
         }
+
+        @Test
+        fun `network failure does not enqueue optimistic offline update`() = runTest {
+            val review = TestFixtures.review(id = "r1", rating = 4, comment = "Updated")
+
+            val docRef = mockk<DocumentReference>(relaxed = true)
+            every { reviewsCollection.document("r1") } returns docRef
+            every { docRef.set(any()) } throws UnknownHostException("offline")
+
+            val result = repository.updateReview(review)
+
+            assertTrue(result is OpResult.Failure)
+            coVerify(exactly = 0) { reviewDao.upsert(any()) }
+        }
     }
 
     // =========================================================================
@@ -282,6 +311,18 @@ class FirestoreReviewRepositoryTest {
 
             assertTrue(result is OpResult.Success)
             coVerify { reviewDao.deleteById("r1") }
+        }
+
+        @Test
+        fun `network failure does not enqueue optimistic offline delete`() = runTest {
+            val docRef = mockk<DocumentReference>(relaxed = true)
+            every { reviewsCollection.document("r1") } returns docRef
+            every { docRef.delete() } throws UnknownHostException("offline")
+
+            val result = repository.deleteReview("r1")
+
+            assertTrue(result is OpResult.Failure)
+            coVerify(exactly = 0) { reviewDao.deleteById(any()) }
         }
     }
 

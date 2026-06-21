@@ -125,8 +125,8 @@ class SyncWorker @AssistedInject constructor(
             OperationType.UPDATE_REVIEW -> processPendingUpdateReview(op.payload)
             OperationType.DELETE_REVIEW -> processPendingDeleteReview(op.payload)
             else -> {
-                Timber.w("SyncWorker: unknown operation type: ${op.type}")
-                true // Don't retry unknown types — treat as success to clear queue
+                Timber.w("SyncWorker: discarding unknown operation type: ${op.type}")
+                true
             }
         }
     }
@@ -194,10 +194,13 @@ class SyncWorker @AssistedInject constructor(
     // ─── Operation processors ────────────────────────────────────────────────
 
     private suspend fun processPendingAddPlace(payload: String): Boolean {
-        Timber.d("SyncWorker: would sync ADD_PLACE: ${payload.take(100)}...")
-        // ADD operations don't need conflict resolution (new documents).
-        // TODO: Deserialize Place from payload and call placeRepository.addPlace()
-        return true
+        val place = runCatching { OfflinePayload.deserializePlace(payload) }.getOrElse {
+            Timber.w(it, "SyncWorker: invalid payload for ADD_PLACE")
+            return true
+        }
+
+        Timber.w("SyncWorker: ADD_PLACE for ${place.id} is gated until write replay is implemented")
+        return false
     }
 
     /**
@@ -210,7 +213,7 @@ class SyncWorker @AssistedInject constructor(
      *  4. If local is newer → apply update via repository
      */
     private suspend fun processPendingUpdatePlace(payload: String): Boolean {
-        Timber.d("SyncWorker: processing UPDATE_PLACE: ${payload.take(100)}...")
+        Timber.d("SyncWorker: processing UPDATE_PLACE")
 
         val json = try {
             JSONObject(payload)
@@ -236,10 +239,8 @@ class SyncWorker @AssistedInject constructor(
                 true
             }
             ConflictResult.LOCAL_WINS -> {
-                // Local change is newer — proceed with the update.
-                // TODO: Deserialize full Place and call placeRepository.updatePlace()
-                Timber.d("SyncWorker: applying local UPDATE_PLACE for $placeId (local wins)")
-                true
+                Timber.w("SyncWorker: UPDATE_PLACE for $placeId is gated until write replay is implemented")
+                false
             }
             ConflictResult.DOCUMENT_NOT_FOUND -> {
                 // Document was deleted on server — discard local update.
@@ -254,18 +255,19 @@ class SyncWorker @AssistedInject constructor(
     }
 
     private suspend fun processPendingDeletePlace(payload: String): Boolean {
-        Timber.d("SyncWorker: would sync DELETE_PLACE: $payload")
-        // DELETE operations don't need conflict resolution — if doc is already
-        // gone, deletePlace() is idempotent.
-        // TODO: Extract placeId and call placeRepository.deletePlace()
-        return true
+        val placeId = parseDeleteId(payload, OperationType.DELETE_PLACE) ?: return true
+        Timber.w("SyncWorker: DELETE_PLACE for $placeId is gated until write replay is implemented")
+        return false
     }
 
     private suspend fun processPendingAddReview(payload: String): Boolean {
-        Timber.d("SyncWorker: would sync ADD_REVIEW: ${payload.take(100)}...")
-        // ADD operations don't need conflict resolution.
-        // TODO: Deserialize Review and call reviewRepository.addReview()
-        return true
+        val review = runCatching { OfflinePayload.deserializeReview(payload) }.getOrElse {
+            Timber.w(it, "SyncWorker: invalid payload for ADD_REVIEW")
+            return true
+        }
+
+        Timber.w("SyncWorker: ADD_REVIEW for ${review.id} is gated until write replay is implemented")
+        return false
     }
 
     /**
@@ -274,7 +276,7 @@ class SyncWorker @AssistedInject constructor(
      * Same logic as UPDATE_PLACE but targets the "reviews" collection.
      */
     private suspend fun processPendingUpdateReview(payload: String): Boolean {
-        Timber.d("SyncWorker: processing UPDATE_REVIEW: ${payload.take(100)}...")
+        Timber.d("SyncWorker: processing UPDATE_REVIEW")
 
         val json = try {
             JSONObject(payload)
@@ -297,9 +299,8 @@ class SyncWorker @AssistedInject constructor(
                 true
             }
             ConflictResult.LOCAL_WINS -> {
-                // TODO: Deserialize full Review and call reviewRepository.updateReview()
-                Timber.d("SyncWorker: applying local UPDATE_REVIEW for $reviewId (local wins)")
-                true
+                Timber.w("SyncWorker: UPDATE_REVIEW for $reviewId is gated until write replay is implemented")
+                false
             }
             ConflictResult.DOCUMENT_NOT_FOUND -> {
                 Timber.i("SyncWorker: discarding UPDATE_REVIEW for $reviewId (document deleted on server)")
@@ -312,9 +313,20 @@ class SyncWorker @AssistedInject constructor(
     }
 
     private suspend fun processPendingDeleteReview(payload: String): Boolean {
-        Timber.d("SyncWorker: would sync DELETE_REVIEW: $payload")
-        // TODO: Extract reviewId and call reviewRepository.deleteReview()
-        return true
+        val reviewId = parseDeleteId(payload, OperationType.DELETE_REVIEW) ?: return true
+        Timber.w("SyncWorker: DELETE_REVIEW for $reviewId is gated until write replay is implemented")
+        return false
+    }
+
+    private fun parseDeleteId(payload: String, operationType: String): String? {
+        val id = runCatching { OfflinePayload.deserializeId(payload) }.getOrElse {
+            Timber.w(it, "SyncWorker: invalid payload for $operationType")
+            null
+        }
+        if (id?.isBlank() == true) {
+            Timber.w("SyncWorker: $operationType payload missing 'id' field")
+        }
+        return id?.takeUnless { it.isBlank() }
     }
 
     companion object {

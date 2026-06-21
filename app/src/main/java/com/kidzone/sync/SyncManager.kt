@@ -20,6 +20,11 @@ import javax.inject.Singleton
 /**
  * Manages the offline write queue and sync scheduling.
  *
+ * Offline write replay is currently gated for user-facing writes until
+ * [SyncWorker] has production processors for every queued operation. Do not
+ * enqueue new place/review writes unless their processor performs the Firestore
+ * write instead of only acknowledging the payload.
+ *
  * ## How it works:
  *
  * 1. **Enqueue**: When a write operation fails due to no network (or is
@@ -44,13 +49,7 @@ import javax.inject.Singleton
  *         // Try online write first
  *         firestoreWrite(place)
  *     } catch (e: Exception) {
- *         if (isNetworkError(e)) {
- *             // Offline: queue for later sync
- *             syncManager.enqueue(OperationType.ADD_PLACE, place.toJson())
- *             OpResult.success(place) // Optimistic: return success to UI
- *         } else {
- *             OpResult.failure(e)
- *         }
+ *         OpResult.failure(e)
  *     }
  * }
  * ```
