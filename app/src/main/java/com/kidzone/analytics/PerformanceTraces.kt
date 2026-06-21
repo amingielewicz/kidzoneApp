@@ -2,6 +2,7 @@ package com.kidzone.analytics
 
 import com.google.firebase.perf.FirebasePerformance
 import com.google.firebase.perf.metrics.Trace
+import com.kidzone.utils.OpResult
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -86,6 +87,32 @@ class PerformanceTraces @Inject constructor() {
     }
 
     /**
+     * Variant for repository methods that return [OpResult] instead of throwing.
+     */
+    suspend fun <T> measureResult(traceName: String, block: suspend () -> OpResult<T>): OpResult<T> {
+        val trace = startTrace(traceName)
+        return try {
+            when (val result = block()) {
+                is OpResult.Success -> {
+                    trace.putAttribute("status", "success")
+                    result
+                }
+                is OpResult.Failure -> {
+                    trace.putAttribute("status", "error")
+                    trace.putAttribute("error_type", result.error.javaClass.simpleName)
+                    result
+                }
+            }
+        } catch (e: Exception) {
+            trace.putAttribute("status", "error")
+            trace.putAttribute("error_type", e.javaClass.simpleName)
+            throw e
+        } finally {
+            stopTrace(trace)
+        }
+    }
+
+    /**
      * Non-suspend version of [measure] for synchronous operations.
      */
     fun <T> measureSync(traceName: String, block: () -> T): T {
@@ -120,6 +147,18 @@ class PerformanceTraces @Inject constructor() {
 
         /** Nearby places query (geohash range query + haversine filter). */
         const val NEARBY_PLACES_LOAD = "nearby_places_load"
+
+        /** Places loaded for the visible map viewport. */
+        const val MAP_PLACES_LOAD = "map_places_load"
+
+        /** Top places ranking query. */
+        const val TOP_PLACES_LOAD = "top_places_load"
+
+        /** Paginated place list query without search text. */
+        const val PLACES_PAGE_LOAD = "places_page_load"
+
+        /** Search-driven place query. */
+        const val PLACE_SEARCH_LOAD = "place_search_load"
 
         /** Review submission (validation + Firestore write). */
         const val REVIEW_SUBMIT = "review_submit"
