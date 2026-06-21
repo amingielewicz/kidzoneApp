@@ -13,6 +13,7 @@ import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.UPLOAD_ERROR_MESSAGE
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -231,7 +232,7 @@ class ProfileViewModelTest {
 
             val state = viewModel.uiState.value
             assertFalse(state.isSaving)
-            assertEquals("Storage full", state.saveError)
+            assertEquals(UPLOAD_ERROR_MESSAGE, state.saveError)
             // Should still be open so user can retry
             assertTrue(state.isEditOpen || state.saveError != null)
         }
