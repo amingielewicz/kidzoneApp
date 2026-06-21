@@ -314,7 +314,7 @@ class RegisterViewModelTest {
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertNotNull(state.errorMessage)
+            assertEquals("Błąd połączenia z serwerem. Spróbuj ponownie.", state.errorMessage)
             assertFalse(state.isRegistered)
         }
     }

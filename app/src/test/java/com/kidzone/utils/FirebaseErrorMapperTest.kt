@@ -1,6 +1,9 @@
 package com.kidzone.utils
 
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.storage.StorageException
+import io.mockk.every
+import io.mockk.mockk
 import java.io.IOException
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -56,6 +59,48 @@ class FirebaseErrorMapperTest {
         val message = error.toPlacesErrorMessage(FALLBACK)
 
         assertEquals(FALLBACK, message)
+    }
+
+    @Test
+    fun `maps storage permission error to safe upload message`() {
+        val error = storageException(StorageException.ERROR_NOT_AUTHORIZED)
+
+        val message = error.toUploadErrorMessage()
+
+        assertEquals(STORAGE_PERMISSION_ERROR_MESSAGE, message)
+    }
+
+    @Test
+    fun `maps storage retry limit to safe upload message`() {
+        val error = storageException(StorageException.ERROR_RETRY_LIMIT_EXCEEDED)
+
+        val message = error.toUploadErrorMessage()
+
+        assertEquals(STORAGE_RETRY_LIMIT_ERROR_MESSAGE, message)
+    }
+
+    @Test
+    fun `maps wrapped upload io error to network message`() {
+        val error = IllegalStateException("Upload failed", IOException("socket closed"))
+
+        val message = error.toUploadErrorMessage()
+
+        assertEquals(NETWORK_ERROR_MESSAGE, message)
+    }
+
+    @Test
+    fun `keeps upload fallback for unknown errors`() {
+        val error = IllegalArgumentException("raw firebase message")
+
+        val message = error.toUploadErrorMessage()
+
+        assertEquals(UPLOAD_ERROR_MESSAGE, message)
+    }
+
+    private fun storageException(errorCode: Int): StorageException {
+        val error = mockk<StorageException>()
+        every { error.errorCode } returns errorCode
+        return error
     }
 
     private companion object {

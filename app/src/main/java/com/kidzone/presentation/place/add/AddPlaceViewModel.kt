@@ -14,6 +14,7 @@ import com.kidzone.review.InAppReviewManager
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.PhotoUploader
 import com.kidzone.utils.TextNormalization
+import com.kidzone.utils.toUploadErrorMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import android.net.Uri
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -503,7 +504,7 @@ class AddPlaceViewModel @Inject constructor(
                                 it.copy(
                                     isSaving = false,
                                     isUploadingPhotos = false,
-                                    errorMessage = "Błąd uploadu zdjęcia: ${e.message}"
+                                    errorMessage = e.toUploadErrorMessage()
                                 )
                             }
                             return@launch

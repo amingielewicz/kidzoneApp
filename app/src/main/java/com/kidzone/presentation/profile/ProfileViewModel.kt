@@ -11,6 +11,7 @@ import com.kidzone.domain.usecase.ComputeBadgesUseCase
 import com.kidzone.domain.usecase.NotificationPrefsUseCase
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.toUploadErrorMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -254,8 +255,7 @@ class ProfileViewModel @Inject constructor(
                         _uiState.update {
                             it.copy(
                                 isSaving = false,
-                                saveError = uploadResult.error.message
-                                    ?: "Nie udało się wgrać zdjęcia"
+                                saveError = uploadResult.error.toUploadErrorMessage()
                             )
                         }
                         return@launch

@@ -6,6 +6,7 @@ import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.PasswordPolicy
+import com.kidzone.utils.SERVER_TEMPORARY_ERROR_MESSAGE
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -115,6 +116,6 @@ class RegisterViewModel @Inject constructor(
 
     private fun mapError(throwable: Throwable): String = when (throwable) {
         is AuthException -> throwable.message ?: "Nieznany błąd"
-        else -> throwable.message ?: "Nieznany błąd"
+        else -> SERVER_TEMPORARY_ERROR_MESSAGE
     }
 }

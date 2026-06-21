@@ -5,6 +5,7 @@ import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.SERVER_TEMPORARY_ERROR_MESSAGE
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -388,7 +389,7 @@ class LoginViewModelTest {
 
             val state = viewModel.uiState.value
             assertTrue(state.isMessageError)
-            assertTrue(state.message!!.contains("Quota exceeded"))
+            assertTrue(state.message!!.contains(SERVER_TEMPORARY_ERROR_MESSAGE))
         }
     }
 

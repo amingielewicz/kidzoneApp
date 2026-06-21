@@ -42,7 +42,7 @@ sealed class AuthException(message: String) : Exception(message) {
 
     /** Brak Internetu, timeout, błąd po stronie Firebase. */
     data class Network(val networkCause: Throwable) :
-        AuthException(networkCause.message ?: "Błąd połączenia z serwerem")
+        AuthException("Błąd połączenia z serwerem. Spróbuj ponownie.")
 
     /** Konto użytkownika zostało zablokowane przez administratora. */
     data class AccountBanned(val banMessage: String, val banReason: String) :
