@@ -2,6 +2,7 @@ package com.kidzone.data.repository
 
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.kidzone.analytics.PerformanceTraces
 import com.kidzone.data.local.PlaceDao
 import com.kidzone.data.local.PlaceEntity
 import com.kidzone.data.remote.FirestoreCollections
@@ -31,7 +32,8 @@ import kotlin.math.*
 class FirestorePlaceRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val placeDao: PlaceDao,
-    private val syncManager: SyncManager
+    private val syncManager: SyncManager,
+    private val performanceTraces: PerformanceTraces
 ) : PlaceRepository {
 
     companion object {
@@ -63,55 +65,67 @@ class FirestorePlaceRepository @Inject constructor(
     override fun observePlacesByOwner(ownerUserId: String): Flow<List<Place>> = 
         placeDao.observeByOwner(ownerUserId, OWNER_PLACES_LIMIT).map { list -> list.map { it.toDomain() } }
 
-    override suspend fun getPlace(placeId: String): OpResult<Place> = try {
-        val doc = firestore.collection(FirestoreCollections.PLACES).document(placeId).get().await()
-        val place = doc.toObject(PlaceDto::class.java)?.toDomain()
-        if (place != null) OpResult.success(place) else OpResult.failure(Exception("Not found"))
-    } catch (e: Exception) {
-        val cached = placeDao.getById(placeId)
-        if (cached != null) OpResult.success(cached.toDomain()) else OpResult.failure(e)
+    override suspend fun getPlace(placeId: String): OpResult<Place> =
+        performanceTraces.measureResult(PerformanceTraces.PLACE_LOAD) {
+            try {
+                val doc = firestore.collection(FirestoreCollections.PLACES).document(placeId).get().await()
+                val place = doc.toObject(PlaceDto::class.java)?.toDomain()
+                if (place != null) OpResult.success(place) else OpResult.failure(Exception("Not found"))
+            } catch (e: Exception) {
+                val cached = placeDao.getById(placeId)
+                if (cached != null) OpResult.success(cached.toDomain()) else OpResult.failure(e)
+            }
     }
 
-    override suspend fun getPlacesNear(latitude: Double, longitude: Double, radiusKm: Double): OpResult<List<Place>> = try {
-        val precision = GeoHash.prefixLengthForRadius(radiusKm)
-        val hash = GeoHash.encode(latitude, longitude, precision)
-        val hashEnd = hash.substring(0, hash.length - 1) + (hash.last() + 1)
-        val snapshot = firestore.collection(FirestoreCollections.PLACES)
-            .whereGreaterThanOrEqualTo("geohash", hash)
-            .whereLessThan("geohash", hashEnd)
-            .limit(GEO_QUERY_LIMIT.toLong()).get().await()
-        val places = snapshot.documents.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
-        if (places.isNotEmpty()) placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
-        OpResult.success(places)
-    } catch (e: Exception) {
-        val cached = placeDao.getRecentPlaces(GEO_QUERY_LIMIT)
-        if (cached.isNotEmpty()) OpResult.success(cached.map { it.toDomain() }) else OpResult.failure(e)
-    }
+    override suspend fun getPlacesNear(latitude: Double, longitude: Double, radiusKm: Double): OpResult<List<Place>> =
+        performanceTraces.measureResult(PerformanceTraces.NEARBY_PLACES_LOAD) {
+            try {
+                val precision = GeoHash.prefixLengthForRadius(radiusKm)
+                val hash = GeoHash.encode(latitude, longitude, precision)
+                val hashEnd = hash.substring(0, hash.length - 1) + (hash.last() + 1)
+                val snapshot = firestore.collection(FirestoreCollections.PLACES)
+                    .whereGreaterThanOrEqualTo("geohash", hash)
+                    .whereLessThan("geohash", hashEnd)
+                    .limit(GEO_QUERY_LIMIT.toLong()).get().await()
+                val places = snapshot.documents.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
+                if (places.isNotEmpty()) placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
+                OpResult.success(places)
+            } catch (e: Exception) {
+                val cached = placeDao.getRecentPlaces(GEO_QUERY_LIMIT)
+                if (cached.isNotEmpty()) OpResult.success(cached.map { it.toDomain() }) else OpResult.failure(e)
+            }
+        }
 
-    override suspend fun getTopPlaces(limit: Int): OpResult<List<Place>> = try {
-        val snapshot = firestore.collection(FirestoreCollections.PLACES)
-            .orderBy("averageRating", com.google.firebase.firestore.Query.Direction.DESCENDING)
-            .limit(limit.toLong()).get().await()
-        val places = snapshot.documents.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
-        placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
-        OpResult.success(places)
-    } catch (e: Exception) {
-        val cached = placeDao.getTopPlaces(limit)
-        if (cached.isNotEmpty()) OpResult.success(cached.map { it.toDomain() }) else OpResult.failure(e)
-    }
+    override suspend fun getTopPlaces(limit: Int): OpResult<List<Place>> =
+        performanceTraces.measureResult(PerformanceTraces.TOP_PLACES_LOAD) {
+            try {
+                val snapshot = firestore.collection(FirestoreCollections.PLACES)
+                    .orderBy("averageRating", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                    .limit(limit.toLong()).get().await()
+                val places = snapshot.documents.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
+                placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
+                OpResult.success(places)
+            } catch (e: Exception) {
+                val cached = placeDao.getTopPlaces(limit)
+                if (cached.isNotEmpty()) OpResult.success(cached.map { it.toDomain() }) else OpResult.failure(e)
+            }
+        }
 
     override suspend fun getPlacesInBounds(bounds: GeoBounds, category: PlaceCategory?, limit: Int): OpResult<List<Place>> {
-        val cached = getCachedPlacesInBounds(bounds, category, limit)
-        if (cached.isNotEmpty()) {
-            // Rezygnujemy z agresywnego odświeżania w tle przy każdym ruchu, 
-            // żeby nie dławić łącza. Dane z cache są wystarczające dla płynności.
-            return OpResult.success(cached)
+        return performanceTraces.measureResult(PerformanceTraces.MAP_PLACES_LOAD) {
+            val cached = getCachedPlacesInBounds(bounds, category, limit)
+            if (cached.isNotEmpty()) {
+                // Rezygnujemy z agresywnego odświeżania w tle przy każdym ruchu,
+                // żeby nie dławić łącza. Dane z cache są wystarczające dla płynności.
+                OpResult.success(cached)
+            } else {
+                try {
+                    val remote = fetchRemotePlacesInBounds(bounds, category, limit)
+                    if (remote.isNotEmpty()) placeDao.upsertAll(remote.map(PlaceEntity::fromDomain))
+                    OpResult.success(remote)
+                } catch (e: Exception) { OpResult.failure(e) }
+            }
         }
-        return try {
-            val remote = fetchRemotePlacesInBounds(bounds, category, limit)
-            if (remote.isNotEmpty()) placeDao.upsertAll(remote.map(PlaceEntity::fromDomain))
-            OpResult.success(remote)
-        } catch (e: Exception) { OpResult.failure(e) }
     }
 
     private suspend fun fetchRemotePlacesInBounds(bounds: GeoBounds, category: PlaceCategory?, limit: Int): List<Place> {
@@ -170,31 +184,43 @@ class FirestorePlaceRepository @Inject constructor(
         return lats.flatMap { la -> lngs.map { lo -> GeoHash.encode(la, lo, precision) } }.distinct().take(MAP_GEOHASH_PREFIX_LIMIT)
     }
 
-    override suspend fun getPlacesPage(pageSize: Int, cursor: String?, category: PlaceCategory?, query: String?): OpResult<PagedResult<Place>> = try {
-        var q = placesCollection() as com.google.firebase.firestore.Query
-        if (category != null) q = q.whereEqualTo("category", category.name)
-        q = if (!query.isNullOrBlank()) q.orderBy("name") else q.orderBy("createdAtMillis", com.google.firebase.firestore.Query.Direction.DESCENDING)
-        if (!cursor.isNullOrBlank() && !cursor.startsWith(ROOM_CURSOR_PREFIX)) {
-            val cs = placesCollection().document(cursor).get().await()
-            if (cs.exists()) q = q.startAfter(cs)
-        } else if (!query.isNullOrBlank()) q = q.startAt(query)
-        if (!query.isNullOrBlank()) q = q.endAt(query + "\uf8ff")
-        val snap = q.limit((pageSize + 1).toLong()).get().await()
-        val docs = snap.documents
-        val hasMore = docs.size > pageSize
-        val page = if (hasMore) docs.take(pageSize) else docs
-        val places = page.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
-        if (places.isNotEmpty()) placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
-        OpResult.success(PagedResult(places, if (hasMore) page.lastOrNull()?.id else null))
-    } catch (e: Exception) { OpResult.failure(e) }
+    override suspend fun getPlacesPage(pageSize: Int, cursor: String?, category: PlaceCategory?, query: String?): OpResult<PagedResult<Place>> {
+        val traceName = if (query.isNullOrBlank()) {
+            PerformanceTraces.PLACES_PAGE_LOAD
+        } else {
+            PerformanceTraces.PLACE_SEARCH_LOAD
+        }
+        return performanceTraces.measureResult(traceName) {
+            try {
+                var q = placesCollection() as com.google.firebase.firestore.Query
+                if (category != null) q = q.whereEqualTo("category", category.name)
+                q = if (!query.isNullOrBlank()) q.orderBy("name") else q.orderBy("createdAtMillis", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                if (!cursor.isNullOrBlank() && !cursor.startsWith(ROOM_CURSOR_PREFIX)) {
+                    val cs = placesCollection().document(cursor).get().await()
+                    if (cs.exists()) q = q.startAfter(cs)
+                } else if (!query.isNullOrBlank()) q = q.startAt(query)
+                if (!query.isNullOrBlank()) q = q.endAt(query + "\uf8ff")
+                val snap = q.limit((pageSize + 1).toLong()).get().await()
+                val docs = snap.documents
+                val hasMore = docs.size > pageSize
+                val page = if (hasMore) docs.take(pageSize) else docs
+                val places = page.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
+                if (places.isNotEmpty()) placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
+                OpResult.success(PagedResult(places, if (hasMore) page.lastOrNull()?.id else null))
+            } catch (e: Exception) { OpResult.failure(e) }
+        }
+    }
 
-    override suspend fun addPlace(place: Place): OpResult<Place> = try {
-        val doc = placesCollection().document()
-        val p = place.copy(id = doc.id)
-        placesCollection().document(p.id).set(PlaceDto.fromDomain(p)).await()
-        placeDao.upsert(PlaceEntity.fromDomain(p))
-        OpResult.success(p)
-    } catch (e: Exception) { OpResult.failure(e) }
+    override suspend fun addPlace(place: Place): OpResult<Place> =
+        performanceTraces.measureResult(PerformanceTraces.ADD_PLACE) {
+            try {
+                val doc = placesCollection().document()
+                val p = place.copy(id = doc.id)
+                placesCollection().document(p.id).set(PlaceDto.fromDomain(p)).await()
+                placeDao.upsert(PlaceEntity.fromDomain(p))
+                OpResult.success(p)
+            } catch (e: Exception) { OpResult.failure(e) }
+        }
 
     override suspend fun updatePlace(place: Place): OpResult<Place> = try {
         placesCollection().document(place.id).set(PlaceDto.fromDomain(place)).await()
