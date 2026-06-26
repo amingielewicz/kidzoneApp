@@ -2,7 +2,9 @@
 
 Powiązane issue: #182
 
-Milestone: v0.1.0-alpha — pierwszy release techniczny
+Milestone: v1.0.0 — publiczny release produkcyjny
+
+Ostatnia aktualizacja: 2026-06-27
 
 ## Cel
 
@@ -19,8 +21,30 @@ Dokument nie zastępuje porady prawnej. Służy jako techniczno-produktowa check
 | Usuwanie konta | Do weryfikacji w aplikacji | Dokumenty opisują możliwość usunięcia konta. Trzeba potwierdzić ekran i flow. |
 | Zgody lokalizacji | Do weryfikacji w aplikacji | Trzeba sprawdzić komunikaty systemowe i uzasadnienie w UI. |
 | Zgody zdjęć | Do weryfikacji w aplikacji | Trzeba sprawdzić Android Photo Picker / uprawnienia oraz komunikaty. |
-| Google Play Data Safety | Do przygotowania | Wypełnić na podstawie faktycznych danych i usług Firebase/Google. |
+| Google Play Data Safety | Roboczy draft gotowy | Ostatecznie przepisać i potwierdzić w Google Play Console. |
 | Finalny przegląd prawny | Do zrobienia | Przed publikacją produkcyjną. |
+
+## Status techniczny na 2026-06-27
+
+Ta sekcja zbiera stan, który można potwierdzić w repozytorium bez ręcznego testu na urządzeniu ani dostępu do Google Play Console.
+
+| Obszar | Stan | Evidence |
+| --- | --- | --- |
+| Regulamin | Dokument istnieje | `public/terms-of-service.html` |
+| Polityka prywatności | Dokument istnieje | `public/privacy-policy.html` |
+| Data Safety draft | Robocze odpowiedzi istnieją | `docs/legal/google-play-data-safety-draft.md` |
+| Usuwanie konta | Checklistę testu przygotowano, wynik manualny nadal wymagany | `docs/legal/account-deletion-test-checklist.md` |
+| Lokalizacja | Manifest deklaruje tylko foreground location | `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`; brak `ACCESS_BACKGROUND_LOCATION` |
+| Zdjęcia | Aplikacja używa Android Photo Picker w kluczowych flow | `PickVisualMedia`, `PickMultipleVisualMedia` w profilach, miejscach i opiniach |
+| Kamera | Kamera jest deklarowana jako funkcja opcjonalna | `android.hardware.camera` z `android:required="false"` |
+| Powiadomienia | Android 13+ permission jest deklarowane i obsługiwane | `POST_NOTIFICATIONS`, `RequestNotificationPermission` / `MainScreen` |
+
+Elementy, których ten przegląd nie może zamknąć bez ręcznego testu:
+
+- finalny wynik usuwania konta w aplikacji i Firebase Console,
+- realne komunikaty systemowe zgód lokalizacji, aparatu i zdjęć na urządzeniu,
+- finalne odpowiedzi zapisane w Google Play Console,
+- finalny przegląd prawny dokumentów przez właściciela/profesjonalnego doradcę.
 
 ## 1. Regulamin
 
@@ -126,6 +150,13 @@ Przed publikacją dodać test manualny:
 
 Aplikacja używa lokalizacji do pokazywania miejsc w pobliżu. Polityka prywatności wskazuje, że lokalizacja jest używana tylko za zgodą użytkownika i nie jest zapisywana jako historia lokalizacji.
 
+Status repozytorium:
+
+- manifest deklaruje `ACCESS_FINE_LOCATION` i `ACCESS_COARSE_LOCATION`,
+- manifest nie deklaruje `ACCESS_BACKGROUND_LOCATION`,
+- aplikacja prosi o lokalizację przez runtime permission dopiero w flow mapy/listy/dodawania miejsca,
+- przed publikacją trzeba nadal sprawdzić realne systemowe dialogi i zachowanie po odmowie uprawnienia.
+
 ### Do weryfikacji w aplikacji
 
 - czy aplikacja prosi tylko o potrzebny zakres lokalizacji,
@@ -149,6 +180,14 @@ Brak historii lokalizacji użytkownika.
 
 Aplikacja pozwala dodawać zdjęcia miejsc, opinii i avatarów. Regulamin zawiera zasady dotyczące zdjęć, wizerunku i bezpieczeństwa dzieci.
 
+Status repozytorium:
+
+- avatar używa `ActivityResultContracts.PickVisualMedia`,
+- dodawanie miejsca i opinii używa `PickMultipleVisualMedia`,
+- dodawanie zdjęcia w szczegółach miejsca używa `PickVisualMedia`,
+- kamera jest osobnym flow przez `TakePicture` i runtime permission `CAMERA`,
+- manifest deklaruje `READ_MEDIA_IMAGES`, więc przed publikacją trzeba potwierdzić, czy Photo Picker w pełni wystarcza, czy ta deklaracja jest nadal potrzebna dla wspieranych wersji Androida.
+
 ### Do weryfikacji w aplikacji
 
 - czy aplikacja używa Android Photo Picker tam, gdzie to możliwe,
@@ -166,6 +205,14 @@ Hardening właścicielski Firebase Storage został wykonany w #161. Przed publik
 ## 6. Google Play Data Safety Form
 
 Formularz Data Safety powinien być wypełniony na podstawie realnego działania aplikacji, nie tylko dokumentów.
+
+Roboczy draft odpowiedzi znajduje się w:
+
+```text
+docs/legal/google-play-data-safety-draft.md
+```
+
+Draft obejmuje aktualne użycie Firebase Authentication, Firestore, Storage, Crashlytics, Analytics, Performance Monitoring, Cloud Messaging, App Check i Remote Config. Ostateczny status nadal wymaga porównania z aktywnymi usługami w Firebase Console i przepisania odpowiedzi do Google Play Console.
 
 ### Dane potencjalnie deklarowane
 
@@ -198,24 +245,27 @@ Formularz Data Safety powinien być wypełniony na podstawie realnego działania
 | Data Safety nieuzupełniony zgodnie z faktyczną konfiguracją Firebase | Wysokie | Przygotować osobną checklistę Google Play Console. |
 | Zdjęcia dzieci/wizerunek | Wysokie | Dodać widoczne ostrzeżenie w UI podczas dodawania zdjęć. |
 | Lokalizacja | Średnie | Potwierdzić brak lokalizacji w tle. |
+| `READ_MEDIA_IMAGES` w manifeście | Średnie | Potwierdzić, czy jest nadal potrzebne mimo Photo Pickera. |
 | Retencja danych | Średnie | Sprawdzić, czy deklarowane terminy są technicznie wykonalne. |
 
 ## 8. Checklista końcowa #182
 
 - [x] Weryfikacja regulaminu — dokument istnieje i obejmuje główne obszary.
 - [x] Weryfikacja polityki prywatności — dokument istnieje i obejmuje główne obszary.
+- [x] Robocza weryfikacja Google Play Data Safety — draft istnieje i obejmuje aktywne SDK/usługi.
 - [ ] Weryfikacja ekranu usuwania konta — wymaga testu w aplikacji.
 - [ ] Weryfikacja zgód lokalizacji — wymaga testu na urządzeniu.
 - [ ] Weryfikacja zgód zdjęć — wymaga testu na urządzeniu.
-- [ ] Weryfikacja Google Play Data Safety Form — wymaga pracy w Google Play Console.
+- [ ] Finalne przepisanie Google Play Data Safety Form — wymaga pracy w Google Play Console.
 - [ ] Finalny przegląd prawny przed publikacją — do wykonania po domknięciu powyższych punktów.
 
 ## 9. Rekomendowane dalsze issue
 
 - `legal: verify account deletion flow before Google Play release`
-- `legal: prepare Google Play Data Safety answers`
+- `legal: fill and confirm Google Play Data Safety in Play Console`
 - `privacy: add photo upload warning about children and third-party image rights`
 - `privacy: verify location permission scope and no background location usage`
+- `privacy: verify whether READ_MEDIA_IMAGES is still needed with Photo Picker`
 
 ## 10. Wniosek
 
