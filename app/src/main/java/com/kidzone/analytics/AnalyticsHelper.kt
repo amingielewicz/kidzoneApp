@@ -46,7 +46,7 @@ class AnalyticsHelper @Inject constructor(
     // ─── Places ─────────────────────────────────────────────────────────
 
     fun logAddPlace(placeId: String, category: String) {
-        Timber.d("Analytics: add_place → id=$placeId, category=$category")
+        Timber.d("Analytics: add_place → category=$category")
         analytics.logEvent("add_place") {
             param("place_id", placeId)
             param("category", category)
@@ -54,15 +54,15 @@ class AnalyticsHelper @Inject constructor(
     }
 
     fun logViewPlace(placeId: String, placeName: String) {
-        Timber.d("Analytics: view_place → id=$placeId, name=$placeName")
+        Timber.d("Analytics: view_place")
         analytics.logEvent("view_place") {
             param("place_id", placeId)
-            param("place_name", placeName.take(100))
+            param("place_name_length", placeName.length.coerceAtMost(MAX_TEXT_LENGTH_METRIC).toLong())
         }
     }
 
     fun logDeletePlace(placeId: String) {
-        Timber.d("Analytics: delete_place → id=$placeId")
+        Timber.d("Analytics: delete_place")
         analytics.logEvent("delete_place") {
             param("place_id", placeId)
         }
@@ -79,7 +79,7 @@ class AnalyticsHelper @Inject constructor(
     // ─── Reviews ────────────────────────────────────────────────────────
 
     fun logAddReview(placeId: String, rating: Float) {
-        Timber.d("Analytics: add_review → placeId=$placeId, rating=$rating")
+        Timber.d("Analytics: add_review → rating=$rating")
         analytics.logEvent("add_review") {
             param("place_id", placeId)
             param("rating", rating.toDouble())
@@ -87,7 +87,7 @@ class AnalyticsHelper @Inject constructor(
     }
 
     fun logDeleteReview(reviewId: String) {
-        Timber.d("Analytics: delete_review → id=$reviewId")
+        Timber.d("Analytics: delete_review")
         analytics.logEvent("delete_review") {
             param("review_id", reviewId)
         }
@@ -133,9 +133,9 @@ class AnalyticsHelper @Inject constructor(
     // ─── Search ─────────────────────────────────────────────────────────
 
     fun logSearch(query: String, resultsCount: Int) {
-        Timber.d("Analytics: search → query=$query, results=$resultsCount")
+        Timber.d("Analytics: search → queryLength=${query.length}, results=$resultsCount")
         analytics.logEvent(FirebaseAnalytics.Event.SEARCH) {
-            param(FirebaseAnalytics.Param.SEARCH_TERM, query.take(100))
+            param("query_length", query.length.coerceAtMost(MAX_TEXT_LENGTH_METRIC).toLong())
             param("results_count", resultsCount.toLong())
         }
     }
@@ -143,11 +143,16 @@ class AnalyticsHelper @Inject constructor(
     // ─── User properties ────────────────────────────────────────────────
 
     fun setUserProperty(key: String, value: String?) {
-        Timber.d("Analytics: user_property → $key=$value")
+        val loggedValue = if (value == null) "null" else "[set]"
+        Timber.d("Analytics: user_property → $key=$loggedValue")
         analytics.setUserProperty(key, value)
     }
 
     fun setUserId(uid: String?) {
         analytics.setUserId(uid)
+    }
+
+    private companion object {
+        const val MAX_TEXT_LENGTH_METRIC = 100
     }
 }
