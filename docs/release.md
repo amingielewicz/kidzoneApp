@@ -60,6 +60,7 @@ Przed wygenerowaniem paczki release trzeba potwierdzić:
 - [ ] Storage Rules są aktualne,
 - [ ] App Check jest poprawnie skonfigurowany,
 - [ ] Crashlytics działa w release,
+- [ ] checklista wydajnosci i obciazenia zostala wykonana albo swiadomie odlozona,
 - [ ] Data Safety jest zgodne z aktualnym kodem,
 - [ ] polityka prywatności i regulamin są aktualne,
 - [ ] flow usuwania konta zostało sprawdzone,
