@@ -15,7 +15,7 @@ import javax.inject.Singleton
 @Singleton
 class RemoteConfigService @Inject constructor(
     private val performanceTraces: PerformanceTraces
-) {
+) : PerformanceConfigProvider {
 
     private val remoteConfig: FirebaseRemoteConfig = FirebaseRemoteConfig.getInstance()
 
@@ -24,18 +24,36 @@ class RemoteConfigService @Inject constructor(
             minimumFetchIntervalInSeconds = if (com.kidzone.BuildConfig.DEBUG) 0 else 3600
         }
         remoteConfig.setConfigSettingsAsync(configSettings)
-        remoteConfig.setDefaultsAsync(mapOf(
-            "maintenance_mode" to false,
-            "maintenance_message" to "Aplikacja jest chwilowo niedostępna. Spróbuj ponownie później.",
-            "max_photos_per_place" to 10L,
-            "max_review_length" to 500L,
-            "enable_subscriptions" to false,
-            "min_app_version" to "0.1.0",
-            // A/B Testing experiment defaults
-            "exp_home_layout" to "control",
-            "exp_review_photos_limit" to "3",
-            "exp_add_place_cta" to "control"
-        ))
+        remoteConfig.setDefaultsAsync(
+            mapOf(
+                "maintenance_mode" to false,
+                "maintenance_message" to "Aplikacja jest chwilowo niedostępna. Spróbuj ponownie później.",
+                "max_photos_per_place" to 10L,
+                "max_review_length" to 500L,
+                "enable_subscriptions" to false,
+                "min_app_version" to "0.1.0",
+                PerformanceConfig.KEY_HOME_NEARBY_LIMIT to
+                    PerformanceConfig.HOME_NEARBY_LIMIT_DEFAULT.toLong(),
+                PerformanceConfig.KEY_HOME_TOP_PLACES_LIMIT to
+                    PerformanceConfig.HOME_TOP_PLACES_LIMIT_DEFAULT.toLong(),
+                PerformanceConfig.KEY_HOME_RECENTLY_ADDED_LIMIT to
+                    PerformanceConfig.HOME_RECENTLY_ADDED_LIMIT_DEFAULT.toLong(),
+                PerformanceConfig.KEY_HOME_TOP_PLACES_RADIUS_KM to
+                    PerformanceConfig.HOME_TOP_PLACES_RADIUS_KM_DEFAULT,
+                PerformanceConfig.KEY_HOME_FETCH_RADIUS_KM to
+                    PerformanceConfig.HOME_FETCH_RADIUS_KM_DEFAULT,
+                PerformanceConfig.KEY_MAP_MARKERS_LIMIT to
+                    PerformanceConfig.MAP_MARKERS_LIMIT_DEFAULT.toLong(),
+                PerformanceConfig.KEY_RANKING_TOP_LIMIT to
+                    PerformanceConfig.RANKING_TOP_LIMIT_DEFAULT.toLong(),
+                PerformanceConfig.KEY_RANKING_FETCH_POOL to
+                    PerformanceConfig.RANKING_FETCH_POOL_DEFAULT.toLong(),
+                // A/B Testing experiment defaults
+                "exp_home_layout" to "control",
+                "exp_review_photos_limit" to "3",
+                "exp_add_place_cta" to "control"
+            )
+        )
     }
 
     suspend fun fetchAndActivate() {
@@ -69,4 +87,67 @@ class RemoteConfigService @Inject constructor(
 
     val minAppVersion: String
         get() = remoteConfig.getString("min_app_version")
+
+    override val performanceConfig: PerformanceConfig
+        get() = PerformanceConfig(
+            homeNearbyLimit = getInt(
+                key = PerformanceConfig.KEY_HOME_NEARBY_LIMIT,
+                default = PerformanceConfig.HOME_NEARBY_LIMIT_DEFAULT,
+                range = 5..40
+            ),
+            homeTopPlacesLimit = getInt(
+                key = PerformanceConfig.KEY_HOME_TOP_PLACES_LIMIT,
+                default = PerformanceConfig.HOME_TOP_PLACES_LIMIT_DEFAULT,
+                range = 5..40
+            ),
+            homeRecentlyAddedLimit = getInt(
+                key = PerformanceConfig.KEY_HOME_RECENTLY_ADDED_LIMIT,
+                default = PerformanceConfig.HOME_RECENTLY_ADDED_LIMIT_DEFAULT,
+                range = 3..30
+            ),
+            homeTopPlacesRadiusKm = getDouble(
+                key = PerformanceConfig.KEY_HOME_TOP_PLACES_RADIUS_KM,
+                default = PerformanceConfig.HOME_TOP_PLACES_RADIUS_KM_DEFAULT,
+                min = 1.0,
+                max = 50.0
+            ),
+            homeFetchRadiusKm = getDouble(
+                key = PerformanceConfig.KEY_HOME_FETCH_RADIUS_KM,
+                default = PerformanceConfig.HOME_FETCH_RADIUS_KM_DEFAULT,
+                min = 5.0,
+                max = 100.0
+            ),
+            mapMarkersLimit = getInt(
+                key = PerformanceConfig.KEY_MAP_MARKERS_LIMIT,
+                default = PerformanceConfig.MAP_MARKERS_LIMIT_DEFAULT,
+                range = 100..2_000
+            ),
+            rankingTopLimit = getInt(
+                key = PerformanceConfig.KEY_RANKING_TOP_LIMIT,
+                default = PerformanceConfig.RANKING_TOP_LIMIT_DEFAULT,
+                range = 10..200
+            ),
+            rankingFetchPool = getInt(
+                key = PerformanceConfig.KEY_RANKING_FETCH_POOL,
+                default = PerformanceConfig.RANKING_FETCH_POOL_DEFAULT,
+                range = 20..500
+            )
+        ).let { config ->
+            if (config.rankingFetchPool >= config.rankingTopLimit) {
+                config
+            } else {
+                config.copy(rankingFetchPool = config.rankingTopLimit)
+            }
+        }
+
+    private fun getInt(key: String, default: Int, range: IntRange): Int =
+        remoteConfig.getLong(key)
+            .takeIf { it in range.first.toLong()..range.last.toLong() }
+            ?.toInt()
+            ?: default
+
+    private fun getDouble(key: String, default: Double, min: Double, max: Double): Double =
+        remoteConfig.getDouble(key)
+            .takeIf { it in min..max }
+            ?: default
 }

@@ -1,5 +1,6 @@
 package com.kidzone.presentation.home
 
+import com.kidzone.data.remote.PerformanceConfig
 import com.kidzone.testutil.TestFixtures
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -42,5 +43,52 @@ class HomeSectionsTest {
             listOf("newest-farther", "older-closer"),
             sections.recentlyAddedPlaces.map { it.place.id }
         )
+    }
+
+    @Test
+    fun `sections use performance config limits and top radius`() {
+        val nowMillis = 1_800_000_000_000L
+        val config = PerformanceConfig(
+            homeNearbyLimit = 2,
+            homeTopPlacesLimit = 1,
+            homeRecentlyAddedLimit = 1,
+            homeTopPlacesRadiusKm = 3.0
+        )
+
+        val highRatedFar = TestFixtures.place(
+            id = "high-rated-far",
+            averageRating = 5.0,
+            reviewsCount = 10,
+            createdAtMillis = nowMillis - 1_000L
+        )
+        val lowerRatedNear = TestFixtures.place(
+            id = "lower-rated-near",
+            averageRating = 4.0,
+            reviewsCount = 3,
+            createdAtMillis = nowMillis - 2_000L
+        )
+        val unratedNearest = TestFixtures.place(
+            id = "unrated-nearest",
+            averageRating = 0.0,
+            reviewsCount = 0,
+            createdAtMillis = nowMillis - 3_000L
+        )
+
+        val sections = buildHomeSections(
+            placesWithDistance = listOf(
+                highRatedFar to 8.0,
+                lowerRatedNear to 2.0,
+                unratedNearest to 0.5
+            ),
+            performanceConfig = config,
+            nowMillis = nowMillis
+        )
+
+        assertEquals(
+            listOf("unrated-nearest", "lower-rated-near"),
+            sections.nearbyPlaces.map { it.place.id }
+        )
+        assertEquals(listOf("lower-rated-near"), sections.topPlaces.map { it.place.id })
+        assertEquals(listOf("high-rated-far"), sections.recentlyAddedPlaces.map { it.place.id })
     }
 }

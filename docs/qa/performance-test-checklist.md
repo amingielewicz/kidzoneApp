@@ -114,6 +114,7 @@ Opcjonalnie, jesli konfiguracja podpisu release jest dostepna:
 
 Po wykonaniu scenariuszy sprawdz w Firebase Console, czy pojawiaja sie albo sa oczekiwane trace:
 
+- [ ] `cold_start`,
 - [ ] `location_fetch`,
 - [ ] `image_compress`,
 - [ ] `photo_upload`,
@@ -125,6 +126,26 @@ Po wykonaniu scenariuszy sprawdz w Firebase Console, czy pojawiaja sie albo sa o
 - [ ] `places_page_load`,
 - [ ] `place_search_load`,
 - [ ] `add_place`.
+
+## Remote Config parametry wydajnosciowe
+
+W Firebase Console -> Remote Config sprawdz albo ustaw:
+
+| Klucz | Domyslnie | Bezpieczny zakres w aplikacji | Wplyw |
+| --- | ---: | ---: | --- |
+| `perf_home_nearby_limit` | 20 | 5-40 | liczba kart w sekcji `Blisko Ciebie` |
+| `perf_home_top_places_limit` | 20 | 5-40 | liczba kart w sekcji `TOP blisko Ciebie` |
+| `perf_home_recently_added_limit` | 10 | 3-30 | liczba kart w sekcji `Ostatnio dodane w okolicy` |
+| `perf_home_top_places_radius_km` | 10 | 1-50 | promien lokalnego rankingu top miejsc |
+| `perf_home_fetch_radius_km` | 50 | 5-100 | promien jednego fetcha danych dla Start |
+| `perf_map_markers_limit` | 1000 | 100-2000 | maksymalna liczba miejsc pobieranych dla viewportu mapy |
+| `perf_ranking_top_limit` | 100 | 10-200 | liczba pozycji pokazywana w rankingu |
+| `perf_ranking_fetch_pool` | 200 | 20-500 | pula pobierana przed filtrowaniem rankingu |
+
+- [ ] zmiana `perf_home_nearby_limit` po fetchu Remote Config ogranicza liczbe kart na Start,
+- [ ] zmiana `perf_map_markers_limit` nie powoduje pustej mapy ani widocznego przyciecia,
+- [ ] `perf_ranking_fetch_pool` jest nie mniejszy niz `perf_ranking_top_limit`,
+- [ ] nieprawidlowa wartosc w Remote Config wraca do domyslnego fallbacku.
 
 Dla kazdego dostepnego trace sprawdz:
 

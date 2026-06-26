@@ -2,6 +2,8 @@ package com.kidzone.presentation.map
 
 import com.kidzone.domain.model.GeoBounds
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.data.remote.PerformanceConfig
+import com.kidzone.data.remote.PerformanceConfigProvider
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.testutil.MainDispatcherRule
@@ -35,6 +37,7 @@ class MapViewModelTest {
 
     private lateinit var placeRepository: PlaceRepository
     private lateinit var authRepository: AuthRepository
+    private lateinit var performanceConfigProvider: PerformanceConfigProvider
 
     private val warsaw = GeoBounds(north = 52.35, east = 21.20, south = 52.10, west = 20.80)
     private val krakow = GeoBounds(north = 50.15, east = 20.10, south = 49.95, west = 19.75)
@@ -43,6 +46,9 @@ class MapViewModelTest {
     fun setUp() {
         placeRepository = mockk(relaxed = true)
         authRepository = mockk(relaxed = true)
+        performanceConfigProvider = object : PerformanceConfigProvider {
+            override val performanceConfig: PerformanceConfig = PerformanceConfig()
+        }
         every { authRepository.currentUser } returns MutableStateFlow(null)
         coEvery {
             placeRepository.getPlacesInBounds(any(), any(), any())
@@ -93,7 +99,7 @@ class MapViewModelTest {
     }
 
     private fun kotlinx.coroutines.test.TestScope.createAndObserve(): MapViewModel {
-        val viewModel = MapViewModel(placeRepository, authRepository)
+        val viewModel = MapViewModel(placeRepository, authRepository, performanceConfigProvider)
         backgroundScope.launch { viewModel.uiState.collect {} }
         return viewModel
     }

@@ -2,6 +2,7 @@ package com.kidzone.presentation.ranking
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kidzone.data.remote.PerformanceConfigProvider
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
@@ -34,12 +35,13 @@ import javax.inject.Inject
 @HiltViewModel
 class RankingViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val performanceConfigProvider: PerformanceConfigProvider
 ) : ViewModel() {
 
     /**
-     * @property topPlaces top miejsc wg średniej oceny (malejąco), do [TOP_LIMIT] pozycji
-     * @property topUsers  top użytkowników wg liczby dodanych miejsc, drugorzędnie po liczbie opinii, do [TOP_LIMIT] pozycji
+     * @property topPlaces top miejsc wg średniej oceny (malejąco), do limitu z Remote Config
+     * @property topUsers  top użytkowników wg liczby dodanych miejsc, drugorzędnie po liczbie opinii, do limitu z Remote Config
      * @property userBadges precomputowane odznaki per user (uid -> lista odznak),
      *   uwzględniają KONTEKST rankingowy (LEADER_*, PLACE_TOP*) - inaczej karta
      *   usera w rankingu pokazywałaby mniej odznak niż ten sam user widzi na
@@ -71,12 +73,17 @@ class RankingViewModel @Inject constructor(
             // Równoległy fetch obu list – ranking ładuje się tak szybko jak
             // wolniejsze z dwóch zapytań, a nie jako ich suma.
             //
-            // FETCH_POOL > TOP_LIMIT - bierzemy z zapasem, żeby po
+            // Fetch pool > visible limit - bierzemy z zapasem, żeby po
             // odfiltrowaniu "nieaktywnych" wpisów (zob. niżej) i tak mieć
-            // szansę zapełnić TOP_LIMIT pozycji aktywnymi userami / miejscami.
+            // szansę zapełnić limit aktywnymi userami / miejscami.
+            val performanceConfig = performanceConfigProvider.performanceConfig
             val (placesResult, usersResult) = coroutineScope {
-                val placesDeferred = async { placeRepository.getTopPlaces(limit = FETCH_POOL) }
-                val usersDeferred = async { authRepository.getTopUsers(limit = FETCH_POOL) }
+                val placesDeferred = async {
+                    placeRepository.getTopPlaces(limit = performanceConfig.rankingFetchPool)
+                }
+                val usersDeferred = async {
+                    authRepository.getTopUsers(limit = performanceConfig.rankingFetchPool)
+                }
                 placesDeferred.await() to usersDeferred.await()
             }
 
@@ -90,13 +97,13 @@ class RankingViewModel @Inject constructor(
             //    nie ma czego "rankingować" - pojawi się dopiero po
             //    pierwszej aktywności.
             //
-            // Po filtrze tnijemy do TOP_LIMIT - to nasz twardy sufit dla UI.
+            // Po filtrze tnijemy do limitu z Remote Config - to twardy sufit dla UI.
             val places = (placesResult as? OpResult.Success)?.data.orEmpty()
                 .filter { it.reviewsCount > 0 && it.averageRating > 0.0 }
-                .take(TOP_LIMIT)
+                .take(performanceConfig.rankingTopLimit)
             val users = (usersResult as? OpResult.Success)?.data.orEmpty()
                 .filter { it.placesAddedCount > 0 || it.reviewsCount > 0 }
-                .take(TOP_LIMIT)
+                .take(performanceConfig.rankingTopLimit)
 
             // Łączymy komunikaty błędów z obu fetchów – jeśli np. użytkownicy
             // się wczytali a miejsca nie, pokażemy błąd nie tracąc danych.
@@ -135,27 +142,4 @@ class RankingViewModel @Inject constructor(
         }
     }
 
-    private companion object {
-        /**
-         * Twardy sufit liczby pozycji widocznych na każdej z list rankingu.
-         *
-         * 100 to świadomy kompromis - wystarczy dla obecnej skali aplikacji
-         * bez paginacji, a jednocześnie wymusza skupienie na "topowych"
-         * pozycjach (długi ogon ratuje placeholder "brak ocen" w UI).
-         */
-        const val TOP_LIMIT = 100
-
-        /**
-         * Liczba rekordów pobieranych z repo, zanim odfiltrujemy nieaktywne
-         * (zob. komentarz w [refresh]).
-         *
-         * Większa niż [TOP_LIMIT], żeby dać miejsce na odpadnięcie świeżych
-         * miejsc z 0 opinii i userów z 0 aktywnością. 200 to praktyczny
-         * sufit - przy obecnym minSdk / wczesnej fazie projektu nawet
-         * 1 fetch po 200 dokumentów to ciągle szybki snapshot Firestore.
-         * Jak baza userów / miejsc dramatycznie urośnie, lepiej przejść na
-         * server-side filtering (zapytanie po `reviewsCount > 0`).
-         */
-        const val FETCH_POOL = 200
-    }
 }
