@@ -61,8 +61,21 @@ jobs:
           }
           EOF
 
+      - name: Check NVD API key configuration
+        run: |
+          if [ -z "${NVD_API_KEY}" ]; then
+            echo "::warning title=NVD_API_KEY missing::Dependency Check can hit NVD rate limits without the free NVD API key secret."
+          else
+            echo "NVD_API_KEY is configured."
+          fi
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+
       - name: Run OWASP Dependency Check
-        run: ./gradlew dependencyCheckAnalyze
+        run: |
+          mkdir -p build/reports
+          ./gradlew dependencyCheckAnalyze --stacktrace 2>&1 | tee build/reports/dependency-check-gradle.log
+          exit ${PIPESTATUS[0]}
         env:
           MAPS_API_KEY: "AIzaSyPlaceholder"
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
@@ -72,7 +85,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dependency-check-reports
-          path: build/reports/dependency-check-report.*
+          path: |
+            build/reports/dependency-check-report.*
+            build/reports/dependency-check-gradle.log
           retention-days: 14
 
       - name: Upload SARIF to code scanning
