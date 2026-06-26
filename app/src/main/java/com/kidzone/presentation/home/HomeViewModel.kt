@@ -3,6 +3,8 @@ package com.kidzone.presentation.home
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kidzone.data.remote.PerformanceConfig
+import com.kidzone.data.remote.PerformanceConfigProvider
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.service.LocationProvider
@@ -22,38 +24,8 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/**
- * Ile miejsc maksymalnie pokazujemy w sekcji "Top miejsca".
- *
- * To lokalny ranking: najpierw ograniczamy bazę do miejsc w pobliżu usera,
- * a potem wybieramy 20 najlepiej ocenianych.
- */
-private const val TOP_PLACES_LIMIT = 20
-
-/**
- * Ile miejsc maksymalnie pokazujemy w sekcji "Blisko Ciebie".
- *
- * Symetrycznie do [TOP_PLACES_LIMIT] - obie sekcje wyglądają tak samo,
- * więc takie same liczby kart wzmacniają poczucie spójności.
- */
-private const val NEARBY_LIMIT = 20
-
-/** Ile nowych miejsc maksymalnie pokazujemy w sekcji "Ostatnio dodane". */
-private const val RECENTLY_ADDED_LIMIT = 10
-
 /** Zakres czasu dla sekcji "Ostatnio dodane w okolicy". */
 private const val RECENTLY_ADDED_WINDOW_MILLIS = 14L * 24L * 60L * 60L * 1000L
-
-/** Promień lokalnego rankingu "Top miejsca" (km). */
-private const val TOP_PLACES_RADIUS_KM = 10.0
-
-/**
- * Promień techniczny fetcha miejsc do sekcji startowych.
- *
- * Repo wykonuje ograniczone zapytanie po prefiksie geohash i docina wynik
- * dokładnym dystansem po stronie klienta.
- */
-private const val HOME_PLACES_FETCH_RADIUS_KM = 50.0
 
 /**
  * ViewModel ekranu Home (zakładka "Start" w bottom navigation).
@@ -61,7 +33,7 @@ private const val HOME_PLACES_FETCH_RADIUS_KM = 50.0
  * Trzyma zestawy danych zależne od aktualnej lokalizacji:
  *  - **Ostatnio dodane w okolicy** – nowe miejsca z ostatnich 14 dni.
  *  - **Top miejsca** – 20 najlepiej ocenianych miejsc w promieniu
- *    [TOP_PLACES_RADIUS_KM] od użytkownika (lokalny ranking).
+ *    z Remote Config od użytkownika (lokalny ranking).
  *  - **Blisko Ciebie** – 20 najbliższych miejsc, bez względu na ocenę i liczbę
  *    opinii.
  *
@@ -72,6 +44,7 @@ private const val HOME_PLACES_FETCH_RADIUS_KM = 50.0
 class HomeViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
     private val locationProvider: LocationProvider,
+    private val performanceConfigProvider: PerformanceConfigProvider,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -166,13 +139,20 @@ class HomeViewModel @Inject constructor(
             }
 
             val (lat, lng) = location
+            val performanceConfig = performanceConfigProvider.performanceConfig
             persistLocationForWidget(lat, lng)
-            when (val result = placeRepository.getPlacesNear(lat, lng, HOME_PLACES_FETCH_RADIUS_KM)) {
+            when (
+                val result = placeRepository.getPlacesNear(
+                    lat,
+                    lng,
+                    performanceConfig.homeFetchRadiusKm
+                )
+            ) {
                 is OpResult.Success -> {
                     val placesWithDistance = result.data
                         .map { it to haversineKm(lat, lng, it.latitude, it.longitude) }
 
-                    val homeSections = buildHomeSections(placesWithDistance)
+                    val homeSections = buildHomeSections(placesWithDistance, performanceConfig)
 
                     _uiState.update {
                         it.copy(
@@ -248,8 +228,15 @@ class HomeViewModel @Inject constructor(
             }
 
             val (lat, lng) = location
+            val performanceConfig = performanceConfigProvider.performanceConfig
             persistLocationForWidget(lat, lng)
-            when (val result = placeRepository.getPlacesNear(lat, lng, HOME_PLACES_FETCH_RADIUS_KM)) {
+            when (
+                val result = placeRepository.getPlacesNear(
+                    lat,
+                    lng,
+                    performanceConfig.homeFetchRadiusKm
+                )
+            ) {
                 is OpResult.Success -> {
                     // Repo zwraca ograniczony bucket geohash; dokładny dystans
                     // liczymy na kliencie. "Blisko Ciebie" to 20 najbliższych, bez
@@ -258,7 +245,7 @@ class HomeViewModel @Inject constructor(
                     val placesWithDistance = result.data
                         .map { it to haversineKm(lat, lng, it.latitude, it.longitude) }
 
-                    val homeSections = buildHomeSections(placesWithDistance)
+                    val homeSections = buildHomeSections(placesWithDistance, performanceConfig)
 
                     _uiState.update {
                         it.copy(
@@ -302,23 +289,24 @@ internal data class HomeSections(
 
 internal fun buildHomeSections(
     placesWithDistance: List<Pair<Place, Double>>,
+    performanceConfig: PerformanceConfig = PerformanceConfig(),
     nowMillis: Long = System.currentTimeMillis()
 ): HomeSections {
     val nearby = placesWithDistance
         .sortedBy { it.second }
-        .take(NEARBY_LIMIT)
+        .take(performanceConfig.homeNearbyLimit)
         .map { (place, distanceKm) -> HomeViewModel.PlaceWithDistance(place, distanceKm) }
 
     val topNearby = placesWithDistance
         .filter { (place, distanceKm) ->
-            place.reviewsCount > 0 && distanceKm <= TOP_PLACES_RADIUS_KM
+            place.reviewsCount > 0 && distanceKm <= performanceConfig.homeTopPlacesRadiusKm
         }
         .sortedWith(
             compareByDescending<Pair<Place, Double>> { it.first.averageRating }
                 .thenByDescending { it.first.reviewsCount }
                 .thenBy { it.second }
         )
-        .take(TOP_PLACES_LIMIT)
+        .take(performanceConfig.homeTopPlacesLimit)
         .map { (place, distanceKm) -> HomeViewModel.PlaceWithDistance(place, distanceKm) }
 
     val recentThresholdMillis = nowMillis - RECENTLY_ADDED_WINDOW_MILLIS
@@ -330,7 +318,7 @@ internal fun buildHomeSections(
             compareByDescending<Pair<Place, Double>> { it.first.createdAtMillis }
                 .thenBy { it.second }
         )
-        .take(RECENTLY_ADDED_LIMIT)
+        .take(performanceConfig.homeRecentlyAddedLimit)
         .map { (place, distanceKm) -> HomeViewModel.PlaceWithDistance(place, distanceKm) }
 
     return HomeSections(

@@ -2,6 +2,7 @@ package com.kidzone.presentation.map
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kidzone.data.remote.PerformanceConfigProvider
 import com.kidzone.domain.model.GeoBounds
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
@@ -48,7 +49,8 @@ import kotlin.math.roundToInt
 @HiltViewModel
 class MapViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val performanceConfigProvider: PerformanceConfigProvider
 ) : ViewModel() {
 
     /**
@@ -138,7 +140,7 @@ class MapViewModel @Inject constructor(
                 val result = placeRepository.getPlacesInBounds(
                     bounds = request.bounds,
                     category = request.category,
-                    limit = MAP_MARKERS_LIMIT
+                    limit = performanceConfigProvider.performanceConfig.mapMarkersLimit
                 )
             ) {
                 is OpResult.Success -> {
@@ -289,7 +291,6 @@ class MapViewModel @Inject constructor(
          * gdy bazka miejsc urośnie.
          */
         const val TOP_RATED_THRESHOLD = 4.0
-        const val MAP_MARKERS_LIMIT = 1000
         const val VIEWPORT_DEBOUNCE_MS = 300L
         const val VIEWPORT_CACHE_TTL_MS = 5 * 60 * 1000L
         const val VIEWPORT_CACHE_SIZE = 12

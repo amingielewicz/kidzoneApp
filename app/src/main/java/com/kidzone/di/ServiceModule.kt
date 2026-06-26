@@ -3,6 +3,8 @@ package com.kidzone.di
 import com.kidzone.data.service.AndroidBadgePreferences
 import com.kidzone.data.service.AndroidImageCompressor
 import com.kidzone.data.service.AndroidLocationProvider
+import com.kidzone.data.remote.PerformanceConfigProvider
+import com.kidzone.data.remote.RemoteConfigService
 import com.kidzone.domain.service.BadgePreferences
 import com.kidzone.domain.service.ImageCompressorPort
 import com.kidzone.domain.service.LocationProvider
@@ -33,4 +35,8 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindImageCompressor(impl: AndroidImageCompressor): ImageCompressorPort
+
+    @Binds
+    @Singleton
+    abstract fun bindPerformanceConfigProvider(impl: RemoteConfigService): PerformanceConfigProvider
 }

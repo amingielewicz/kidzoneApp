@@ -58,6 +58,31 @@ Zalecana kolejność:
 4. Zweryfikuj Crashlytics i logi Firebase.
 5. Dopiero potem rozszerz enforcement na kolejne usługi.
 
+### Minimalny smoke test enforcement
+
+W Firebase Console przejdz do:
+
+```text
+Build -> App Check -> Apps -> Android app
+```
+
+Przed zmiana trybu enforcement:
+
+1. Upewnij sie, ze debug token aktualnego urzadzenia jest dodany.
+2. Uruchom aplikacje i zaloguj testowego uzytkownika.
+3. Otworz Start, Liste, Mape, Ranking i Profil.
+4. Dodaj testowe miejsce bez zdjec, potem dodaj jedno zdjecie.
+5. Dodaj opinie z jednym zdjeciem.
+
+Po wlaczeniu enforcement dla pojedynczej uslugi powtorz smoke test:
+
+- Firestore: logowanie, profil, lista miejsc, dodanie miejsca, opinia.
+- Storage: upload zdjec miejsca i opinii.
+- Cloud Functions: funkcje wywolywane przez aplikacje, jesli sa objete App Check.
+
+PASS oznacza brak `PERMISSION_DENIED`, `App attestation failed` i brak nowych bledow
+blokujacych flow w Crashlytics.
+
 ## Checklist
 
 - [ ] Debug token dodany w Firebase Console.

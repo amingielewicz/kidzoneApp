@@ -3,6 +3,7 @@ package com.kidzone
 import android.app.Application
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
+import com.kidzone.analytics.ColdStartTrace
 import com.kidzone.data.local.PlaceDao
 import com.kidzone.data.remote.RemoteConfigService
 import com.kidzone.experiment.ExperimentManager
@@ -43,11 +44,15 @@ class KidZoneApplication : Application() {
     @Inject
     lateinit var experimentManager: ExperimentManager
 
+    @Inject
+    lateinit var coldStartTrace: ColdStartTrace
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()
         initTimber()
+        coldStartTrace.start()
         initDebugTools()
         initAppCheck()
         initRemoteConfig()

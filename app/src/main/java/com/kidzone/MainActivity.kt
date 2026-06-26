@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
@@ -16,10 +17,12 @@ import com.google.android.play.core.install.InstallStateUpdatedListener
 import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.InstallStatus
 import com.google.android.play.core.install.model.UpdateAvailability
+import com.kidzone.analytics.ColdStartTrace
 import com.kidzone.navigation.KidZoneNavGraph
 import com.kidzone.ui.theme.KidZoneTheme
 import dagger.hilt.android.AndroidEntryPoint
 import timber.log.Timber
+import javax.inject.Inject
 
 /**
  * Jedyna aktywność aplikacji – host dla całej hierarchii Compose.
@@ -42,6 +45,9 @@ import timber.log.Timber
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var coldStartTrace: ColdStartTrace
 
     private val appUpdateManager by lazy { AppUpdateManagerFactory.create(this) }
 
@@ -79,6 +85,9 @@ class MainActivity : ComponentActivity() {
         checkForAppUpdate()
 
         setContent {
+            LaunchedEffect(Unit) {
+                coldStartTrace.stopAtFirstContent()
+            }
             KidZoneTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     KidZoneNavGraph(intent = intent)
