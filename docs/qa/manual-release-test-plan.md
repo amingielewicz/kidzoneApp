@@ -8,6 +8,10 @@ Ten dokument opisuje manualną checklistę testów przed release aplikacji kidZo
 
 Issue #210 pozostaje otwarte po dodaniu tej dokumentacji, ponieważ realne testy muszą zostać wykonane ręcznie na aplikacji, urządzeniu/emulatorze i docelowej konfiguracji Firebase/Google Cloud.
 
+Testy wydajnosci, obciazenia, Firebase Performance i Crashlytics sa rozpisane osobno w:
+
+- [Performance and load test checklist](performance-test-checklist.md)
+
 ## Zakres
 
 Plan obejmuje:
@@ -264,6 +268,8 @@ Uwagi:
 - [ ] Storage Rules są wdrożone,
 - [ ] App Check jest w oczekiwanym trybie,
 - [ ] usage Firestore/Storage nie pokazuje nietypowych pików.
+
+Szczegolowa walidacja Performance Monitoring i Crashlytics: [Performance and load test checklist](performance-test-checklist.md).
 
 ## 14. Google Cloud
 
