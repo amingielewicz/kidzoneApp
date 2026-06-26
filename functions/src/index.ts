@@ -4,6 +4,14 @@ import {onRequest} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import * as nodemailer from "nodemailer";
+import {
+  escapeHtml,
+  extractBearerToken,
+  mapPhotoReason,
+  mapReason,
+  mapReviewReason,
+  renderAdminResponse,
+} from "./adminHelpers";
 
 admin.initializeApp();
 
@@ -66,13 +74,11 @@ async function verifyAdminRequest(
   req: HttpRequestLike,
   res: HttpResponseLike
 ): Promise<string | null> {
-  const rawAuthHeader = req.headers.authorization || "";
-  const authHeader = Array.isArray(rawAuthHeader) ? rawAuthHeader[0] || "" : rawAuthHeader;
-  if (!authHeader.startsWith("Bearer ")) {
+  const idToken = extractBearerToken(req.headers);
+  if (!idToken) {
     res.status(401).send(renderAdminResponse("Brak autoryzacji", "Wymagany token w nagłówku Authorization."));
     return null;
   }
-  const idToken = authHeader.split("Bearer ")[1];
   try {
     const decoded = await admin.auth().verifyIdToken(idToken);
     const uid = decoded.uid;
@@ -112,15 +118,6 @@ async function logAudit(adminUid: string, action: string, details: Record<string
   } catch (err) {
     console.error("Failed to log audit:", err);
   }
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
 }
 
 const gmailEmail = defineSecret("GMAIL_EMAIL");
@@ -195,42 +192,6 @@ async function getUserInfo(userId: string): Promise<string> {
   } catch {
     return `Nieznany [${userId}]`;
   }
-}
-
-function mapReason(reason: string): string {
-  const reasons: Record<string, string> = {
-    "NOT_EXISTS": "Miejsce nie istnieje / zamknięte",
-    "INAPPROPRIATE": "Nieodpowiednia treść (wulgaryzmy, reklama)",
-    "DUPLICATE": "Duplikat innego miejsca",
-    "FALSE_DATA": "Fałszywe dane (adres, udogodnienia)",
-    "OTHER": "Inne",
-  };
-  const label = reasons[reason] || reason;
-  return `${label} [${reason}]`;
-}
-
-function mapReviewReason(reason: string): string {
-  const reasons: Record<string, string> = {
-    "SPAM": "Spam / reklama",
-    "OFFENSIVE": "Obraźliwa treść",
-    "FALSE_INFO": "Fałszywe informacje",
-    "NOT_RELEVANT": "Nie dotyczy tego miejsca",
-    "OTHER": "Inne",
-  };
-  const label = reasons[reason] || reason;
-  return `${label} [${reason}]`;
-}
-
-function mapPhotoReason(reason: string): string {
-  const reasons: Record<string, string> = {
-    "INAPPROPRIATE": "Nieodpowiednia treść",
-    "NOT_RELEVANT": "Niezwiązane z miejscem",
-    "COPYRIGHT": "Narusza prawa autorskie",
-    "OFFENSIVE": "Obraźliwe / wulgarne",
-    "OTHER": "Inne",
-  };
-  const label = reasons[reason] || reason;
-  return `${label} [${reason}]`;
 }
 
 async function getReviewInfo(reviewId: string): Promise<ReviewInfo> {
@@ -1201,35 +1162,6 @@ function decodeStoragePath(downloadUrl: string): string {
     return "";
   }
 }
-
-/**
- * Renderuje prostą stronę HTML z wynikiem akcji admina.
- */
-function renderAdminResponse(title: string, message: string): string {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>kidZone Admin - ${title}</title>
-  <style>
-    body { margin: 0; padding: 40px 20px; background: #f5f8fb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; }
-    .card { max-width: 500px; margin: 0 auto; background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-    h1 { color: #1976D2; margin-bottom: 12px; font-size: 24px; }
-    p { color: #555; font-size: 16px; line-height: 1.5; }
-    .logo { color: #1976D2; font-size: 14px; margin-top: 24px; font-weight: 600; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>${title}</h1>
-    <p>${message}</p>
-    <p class="logo">kidZone Admin Panel</p>
-  </div>
-</body>
-</html>`;
-}
-
 
 // --- Trigger: nowa opinia → push do właściciela miejsca ---
 export const onReviewCreatedPush = onDocumentCreated(
