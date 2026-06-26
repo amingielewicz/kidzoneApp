@@ -8,8 +8,10 @@ Ten dokument opisuje manualną checklistę testów przed release aplikacji kidZo
 
 Issue #210 pozostaje otwarte po dodaniu tej dokumentacji, ponieważ realne testy muszą zostać wykonane ręcznie na aplikacji, urządzeniu/emulatorze i docelowej konfiguracji Firebase/Google Cloud.
 
-Testy wydajnosci, obciazenia, Firebase Performance i Crashlytics sa rozpisane osobno w:
+Strategia testow automatycznych i regresji oraz testy wydajnosci, obciazenia,
+Firebase Performance i Crashlytics sa rozpisane osobno w:
 
+- [Testing strategy and regression coverage](testing-strategy.md)
 - [Performance and load test checklist](performance-test-checklist.md)
 
 ## Zakres
