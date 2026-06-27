@@ -17,11 +17,19 @@ Dokument obejmuje:
 - Firebase Security Rules,
 - Storage Security Rules,
 - App Check,
+- abuse protection i rate limiting,
+- audyt publicznych profili użytkowników,
 - logowanie i diagnostykę,
 - dane użytkownika,
 - keystore,
 - zależności,
 - procedurę reakcji na incydent.
+
+## Powiązane dokumenty
+
+- `docs/app-check.md` - konfiguracja i smoke test App Check.
+- `docs/abuse-rate-limiting.md` - strategia ograniczania spamu, nadużyć i kosztów.
+- `docs/qa/public-user-profile-audit.md` - ręczna weryfikacja publicznych profili użytkowników.
 
 ## Zasady ogólne
 

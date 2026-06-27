@@ -139,6 +139,21 @@ describe('Users collection', () => {
     );
   });
 
+  it('denies additional PII fields on public user document create', async () => {
+    const db = authedDb('user1');
+    await assertFails(
+      setDoc(doc(db, 'users', 'user1'), {
+        name: 'Test User',
+        role: 'user',
+        phone: '+48123123123',
+        address: 'Private street 1',
+        privateSettings: { marketing: false },
+        placesAddedCount: 0,
+        reviewsCount: 0,
+      }),
+    );
+  });
+
   it('allows owner to read and write own private profile', async () => {
     const db = authedDb('user1');
     await assertSucceeds(
@@ -346,6 +361,35 @@ describe('Places collection', () => {
     );
   });
 
+  it('allows owner and admin to update place photos', async () => {
+    await seedPlace('place1', 'owner1');
+    const ownerDb = authedDb('owner1');
+    await assertSucceeds(
+      updateDoc(doc(ownerDb, 'places', 'place1'), {
+        photoUrls: ['https://example.com/photo.webp'],
+        photoUploadedBy: ['owner1'],
+      }),
+    );
+
+    const adminDb = authedDb('admin1', { admin: true });
+    await assertSucceeds(
+      updateDoc(doc(adminDb, 'places', 'place1'), {
+        photoUrls: ['https://example.com/moderated.webp'],
+      }),
+    );
+  });
+
+  it('denies non-owner from changing place photos', async () => {
+    await seedPlace('place1', 'owner1');
+    const db = authedDb('user2');
+    await assertFails(
+      updateDoc(doc(db, 'places', 'place1'), {
+        photoUrls: ['https://attacker.example/photo.webp'],
+        photoUploadedBy: ['user2'],
+      }),
+    );
+  });
+
   it('denies owner from changing averageRating', async () => {
     await seedPlace('place1', 'owner1');
     const db = authedDb('owner1');
@@ -429,6 +473,69 @@ describe('Reviews collection', () => {
         createdAtMillis: Date.now(),
       }),
     );
+  });
+
+  it('allows review owner to update mutable fields with valid rating', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'reviews', 'review1'), {
+        userId: 'reviewer1',
+        placeId: 'place1',
+        rating: 4,
+        comment: 'Good',
+        photoUrls: [],
+        createdAtMillis: Date.now(),
+        updatedAtMillis: Date.now(),
+      });
+    });
+    const db = authedDb('reviewer1');
+    await assertSucceeds(
+      updateDoc(doc(db, 'reviews', 'review1'), {
+        rating: 5,
+        comment: 'Great',
+        updatedAtMillis: Date.now(),
+      }),
+    );
+  });
+
+  it('denies review owner from updating rating outside allowed range', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'reviews', 'review1'), {
+        userId: 'reviewer1',
+        placeId: 'place1',
+        rating: 4,
+        comment: 'Good',
+        photoUrls: [],
+        createdAtMillis: Date.now(),
+        updatedAtMillis: Date.now(),
+      });
+    });
+    const db = authedDb('reviewer1');
+
+    await assertFails(updateDoc(doc(db, 'reviews', 'review1'), { rating: 0 }));
+    await assertFails(updateDoc(doc(db, 'reviews', 'review1'), { rating: 6 }));
+    await assertFails(updateDoc(doc(db, 'reviews', 'review1'), { rating: '5' }));
+  });
+
+  it('denies review owner from updating immutable review fields', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'reviews', 'review1'), {
+        userId: 'reviewer1',
+        placeId: 'place1',
+        rating: 4,
+        comment: 'Good',
+        photoUrls: [],
+        createdAtMillis: Date.now(),
+        updatedAtMillis: Date.now(),
+      });
+    });
+    const db = authedDb('reviewer1');
+
+    await assertFails(updateDoc(doc(db, 'reviews', 'review1'), { userId: 'user2' }));
+    await assertFails(updateDoc(doc(db, 'reviews', 'review1'), { placeId: 'place2' }));
+    await assertFails(updateDoc(doc(db, 'reviews', 'review1'), { createdAtMillis: Date.now() }));
   });
 });
 

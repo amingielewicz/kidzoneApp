@@ -114,8 +114,11 @@ describe('Place photos storage rules', () => {
     await assertSucceeds(deleteObject(ref(authedStorage(ADMIN_UID, { admin: true }), path)));
   });
 
-  it('denies non-images and files at or above the 10 MB place photo limit', async () => {
+  it('denies non-images, unapproved image types, and files at or above the 10 MB place photo limit', async () => {
     await assertFails(uploadImage(OWNER_UID, path, IMAGE_BYTES, 'text/plain'));
+    await assertFails(uploadImage(OWNER_UID, path, IMAGE_BYTES, 'image/svg+xml'));
+    await assertFails(uploadImage(OWNER_UID, path, IMAGE_BYTES, 'image/heic'));
+    await assertFails(uploadImage(OWNER_UID, path, IMAGE_BYTES, 'image/tiff'));
     await assertFails(uploadImage(OWNER_UID, path, LARGE_IMAGE_BYTES, 'image/webp'));
   });
 
@@ -142,6 +145,14 @@ describe('Review photos storage rules', () => {
   it('allows owner to create and overwrite own review photo', async () => {
     await assertSucceeds(uploadImage(OWNER_UID, path));
     await assertSucceeds(uploadImage(OWNER_UID, path, new Uint8Array([5, 6, 7])));
+  });
+
+  it('allows only approved image formats for review photos', async () => {
+    await assertSucceeds(uploadImage(OWNER_UID, path, IMAGE_BYTES, 'image/jpeg'));
+    await assertSucceeds(uploadImage(OWNER_UID, path, IMAGE_BYTES, 'image/png'));
+    await assertSucceeds(uploadImage(OWNER_UID, path, IMAGE_BYTES, 'image/webp'));
+
+    await assertFails(uploadImage(OWNER_UID, path, IMAGE_BYTES, 'image/svg+xml'));
   });
 
   it('denies another user creating, overwriting, or deleting owner review photo', async () => {
@@ -207,10 +218,12 @@ describe('Avatar storage rules', () => {
     await assertSucceeds(deleteObject(ref(authedStorage(ADMIN_UID, { admin: true }), path)));
   });
 
-  it('denies non-images and files at or above the 5 MB avatar limit', async () => {
+  it('denies non-images, unapproved image types, and files at or above the 5 MB avatar limit', async () => {
     const oversizedAvatar = new Uint8Array(5 * 1024 * 1024);
 
     await assertFails(uploadImage(OWNER_UID, path, IMAGE_BYTES, 'text/plain'));
+    await assertFails(uploadImage(OWNER_UID, path, IMAGE_BYTES, 'image/svg+xml'));
+    await assertFails(uploadImage(OWNER_UID, path, IMAGE_BYTES, 'image/heic'));
     await assertFails(uploadImage(OWNER_UID, path, oversizedAvatar, 'image/jpeg'));
   });
 });
