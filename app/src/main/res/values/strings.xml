@@ -9,6 +9,36 @@
     <string name="password">Hasło</string>
     <string name="forgot_password">Nie pamiętam hasła</string>
     <string name="login_with_google">Zaloguj się przez Google</string>
+    <string name="login_subtitle">Zaloguj się, by zacząć odkrywać miejsca</string>
+    <string name="field_required">Pole wymagane</string>
+    <string name="invalid_email">Wpisz poprawny adres e-mail</string>
+    <string name="resend_verification_link">Wyślij ponownie link weryfikacyjny</string>
+    <string name="login_no_account">Nie masz jeszcze konta?</string>
+    <string name="auth_divider_or">lub</string>
+    <string name="show_password">Pokaż hasło</string>
+    <string name="hide_password">Ukryj hasło</string>
+    <string name="google_sign_in_not_configured">Włącz Google Sign-In w Firebase Console i pobierz nowy google-services.json do app/</string>
+    <string name="google_sign_in_missing_activity">Nie udało się uruchomić logowania Google (brak Activity)</string>
+    <string name="register_title">Stwórz konto</string>
+    <string name="register_subtitle">Dołącz do społeczności kidZone i zacznij odkrywać miejsca przyjazne dzieciom</string>
+    <string name="username">Nazwa użytkownika</string>
+    <string name="username_helper">Widoczna w opiniach, miejscach i rankingu</string>
+    <string name="invalid_email_format">Niepoprawny format e-maila</string>
+    <string name="register_success_title">Konto utworzone!</string>
+    <string name="register_success_message">Wysłaliśmy link weryfikacyjny na podany adres e-mail. Kliknij link w wiadomości, aby potwierdzić konto i móc się zalogować.</string>
+    <string name="go_to_login">Przejdź do logowania</string>
+    <string name="register_has_account">Masz już konto?</string>
+    <string name="password_requirement_min_length">Minimum %1$d znaków</string>
+    <string name="password_requirement_lowercase">Co najmniej jedna mała litera</string>
+    <string name="password_requirement_uppercase">Co najmniej jedna duża litera</string>
+    <string name="password_requirement_special_character">Co najmniej jeden znak specjalny</string>
+    <string name="change_password_title">Zmiana hasła</string>
+    <string name="current_password">Aktualne hasło</string>
+    <string name="new_password">Nowe hasło</string>
+    <string name="repeat_new_password">Powtórz nowe hasło</string>
+    <string name="passwords_do_not_match">Hasła nie są takie same</string>
+    <string name="change_password_action">Zmień hasło</string>
+    <string name="cancel">Anuluj</string>
 
     <!-- Navigation -->
     <string name="nav_home">Start</string>

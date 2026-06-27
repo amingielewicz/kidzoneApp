@@ -27,10 +27,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.kidzone.R
+import com.kidzone.presentation.common.passwordRequirementText
 import com.kidzone.utils.PasswordPolicy
 
 /**
@@ -72,21 +75,25 @@ fun ChangePasswordDialog(
 
     val isNewPasswordValid = PasswordPolicy.isValid(newPassword)
     val passwordsMismatch = confirmPassword.isNotEmpty() && confirmPassword != newPassword
-    val confirmPasswordHelp = confirmPasswordSupportingText(confirmPassword, passwordsMismatch)
+    val confirmPasswordHelp = confirmPasswordSupportingTextRes(confirmPassword, passwordsMismatch)
     val isFormValid = currentPassword.isNotBlank() &&
         isNewPasswordValid &&
         confirmPassword == newPassword
 
     AlertDialog(
         onDismissRequest = { if (!isInProgress) onDismiss() },
-        title = { Text("Zmiana hasła") },
+        title = { Text(stringResource(R.string.change_password_title)) },
         text = {
             Column {
                 PasswordField(
                     value = currentPassword,
                     onValueChange = { currentPassword = it },
-                    label = "Aktualne hasło",
-                    supportingText = if (currentPassword.isBlank()) "Pole wymagane" else null,
+                    label = stringResource(R.string.current_password),
+                    supportingText = if (currentPassword.isBlank()) {
+                        stringResource(R.string.field_required)
+                    } else {
+                        null
+                    },
                     showText = showPasswords,
                     onToggleVisibility = { showPasswords = !showPasswords },
                     enabled = !isInProgress
@@ -95,9 +102,13 @@ fun ChangePasswordDialog(
                 PasswordField(
                     value = newPassword,
                     onValueChange = { newPassword = it },
-                    label = "Nowe hasło",
+                    label = stringResource(R.string.new_password),
                     isError = newPassword.isNotEmpty() && !isNewPasswordValid,
-                    supportingText = if (newPassword.isBlank()) "Pole wymagane" else null,
+                    supportingText = if (newPassword.isBlank()) {
+                        stringResource(R.string.field_required)
+                    } else {
+                        null
+                    },
                     showText = showPasswords,
                     onToggleVisibility = { showPasswords = !showPasswords },
                     enabled = !isInProgress
@@ -110,9 +121,9 @@ fun ChangePasswordDialog(
                 PasswordField(
                     value = confirmPassword,
                     onValueChange = { confirmPassword = it },
-                    label = "Powtórz nowe hasło",
+                    label = stringResource(R.string.repeat_new_password),
                     isError = passwordsMismatch,
-                    supportingText = confirmPasswordHelp,
+                    supportingText = confirmPasswordHelp?.let { stringResource(it) },
                     showText = showPasswords,
                     onToggleVisibility = { showPasswords = !showPasswords },
                     enabled = !isInProgress
@@ -138,7 +149,7 @@ fun ChangePasswordDialog(
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("Zmień hasło")
+                    Text(stringResource(R.string.change_password_action))
                 }
             }
         },
@@ -147,18 +158,18 @@ fun ChangePasswordDialog(
                 onClick = onDismiss,
                 enabled = !isInProgress
             ) {
-                Text("Anuluj")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
 }
 
-private fun confirmPasswordSupportingText(
+private fun confirmPasswordSupportingTextRes(
     confirmPassword: String,
     passwordsMismatch: Boolean
-): String? = when {
-    confirmPassword.isBlank() -> "Pole wymagane"
-    passwordsMismatch -> "Hasła nie są takie same"
+): Int? = when {
+    confirmPassword.isBlank() -> R.string.field_required
+    passwordsMismatch -> R.string.passwords_do_not_match
     else -> null
 }
 
@@ -190,7 +201,7 @@ private fun PasswordRequirements(password: String) {
                 )
                 Spacer(Modifier.size(8.dp))
                 Text(
-                    text = status.label,
+                    text = passwordRequirementText(status.labelKey),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (status.isSatisfied) {
                         MaterialTheme.colorScheme.onSurface
@@ -243,7 +254,11 @@ private fun PasswordField(
                     } else {
                         Icons.Filled.Visibility
                     },
-                    contentDescription = if (showText) "Ukryj hasło" else "Pokaż hasło"
+                    contentDescription = if (showText) {
+                        stringResource(R.string.hide_password)
+                    } else {
+                        stringResource(R.string.show_password)
+                    }
                 )
             }
         },

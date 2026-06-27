@@ -9,6 +9,36 @@
     <string name="password">Password</string>
     <string name="forgot_password">Forgot password</string>
     <string name="login_with_google">Sign in with Google</string>
+    <string name="login_subtitle">Sign in to start discovering places</string>
+    <string name="field_required">Required</string>
+    <string name="invalid_email">Enter a valid email address</string>
+    <string name="resend_verification_link">Resend verification link</string>
+    <string name="login_no_account">No account yet?</string>
+    <string name="auth_divider_or">or</string>
+    <string name="show_password">Show password</string>
+    <string name="hide_password">Hide password</string>
+    <string name="google_sign_in_not_configured">Enable Google Sign-In in Firebase Console and download a new google-services.json to app/</string>
+    <string name="google_sign_in_missing_activity">Could not start Google sign-in (missing Activity)</string>
+    <string name="register_title">Create account</string>
+    <string name="register_subtitle">Join the kidZone community and start discovering kid-friendly places</string>
+    <string name="username">Username</string>
+    <string name="username_helper">Visible in reviews, places, and ranking</string>
+    <string name="invalid_email_format">Invalid email format</string>
+    <string name="register_success_title">Account created!</string>
+    <string name="register_success_message">We sent a verification link to the email address you provided. Click the link in the email to verify your account and sign in.</string>
+    <string name="go_to_login">Go to sign in</string>
+    <string name="register_has_account">Already have an account?</string>
+    <string name="password_requirement_min_length">At least %1$d characters</string>
+    <string name="password_requirement_lowercase">At least one lowercase letter</string>
+    <string name="password_requirement_uppercase">At least one uppercase letter</string>
+    <string name="password_requirement_special_character">At least one special character</string>
+    <string name="change_password_title">Change password</string>
+    <string name="current_password">Current password</string>
+    <string name="new_password">New password</string>
+    <string name="repeat_new_password">Repeat new password</string>
+    <string name="passwords_do_not_match">Passwords do not match</string>
+    <string name="change_password_action">Change password</string>
+    <string name="cancel">Cancel</string>
 
     <!-- Navigation -->
     <string name="nav_home">Home</string>

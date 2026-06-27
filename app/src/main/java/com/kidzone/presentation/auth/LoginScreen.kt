@@ -205,7 +205,7 @@ fun LoginScreen(
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            text = "Zaloguj się, by zacząć odkrywać miejsca",
+                            text = stringResource(R.string.login_subtitle),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
@@ -227,8 +227,8 @@ fun LoginScreen(
                             isError = emailFormatInvalid,
                             supportingText = {
                                 when {
-                                    state.email.isBlank() -> Text("Pole wymagane")
-                                    emailFormatInvalid -> Text("Wpisz poprawny adres e-mail")
+                                    state.email.isBlank() -> Text(stringResource(R.string.field_required))
+                                    emailFormatInvalid -> Text(stringResource(R.string.invalid_email))
                                 }
                             },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -258,7 +258,7 @@ fun LoginScreen(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                             supportingText = {
                                 if (state.password.isBlank()) {
-                                    Text("Pole wymagane")
+                                    Text(stringResource(R.string.field_required))
                                 }
                             },
                             trailingIcon = {
@@ -273,9 +273,9 @@ fun LoginScreen(
                                             Icons.Filled.Visibility
                                         },
                                         contentDescription = if (isPasswordVisible) {
-                                            "Ukryj hasło"
+                                            stringResource(R.string.hide_password)
                                         } else {
-                                            "Pokaż hasło"
+                                            stringResource(R.string.show_password)
                                         }
                                     )
                                 }
@@ -322,7 +322,7 @@ fun LoginScreen(
                                 enabled = !state.isLoading,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Wyślij ponownie link weryfikacyjny")
+                                Text(stringResource(R.string.resend_verification_link))
                             }
                         }
 
@@ -380,8 +380,7 @@ fun LoginScreen(
 
                                     if (webClientId.isBlank()) {
                                         viewModel.showInlineMessage(
-                                            "Włącz Google Sign-In w Firebase Console " +
-                                                "i pobierz nowy google-services.json do app/"
+                                            context.getString(R.string.google_sign_in_not_configured)
                                         )
                                         return@launch
                                     }
@@ -389,7 +388,7 @@ fun LoginScreen(
                                     when (val result = launchGoogleSignIn(
                                         activity ?: run {
                                             viewModel.showInlineMessage(
-                                                "Nie udało się uruchomić logowania Google (brak Activity)"
+                                                context.getString(R.string.google_sign_in_missing_activity)
                                             )
                                             return@launch
                                         },
@@ -440,7 +439,7 @@ fun LoginScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Nie masz jeszcze konta?",
+                        text = stringResource(R.string.login_no_account),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
                     )
@@ -528,7 +527,7 @@ private fun OrDivider() {
     ) {
         HorizontalDivider(modifier = Modifier.weight(1f))
         Text(
-            text = "lub",
+            text = stringResource(R.string.auth_divider_or),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
             modifier = Modifier.padding(horizontal = 12.dp)
