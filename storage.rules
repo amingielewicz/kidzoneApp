@@ -13,10 +13,18 @@ service firebase.storage {
         && request.auth.token.admin == true;
     }
 
+    function isAcceptedImageContentType() {
+      return request.resource.contentType in [
+        'image/jpeg',
+        'image/png',
+        'image/webp'
+      ];
+    }
+
     function isImageUnder(maxSizeBytes) {
       return request.resource != null
         && request.resource.size < maxSizeBytes
-        && request.resource.contentType.matches('image/.*');
+        && isAcceptedImageContentType();
     }
 
     function isOwner(userId) {

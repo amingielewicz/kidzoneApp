@@ -21,13 +21,21 @@ service cloud.firestore {
       return !(request.resource.data.diff(resource.data).affectedKeys().hasAny(fields));
     }
 
+    function isValidRating(rating) {
+      return rating is number && rating >= 1 && rating <= 5;
+    }
+
     function hasNoPrivateUserFields() {
       return !request.resource.data.keys().hasAny([
         'email',
         'firstName',
         'lastName',
         'emailNotificationsEnabled',
-        'fcmTokens'
+        'fcmTokens',
+        'phone',
+        'address',
+        'notificationPrefs',
+        'privateSettings'
       ]);
     }
 
@@ -51,6 +59,7 @@ service cloud.firestore {
       allow create: if isOwner(userId)
         && request.resource.data.role == 'user'
         && request.resource.data.placesAddedCount == 0
+        && request.resource.data.reviewsCount == 0
         && hasNoPrivateUserFields();
 
       allow update: if (isOwner(userId)
@@ -104,8 +113,9 @@ service cloud.firestore {
         && request.resource.data.reviewsCount == 0;
 
       allow update: if isAdmin()
-        || (isSignedIn() && resource.data.ownerUserId == request.auth.uid && isNotUpdating(['averageRating', 'reviewsCount', 'ownerUserId']))
-        || (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoUrls', 'photoUploadedBy']));
+        || (isSignedIn()
+          && resource.data.ownerUserId == request.auth.uid
+          && isNotUpdating(['averageRating', 'reviewsCount', 'ownerUserId']));
 
       allow delete: if isAdmin() || (isSignedIn() && resource.data.ownerUserId == request.auth.uid);
     }
@@ -115,12 +125,20 @@ service cloud.firestore {
 
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
-        && request.resource.data.rating >= 1
-        && request.resource.data.rating <= 5
+        && isValidRating(request.resource.data.rating)
         && exists(/databases/$(database)/documents/places/$(request.resource.data.placeId))
         && get(/databases/$(database)/documents/places/$(request.resource.data.placeId)).data.ownerUserId != request.auth.uid;
 
-      allow update: if isAdmin() || (isOwner(resource.data.userId) && isNotUpdating(['userId', 'placeId']));
+      allow update: if isAdmin()
+        || (isOwner(resource.data.userId)
+          && isNotUpdating(['userId', 'placeId', 'createdAtMillis'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'rating',
+            'comment',
+            'photoUrls',
+            'updatedAtMillis'
+          ])
+          && isValidRating(request.resource.data.rating));
 
       allow delete: if isAdmin() || isOwner(resource.data.userId);
     }

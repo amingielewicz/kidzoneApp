@@ -83,6 +83,22 @@ describe('users rules', () => {
     );
   });
 
+  it('rejects additional PII fields on public user document create', async () => {
+    const db = authedDb(OWNER_UID);
+
+    await assertFails(
+      db.doc(`users/${OWNER_UID}`).set({
+        name: 'Owner',
+        role: 'user',
+        placesAddedCount: 0,
+        reviewsCount: 0,
+        phone: '+48123123123',
+        address: 'Private street 1',
+        privateSettings: { marketing: false },
+      })
+    );
+  });
+
   it('rejects user creation for another uid', async () => {
     const db = authedDb(OTHER_UID);
 
@@ -368,6 +384,44 @@ describe('places rules', () => {
       db.doc('places/place-1').update({ name: 'Updated Playground' })
     );
   });
+
+  it('allows owner and admin to update place photos', async () => {
+    await seed('places/place-1', {
+      name: 'Playground',
+      ownerUserId: OWNER_UID,
+      averageRating: 0,
+      reviewsCount: 0,
+    });
+
+    await assertSucceeds(
+      authedDb(OWNER_UID).doc('places/place-1').update({
+        photoUrls: ['https://example.com/photo.webp'],
+        photoUploadedBy: [OWNER_UID],
+      })
+    );
+
+    await assertSucceeds(
+      authedDb(ADMIN_UID, { admin: true }).doc('places/place-1').update({
+        photoUrls: ['https://example.com/moderated.webp'],
+      })
+    );
+  });
+
+  it('rejects non-owner changing place photos', async () => {
+    await seed('places/place-1', {
+      name: 'Playground',
+      ownerUserId: OWNER_UID,
+      averageRating: 0,
+      reviewsCount: 0,
+    });
+
+    await assertFails(
+      authedDb(OTHER_UID).doc('places/place-1').update({
+        photoUrls: ['https://attacker.example/photo.webp'],
+        photoUploadedBy: [OTHER_UID],
+      })
+    );
+  });
 });
 
 describe('reviews rules', () => {
@@ -432,6 +486,10 @@ describe('reviews rules', () => {
       userId: OWNER_UID,
       placeId: 'place-1',
       rating: 4,
+      comment: 'Good',
+      photoUrls: [],
+      createdAtMillis: Date.now(),
+      updatedAtMillis: Date.now(),
     });
 
     const db = authedDb(OWNER_UID);
@@ -439,6 +497,44 @@ describe('reviews rules', () => {
     await assertFails(
       db.doc('reviews/review-1').update({ placeId: 'place-2' })
     );
+  });
+
+  it('allows review owner to update mutable fields with valid rating', async () => {
+    await seed('reviews/review-1', {
+      userId: OWNER_UID,
+      placeId: 'place-1',
+      rating: 4,
+      comment: 'Good',
+      photoUrls: [],
+      createdAtMillis: Date.now(),
+      updatedAtMillis: Date.now(),
+    });
+
+    await assertSucceeds(
+      authedDb(OWNER_UID).doc('reviews/review-1').update({
+        rating: 5,
+        comment: 'Great',
+        updatedAtMillis: Date.now(),
+      })
+    );
+  });
+
+  it('rejects review owner updating rating outside allowed range', async () => {
+    await seed('reviews/review-1', {
+      userId: OWNER_UID,
+      placeId: 'place-1',
+      rating: 4,
+      comment: 'Good',
+      photoUrls: [],
+      createdAtMillis: Date.now(),
+      updatedAtMillis: Date.now(),
+    });
+
+    const db = authedDb(OWNER_UID);
+
+    await assertFails(db.doc('reviews/review-1').update({ rating: 0 }));
+    await assertFails(db.doc('reviews/review-1').update({ rating: 6 }));
+    await assertFails(db.doc('reviews/review-1').update({ rating: '5' }));
   });
 });
 
