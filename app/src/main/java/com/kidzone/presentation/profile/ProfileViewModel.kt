@@ -9,6 +9,8 @@ import com.kidzone.domain.repository.SignInProvider
 import com.kidzone.domain.service.BadgePreferences
 import com.kidzone.domain.usecase.ComputeBadgesUseCase
 import com.kidzone.domain.usecase.NotificationPrefsUseCase
+import com.kidzone.i18n.AppLanguage
+import com.kidzone.i18n.LanguagePreferences
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.toUploadErrorMessage
@@ -51,7 +53,8 @@ class ProfileViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val computeBadgesUseCase: ComputeBadgesUseCase,
     private val notificationPrefsUseCase: NotificationPrefsUseCase,
-    private val badgePreferences: BadgePreferences
+    private val badgePreferences: BadgePreferences,
+    private val languagePreferences: LanguagePreferences
 ) : ViewModel() {
 
     /**
@@ -100,7 +103,9 @@ class ProfileViewModel @Inject constructor(
         val newlyEarnedBadges: List<UserBadge> = emptyList(),
         val isRefreshing: Boolean = false,
         val isNotificationPrefsOpen: Boolean = false,
-        val notificationPrefs: NotificationPrefs = NotificationPrefs()
+        val notificationPrefs: NotificationPrefs = NotificationPrefs(),
+        val isLanguageDialogOpen: Boolean = false,
+        val selectedLanguage: AppLanguage = AppLanguage.SYSTEM
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -130,7 +135,12 @@ class ProfileViewModel @Inject constructor(
         // i tak jest tworzony na nowo, bo NavGraph wraca na Main → Profile).
         viewModelScope.launch {
             val provider = authRepository.getCurrentSignInProvider()
-            _uiState.update { it.copy(signInProvider = provider) }
+            _uiState.update {
+                it.copy(
+                    signInProvider = provider,
+                    selectedLanguage = languagePreferences.getLanguage()
+                )
+            }
         }
 
         // Detekcja nowych odznak. Subskrybujemy strumień bogatego usera i
@@ -204,6 +214,29 @@ class ProfileViewModel @Inject constructor(
 
     fun dismissNotificationPrefs() {
         _uiState.update { it.copy(isNotificationPrefsOpen = false) }
+    }
+
+    fun openLanguageDialog() {
+        _uiState.update {
+            it.copy(
+                isLanguageDialogOpen = true,
+                selectedLanguage = languagePreferences.getLanguage()
+            )
+        }
+    }
+
+    fun dismissLanguageDialog() {
+        _uiState.update { it.copy(isLanguageDialogOpen = false) }
+    }
+
+    fun saveLanguage(language: AppLanguage) {
+        languagePreferences.setLanguage(language)
+        _uiState.update {
+            it.copy(
+                isLanguageDialogOpen = false,
+                selectedLanguage = language
+            )
+        }
     }
 
     fun saveNotificationPrefs(prefs: NotificationPrefs) {

@@ -40,6 +40,19 @@
     <string name="rating">Ocena</string>
     <string name="reviews">Opinie</string>
 
+    <!-- Profile / settings -->
+    <string name="settings">Ustawienia</string>
+    <string name="language_settings_title">Język aplikacji</string>
+    <string name="language_system_default">Domyślny systemu</string>
+    <string name="language_polish">Polski</string>
+    <string name="language_english">English</string>
+    <string name="notification_settings">Powiadomienia email i push</string>
+    <string name="terms_of_service">Regulamin użytkowania</string>
+    <string name="privacy_policy">Polityka prywatności</string>
+    <string name="sign_out">Wyloguj</string>
+    <string name="close">Zamknij</string>
+    <string name="app_version">Wersja: %1$s</string>
+
     <!-- Categories -->
     <string name="category_playground">Plac zabaw</string>
     <string name="category_restaurant">Restauracja</string>

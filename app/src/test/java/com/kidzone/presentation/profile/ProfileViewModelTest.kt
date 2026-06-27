@@ -9,6 +9,8 @@ import com.kidzone.domain.repository.SignInProvider
 import com.kidzone.domain.service.BadgePreferences
 import com.kidzone.domain.usecase.ComputeBadgesUseCase
 import com.kidzone.domain.usecase.NotificationPrefsUseCase
+import com.kidzone.i18n.AppLanguage
+import com.kidzone.i18n.LanguagePreferences
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.AuthException
@@ -44,6 +46,7 @@ class ProfileViewModelTest {
     private lateinit var computeBadgesUseCase: ComputeBadgesUseCase
     private lateinit var notificationPrefsUseCase: NotificationPrefsUseCase
     private lateinit var badgePreferences: BadgePreferences
+    private lateinit var languagePreferences: LanguagePreferences
     private lateinit var viewModel: ProfileViewModel
 
     private val currentUserFlow = MutableStateFlow<User?>(null)
@@ -54,8 +57,11 @@ class ProfileViewModelTest {
         computeBadgesUseCase = mockk(relaxed = true)
         notificationPrefsUseCase = mockk(relaxed = true)
         badgePreferences = mockk(relaxed = true)
+        languagePreferences = mockk(relaxed = true)
 
         every { badgePreferences.getSeenBadges(any()) } returns emptySet()
+        every { languagePreferences.getLanguage() } returns AppLanguage.SYSTEM
+        every { languagePreferences.setLanguage(any()) } just Runs
 
         every { authRepository.currentUser } returns currentUserFlow
         coEvery { authRepository.getCurrentSignInProvider() } returns SignInProvider.EMAIL_PASSWORD
@@ -63,7 +69,13 @@ class ProfileViewModelTest {
     }
 
     private fun createViewModel(): ProfileViewModel {
-        return ProfileViewModel(authRepository, computeBadgesUseCase, notificationPrefsUseCase, badgePreferences)
+        return ProfileViewModel(
+            authRepository,
+            computeBadgesUseCase,
+            notificationPrefsUseCase,
+            badgePreferences,
+            languagePreferences
+        )
     }
 
     // =========================================================================
@@ -509,6 +521,21 @@ class ProfileViewModelTest {
 
             viewModel.dismissBadgesInfo()
             assertFalse(viewModel.uiState.value.isBadgesInfoOpen)
+        }
+
+        @Test
+        fun `language dialog saves selected language`() = runTest {
+            viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.openLanguageDialog()
+            assertTrue(viewModel.uiState.value.isLanguageDialogOpen)
+
+            viewModel.saveLanguage(AppLanguage.ENGLISH)
+
+            assertFalse(viewModel.uiState.value.isLanguageDialogOpen)
+            assertEquals(AppLanguage.ENGLISH, viewModel.uiState.value.selectedLanguage)
+            verify { languagePreferences.setLanguage(AppLanguage.ENGLISH) }
         }
 
         @Test

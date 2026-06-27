@@ -43,10 +43,12 @@ private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
  * pchanie ekranów stackowych ponad shellem [MainScreen].
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
 @Composable
 fun KidZoneNavGraph(
     navController: NavHostController = rememberNavController(),
-    intent: android.content.Intent? = null
+    intent: android.content.Intent? = null,
+    onLocaleChanged: () -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val pendingDeepLink = androidx.compose.runtime.remember {
@@ -235,6 +237,7 @@ fun KidZoneNavGraph(
                             popUpTo(Route.Main.path) { inclusive = true }
                         }
                     },
+                    onLocaleChanged = onLocaleChanged,
                     sharedTransitionScope = this@SharedTransitionLayout,
                     animatedContentScope = this@composable
                 )
