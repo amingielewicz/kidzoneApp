@@ -70,6 +70,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
 import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.NoInternetBanner
+import com.kidzone.presentation.common.passwordRequirementText
 import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.utils.PasswordPolicy
 
@@ -170,14 +171,14 @@ fun RegisterScreen(
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp)
                     ) {
                         Text(
-                            text = "Stwórz konto",
+                            text = stringResource(R.string.register_title),
                             style = MaterialTheme.typography.headlineMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            text = "Dołącz do społeczności kidZone i zacznij odkrywać miejsca przyjazne dzieciom",
+                            text = stringResource(R.string.register_subtitle),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
@@ -187,7 +188,7 @@ fun RegisterScreen(
                         OutlinedTextField(
                             value = state.name,
                             onValueChange = viewModel::onNameChange,
-                            label = { RequiredFieldLabel("Nazwa użytkownika") },
+                            label = { RequiredFieldLabel(stringResource(R.string.username)) },
                             leadingIcon = {
                                 Icon(Icons.Filled.Person, contentDescription = null)
                             },
@@ -205,10 +206,10 @@ fun RegisterScreen(
                             isError = state.name.isNotEmpty() && !state.isNameValid,
                             supportingText = {
                                 if (state.name.isBlank()) {
-                                    Text("Pole wymagane")
+                                    Text(stringResource(R.string.field_required))
                                 } else {
                                     Text(
-                                        text = "Widoczna w opiniach, miejscach i rankingu",
+                                        text = stringResource(R.string.username_helper),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                     )
@@ -240,8 +241,8 @@ fun RegisterScreen(
                             isError = state.email.isNotEmpty() && !state.isEmailValid,
                             supportingText = {
                                 when {
-                                    state.email.isBlank() -> Text("Pole wymagane")
-                                    !state.isEmailValid -> Text("Niepoprawny format e-maila")
+                                    state.email.isBlank() -> Text(stringResource(R.string.field_required))
+                                    !state.isEmailValid -> Text(stringResource(R.string.invalid_email_format))
                                 }
                             },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -278,9 +279,9 @@ fun RegisterScreen(
                                             Icons.Filled.Visibility
                                         },
                                         contentDescription = if (isPasswordVisible) {
-                                            "Ukryj hasło"
+                                            stringResource(R.string.hide_password)
                                         } else {
-                                            "Pokaż hasło"
+                                            stringResource(R.string.show_password)
                                         }
                                     )
                                 }
@@ -288,7 +289,7 @@ fun RegisterScreen(
                             enabled = !state.isLoading,
                             supportingText = {
                                 if (state.password.isBlank()) {
-                                    Text("Pole wymagane")
+                                    Text(stringResource(R.string.field_required))
                                 }
                             },
                             modifier = Modifier.fillMaxWidth()
@@ -327,14 +328,13 @@ fun RegisterScreen(
                                     )
                                     Spacer(Modifier.height(12.dp))
                                     Text(
-                                        text = "Konto utworzone!",
+                                        text = stringResource(R.string.register_success_title),
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Spacer(Modifier.height(8.dp))
                                     Text(
-                                        text = "Wysłaliśmy link weryfikacyjny na podany adres e-mail. " +
-                                            "Kliknij link w wiadomości, aby potwierdzić konto i móc się zalogować.",
+                                        text = stringResource(R.string.register_success_message),
                                         style = MaterialTheme.typography.bodyMedium,
                                         textAlign = TextAlign.Center,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -345,7 +345,7 @@ fun RegisterScreen(
                                         shape = RoundedCornerShape(12.dp),
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Text("Przejdź do logowania")
+                                        Text(stringResource(R.string.go_to_login))
                                     }
                                 }
                             }
@@ -385,7 +385,7 @@ fun RegisterScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Masz już konto?",
+                        text = stringResource(R.string.register_has_account),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
                     )
@@ -433,7 +433,7 @@ internal fun PasswordRequirementsChecklist(password: String) {
                 )
                 Spacer(Modifier.size(8.dp))
                 Text(
-                    text = status.label,
+                    text = passwordRequirementText(status.labelKey),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (status.isSatisfied) {
                         MaterialTheme.colorScheme.onSurface

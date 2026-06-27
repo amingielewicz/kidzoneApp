@@ -119,9 +119,17 @@ class PasswordPolicyTest {
         }
 
         @Test
-        fun `each result has a non-empty label`() {
+        fun `each result has a label key`() {
             val results = PasswordPolicy.evaluate("test")
-            assertTrue(results.all { it.label.isNotBlank() })
+            assertEquals(
+                listOf(
+                    PasswordPolicy.LabelKey.MinLength,
+                    PasswordPolicy.LabelKey.Lowercase,
+                    PasswordPolicy.LabelKey.Uppercase,
+                    PasswordPolicy.LabelKey.SpecialCharacter
+                ),
+                results.map { it.labelKey }
+            )
         }
     }
 

@@ -31,19 +31,26 @@ object PasswordPolicy {
      * Pojedyncza zasada walidacji hasła. Używana przez UI do pokazania
      * checklisty wymagań ze stanem spełnione/niespełnione.
      *
-     * @property label tekst do pokazania użytkownikowi (po polsku)
+     * @property labelKey stabilny klucz etykiety do zmapowania na zasoby UI
      * @property predicate sprawdza, czy podane hasło spełnia tę regułę
      */
     data class Rule(
-        val label: String,
+        val labelKey: LabelKey,
         val predicate: (String) -> Boolean
     )
 
+    enum class LabelKey {
+        MinLength,
+        Lowercase,
+        Uppercase,
+        SpecialCharacter
+    }
+
     val rules: List<Rule> = listOf(
-        Rule("Minimum $MIN_LENGTH znaków") { it.length >= MIN_LENGTH },
-        Rule("Co najmniej jedna mała litera") { pwd -> pwd.any { it.isLowerCase() } },
-        Rule("Co najmniej jedna duża litera") { pwd -> pwd.any { it.isUpperCase() } },
-        Rule("Co najmniej jeden znak specjalny") { pwd ->
+        Rule(LabelKey.MinLength) { it.length >= MIN_LENGTH },
+        Rule(LabelKey.Lowercase) { pwd -> pwd.any { it.isLowerCase() } },
+        Rule(LabelKey.Uppercase) { pwd -> pwd.any { it.isUpperCase() } },
+        Rule(LabelKey.SpecialCharacter) { pwd ->
             pwd.any { ch -> !ch.isLetterOrDigit() && !ch.isWhitespace() }
         }
     )
@@ -57,10 +64,10 @@ object PasswordPolicy {
      * z zielonymi / szarymi ikonami.
      */
     fun evaluate(password: String): List<RuleStatus> = rules.map { rule ->
-        RuleStatus(rule.label, rule.predicate(password))
+        RuleStatus(rule.labelKey, rule.predicate(password))
     }
 
-    data class RuleStatus(val label: String, val isSatisfied: Boolean)
+    data class RuleStatus(val labelKey: LabelKey, val isSatisfied: Boolean)
 
     /**
      * Krótki komunikat dla snackbara / pola "errorMessage" w VM, gdy user
