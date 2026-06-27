@@ -18,6 +18,8 @@ import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.InstallStatus
 import com.google.android.play.core.install.model.UpdateAvailability
 import com.kidzone.analytics.ColdStartTrace
+import com.kidzone.i18n.LanguagePreferences
+import com.kidzone.i18n.LocaleApplier
 import com.kidzone.navigation.KidZoneNavGraph
 import com.kidzone.ui.theme.KidZoneTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -49,6 +51,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var coldStartTrace: ColdStartTrace
 
+    @Inject
+    lateinit var languagePreferences: LanguagePreferences
+
     private val appUpdateManager by lazy { AppUpdateManagerFactory.create(this) }
 
     /**
@@ -79,6 +84,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        LocaleApplier.apply(this, languagePreferences.getLanguage())
         enableEdgeToEdge()
 
         appUpdateManager.registerListener(installStateListener)
@@ -90,7 +96,10 @@ class MainActivity : ComponentActivity() {
             }
             KidZoneTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    KidZoneNavGraph(intent = intent)
+                    KidZoneNavGraph(
+                        intent = intent,
+                        onLocaleChanged = ::recreate
+                    )
                 }
             }
         }

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
@@ -46,9 +47,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -72,10 +75,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.kidzone.R
 import coil.compose.AsyncImage
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.SignInProvider
+import com.kidzone.i18n.AppLanguage
 import com.kidzone.presentation.common.BadgeRowItem
 import com.kidzone.presentation.common.BadgesRow
 import com.kidzone.presentation.common.KidZoneCard
@@ -115,12 +121,14 @@ import java.util.concurrent.TimeUnit
  *   callback, żeby nie wprowadzać drugiego)
  */
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod", "LongParameterList")
 @Composable
 fun ProfileScreen(
     onSignOut: () -> Unit,
     onOpenMyPlaces: () -> Unit,
     onOpenMyReviews: () -> Unit,
     scrollToSection: String = "",
+    onLocaleChanged: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val user by viewModel.user.collectAsState()
@@ -179,6 +187,8 @@ fun ProfileScreen(
                     onTermsOfService = viewModel::openTermsOfService,
                     onPrivacyPolicy = viewModel::openPrivacyPolicy,
                     onNotificationPrefs = viewModel::openNotificationPrefs,
+                    selectedLanguage = ui.selectedLanguage,
+                    onLanguageSettings = viewModel::openLanguageDialog,
                     onSignOut = { viewModel.signOut(onSignOut) }
                 )
             }
@@ -224,6 +234,17 @@ fun ProfileScreen(
             currentPrefs = ui.notificationPrefs,
             onSave = viewModel::saveNotificationPrefs,
             onDismiss = viewModel::dismissNotificationPrefs
+        )
+    }
+
+    if (ui.isLanguageDialogOpen) {
+        LanguageSettingsDialog(
+            selectedLanguage = ui.selectedLanguage,
+            onSelectLanguage = { language ->
+                viewModel.saveLanguage(language)
+                onLocaleChanged()
+            },
+            onDismiss = viewModel::dismissLanguageDialog
         )
     }
 
@@ -286,6 +307,7 @@ fun ProfileScreen(
 }
 
 @Composable
+@Suppress("FunctionNaming", "LongParameterList")
 private fun ProfileContent(
     user: User,
     signInProvider: SignInProvider,
@@ -302,6 +324,8 @@ private fun ProfileContent(
     onTermsOfService: () -> Unit,
     onPrivacyPolicy: () -> Unit,
     onNotificationPrefs: () -> Unit,
+    selectedLanguage: AppLanguage,
+    onLanguageSettings: () -> Unit,
     onSignOut: () -> Unit
 ) {
     val lazyListState = rememberLazyListState()
@@ -359,6 +383,8 @@ private fun ProfileContent(
                 onTermsOfService = onTermsOfService,
                 onPrivacyPolicy = onPrivacyPolicy,
                 onNotificationPrefs = onNotificationPrefs,
+                selectedLanguage = selectedLanguage,
+                onLanguageSettings = onLanguageSettings,
                 onSignOut = onSignOut
             )
         }
@@ -949,28 +975,38 @@ private fun AccountSecurityCard(
 // --- Settings ------------------------------------------------------------
 
 @Composable
+@Suppress("FunctionNaming", "LongParameterList")
 private fun SettingsCard(
     onTermsOfService: () -> Unit,
     onPrivacyPolicy: () -> Unit,
     onNotificationPrefs: () -> Unit,
+    selectedLanguage: AppLanguage,
+    onLanguageSettings: () -> Unit,
     onSignOut: () -> Unit
 ) {
-    SectionCard(title = "Ustawienia") {
+    SectionCard(title = stringResource(R.string.settings)) {
+        ProfileNavRow(
+            icon = Icons.Filled.Language,
+            label = stringResource(R.string.language_settings_title),
+            trailingText = stringResource(selectedLanguage.labelRes),
+            onClick = onLanguageSettings
+        )
+        Spacer(Modifier.height(4.dp))
         ProfileNavRow(
             icon = Icons.Filled.Notifications,
-            label = "Powiadomienia email i push",
+            label = stringResource(R.string.notification_settings),
             onClick = onNotificationPrefs
         )
         Spacer(Modifier.height(4.dp))
         ProfileNavRow(
             icon = Icons.Filled.Gavel,
-            label = "Regulamin użytkowania",
+            label = stringResource(R.string.terms_of_service),
             onClick = onTermsOfService
         )
         Spacer(Modifier.height(4.dp))
         ProfileNavRow(
             icon = Icons.Filled.PrivacyTip,
-            label = "Polityka prywatności",
+            label = stringResource(R.string.privacy_policy),
             onClick = onPrivacyPolicy
         )
         Spacer(Modifier.height(8.dp))
@@ -986,17 +1022,61 @@ private fun SettingsCard(
                 modifier = Modifier.size(18.dp)
             )
             Spacer(Modifier.width(8.dp))
-            Text("Wyloguj")
+            Text(stringResource(R.string.sign_out))
         }
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "Wersja: ${com.kidzone.BuildConfig.VERSION_NAME}",
+            text = stringResource(R.string.app_version, com.kidzone.BuildConfig.VERSION_NAME),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center
         )
     }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun LanguageSettingsDialog(
+    selectedLanguage: AppLanguage,
+    onSelectLanguage: (AppLanguage) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.language_settings_title)) },
+        text = {
+            Column {
+                AppLanguage.entries.forEach { language ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                role = Role.RadioButton,
+                                onClick = { onSelectLanguage(language) }
+                            )
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = language == selectedLanguage,
+                            onClick = { onSelectLanguage(language) }
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(language.labelRes),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.close))
+            }
+        }
+    )
 }
 
 /**

@@ -96,6 +96,7 @@ import com.kidzone.presentation.ranking.RankingScreen
  *   nie odpalało powtórnie nawigacji).
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
 fun MainScreen(
     onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
@@ -109,6 +110,7 @@ fun MainScreen(
     rankingTab: String = "",
     profileSection: String = "",
     onFocusConsumed: () -> Unit = {},
+    onLocaleChanged: () -> Unit = {},
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedContentScope: AnimatedContentScope? = null
 ) {
@@ -342,7 +344,8 @@ fun MainScreen(
                         onSignOut = onSignOut,
                         onOpenMyPlaces = onOpenMyPlaces,
                         onOpenMyReviews = onOpenMyReviews,
-                        scrollToSection = profileSection
+                        scrollToSection = profileSection,
+                        onLocaleChanged = onLocaleChanged
                     )
                 }
             }

@@ -8,6 +8,8 @@ import com.kidzone.data.remote.RemoteConfigService
 import com.kidzone.domain.service.BadgePreferences
 import com.kidzone.domain.service.ImageCompressorPort
 import com.kidzone.domain.service.LocationProvider
+import com.kidzone.i18n.AndroidLanguagePreferences
+import com.kidzone.i18n.LanguagePreferences
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -31,6 +33,10 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindBadgePreferences(impl: AndroidBadgePreferences): BadgePreferences
+
+    @Binds
+    @Singleton
+    abstract fun bindLanguagePreferences(impl: AndroidLanguagePreferences): LanguagePreferences
 
     @Binds
     @Singleton
