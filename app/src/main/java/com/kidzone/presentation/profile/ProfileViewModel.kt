@@ -90,6 +90,7 @@ class ProfileViewModel @Inject constructor(
         val saveError: String? = null,
         val isPrivacyPolicyOpen: Boolean = false,
         val isTermsOfServiceOpen: Boolean = false,
+        val isContactOpen: Boolean = false,
         val signInProvider: SignInProvider = SignInProvider.UNKNOWN,
         val isChangePasswordOpen: Boolean = false,
         val isChangeEmailOpen: Boolean = false,
@@ -203,6 +204,16 @@ class ProfileViewModel @Inject constructor(
 
     fun dismissTermsOfService() {
         _uiState.update { it.copy(isTermsOfServiceOpen = false) }
+    }
+
+    // -------- Kontakt --------
+
+    fun openContact() {
+        _uiState.update { it.copy(isContactOpen = true) }
+    }
+
+    fun dismissContact() {
+        _uiState.update { it.copy(isContactOpen = false) }
     }
 
     // -------- Preferencje powiadomień --------
