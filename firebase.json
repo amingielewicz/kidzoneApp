@@ -37,6 +37,10 @@
           "destination": "/terms-of-service.html"
         },
         {
+          "source": "/account-deletion",
+          "destination": "/account-deletion.html"
+        },
+        {
           "source": "/place/**",
           "destination": "/place/index.html"
         }

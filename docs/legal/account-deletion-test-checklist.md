@@ -1,13 +1,16 @@
 # Account deletion test checklist
 
-Powiązane issue: #212  
+Powiązane issue: #210
+Powiązane issue release: #269, #270, #275
 Parent: #182
+
+Ostatnia aktualizacja: 2026-06-28
 
 ## Cel
 
 Ten dokument opisuje sposób ręcznej weryfikacji usuwania konta użytkownika w aplikacji kidZone przed publikacją w Google Play.
 
-Issue #212 pozostaje otwarte po dodaniu tej dokumentacji, ponieważ realny test musi zostać wykonany ręcznie na aplikacji i w Firebase Console.
+Issue #210 pozostaje otwarte po dodaniu tej dokumentacji, ponieważ realny test musi zostać wykonany ręcznie na aplikacji i w Firebase Console.
 
 ## Dlaczego to ważne
 
@@ -17,6 +20,7 @@ Flow usuwania konta musi być zgodny z:
 
 - polityką prywatności,
 - regulaminem,
+- publiczną stroną `public/account-deletion.html`,
 - Google Play Data Safety,
 - realnym zachowaniem aplikacji,
 - faktyczną konfiguracją Firebase.
@@ -341,6 +345,7 @@ Sprawdzić zgodność z:
 ```text
 public/privacy-policy.html
 public/terms-of-service.html
+public/account-deletion.html
 ```
 
 Polityka prywatności powinna wyjaśniać:
@@ -351,6 +356,15 @@ Polityka prywatności powinna wyjaśniać:
 - [ ] co dzieje się ze zdjęciami,
 - [ ] jaki jest kontakt do administratora,
 - [ ] czy część danych może zostać zanonimizowana zamiast usunięta.
+
+Publiczna strona usuwania konta powinna:
+
+- [ ] działać bez logowania,
+- [ ] zawierać ścieżkę w aplikacji,
+- [ ] zawierać kontakt e-mail,
+- [ ] opisywać dane usuwane i anonimizowane,
+- [ ] opisywać termin realizacji,
+- [ ] linkować politykę prywatności i regulamin.
 
 Wynik:
 
@@ -387,13 +401,13 @@ Test można uznać za zaliczony, jeśli:
 - [ ] publiczne treści są usunięte albo zanonimizowane,
 - [ ] zdjęcia mają jasną strategię usunięcia albo pozostawienia,
 - [ ] dokumenty prawne są zgodne z aplikacją,
-- [ ] wynik testu jest zapisany w issue #212.
+- [ ] wynik testu jest zapisany w issue #210.
 
 ## 15. Co zrobić przy wyniku FAIL
 
 Jeżeli test nie przejdzie:
 
-1. Nie zamykać #212.
+1. Nie zamykać #210.
 2. Utworzyć osobne issue dla każdego realnego braku.
 3. Oznaczyć braki jako blocker przed Google Play, jeśli dotyczą wymagań usuwania konta.
 4. Nie oznaczać Data Safety jako finalnego.
@@ -408,7 +422,7 @@ storage: delete or anonymize user photos after account deletion
 privacy: anonymize public user content after account deletion
 ```
 
-## 16. Format komentarza do issue #212
+## 16. Format komentarza do issue #210
 
 Po wykonaniu testu dopisać komentarz:
 
@@ -458,9 +472,9 @@ Po wykonaniu testu dopisać komentarz:
 - ...
 ```
 
-## Kryteria zamknięcia issue #212
+## Kryteria zamknięcia issue #210
 
-Issue #212 można zamknąć dopiero, gdy:
+Issue #210 można zamknąć dopiero, gdy:
 
 - realny test usuwania konta został wykonany,
 - wynik testu jest zapisany,
@@ -468,4 +482,4 @@ Issue #212 można zamknąć dopiero, gdy:
 - zachowanie aplikacji jest zgodne z polityką prywatności,
 - Google Play Data Safety może zostać wypełnione bez zgadywania.
 
-Samo dodanie tej dokumentacji nie zamyka issue #212.
+Samo dodanie tej dokumentacji nie zamyka issue #210.

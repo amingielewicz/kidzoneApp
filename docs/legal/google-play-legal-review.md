@@ -4,7 +4,7 @@ Powiązane issue: #182
 
 Milestone: v1.0.0 — publiczny release produkcyjny
 
-Ostatnia aktualizacja: 2026-06-27
+Ostatnia aktualizacja: 2026-06-28
 
 ## Cel
 
@@ -16,12 +16,12 @@ Dokument nie zastępuje porady prawnej. Służy jako techniczno-produktowa check
 
 | Obszar | Status | Uwagi |
 | --- | --- | --- |
-| Regulamin | Wstępnie gotowy | Wymaga finalnego przeglądu przed publikacją. |
-| Polityka prywatności | Wstępnie gotowa | Wymaga sprawdzenia zgodności z faktycznym zakresem danych. |
-| Usuwanie konta | Do weryfikacji w aplikacji | Dokumenty opisują możliwość usunięcia konta. Trzeba potwierdzić ekran i flow. |
-| Zgody lokalizacji | Do weryfikacji w aplikacji | Trzeba sprawdzić komunikaty systemowe i uzasadnienie w UI. |
-| Zgody zdjęć | Do weryfikacji w aplikacji | Trzeba sprawdzić Android Photo Picker / uprawnienia oraz komunikaty. |
-| Google Play Data Safety | Roboczy draft gotowy | Ostatecznie przepisać i potwierdzić w Google Play Console. |
+| Regulamin | Gotowy w repo | Wymaga finalnego przeglądu publicznego URL po deployu hostingu. |
+| Polityka prywatności | Gotowa w repo | Zsynchronizowana z aktualnymi Firebase/Google SDK w Gradle. |
+| Usuwanie konta | Gotowe w repo, QA ręczne wymagane | Istnieje publiczna strona `/account-deletion` i akcja w Profilu; wynik flow trzeba potwierdzić na urządzeniu. |
+| Zgody lokalizacji | Gotowe w repo, QA ręczne wymagane | Manifest nie ma background location; aplikacja pokazuje rationale przed dialogiem systemowym. |
+| Zgody zdjęć | Gotowe w repo, QA ręczne wymagane | Aplikacja używa Photo Picker w głównych flow; `READ_MEDIA_IMAGES` wymaga finalnej decyzji przed publikacją. |
+| Google Play Data Safety | Draft gotowy do przepisania | Ostatecznie przepisać i potwierdzić w Google Play Console. |
 | Finalny przegląd prawny | Do zrobienia | Przed publikacją produkcyjną. |
 
 ## Status techniczny na 2026-06-27
@@ -32,8 +32,10 @@ Ta sekcja zbiera stan, który można potwierdzić w repozytorium bez ręcznego t
 | --- | --- | --- |
 | Regulamin | Dokument istnieje | `public/terms-of-service.html` |
 | Polityka prywatności | Dokument istnieje | `public/privacy-policy.html` |
+| Usuwanie konta | Publiczna strona istnieje | `public/account-deletion.html`, rewrite `/account-deletion` |
 | Data Safety draft | Robocze odpowiedzi istnieją | `docs/legal/google-play-data-safety-draft.md` |
-| Usuwanie konta | Checklistę testu przygotowano, wynik manualny nadal wymagany | `docs/legal/account-deletion-test-checklist.md` |
+| Usuwanie konta QA | Checklistę testu przygotowano, wynik manualny nadal wymagany | `docs/legal/account-deletion-test-checklist.md` |
+| Android permissions | Audyt przygotowano, wynik manualny nadal wymagany | `docs/legal/android-permissions-play-compliance.md` |
 | Lokalizacja | Manifest deklaruje tylko foreground location | `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`; brak `ACCESS_BACKGROUND_LOCATION` |
 | Zdjęcia | Aplikacja używa Android Photo Picker w kluczowych flow | `PickVisualMedia`, `PickMultipleVisualMedia` w profilach, miejscach i opiniach |
 | Kamera | Kamera jest deklarowana jako funkcja opcjonalna | `android.hardware.camera` z `android:required="false"` |
@@ -42,6 +44,7 @@ Ta sekcja zbiera stan, który można potwierdzić w repozytorium bez ręcznego t
 Elementy, których ten przegląd nie może zamknąć bez ręcznego testu:
 
 - finalny wynik usuwania konta w aplikacji i Firebase Console,
+- publiczny URL `/account-deletion` po deployu Firebase Hosting,
 - realne komunikaty systemowe zgód lokalizacji, aparatu i zdjęć na urządzeniu,
 - finalne odpowiedzi zapisane w Google Play Console,
 - finalny przegląd prawny dokumentów przez właściciela/profesjonalnego doradcę.
@@ -121,7 +124,12 @@ Zakres obecnie opisany:
 
 ## 3. Usuwanie konta
 
-Dokumenty zakładają możliwość usunięcia konta z poziomu aplikacji albo kontakt z administratorem.
+Dokumenty i aplikacja zapewniają dwie ścieżki:
+
+- aplikacja: `Profil → Konto i bezpieczeństwo → Usuń konto`,
+- publiczna strona: `/account-deletion` oraz `/account-deletion.html`.
+
+Strona publiczna opisuje kontakt e-mail, zakres usuwanych/anonimizowanych danych, treści publiczne, zdjęcia oraz termin 30 dni.
 
 ### Do weryfikacji w aplikacji
 
@@ -132,6 +140,16 @@ Dokumenty zakładają możliwość usunięcia konta z poziomu aplikacji albo kon
 - czy treści użytkownika po usunięciu konta są anonimizowane,
 - czy zdjęcia i dane prywatne są sprzątane albo oznaczone do sprzątania,
 - czy dokumentacja Google Play zawiera link lub opis procesu usuwania konta.
+
+### Linki do Google Play
+
+Po deployu hostingu do Google Play Console wpisać:
+
+```text
+Privacy Policy URL: https://playground-705e7162.web.app/privacy-policy
+Account deletion URL: https://playground-705e7162.web.app/account-deletion
+Terms URL: https://playground-705e7162.web.app/terms-of-service
+```
 
 ### Rekomendacja
 
@@ -149,6 +167,12 @@ Przed publikacją dodać test manualny:
 ## 4. Zgody lokalizacji
 
 Aplikacja używa lokalizacji do pokazywania miejsc w pobliżu. Polityka prywatności wskazuje, że lokalizacja jest używana tylko za zgodą użytkownika i nie jest zapisywana jako historia lokalizacji.
+
+Szczegółowy audyt Android permissions znajduje się w:
+
+```text
+docs/legal/android-permissions-play-compliance.md
+```
 
 Status repozytorium:
 
@@ -237,6 +261,13 @@ Draft obejmuje aktualne użycie Firebase Authentication, Firestore, Storage, Cra
 - w jakim celu dane są używane: funkcjonalność aplikacji, bezpieczeństwo, diagnostyka, obsługa konta, personalizacja.
 
 ## 7. Braki i ryzyka przed publikacją
+
+| Ryzyko | Status | Decyzja |
+| --- | --- | --- |
+| Play Console nieuzupełnione | Otwarte | Przepisać `docs/legal/google-play-data-safety-draft.md` do Google Play Console. |
+| Account deletion nieprzetestowane ręcznie | Otwarte | Wykonać `docs/legal/account-deletion-test-checklist.md` i dopisać wynik w issue #210. |
+| Publiczne URL-e po deployu | Otwarte | Po deployu sprawdzić `/privacy-policy`, `/terms-of-service`, `/account-deletion`. |
+| Finalny przegląd prawny | Otwarte | Właściciel musi potwierdzić treść przed produkcyjną publikacją. |
 
 | Ryzyko | Poziom | Rekomendacja |
 | --- | --- | --- |
