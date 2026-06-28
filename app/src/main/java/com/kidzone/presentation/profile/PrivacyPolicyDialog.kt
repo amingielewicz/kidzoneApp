@@ -73,12 +73,15 @@ fun PrivacyPolicyDialog(onDismiss: () -> Unit) {
                     "• Adres e-mail oraz nazwa konta (login) podane przy rejestracji.\n" +
                         "• Imię, nazwisko i avatar – tylko jeśli sam(a) je dodasz w profilu.\n" +
                         "• Treści, które tworzysz w aplikacji: dodane miejsca, opinie, " +
-                        "oceny i przybliżona lokalizacja tych miejsc.\n" +
+                        "oceny, zdjęcia, zgłoszenia i przybliżona lokalizacja tych miejsc.\n" +
                         "• Dane logowania Google (jeśli wybierzesz logowanie przez Google) " +
                         "– otrzymujemy od Google jedynie identyfikator, e-mail i avatar.\n" +
                         "• Bieżąca lokalizacja urządzenia – tylko gdy świadomie użyjesz " +
                         "funkcji „Pobierz moją lokalizację” przy dodawaniu miejsca lub " +
-                        "wyświetlaniu miejsc w pobliżu. Nie zapisujemy historii lokalizacji."
+                        "wyświetlaniu miejsc w pobliżu. Nie zapisujemy historii lokalizacji.\n" +
+                        "• Dane techniczne: tokeny powiadomień, identyfikatory instalacji, " +
+                        "logi awarii, dane diagnostyczne, wydajnościowe i podstawowe " +
+                        "zdarzenia analityczne."
                 )
                 Spacer(Modifier.height(12.dp))
 
@@ -86,18 +89,24 @@ fun PrivacyPolicyDialog(onDismiss: () -> Unit) {
                 Text(
                     "Dane wykorzystujemy wyłącznie do działania aplikacji: zalogowania, " +
                         "wyświetlania mapy miejsc przyjaznych dzieciom, prezentacji opinii " +
-                        "innych rodziców oraz rankingu najaktywniejszych użytkowników. " +
+                        "innych rodziców, powiadomień, obsługi zgłoszeń, diagnostyki awarii, " +
+                        "poprawy wydajności oraz rankingu najaktywniejszych użytkowników. " +
                         "Nie używamy Twoich danych do reklam ani profilowania."
                 )
                 Spacer(Modifier.height(12.dp))
 
                 SectionTitle("4. Komu udostępniamy dane")
                 Text(
-                    "• Google Firebase (Authentication, Firestore, Storage) – jako podmiot " +
-                        "przetwarzający, na potrzeby działania aplikacji. Serwery Google " +
-                        "mogą znajdować się poza Europejskim Obszarem Gospodarczym; " +
-                        "Google zapewnia odpowiedni poziom ochrony w ramach " +
-                        "Standardowych Klauzul Umownych UE.\n" +
+                    "• Google Firebase: Authentication, Firestore, Storage, Crashlytics, " +
+                        "Analytics, Performance Monitoring, Cloud Messaging, App Check " +
+                        "i Remote Config – jako usługi techniczne potrzebne do konta, bazy " +
+                        "danych, zdjęć, powiadomień, bezpieczeństwa, diagnostyki i jakości " +
+                        "aplikacji.\n" +
+                        "• Google Maps Platform i Google Play Services – do mapy, lokalizacji, " +
+                        "logowania Google i funkcji systemowych.\n" +
+                        "Serwery Google mogą znajdować się poza Europejskim Obszarem " +
+                        "Gospodarczym; Google zapewnia odpowiedni poziom ochrony w ramach " +
+                        "mechanizmów przewidzianych przez RODO.\n" +
                         "• Inni użytkownicy aplikacji – widzą Twój login, avatar oraz treści, " +
                         "które publicznie publikujesz (miejsca, opinie). Imię i nazwisko " +
                         "pozostają prywatne."
@@ -112,6 +121,8 @@ fun PrivacyPolicyDialog(onDismiss: () -> Unit) {
                         "wprowadzić samodzielnie z poziomu zakładki Profil – w tym " +
                         "edycję danych i trwałe usunięcie konta wraz z opiniami " +
                         "i miejscami (przycisk „Usuń konto”).\n\n" +
+                        "Publiczna instrukcja usuwania konta jest dostępna pod adresem " +
+                        "https://playground-705e7162.web.app/account-deletion.\n\n" +
                         "Jeśli z jakiegokolwiek powodu nie możesz wykonać tych operacji " +
                         "samodzielnie – napisz na ${AppConfig.PRIVACY_CONTACT_EMAIL}, " +
                         "a my pomożemy."
@@ -123,9 +134,10 @@ fun PrivacyPolicyDialog(onDismiss: () -> Unit) {
                     "Dane konta przechowujemy do momentu usunięcia konta. Treści " +
                         "publiczne (miejsca, opinie) mogą zostać zachowane w formie " +
                         "zanonimizowanej, jeśli ich usunięcie utrudniłoby działanie " +
-                        "aplikacji innym użytkownikom (np. opinie innych userów na " +
-                        "Twoich miejscach – po usunięciu konta Twoje miejsca znikają, " +
-                        "ale opinie innych mogą zostać do czasu manualnego sprzątnięcia)."
+                        "aplikacji innym użytkownikom. Tokeny powiadomień są usuwane " +
+                        "lub dezaktywowane po wylogowaniu, usunięciu konta albo utracie " +
+                        "ważności. Dane diagnostyczne i wydajnościowe przechowujemy tylko " +
+                        "przez czas potrzebny do analizy błędów, bezpieczeństwa i jakości."
                 )
                 Spacer(Modifier.height(12.dp))
 

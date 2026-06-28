@@ -2,9 +2,12 @@
 
 Powiązane issue: #213  
 Powiązane issue pomocnicze: #216  
+Powiązane issue release: #269, #271, #272, #275
 Parent: #182
 
-Milestone: v0.1.0-alpha — pierwszy release techniczny
+Milestone: v1.0.0 — publiczny release produkcyjny
+
+Ostatnia aktualizacja: 2026-06-28
 
 ## Cel
 
@@ -12,11 +15,22 @@ Dokument zbiera robocze odpowiedzi do formularza **Google Play Data Safety** dla
 
 To jest materiał pomocniczy do przepisania w Google Play Console. Ostateczne odpowiedzi trzeba potwierdzić z faktyczną konfiguracją Firebase, Google Play Console i aktualnym buildem aplikacji.
 
+## Status release readiness
+
+| Obszar | Status | Evidence / następny krok |
+| --- | --- | --- |
+| Publiczna polityka prywatności | Gotowe w repo | `public/privacy-policy.html` opisuje Firebase Auth, Firestore, Storage, Crashlytics, Analytics, Performance, FCM, App Check, Remote Config, Google Maps i Google Play Services. |
+| Publiczna procedura usuwania konta | Gotowe w repo | `public/account-deletion.html` oraz rewrite `/account-deletion` w `firebase.json`. |
+| Regulamin | Gotowe w repo | `public/terms-of-service.html` linkuje politykę prywatności i procedurę usuwania konta. |
+| Data Safety Console | Do wykonania ręcznie | Przepisać odpowiedzi z tego dokumentu do Google Play Console i zapisać screenshot/link w issue #272. |
+| Account deletion manual QA | Do wykonania ręcznie | Wykonać `docs/legal/account-deletion-test-checklist.md` i zapisać wynik w issue #210. |
+| Final legal review | Do wykonania ręcznie | Przejrzeć publiczne URL-e po deployu hostingu i potwierdzić checklistę #275. |
+
 ## Aktualne decyzje Firebase SDK
 
 Stan audytu #216: zweryfikowano lokalny kod aplikacji, Cloud Functions,
 `firebase.json`, `firestore.rules`, manifest Androida i zależności Gradle.
-Data weryfikacji: 2026-06-17.
+Data weryfikacji: 2026-06-28.
 
 | SDK / usługa | Decyzja | Wpływ na Google Play Data Safety |
 | --- | --- | --- |
@@ -52,17 +66,17 @@ Na podstawie aktualnych dokumentów i funkcji aplikacji zakładamy, że kidZone:
 
 | Obszar | Status | Komentarz |
 | --- | --- | --- |
-| Dane konta | Do zadeklarowania | Email, nazwa użytkownika, opcjonalnie imię i nazwisko. |
-| Lokalizacja | Do zadeklarowania | Używana do mapy i miejsc w pobliżu. |
-| Zdjęcia | Do zadeklarowania | Użytkownik może przesyłać zdjęcia miejsc, opinii i avatar. |
-| Treści użytkownika | Do zadeklarowania | Miejsca, opinie, oceny, zgłoszenia. |
-| Crash logs | Do zadeklarowania | Crashlytics zostaje. |
-| Diagnostics | Do zadeklarowania | Crashlytics i Performance Monitoring. |
-| Analytics / app activity | Do zadeklarowania | Analytics zostaje. |
-| Performance data | Do zadeklarowania | Performance Monitoring zostaje; custom traces są użyte w kodzie, release nie wyłącza SDK. |
-| Device or other IDs | Do zadeklarowania | Firebase/Google Play Services/Analytics/Crashlytics/FCM mogą używać identyfikatorów. |
-| Push notifications / FCM | Do zadeklarowania | FCM zostaje; tokeny są zapisywane prywatnie, Cloud Functions wysyłają powiadomienia, test FCM z Firebase Console przeszedł. |
-| Usuwanie danych | Do potwierdzenia | Powiązane z #212. |
+| Dane konta | Zadeklarować w Console | Email, nazwa użytkownika, opcjonalnie imię i nazwisko. |
+| Lokalizacja | Zadeklarować w Console | Używana tylko podczas korzystania z aplikacji do mapy i miejsc w pobliżu. Brak background location w manifeście. |
+| Zdjęcia | Zadeklarować w Console | Użytkownik może przesyłać zdjęcia miejsc, opinii i avatar. |
+| Treści użytkownika | Zadeklarować w Console | Miejsca, opinie, oceny, zgłoszenia. |
+| Crash logs | Zadeklarować w Console | Crashlytics zostaje. |
+| Diagnostics | Zadeklarować w Console | Crashlytics i Performance Monitoring. |
+| Analytics / app activity | Zadeklarować w Console | Analytics zostaje. |
+| Performance data | Zadeklarować w Console | Performance Monitoring zostaje; custom traces są użyte w kodzie, release nie wyłącza SDK. |
+| Device or other IDs | Zadeklarować w Console | Firebase/Google Play Services/Analytics/Crashlytics/FCM mogą używać identyfikatorów. |
+| Push notifications / FCM | Zadeklarować w Console | FCM zostaje; tokeny są zapisywane prywatnie, Cloud Functions wysyłają powiadomienia. |
+| Usuwanie danych | Zadeklarować w Console po QA | Publiczna strona istnieje w repo; realny test flow wykonać z checklisty #210. |
 
 ## 1. Czy aplikacja zbiera dane użytkownika?
 
@@ -90,22 +104,22 @@ Firebase, Google APIs i Google Play Services komunikują się przez HTTPS/TLS. T
 
 ## 3. Czy użytkownik może zażądać usunięcia danych?
 
-Rekomendowana odpowiedź robocza:
+Rekomendowana odpowiedź:
 
 ```text
-Tak, ale wymaga potwierdzenia flow w aplikacji.
+Tak.
 ```
 
-Powiązane zadanie:
+Uzasadnienie:
 
 ```text
-#212 legal: verify account deletion flow before Google Play release
+Użytkownik ma opcję usunięcia konta w aplikacji: Profil → Konto i bezpieczeństwo → Usuń konto.
+Publiczna procedura jest dostępna pod /account-deletion oraz /account-deletion.html.
 ```
 
 Do potwierdzenia:
 
-- czy usuwanie konta działa z poziomu aplikacji,
-- czy istnieje publiczna procedura kontaktu mailowego,
+- czy usuwanie konta działa z poziomu aplikacji na buildzie release,
 - czy dane prywatne są usuwane lub anonimizowane,
 - czy publiczne treści użytkownika są anonimizowane,
 - czy zdjęcia użytkownika są usuwane albo pozostają jako treści zanonimizowane.
@@ -418,7 +432,7 @@ Tak.
 ### Czy użytkownik może poprosić o usunięcie danych?
 
 ```text
-Tak — do potwierdzenia po zakończeniu #212.
+Tak — do potwierdzenia po zakończeniu #210.
 ```
 
 ### Kategorie do zaznaczenia roboczo
@@ -454,7 +468,7 @@ Messages / notifications:
 
 ## 10. Rekomendacje przed publikacją
 
-- Domknąć #212, zanim formularz zostanie oznaczony jako finalny.
+- Domknąć #210, zanim formularz zostanie oznaczony jako finalny.
 - #216: decyzje SDK są zweryfikowane w tym dokumencie; przed finalnym wysłaniem formularza zostaje ręczne porównanie z aktywnymi usługami w Firebase Console.
 - Zweryfikować manifest i uprawnienia Androida.
 - Zweryfikować aktywne usługi Firebase.

@@ -46,7 +46,9 @@ fun TermsOfServiceDialog(onDismiss: () -> Unit) {
                 Text(
                     "Każdy użytkownik może posiadać jedno konto. Jesteś odpowiedzialny " +
                         "za bezpieczeństwo swoich danych logowania. Możesz usunąć konto " +
-                        "w dowolnym momencie."
+                        "w dowolnym momencie w Profilu, w sekcji Konto i bezpieczeństwo. " +
+                        "Publiczna instrukcja usuwania konta jest dostępna pod adresem " +
+                        "https://playground-705e7162.web.app/account-deletion."
                 )
                 Spacer(Modifier.height(12.dp))
 
@@ -91,18 +93,27 @@ fun TermsOfServiceDialog(onDismiss: () -> Unit) {
                 Text(
                     "Dodając treści, oświadczasz, że masz prawo do ich publikacji. " +
                         "Po usunięciu konta Twoje opinie zostaną zanonimizowane, " +
-                        "a dodane miejsca pozostaną widoczne."
+                        "a dodane miejsca mogą pozostać widoczne, jeżeli nie zawierają " +
+                        "danych osobowych i są częścią publicznej bazy miejsc."
                 )
                 Spacer(Modifier.height(12.dp))
 
-                SectionTitle2("7. Odpowiedzialność")
+                SectionTitle2("7. Zdjęcia dzieci i osób trzecich")
+                Text(
+                    "Nie publikuj zdjęć dzieci ani osób trzecich bez wszystkich wymaganych " +
+                        "zgód. Zdjęcia naruszające prywatność, wizerunek lub bezpieczeństwo " +
+                        "dziecka mogą zostać usunięte po zgłoszeniu."
+                )
+                Spacer(Modifier.height(12.dp))
+
+                SectionTitle2("8. Odpowiedzialność")
                 Text(
                     "kidZone nie ponosi odpowiedzialności za treści publikowane " +
                         "przez użytkowników ani nie gwarantuje ich aktualności."
                 )
                 Spacer(Modifier.height(12.dp))
 
-                SectionTitle2("8. Zmiany Regulaminu")
+                SectionTitle2("9. Zmiany Regulaminu")
                 Text(
                     "O istotnych zmianach Regulaminu zostaniesz poinformowany " +
                         "w aplikacji lub emailem. Dalsze korzystanie z aplikacji " +

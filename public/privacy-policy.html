@@ -21,7 +21,7 @@
 <body>
   <div class="container">
     <h1>Polityka Prywatności</h1>
-    <p class="date">Ostatnia aktualizacja: 15 czerwca 2026</p>
+    <p class="date">Ostatnia aktualizacja: 28 czerwca 2026</p>
 
     <p>Aplikacja <strong>kidZone</strong> ("Aplikacja") jest społecznościową platformą
     umożliwiającą rodzicom i opiekunom odkrywanie, dodawanie i ocenianie miejsc
@@ -41,7 +41,8 @@
       <li><strong>Dane konta:</strong> adres e-mail, nazwa użytkownika (nick), imię i nazwisko (opcjonalne), zdjęcie profilowe (opcjonalne).</li>
       <li><strong>Dane lokalizacyjne:</strong> współrzędne GPS wykorzystywane podczas aktywnego korzystania z Aplikacji, wyłącznie po wyrażeniu zgody przez użytkownika.</li>
       <li><strong>Treści użytkownika:</strong> dodane miejsca, opinie, oceny, zdjęcia oraz zgłoszenia treści lub błędnych danych.</li>
-      <li><strong>Dane techniczne:</strong> identyfikator urządzenia, wersja systemu, informacje diagnostyczne oraz logi awarii.</li>
+      <li><strong>Dane techniczne i diagnostyczne:</strong> identyfikatory urządzenia lub instalacji, wersja aplikacji, wersja systemu, informacje diagnostyczne, logi awarii, dane wydajnościowe i podstawowe zdarzenia analityczne.</li>
+      <li><strong>Dane powiadomień:</strong> tokeny Firebase Cloud Messaging oraz preferencje powiadomień, przechowywane w prywatnej części profilu.</li>
       <li><strong>Dane widoczne dla innych użytkowników:</strong> nick, dodane miejsca, opinie, oceny i zdjęcia mogą być widoczne w Aplikacji.</li>
     </ul>
 
@@ -51,7 +52,8 @@
       <li>Wyświetlanie miejsc znajdujących się w pobliżu użytkownika.</li>
       <li>Umożliwienie dodawania miejsc, opinii, ocen, zdjęć i zgłoszeń.</li>
       <li>Moderacja treści i zapewnienie bezpieczeństwa społeczności.</li>
-      <li>Poprawa stabilności, bezpieczeństwa i jakości działania Aplikacji.</li>
+      <li>Poprawa stabilności, bezpieczeństwa, wydajności i jakości działania Aplikacji.</li>
+      <li>Pomiar podstawowego użycia funkcji, diagnostyka błędów i eksperymenty konfiguracyjne związane z jakością działania Aplikacji.</li>
       <li>Komunikacja z użytkownikiem w sprawach związanych z działaniem Aplikacji, kontem, zgłoszeniami lub zmianami dokumentów.</li>
     </ul>
 
@@ -66,7 +68,15 @@
     <h2>5. Usługi zewnętrzne i odbiorcy danych</h2>
     <p>Dane mogą być przetwarzane przy pomocy zewnętrznych dostawców usług technologicznych, w szczególności:</p>
     <ul>
-      <li><strong>Google Firebase</strong> (Auth, Firestore, Storage, Crashlytics) — uwierzytelnianie, baza danych, przechowywanie plików i analiza awarii.</li>
+      <li><strong>Google Firebase Authentication</strong> — rejestracja, logowanie i zarządzanie kontem.</li>
+      <li><strong>Cloud Firestore</strong> — baza danych profili, miejsc, opinii, zgłoszeń, ustawień i liczników.</li>
+      <li><strong>Firebase Storage</strong> — przechowywanie avatarów oraz zdjęć miejsc i opinii.</li>
+      <li><strong>Firebase Crashlytics</strong> — analiza awarii, stabilności i błędów aplikacji.</li>
+      <li><strong>Firebase Analytics</strong> — podstawowa analityka użycia aplikacji, zdarzenia logowania, rejestracji, interakcji z funkcjami i właściwości użytkownika wykorzystywane do jakości produktu.</li>
+      <li><strong>Firebase Performance Monitoring</strong> — pomiar wydajności, czasu działania wybranych operacji i diagnostyka jakości aplikacji.</li>
+      <li><strong>Firebase Cloud Messaging</strong> — wysyłka powiadomień push i obsługa tokenów urządzeń.</li>
+      <li><strong>Firebase App Check</strong> — ochrona przed nadużyciami i weryfikacja integralności aplikacji.</li>
+      <li><strong>Firebase Remote Config</strong> — konfiguracja funkcji, limitów i eksperymentów produktowych.</li>
       <li><strong>Google Maps Platform</strong> — wyświetlanie mapy i obsługa funkcji związanych z lokalizacją miejsc.</li>
       <li><strong>Google Play Services</strong> — obsługa wybranych funkcji systemowych, uwierzytelniania i aktualizacji.</li>
     </ul>
@@ -79,7 +89,8 @@
       <li>Po usunięciu konta dane identyfikujące użytkownika są usuwane lub anonimizowane w ciągu 30 dni.</li>
       <li>Treści dodane przez użytkownika, takie jak miejsca, opinie lub oceny, mogą pozostać widoczne w Aplikacji w formie zanonimizowanej, o ile nie zawierają danych osobowych.</li>
       <li>Zdjęcia naruszające prywatność, wizerunek lub prawa osób trzecich mogą zostać usunięte.</li>
-      <li>Logi awarii i dane diagnostyczne przechowywane są przez okres niezbędny do analizy błędów, nie dłużej niż 90 dni, chyba że dłuższe przechowywanie jest wymagane dla bezpieczeństwa lub dochodzenia roszczeń.</li>
+      <li>Tokeny powiadomień FCM są usuwane lub dezaktywowane po wylogowaniu, usunięciu konta albo utracie ważności tokenu.</li>
+      <li>Logi awarii, dane diagnostyczne, analityczne i wydajnościowe przechowywane są przez okres niezbędny do analizy błędów, bezpieczeństwa i jakości aplikacji, nie dłużej niż wymagają tego skonfigurowane usługi Google/Firebase lub obowiązki prawne.</li>
     </ul>
 
     <h2>7. Prawa użytkownika (RODO)</h2>
@@ -119,6 +130,8 @@
     <p>Użytkownik może usunąć konto z poziomu Aplikacji, jeżeli taka funkcja jest dostępna, albo kontaktując się z administratorem pod adresem
     <a href="mailto:bonoboczemunie+privacy@gmail.com">bonoboczemunie+privacy@gmail.com</a>.</p>
     <p>Po usunięciu konta dane identyfikujące użytkownika zostaną usunięte lub zanonimizowane w ciągu 30 dni. Treści dodane przez użytkownika mogą pozostać widoczne w formie zanonimizowanej, o ile nie naruszają prawa, prywatności ani praw osób trzecich.</p>
+    <p>Publiczna instrukcja usuwania konta jest dostępna pod adresem:
+    <a href="/account-deletion.html">/account-deletion.html</a>.</p>
 
     <h2>13. Zgłaszanie naruszeń</h2>
     <p>Użytkownik może zgłosić treść, miejsce, opinię lub zdjęcie naruszające prawo, prywatność, prawa osób trzecich albo zasady Aplikacji za pomocą funkcji dostępnych w Aplikacji lub mailowo na adres
@@ -132,7 +145,8 @@
     <h2>15. Kontakt</h2>
     <p>W sprawach dotyczących ochrony danych osobowych prosimy o kontakt:
     <a href="mailto:bonoboczemunie+privacy@gmail.com">bonoboczemunie+privacy@gmail.com</a></p>
-    <p>Regulamin Aplikacji jest dostępny pod adresem: <a href="/terms-of-service.html">Regulamin</a>.</p>
+    <p>Regulamin Aplikacji jest dostępny pod adresem: <a href="/terms-of-service.html">Regulamin</a>.
+    Instrukcja usuwania konta jest dostępna pod adresem: <a href="/account-deletion.html">Usuwanie konta</a>.</p>
 
     <div class="footer">
       &copy; 2026 kidZone. Wszelkie prawa zastrzeżone.
