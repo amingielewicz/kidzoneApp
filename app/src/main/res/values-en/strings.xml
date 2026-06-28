@@ -79,6 +79,10 @@
     <string name="notification_settings">Email and push notifications</string>
     <string name="terms_of_service">Terms of service</string>
     <string name="privacy_policy">Privacy policy</string>
+    <string name="contact_support">Contact</string>
+    <string name="contact_support_title">Contact kidZone</string>
+    <string name="contact_support_body">For account, personal data, content reports, or app support, email us at:</string>
+    <string name="contact_support_hint">Include your username, account email, and a short description of the issue.</string>
     <string name="sign_out">Sign out</string>
     <string name="close">Close</string>
     <string name="app_version">Version: %1$s</string>

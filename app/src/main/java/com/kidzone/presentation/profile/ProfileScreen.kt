@@ -90,6 +90,7 @@ import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.rememberHapticFeedback
 import com.kidzone.presentation.common.rememberReducedMotionEnabled
 import com.kidzone.presentation.common.shimmerEffect
+import com.kidzone.utils.AppConfig
 import nl.dionsegijn.konfetti.compose.KonfettiView
 import nl.dionsegijn.konfetti.core.Party
 import nl.dionsegijn.konfetti.core.Position
@@ -186,6 +187,7 @@ fun ProfileScreen(
                     onDeleteAccount = viewModel::openDeleteAccount,
                     onTermsOfService = viewModel::openTermsOfService,
                     onPrivacyPolicy = viewModel::openPrivacyPolicy,
+                    onContact = viewModel::openContact,
                     onNotificationPrefs = viewModel::openNotificationPrefs,
                     selectedLanguage = ui.selectedLanguage,
                     onLanguageSettings = viewModel::openLanguageDialog,
@@ -227,6 +229,10 @@ fun ProfileScreen(
 
     if (ui.isPrivacyPolicyOpen) {
         PrivacyPolicyDialog(onDismiss = viewModel::dismissPrivacyPolicy)
+    }
+
+    if (ui.isContactOpen) {
+        ContactSupportDialog(onDismiss = viewModel::dismissContact)
     }
 
     if (ui.isNotificationPrefsOpen) {
@@ -323,6 +329,7 @@ private fun ProfileContent(
     onDeleteAccount: () -> Unit,
     onTermsOfService: () -> Unit,
     onPrivacyPolicy: () -> Unit,
+    onContact: () -> Unit,
     onNotificationPrefs: () -> Unit,
     selectedLanguage: AppLanguage,
     onLanguageSettings: () -> Unit,
@@ -382,6 +389,7 @@ private fun ProfileContent(
             SettingsCard(
                 onTermsOfService = onTermsOfService,
                 onPrivacyPolicy = onPrivacyPolicy,
+                onContact = onContact,
                 onNotificationPrefs = onNotificationPrefs,
                 selectedLanguage = selectedLanguage,
                 onLanguageSettings = onLanguageSettings,
@@ -979,6 +987,7 @@ private fun AccountSecurityCard(
 private fun SettingsCard(
     onTermsOfService: () -> Unit,
     onPrivacyPolicy: () -> Unit,
+    onContact: () -> Unit,
     onNotificationPrefs: () -> Unit,
     selectedLanguage: AppLanguage,
     onLanguageSettings: () -> Unit,
@@ -1009,6 +1018,12 @@ private fun SettingsCard(
             label = stringResource(R.string.privacy_policy),
             onClick = onPrivacyPolicy
         )
+        Spacer(Modifier.height(4.dp))
+        ProfileNavRow(
+            icon = Icons.Filled.Email,
+            label = stringResource(R.string.contact_support),
+            onClick = onContact
+        )
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
             onClick = onSignOut,
@@ -1033,6 +1048,48 @@ private fun SettingsCard(
             textAlign = TextAlign.Center
         )
     }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun ContactSupportDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Filled.Email,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        },
+        title = { Text(stringResource(R.string.contact_support_title)) },
+        text = {
+            Column {
+                Text(
+                    text = stringResource(R.string.contact_support_body),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = AppConfig.PRIVACY_CONTACT_EMAIL,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = stringResource(R.string.contact_support_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.close))
+            }
+        }
+    )
 }
 
 @Composable

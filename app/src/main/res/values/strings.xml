@@ -79,6 +79,10 @@
     <string name="notification_settings">Powiadomienia email i push</string>
     <string name="terms_of_service">Regulamin użytkowania</string>
     <string name="privacy_policy">Polityka prywatności</string>
+    <string name="contact_support">Kontakt</string>
+    <string name="contact_support_title">Kontakt z kidZone</string>
+    <string name="contact_support_body">W sprawach konta, danych osobowych, zgłoszeń treści albo działania aplikacji napisz na:</string>
+    <string name="contact_support_hint">W zgłoszeniu podaj nazwę użytkownika, adres e-mail konta i krótki opis sprawy.</string>
     <string name="sign_out">Wyloguj</string>
     <string name="close">Zamknij</string>
     <string name="app_version">Wersja: %1$s</string>
