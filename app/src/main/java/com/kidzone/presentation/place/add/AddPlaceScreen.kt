@@ -70,6 +70,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
@@ -265,6 +266,7 @@ fun AddPlaceScreen(
             verticalArrangement = Arrangement.Top
         ) {
             // --- Nazwa (wymagana) ---
+            val nameHasError = state.hasTriedToSave && state.name.isBlank()
             // Title Case (KeyboardCapitalization.Words) - "Plac Zabaw Kasztanowa"
             // wygląda lepiej niż "plac zabaw kasztanowa". Klawiatura sama
             // zacznie każde słowo dużą literą; ostateczna normalizacja
@@ -283,12 +285,18 @@ fun AddPlaceScreen(
                     }
                     Text("$requiredText${state.name.length}/$PLACE_NAME_MAX_LENGTH")
                 },
-                isError = state.name.isNotEmpty() && state.name.isBlank(),
+                isError = nameHasError,
                 enabled = !state.isSaving,
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Words
                 ),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics {
+                        if (nameHasError) {
+                            error("Pole wymagane")
+                        }
+                    }
             )
 
             Spacer(Modifier.height(8.dp))
@@ -352,7 +360,11 @@ fun AddPlaceScreen(
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
-                modifier = Modifier.padding(horizontal = 4.dp)
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .semantics {
+                        liveRegion = LiveRegionMode.Polite
+                    }
             )
 
             // --- Miejsca w pobliżu (ochrona przed duplikatami) ---
@@ -374,7 +386,7 @@ fun AddPlaceScreen(
                 },
                 singleLine = true,
                 readOnly = true,
-                enabled = false,
+                enabled = !state.isSaving,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -669,7 +681,7 @@ private fun LocationSection(
             } else {
                 Icon(
                     Icons.Filled.MyLocation,
-                    contentDescription = "Pobierz lokalizację",
+                    contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.size(8.dp))
