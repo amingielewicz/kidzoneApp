@@ -112,6 +112,8 @@ class AddPlaceViewModel @Inject constructor(
         val isUploadingPhotos: Boolean = false,
         /** Komunikat o duplikatach (event jednorazowy, konsumowany przez UI). */
         val photoDuplicateMessage: String? = null,
+        /** True after user attempted to save an invalid form. */
+        val hasTriedToSave: Boolean = false,
         /** True when in-app review should be requested. */
         val shouldRequestReview: Boolean = false
     ) {
@@ -344,7 +346,12 @@ class AddPlaceViewModel @Inject constructor(
     fun save() {
         val state = _uiState.value
         if (!state.isFormValid) {
-            _uiState.update { it.copy(errorMessage = "Wypełnij wymagane pola i pobierz lokalizację") }
+            _uiState.update {
+                it.copy(
+                    hasTriedToSave = true,
+                    errorMessage = "Wypełnij wymagane pola i pobierz lokalizację"
+                )
+            }
             return
         }
 

@@ -273,6 +273,7 @@ class AddPlaceViewModelTest {
             advanceUntilIdle()
 
             assertNotNull(viewModel.uiState.value.errorMessage)
+            assertTrue(viewModel.uiState.value.hasTriedToSave)
             assertFalse(viewModel.uiState.value.isSaved)
         }
 
