@@ -42,46 +42,34 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: |
           missing=0
-          for secret_name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+          for secret_name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD GOOGLE_SERVICES_JSON MAPS_API_KEY; do
             if [ -z "${!secret_name}" ]; then
               echo "::error::$secret_name is not configured. Add it in GitHub repository secrets."
               missing=1
             fi
           done
+          if [ -n "$GOOGLE_SERVICES_JSON" ] && echo "$GOOGLE_SERVICES_JSON" | grep -Eq 'placeholder-ci|AIzaSyPlaceholder|000000000000'; then
+            echo "::error::GOOGLE_SERVICES_JSON looks like a placeholder. Use the production Firebase config."
+            missing=1
+          fi
+          if [ "$MAPS_API_KEY" = "AIzaSyPlaceholder" ]; then
+            echo "::error::MAPS_API_KEY is still the placeholder value."
+            missing=1
+          fi
           if [ "$missing" -ne 0 ]; then
             exit 1
           fi
 
-      - name: Create google-services.json from secret or template
+      - name: Create google-services.json from secret
         shell: bash
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
-          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
-            printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
-          elif [ -f app/google-services.json.template ]; then
-            cp app/google-services.json.template app/google-services.json
-          else
-            cat > app/google-services.json << 'EOF'
-          {
-            "project_info": {
-              "project_number": "000000000000",
-              "project_id": "placeholder-ci",
-              "storage_bucket": "placeholder-ci.appspot.com"
-            },
-            "client": [{
-              "client_info": {
-                "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
-                "android_client_info": { "package_name": "com.kidzone" }
-              },
-              "api_key": [{ "current_key": "AIzaSyPlaceholder" }]
-            }],
-            "configuration_version": "1"
-          }
-          EOF
-          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
 
       - name: Decode release keystore
         shell: bash
