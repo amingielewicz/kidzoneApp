@@ -3,7 +3,7 @@
 Powiązane issue: #274  
 Powiązane issue release: #269, #275
 
-Ostatnia aktualizacja: 2026-06-28
+Ostatnia aktualizacja: 2026-06-29
 
 ## Cel
 
@@ -21,12 +21,13 @@ Aktualny manifest `app/src/main/AndroidManifest.xml` deklaruje:
 | `ACCESS_FINE_LOCATION` | Runtime | Mapa, miejsca w pobliżu, pobranie lokalizacji przy dodawaniu miejsca. |
 | `ACCESS_COARSE_LOCATION` | Runtime | Przybliżona lokalizacja, gdy system/użytkownik ograniczy dokładność. |
 | `CAMERA` | Runtime | Zrobienie zdjęcia w aplikacji. Kamera jest funkcją opcjonalną. |
-| `READ_MEDIA_IMAGES` | Do decyzji przed release | Zadeklarowane w manifeście; główne flow zdjęć używa Android Photo Picker. |
 | `POST_NOTIFICATIONS` | Runtime Android 13+ | Powiadomienia push Firebase Cloud Messaging. |
 
 Manifest nie deklaruje:
 
 - `ACCESS_BACKGROUND_LOCATION`,
+- `READ_MEDIA_IMAGES`,
+- `READ_EXTERNAL_STORAGE`,
 - uprawnień do audio/wideo,
 - uprawnień SMS/kontaktów/kalendarza/telefonu,
 - `QUERY_ALL_PACKAGES`.
@@ -49,7 +50,7 @@ choć część funkcji będzie ograniczona.
 | Lokalizacja | Aplikacja pokazuje contextual rationale przed systemowym dialogiem. | Odmowa, zgoda approximate, zgoda precise, ponowna próba po odmowie. |
 | Kamera | Kamera jest osobnym flow i wymaga runtime permission. | Pierwsza zgoda, odmowa, odmowa z "nie pytaj ponownie", działanie bez kamery. |
 | Powiadomienia | Android 13+ używa `POST_NOTIFICATIONS` i rationale. | Zgoda, odmowa, zachowanie ustawień powiadomień po odmowie. |
-| Zdjęcia | Główne flow używa Android Photo Picker. | Czy system nie pokazuje szerokiego dostępu do całej galerii tam, gdzie wystarczy picker. |
+| Zdjęcia | Główne flow używa Android Photo Picker i nie deklaruje `READ_MEDIA_IMAGES`. | Avatar, zdjęcie miejsca i zdjęcie opinii powinny otwierać picker bez systemowej prośby o szeroki dostęp do galerii. |
 
 ## Google Play Console
 
@@ -63,17 +64,26 @@ Rekomendowane deklaracje:
 
 ## Decyzja o `READ_MEDIA_IMAGES`
 
-Przed publikacją trzeba podjąć jedną z decyzji:
-
-1. Usunąć `READ_MEDIA_IMAGES`, jeśli wszystkie obsługiwane flow zdjęć działają przez Android Photo Picker bez szerokiego dostępu do galerii.
-2. Zostawić `READ_MEDIA_IMAGES`, jeśli istnieje realny flow wymagający dostępu do biblioteki zdjęć poza Photo Pickerem.
-
-Aktualna rekomendacja:
+Decyzja na 2026-06-29:
 
 ```text
-Zweryfikować na Androidzie 13+ i 14+, czy usunięcie READ_MEDIA_IMAGES nie psuje avatara,
-dodawania zdjęć miejsc, zdjęć opinii i edycji profilu. Jeśli testy przejdą, usunąć uprawnienie
-osobnym PR-em przed publikacją.
+Usuwamy READ_MEDIA_IMAGES z manifestu.
+```
+
+Uzasadnienie:
+
+- avatar używa `ActivityResultContracts.PickVisualMedia`,
+- dodawanie miejsca używa `ActivityResultContracts.PickMultipleVisualMedia`,
+- dodawanie opinii używa `ActivityResultContracts.PickMultipleVisualMedia`,
+- dodawanie zdjęcia w szczegółach miejsca używa `ActivityResultContracts.PickVisualMedia`,
+- kamera ma osobne runtime permission `CAMERA`,
+- w kodzie nie ma użycia `READ_MEDIA_IMAGES`, `READ_EXTERNAL_STORAGE`, `GetContent` ani `OpenDocument`.
+
+Efekt dla Google Play:
+
+```text
+Aplikacja nie deklaruje szerokiego dostępu do galerii. Użytkownik wybiera konkretne zdjęcia
+przez systemowy Android Photo Picker.
 ```
 
 ## Manual QA przed zamknięciem #274
@@ -82,14 +92,15 @@ osobnym PR-em przed publikacją.
 - [ ] Location permission: precise / approximate / deny.
 - [ ] Camera permission: allow / deny.
 - [ ] Photo Picker: avatar, zdjęcie miejsca, zdjęcie opinii.
+- [ ] Android 13+/14+: brak systemowego dialogu o szerokim dostępie do zdjęć/galerii.
 - [ ] Aplikacja działa bez lokalizacji.
 - [ ] Aplikacja działa bez powiadomień.
 - [ ] Aplikacja działa bez kamery, jeśli użytkownik wybiera zdjęcie z galerii.
 - [ ] Google Play Console nie deklaruje background location.
-- [ ] Decyzja o `READ_MEDIA_IMAGES` zapisana w issue #274.
+- [x] Decyzja o `READ_MEDIA_IMAGES`: usunięte z manifestu, bo Photo Picker wystarcza.
 
 ## Kryteria zamknięcia
 
-Issue #274 można zamknąć po ręcznym teście runtime permissions i finalnej decyzji
-o `READ_MEDIA_IMAGES`. Sam ten dokument przygotowuje audyt, ale nie zastępuje testu
-na urządzeniu i potwierdzenia w Google Play Console.
+Issue #274 można zamknąć po ręcznym teście runtime permissions i potwierdzeniu
+w Google Play Console. Decyzja o `READ_MEDIA_IMAGES` jest już wykonana w repo,
+ale dokument nie zastępuje testu na urządzeniu.
