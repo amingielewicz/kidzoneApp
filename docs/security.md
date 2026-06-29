@@ -370,4 +370,5 @@ Release można traktować jako gotowy bezpieczeństwowo, gdy:
 - Data Safety jest zgodne z kodem,
 - logi release nie ujawniają danych prywatnych,
 - użytkownik może usunąć konto albo ma jasną procedurę żądania usunięcia danych,
-- nie ma znanych krytycznych podatności w zależnościach.
+- nie ma znanych krytycznych podatności w zależnościach,
+- [Google Play security release checklist](qa/google-play-security-checklist.md) ma uzupełnione statusy i decyzję GO / NO-GO.
