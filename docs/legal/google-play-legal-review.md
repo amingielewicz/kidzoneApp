@@ -12,6 +12,12 @@ Celem dokumentu jest zebranie w jednym miejscu kontroli prawno-produktowej przed
 
 Dokument nie zastępuje porady prawnej. Służy jako techniczno-produktowa checklista zgodności aplikacji, dokumentów publicznych i deklaracji Google Play Console.
 
+Szczegółowa kolejność ostatnich ręcznych bramek przed zamknięciem milestone znajduje się w:
+
+```text
+docs/legal/v1-release-manual-gates.md
+```
+
 ## Status ogólny
 
 | Obszar | Status | Uwagi |
@@ -36,6 +42,7 @@ Ta sekcja zbiera stan, który można potwierdzić w repozytorium bez ręcznego t
 | Data Safety draft | Robocze odpowiedzi istnieją | `docs/legal/google-play-data-safety-draft.md` |
 | Usuwanie konta QA | Checklistę testu przygotowano, wynik manualny nadal wymagany | `docs/legal/account-deletion-test-checklist.md` |
 | Android permissions | Audyt przygotowano, wynik manualny nadal wymagany | `docs/legal/android-permissions-play-compliance.md` |
+| Manual release gates | Runbook przygotowano, wynik manualny nadal wymagany | `docs/legal/v1-release-manual-gates.md` |
 | Lokalizacja | Manifest deklaruje tylko foreground location | `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`; brak `ACCESS_BACKGROUND_LOCATION` |
 | Zdjęcia | Aplikacja używa Android Photo Picker w kluczowych flow | `PickVisualMedia`, `PickMultipleVisualMedia` w profilach, miejscach i opiniach |
 | Kamera | Kamera jest deklarowana jako funkcja opcjonalna | `android.hardware.camera` z `android:required="false"` |
