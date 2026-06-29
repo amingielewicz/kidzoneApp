@@ -9,6 +9,10 @@ Ten dokument opisuje bezpieczny proces przygotowania release aplikacji kidZone p
 
 Release nie powinien być wykonywany bez przejścia checklisty technicznej, bezpieczeństwa, prawnej i testowej.
 
+Finalna bramka Google Play security/release znajduje się w:
+
+- [Google Play security release checklist](qa/google-play-security-checklist.md)
+
 ## Zakres dokumentu
 
 Dokument obejmuje:
@@ -65,7 +69,8 @@ Przed wygenerowaniem paczki release trzeba potwierdzić:
 - [ ] polityka prywatności i regulamin są aktualne,
 - [ ] flow usuwania konta zostało sprawdzone,
 - [ ] wersja aplikacji została podbita,
-- [ ] changelog został przygotowany.
+- [ ] changelog został przygotowany,
+- [ ] [Google Play security release checklist](qa/google-play-security-checklist.md) ma decyzję GO albo świadome NO-GO.
 
 ## Lokalna walidacja
 
