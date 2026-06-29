@@ -1,13 +1,14 @@
 # Accessibility TalkBack checklist
 
-Use this checklist for release candidates and accessibility-focused PRs. Test on a real Android device when possible; emulator checks are useful, but TalkBack timing and focus behavior can differ.
+Use this checklist for release candidates and accessibility-focused PRs. Test on a real Android device when possible; emulator checks are useful for repeatability, but TalkBack timing, focus behavior, system font limits and Material You colors can differ from physical devices.
 
 ## Setup
 
 - [ ] Turn on TalkBack.
 - [ ] Test light mode and dark mode.
-- [ ] Test Android font scale at default and at least 1.3x.
-- [ ] Test Android display size at default and large.
+- [ ] Test Android font scale at default, 1.3x, 1.5x and the maximum available value on the device.
+- [ ] Test Android display size at default and large/maximum.
+- [ ] On Android 12+, test Material You dynamic colors with at least one bright and one muted wallpaper palette.
 - [ ] Test with reduced motion enabled.
 - [ ] Test with a signed-in regular user and an admin account.
 
@@ -23,8 +24,10 @@ Use this checklist for release candidates and accessibility-focused PRs. Test on
 ### Add place
 
 - [ ] Required-field errors are announced after attempting to save an incomplete form.
+- [ ] Incomplete form flow is clear: empty place name, missing GPS, GPS fetched and second save attempt.
 - [ ] Category and amenities controls announce selected/unselected state.
 - [ ] Location, camera and photo picker actions explain why the permission or picker is needed.
+- [ ] Location status changes are announced after GPS is fetched.
 - [ ] Photo thumbnails and remove buttons have meaningful labels.
 - [ ] The save button state is understandable when the form is incomplete.
 
