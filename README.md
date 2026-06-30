@@ -136,6 +136,9 @@ Implementacje Android są w `data/service/` i bindowane przez Hilt (`di/ServiceM
 
 ## 📝 Dokumentacja kodu (KDoc)
 
+Dokumentacja projektowa i checklisty QA: [`docs/README.md`](docs/README.md).
+Architektura trybu offline: [`docs/android/OFFLINE_MODE.md`](docs/android/OFFLINE_MODE.md).
+
 Projekt używa **KDoc** — kotlinowy odpowiednik Javadoc:
 
 ```kotlin
