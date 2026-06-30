@@ -1,55 +1,107 @@
 # Contributing
 
-## Cel zasad
+## Cel
 
-Ten dokument opisuje prosty, darmowy workflow pracy z repozytorium KidZone.
+Dokument opisuje zasady pracy nad KidZone: branchowanie, Pull Requesty, review, testy i Definition of Done.
 
-Repozytorium jest prywatne i należy do konta indywidualnego GitHub. Część mechanizmów automatycznej ochrony brancha `main`, takich jak egzekwowane rulesety dla prywatnych repozytoriów, może wymagać płatnego planu GitHub Team lub organizacji. Z tego powodu stosujemy manualną zasadę jakości: **nie mergujemy kodu bez zielonego CI**.
+## Zasady ogólne
 
-## Główna zasada
-
-Nie commitujemy bezpośrednio do `main`.
-
-Każda zmiana powinna przechodzić przez pull request.
+- Każda większa zmiana powinna mieć issue.
+- Każda zmiana trafia przez Pull Request.
+- PR powinien mieć jasny opis celu i zakresu.
+- Nie mieszamy wielu niezwiązanych zmian w jednym PR.
+- Dokumentację aktualizujemy razem ze zmianą, jeśli wpływa na proces, architekturę, release albo UX.
+- Nie commitujemy bezpośrednio do `main`.
+- Nie mergujemy PR bez zielonego CI.
 
 ## Branch naming
 
-Stosujemy krótkie, czytelne prefiksy:
+```text
+feature/short-description
+bugfix/short-description
+hotfix/x.y.z-short-description
+docs/short-description
+refactor/short-description
+test/short-description
+ci/short-description
+chore/short-description
+```
 
-| Typ zmiany | Prefix | Przykład |
-|---|---|---|
-| Nowa funkcja | `feature/` | `feature/add-place-details` |
-| Poprawka błędu | `bugfix/` | `bugfix/fix-map-marker` |
-| Pilna poprawka | `hotfix/` | `hotfix/fix-crash-on-startup` |
-| Testy | `test/` | `test/login-screen-validation` |
-| CI/CD | `ci/` | `ci/harden-android-workflow` |
-| Dokumentacja | `docs/` | `docs/add-ci-workflow-rules` |
-| Porządki | `chore/` | `chore/update-dependencies` |
+Przykłady:
 
-## Pull request checklist
+```text
+feature/add-place-form
+bugfix/map-empty-state
+docs/engineering-handbook
+hotfix/0.5.1-login-crash
+```
 
-Przed mergem PR sprawdzamy:
+## Commit messages
 
-- [ ] PR ma jasny tytuł.
-- [ ] PR opisuje, co zostało zmienione.
-- [ ] PR opisuje, jak sprawdzić zmianę.
-- [ ] `Android CI` jest zielony.
-- [ ] Nie ma przypadkowo dodanych sekretów, kluczy API ani plików lokalnych.
-- [ ] Nie ma zmian niezwiązanych z celem PR.
+Preferowane prefiksy:
 
-## Wymagane CI przed merge
+```text
+feat:      nowa funkcja
+fix:       poprawka błędu
+docs:      dokumentacja
+refactor:  refaktor bez zmiany zachowania
+test:      testy
+perf:      wydajność
+chore:     zmiany techniczne / utrzymaniowe
+ci:        CI/CD
+build:     build / dependencies
+```
 
-PR można mergować tylko wtedy, gdy workflow `Android CI` jest zielony.
+Przykłady:
 
-Aktualnie `Android CI` wykonuje między innymi:
+```text
+feat: add place details screen
+fix: handle missing location permission
+docs: add release checklist
+perf: limit map marker loading
+```
 
-- Android Lint,
-- unit testy,
-- build debug APK,
-- skan sekretów przez Gitleaks,
-- upload raportów i APK jako artifacty.
+## Pull Request
 
-Jeżeli `Android CI` jest czerwony, PR nie powinien być mergowany.
+PR powinien zawierać:
+
+- opis zmiany,
+- powiązane issue,
+- zakres zmian,
+- sposób testowania,
+- screenshoty lub nagrania dla UI,
+- wpływ na release, security, performance i accessibility.
+
+## Code review
+
+Reviewer sprawdza:
+
+- czy kod jest czytelny,
+- czy zakres PR jest spójny,
+- czy nie ma regresji UX,
+- czy nie ma danych wrażliwych w logach,
+- czy nie ma nieograniczonych zapytań,
+- czy testy i dokumentacja są adekwatne.
+
+## Definition of Done
+
+Zmiana jest gotowa, gdy:
+
+- [ ] PR ma jasny opis.
+- [ ] Kod buduje się lokalnie.
+- [ ] CI przechodzi.
+- [ ] Testy są dodane lub świadomie pominięte.
+- [ ] UI ma loading, empty i error states, jeśli dotyczy.
+- [ ] Accessibility została sprawdzona, jeśli dotyczy UI.
+- [ ] Performance został sprawdzony, jeśli dotyczy list, mapy, wyszukiwarki lub Firebase.
+- [ ] Security/privacy zostały sprawdzone, jeśli dotyczy danych użytkownika, logowania, uploadu lub rules.
+- [ ] Dokumentacja została zaktualizowana, jeśli zmiana wpływa na proces albo architekturę.
+
+## CI przed merge
+
+PR można mergować tylko wtedy, gdy workflow CI jest zielony.
+
+Jeżeli CI jest czerwony, PR nie powinien być mergowany.
 
 ## Czego nie mergujemy
 
@@ -58,9 +110,54 @@ Nie mergujemy PR, jeśli:
 - build nie przechodzi,
 - testy są czerwone,
 - lint zgłasza błędy,
-- Gitleaks wykrył potencjalny sekret,
+- wykryto potencjalny sekret,
 - zmiana dodaje prawdziwe klucze API, tokeny albo dane dostępowe,
-- nie wiadomo, co zmiana właściwie robi.
+- nie wiadomo, co zmiana właściwie robi,
+- PR miesza kilka niezwiązanych tematów.
+
+## Release changes
+
+Zmiany wpływające na release muszą aktualizować odpowiednie dokumenty:
+
+- `docs/release/GO_NO_GO_CHECKLIST.md`,
+- `docs/release/RELEASE_PROCESS.md`,
+- `docs/release/RELEASE_NOTES_TEMPLATE.md`,
+- `docs/release/PLAY_STORE_RELEASE.md`,
+- `docs/release/VERSIONING.md`,
+- `docs/release/HOTFIX_PROCESS.md`.
+
+## Security
+
+Nie commitujemy:
+
+- sekretów,
+- tokenów,
+- prywatnych kluczy,
+- plików konfiguracyjnych z produkcyjnymi danymi dostępowymi,
+- logów z danymi użytkowników.
+
+Security issue oznaczamy jako `security` i nie wklejamy do niego realnych sekretów ani danych prywatnych.
+
+## Performance
+
+Przy zmianach list, mapy, wyszukiwarki, Firebase albo obrazów sprawdzić:
+
+- limity zapytań,
+- paginację,
+- debounce/throttle,
+- cache,
+- rekompozycje Compose,
+- koszty Firebase / Maps.
+
+## Dokumentacja
+
+Dokumentacja powinna być:
+
+- praktyczna,
+- aktualna,
+- krótka tam, gdzie się da,
+- konkretna tam, gdzie trzeba,
+- powiązana z realnymi procesami projektu.
 
 ## Koszty i narzędzia płatne
 
@@ -71,25 +168,8 @@ Przykłady narzędzi lub funkcji, które mogą wymagać dodatkowej weryfikacji k
 - GitHub Advanced Security,
 - CodeQL dla prywatnych repozytoriów,
 - GitHub Team rulesets dla prywatnych repozytoriów,
-- Snyk w wyższych limitach,
-- długie testy emulatorowe zużywające minuty GitHub Actions.
-
-Narzędzia aktualnie używane w darmowym zakresie:
-
-- GitHub Actions w ramach dostępnych minut,
-- Gitleaks CLI,
-- Android Lint,
-- Gradle unit tests.
-
-## Manualna ochrona `main`
-
-Ponieważ egzekwowane rulesety dla prywatnego repo mogą wymagać płatnego planu, obowiązuje manualna zasada:
-
-1. Tworzymy branch roboczy.
-2. Otwieramy pull request do `main`.
-3. Czekamy na wynik `Android CI`.
-4. Jeśli `Android CI` jest zielony, można mergować.
-5. Jeśli `Android CI` jest czerwony, najpierw naprawiamy problem.
+- długie testy emulatorowe zużywające minuty GitHub Actions,
+- dodatkowe usługi Firebase albo Google Maps.
 
 ## Zalecany merge method
 
