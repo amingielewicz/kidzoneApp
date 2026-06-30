@@ -1,11 +1,12 @@
 package com.kidzone.presentation.auth
 
+import com.kidzone.R
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
-import com.kidzone.utils.SERVER_TEMPORARY_ERROR_MESSAGE
+import com.kidzone.utils.UiText
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -118,7 +119,8 @@ class LoginViewModelTest {
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertEquals("Wypełnij e-mail i hasło", state.message)
+            assertTrue(state.message is UiText.StringResource)
+            assertEquals(R.string.login_validation_empty, (state.message as UiText.StringResource).resId)
             assertTrue(state.isMessageError)
             assertFalse(state.isSignedIn)
         }
@@ -130,7 +132,8 @@ class LoginViewModelTest {
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertEquals("Wypełnij e-mail i hasło", state.message)
+            assertTrue(state.message is UiText.StringResource)
+            assertEquals(R.string.login_validation_empty, (state.message as UiText.StringResource).resId)
             assertTrue(state.isMessageError)
         }
 
@@ -292,7 +295,8 @@ class LoginViewModelTest {
 
             val state = viewModel.uiState.value
             assertTrue(state.isMessageError)
-            assertEquals("Wpisz e-mail w polu wyżej, żeby zresetować hasło", state.message)
+            assertTrue(state.message is UiText.StringResource)
+            assertEquals(R.string.forgot_password_hint, (state.message as UiText.StringResource).resId)
         }
 
         @Test
@@ -305,7 +309,9 @@ class LoginViewModelTest {
 
             val state = viewModel.uiState.value
             assertFalse(state.isMessageError)
-            assertTrue(state.message!!.contains("user@test.com"))
+            assertTrue(state.message is UiText.StringResource)
+            assertEquals(R.string.password_reset_sent, (state.message as UiText.StringResource).resId)
+            assertEquals("user@test.com", (state.message as UiText.StringResource).args[0])
             assertFalse(state.isLoading)
         }
 
@@ -374,7 +380,8 @@ class LoginViewModelTest {
             val state = viewModel.uiState.value
             assertFalse(state.isMessageError)
             assertFalse(state.showResendVerification)
-            assertTrue(state.message!!.contains("wysłany"))
+            assertTrue(state.message is UiText.StringResource)
+            assertEquals(R.string.verification_email_sent, (state.message as UiText.StringResource).resId)
         }
 
         @Test
@@ -389,7 +396,8 @@ class LoginViewModelTest {
 
             val state = viewModel.uiState.value
             assertTrue(state.isMessageError)
-            assertTrue(state.message!!.contains(SERVER_TEMPORARY_ERROR_MESSAGE))
+            assertTrue(state.message is UiText.StringResource)
+            assertEquals(R.string.verification_email_error, (state.message as UiText.StringResource).resId)
         }
     }
 
@@ -400,11 +408,13 @@ class LoginViewModelTest {
     @Test
     fun `showInlineMessage sets message and isError flag`() {
         viewModel.showInlineMessage("Test error", isError = true)
-        assertEquals("Test error", viewModel.uiState.value.message)
+        assertTrue(viewModel.uiState.value.message is UiText.DynamicString)
+        assertEquals("Test error", (viewModel.uiState.value.message as UiText.DynamicString).value)
         assertTrue(viewModel.uiState.value.isMessageError)
 
         viewModel.showInlineMessage("Test info", isError = false)
-        assertEquals("Test info", viewModel.uiState.value.message)
+        assertTrue(viewModel.uiState.value.message is UiText.DynamicString)
+        assertEquals("Test info", (viewModel.uiState.value.message as UiText.DynamicString).value)
         assertFalse(viewModel.uiState.value.isMessageError)
     }
 }

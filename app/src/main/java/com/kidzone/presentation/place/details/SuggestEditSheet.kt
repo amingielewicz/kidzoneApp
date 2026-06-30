@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import com.kidzone.R
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
@@ -67,14 +68,13 @@ fun SuggestEditSheet(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                text = "Zaproponuj zmian\u0119",
+                text = stringResource(R.string.suggest_edit),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Zmie\u0144 dane, kt\u00F3re uwa\u017Casz za nieprawid\u0142owe. " +
-                    "Propozycja zostanie wys\u0142ana do weryfikacji.",
+                text = stringResource(R.string.suggest_edit_subtitle),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -84,7 +84,7 @@ fun SuggestEditSheet(
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it.take(PLACE_NAME_MAX_LENGTH) },
-                label = { Text("Nazwa miejsca") },
+                label = { Text(stringResource(R.string.place_name_label)) },
                 singleLine = true,
                 supportingText = {
                     Text("${name.length}/$PLACE_NAME_MAX_LENGTH")
@@ -98,7 +98,7 @@ fun SuggestEditSheet(
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = { Text("Opis") },
+                label = { Text(stringResource(R.string.place_description_label)) },
                 minLines = 2,
                 maxLines = 4,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
@@ -115,7 +115,7 @@ fun SuggestEditSheet(
             Spacer(Modifier.height(12.dp))
 
             Text(
-                text = "Udogodnienia",
+                text = stringResource(R.string.amenities_label),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )
@@ -154,7 +154,7 @@ fun SuggestEditSheet(
                     .fillMaxWidth()
                     .height(48.dp)
             ) {
-                Text("Wy\u015Blij propozycj\u0119 zmiany")
+                Text(stringResource(R.string.submit_suggested_edit))
             }
 
             Spacer(Modifier.height(16.dp))
@@ -179,7 +179,7 @@ private fun CategoryDropdownSuggest(
             value = stringResource(selected.labelRes),
             onValueChange = {},
             readOnly = true,
-            label = { Text("Kategoria") },
+            label = { Text(stringResource(R.string.category_label)) },
             leadingIcon = {
                 Icon(
                     imageVector = selectedStyle.icon,

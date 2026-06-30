@@ -47,8 +47,8 @@ import javax.inject.Singleton
  * bogato odczytywac (avatar, statystyki) bez polegania wylacznie na
  * FirebaseUser.
  */
-@Singleton
 @Suppress("LargeClass")
+@Singleton
 class FirebaseAuthRepository @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
@@ -253,6 +253,11 @@ class FirebaseAuthRepository @Inject constructor(
         }
         firebaseAuth.signOut()
         clearWidgetLocationState()
+    }
+
+    override suspend fun refreshUser(): OpResult<Unit> = runFirebase {
+        firebaseAuth.currentUser?.reload()?.await()
+        Unit
     }
 
     override suspend fun getUserById(userId: String): OpResult<User> = try {

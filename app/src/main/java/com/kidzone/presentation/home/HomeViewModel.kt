@@ -8,8 +8,9 @@ import com.kidzone.data.remote.PerformanceConfigProvider
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.service.LocationProvider
-import com.kidzone.presentation.place.add.LOCATION_TIMEOUT_USER_MESSAGE
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.UiText
+import com.kidzone.utils.toPlacesErrorMessage
 import com.kidzone.widget.NearbyPlacesWidget
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -73,7 +74,7 @@ class HomeViewModel @Inject constructor(
         val isRecentlyAddedLoading: Boolean = false,
         val isRefreshing: Boolean = false,
         val locationGranted: Boolean = false,
-        val errorMessage: String? = null,
+        val errorMessage: UiText? = null,
         /** true gdy GPS jest włączony ale lokalizacja jeszcze nie ustalona (trwa retry). */
         val isAcquiringLocation: Boolean = false
     )
@@ -132,7 +133,7 @@ class HomeViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isRefreshing = false,
-                        errorMessage = LOCATION_TIMEOUT_USER_MESSAGE
+                        errorMessage = UiText.StringResource(com.kidzone.R.string.error_location_timeout)
                     )
                 }
                 return@launch
@@ -167,8 +168,9 @@ class HomeViewModel @Inject constructor(
                 is OpResult.Failure -> _uiState.update {
                     it.copy(
                         isRefreshing = false,
-                        errorMessage = result.error.message
-                            ?: "Nie udało się wczytać miejsc w pobliżu"
+                        errorMessage = result.error.toPlacesErrorMessage(
+                            UiText.StringResource(com.kidzone.R.string.error_fetch_places)
+                        )
                     )
                 }
             }
@@ -221,7 +223,7 @@ class HomeViewModel @Inject constructor(
                         topPlaces = emptyList(),
                         nearbyPlaces = emptyList(),
                         recentlyAddedPlaces = emptyList(),
-                        errorMessage = LOCATION_TIMEOUT_USER_MESSAGE
+                        errorMessage = UiText.StringResource(com.kidzone.R.string.error_location_timeout)
                     )
                 }
                 return@launch
@@ -263,8 +265,9 @@ class HomeViewModel @Inject constructor(
                         isTopLoading = false,
                         isNearbyLoading = false,
                         isRecentlyAddedLoading = false,
-                        errorMessage = result.error.message
-                            ?: "Nie udało się wczytać miejsc w pobliżu"
+                        errorMessage = result.error.toPlacesErrorMessage(
+                            UiText.StringResource(com.kidzone.R.string.error_fetch_places)
+                        )
                     )
                 }
             }

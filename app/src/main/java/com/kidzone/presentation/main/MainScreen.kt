@@ -192,7 +192,7 @@ fun MainScreen(
                 launchSingleTop = true
                 restoreState = true
             }
-            Toast.makeText(context, "Dodano nowe miejsce", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.place_added_success), Toast.LENGTH_SHORT).show()
             onFocusConsumed()
         }
     }
@@ -270,9 +270,9 @@ fun MainScreen(
             if (showNotificationRationale) {
                 PermissionRationaleBanner(
                     rationale = PermissionRationale(
-                        title = "Włącz powiadomienia",
-                        message = "Damy znać o nowych odznakach, odpowiedziach i ważnych zmianach w Twoich miejscach.",
-                        primaryActionLabel = "Włącz"
+                        title = stringResource(R.string.notification_permission_title),
+                        message = stringResource(R.string.notification_permission_message),
+                        primaryActionLabel = stringResource(R.string.enable)
                     ),
                     onPrimaryAction = {
                         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -284,9 +284,9 @@ fun MainScreen(
             if (showLocationRationale) {
                 PermissionRationaleBanner(
                     rationale = PermissionRationale(
-                        title = "Udostępnij lokalizację",
-                        message = "Pokażemy miejsca blisko Ciebie, odległości na Start i wygodniej wycentrujemy mapę.",
-                        primaryActionLabel = "Pozwól"
+                        title = stringResource(R.string.location_permission_title),
+                        message = stringResource(R.string.location_permission_message),
+                        primaryActionLabel = stringResource(R.string.allow)
                     ),
                     onPrimaryAction = {
                         locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -407,7 +407,7 @@ private fun PermissionRationaleBanner(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text("Później")
+                    Text(stringResource(R.string.later))
                 }
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = onPrimaryAction) {

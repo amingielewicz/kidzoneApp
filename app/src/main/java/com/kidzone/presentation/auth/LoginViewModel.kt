@@ -2,10 +2,11 @@ package com.kidzone.presentation.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kidzone.R
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
-import com.kidzone.utils.SERVER_TEMPORARY_ERROR_MESSAGE
+import com.kidzone.utils.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,10 +17,6 @@ import javax.inject.Inject
 
 /**
  * ViewModel ekranu logowania.
- *
- * Trzyma stan formularza ([UiState]), dyspozycjonuje akcje użytkownika
- * (zaloguj, reset hasła) i tłumaczy błędy z [AuthException] na czytelne
- * komunikaty po polsku.
  */
 @HiltViewModel
 class LoginViewModel @Inject constructor(
@@ -28,28 +25,18 @@ class LoginViewModel @Inject constructor(
 
     /**
      * Stan UI logowania.
-     *
-     * @property email aktualna wartość pola e-mail
-     * @property password aktualna wartość pola hasło
-     * @property isLoading czy trwa request do Firebase
-     * @property message komunikat do pokazania użytkownikowi (błąd lub info)
-     * @property isMessageError true gdy [message] jest błędem (kolor czerwony),
-     *           false gdy informacja (np. "wysłano link resetujący")
-     * @property isSignedIn true po pomyślnym logowaniu – sygnał dla UI by
-     *           wykonać nawigację na main
      */
     data class UiState(
         val email: String = "",
         val password: String = "",
         val isLoading: Boolean = false,
-        val message: String? = null,
+        val message: UiText? = null,
         val isMessageError: Boolean = true,
         val isSignedIn: Boolean = false,
         val showResendVerification: Boolean = false,
         val banMessage: String? = null,
         val banReason: String? = null
     ) {
-        /** Oba pola wypełnione – tylko wtedy można kliknąć "Zaloguj się". */
         val isFormValid: Boolean
             get() = email.isNotBlank() && password.isNotBlank()
     }
@@ -68,7 +55,12 @@ class LoginViewModel @Inject constructor(
     fun signIn() {
         val state = _uiState.value
         if (state.email.isBlank() || state.password.isBlank()) {
-            _uiState.update { it.copy(message = "Wypełnij e-mail i hasło", isMessageError = true) }
+            _uiState.update {
+                it.copy(
+                    message = UiText.StringResource(R.string.login_validation_empty),
+                    isMessageError = true
+                )
+            }
             return
         }
         viewModelScope.launch {
@@ -94,10 +86,6 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Wywoływane z UI po uzyskaniu idToken z Google Sign-In (Credential Manager).
-     * Przekazuje token do repo, który wymienia go na sesję FirebaseAuth.
-     */
     fun signInWithGoogle(idToken: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, message = null, banMessage = null) }
@@ -120,9 +108,8 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    /** Pokazuje użytkownikowi błąd/info pochodzący z procesu Google Sign-In w UI. */
     fun showInlineMessage(text: String, isError: Boolean = true) {
-        _uiState.update { it.copy(message = text, isMessageError = isError) }
+        _uiState.update { it.copy(message = UiText.DynamicString(text), isMessageError = isError) }
     }
 
     fun forgotPassword() {
@@ -130,7 +117,7 @@ class LoginViewModel @Inject constructor(
         if (email.isBlank()) {
             _uiState.update {
                 it.copy(
-                    message = "Wpisz e-mail w polu wyżej, żeby zresetować hasło",
+                    message = UiText.StringResource(R.string.forgot_password_hint),
                     isMessageError = true
                 )
             }
@@ -143,8 +130,7 @@ class LoginViewModel @Inject constructor(
                 when (result) {
                     is OpResult.Success -> it.copy(
                         isLoading = false,
-                        message = "Wysłaliśmy link do zresetowania hasła na $email. " +
-                            "Jeśli logowałeś/aś się przez Google, użyj przycisku \"Zaloguj się przez Google\" poniżej.",
+                        message = UiText.StringResource(R.string.password_reset_sent, email),
                         isMessageError = false
                     )
                     is OpResult.Failure -> it.copy(
@@ -157,10 +143,10 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    private fun mapError(throwable: Throwable): String = when (throwable) {
-        is AuthException.AccountBanned -> throwable.banMessage
-        is AuthException -> throwable.message ?: "Nieznany błąd"
-        else -> SERVER_TEMPORARY_ERROR_MESSAGE
+    private fun mapError(throwable: Throwable): UiText = when (throwable) {
+        is AuthException.AccountBanned -> UiText.DynamicString(throwable.banMessage)
+        is AuthException -> UiText.StringResource(throwable.messageRes)
+        else -> UiText.StringResource(R.string.error_unknown)
     }
 
     fun resendVerificationEmail() {
@@ -173,13 +159,13 @@ class LoginViewModel @Inject constructor(
                 when (result) {
                     is OpResult.Success -> it.copy(
                         isLoading = false,
-                        message = "Link weryfikacyjny wysłany ponownie. Sprawdź skrzynkę.",
+                        message = UiText.StringResource(R.string.verification_email_sent),
                         isMessageError = false,
                         showResendVerification = false
                     )
                     is OpResult.Failure -> it.copy(
                         isLoading = false,
-                        message = "Nie udało się wysłać linku: ${mapError(result.error)}",
+                        message = UiText.StringResource(R.string.verification_email_error),
                         isMessageError = true
                     )
                 }

@@ -1,11 +1,12 @@
 package com.kidzone.presentation.auth
 
+import com.kidzone.R
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
-import com.kidzone.utils.PasswordPolicy
+import com.kidzone.utils.UiText
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -157,7 +158,9 @@ class RegisterViewModelTest {
             viewModel.register()
             advanceUntilIdle()
 
-            assertEquals("Podaj imię / nazwę użytkownika", viewModel.uiState.value.errorMessage)
+            val state = viewModel.uiState.value
+            assertTrue(state.errorMessage is UiText.StringResource)
+            assertEquals(R.string.error_enter_username, (state.errorMessage as UiText.StringResource).resId)
         }
 
         @Test
@@ -167,7 +170,9 @@ class RegisterViewModelTest {
             viewModel.register()
             advanceUntilIdle()
 
-            assertEquals("Podaj e-mail", viewModel.uiState.value.errorMessage)
+            val state = viewModel.uiState.value
+            assertTrue(state.errorMessage is UiText.StringResource)
+            assertEquals(R.string.error_enter_email, (state.errorMessage as UiText.StringResource).resId)
         }
 
         @Test
@@ -177,7 +182,9 @@ class RegisterViewModelTest {
             viewModel.register()
             advanceUntilIdle()
 
-            assertEquals("Podaj hasło", viewModel.uiState.value.errorMessage)
+            val state = viewModel.uiState.value
+            assertTrue(state.errorMessage is UiText.StringResource)
+            assertEquals(R.string.error_enter_password, (state.errorMessage as UiText.StringResource).resId)
         }
 
         @Test
@@ -188,7 +195,9 @@ class RegisterViewModelTest {
             viewModel.register()
             advanceUntilIdle()
 
-            assertEquals(PasswordPolicy.DEFAULT_ERROR_MESSAGE, viewModel.uiState.value.errorMessage)
+            val state = viewModel.uiState.value
+            assertTrue(state.errorMessage is UiText.StringResource)
+            assertEquals(R.string.error_weak_password, (state.errorMessage as UiText.StringResource).resId)
         }
 
         @Test
@@ -205,8 +214,8 @@ class RegisterViewModelTest {
 
             val state = viewModel.uiState.value
             assertTrue(state.isRegistered)
-            assertNotNull(state.successMessage)
-            assertTrue(state.successMessage!!.contains("Konto utworzone"))
+            assertTrue(state.successMessage is UiText.StringResource)
+            assertEquals(R.string.register_success_message, (state.successMessage as UiText.StringResource).resId)
             assertFalse(state.isLoading)
             assertNull(state.errorMessage)
         }
@@ -266,8 +275,8 @@ class RegisterViewModelTest {
 
             val state = viewModel.uiState.value
             assertFalse(state.isRegistered)
-            assertNotNull(state.errorMessage)
-            assertTrue(state.errorMessage!!.contains("istnieje"))
+            assertTrue(state.errorMessage is UiText.StringResource)
+            assertEquals(R.string.error_email_already_in_use, (state.errorMessage as UiText.StringResource).resId)
         }
 
         @Test
@@ -283,7 +292,8 @@ class RegisterViewModelTest {
 
             val state = viewModel.uiState.value
             assertFalse(state.isRegistered)
-            assertTrue(state.errorMessage!!.contains("zajęta"))
+            assertTrue(state.errorMessage is UiText.StringResource)
+            assertEquals(R.string.error_username_taken, (state.errorMessage as UiText.StringResource).resId)
         }
 
         @Test
@@ -314,7 +324,8 @@ class RegisterViewModelTest {
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertEquals("Błąd połączenia z serwerem. Spróbuj ponownie.", state.errorMessage)
+            assertTrue(state.errorMessage is UiText.StringResource)
+            assertEquals(R.string.error_network, (state.errorMessage as UiText.StringResource).resId)
             assertFalse(state.isRegistered)
         }
     }

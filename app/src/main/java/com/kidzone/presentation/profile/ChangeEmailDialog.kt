@@ -1,5 +1,6 @@
 package com.kidzone.presentation.profile
 
+import android.util.Patterns
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,38 +21,29 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import android.util.Patterns
+import com.kidzone.R
+import com.kidzone.utils.UiText
 
 /**
  * Dialog zmiany adresu e-mail.
- *
- * Pola:
- *  - nowy adres e-mail (walidowany formatem przez [Patterns.EMAIL_ADDRESS]),
- *  - aktualne hasło (do reauth).
- *
- * **UWAGA**: po sukcesie e-mail nie zostaje natychmiast zmieniony. Firebase
- * wysyła link weryfikacyjny na nowy adres – dopiero kliknięcie linku
- * finalizuje zmianę. ProfileViewModel pokazuje o tym snackowy info
- * ("Sprawdź skrzynkę..."). Dialog tylko zamyka się po pomyślnym wysłaniu
- * linku.
- *
- * Aktualny e-mail pokazujemy jako wspierające info nad polami – żeby
- * user widział co aktualnie ma, zanim zacznie wpisywać nowy.
  */
+@Suppress("LongMethod", "CyclomaticComplexMethod", "FunctionNaming")
 @Composable
 fun ChangeEmailDialog(
     currentEmail: String,
     isInProgress: Boolean,
-    errorMessage: String?,
+    errorMessage: UiText?,
     onDismiss: () -> Unit,
-    onConfirm: (currentPassword: String, newEmail: String) -> Unit
+    onConfirm: (currentPassword: String, newEmail: String) -> Unit,
 ) {
     var newEmail by rememberSaveable { mutableStateOf("") }
     var currentPassword by rememberSaveable { mutableStateOf("") }
@@ -66,68 +58,72 @@ fun ChangeEmailDialog(
 
     AlertDialog(
         onDismissRequest = { if (!isInProgress) onDismiss() },
-        title = { Text("Zmiana adresu e-mail") },
+        title = { Text(stringResource(R.string.change_email_title)) },
         text = {
             Column {
                 if (currentEmail.isNotBlank()) {
                     Text(
-                        text = "Aktualny adres: $currentEmail",
+                        text = stringResource(R.string.current_email_label, currentEmail),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(8.dp))
                 }
                 OutlinedTextField(
                     value = newEmail,
                     onValueChange = { newEmail = it.trim() },
-                    label = { Text("Nowy adres e-mail") },
+                    label = { Text(stringResource(R.string.new_email_label)) },
                     singleLine = true,
                     isError = emailFormatInvalid || sameAsCurrent,
                     enabled = !isInProgress,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     supportingText = {
                         when {
-                            newEmail.isBlank() -> Text("Pole wymagane")
-                            emailFormatInvalid -> Text("Niepoprawny format adresu")
-                            sameAsCurrent -> Text("To jest Twój aktualny adres")
-                            else -> Text("Wyślemy link weryfikacyjny na nowy adres")
+                            newEmail.isBlank() -> Text(stringResource(R.string.field_required))
+                            emailFormatInvalid -> Text(stringResource(R.string.invalid_email_format))
+                            sameAsCurrent -> Text(stringResource(R.string.email_already_set))
+                            else -> Text(stringResource(R.string.email_verification_hint))
                         }
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = currentPassword,
                     onValueChange = { currentPassword = it },
-                    label = { Text("Aktualne hasło") },
+                    label = { Text(stringResource(R.string.current_password)) },
                     singleLine = true,
                     enabled = !isInProgress,
                     visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     supportingText = {
                         if (currentPassword.isBlank()) {
-                            Text("Pole wymagane")
+                            Text(stringResource(R.string.field_required))
                         }
                     },
                     trailingIcon = {
                         IconButton(
                             onClick = { showPassword = !showPassword },
-                            enabled = !isInProgress
+                            enabled = !isInProgress,
                         ) {
                             Icon(
                                 imageVector = if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                contentDescription = if (showPassword) "Ukryj hasło" else "Pokaż hasło"
+                                contentDescription = if (showPassword) {
+                                    stringResource(R.string.hide_password)
+                                } else {
+                                    stringResource(R.string.show_password)
+                                },
                             )
                         }
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 if (errorMessage != null) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = errorMessage,
+                        text = errorMessage.asString(),
                         color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
@@ -135,25 +131,25 @@ fun ChangeEmailDialog(
         confirmButton = {
             TextButton(
                 onClick = { onConfirm(currentPassword, newEmail) },
-                enabled = isFormValid && !isInProgress
+                enabled = isFormValid && !isInProgress,
             ) {
                 if (isInProgress) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp
+                        strokeWidth = 2.dp,
                     )
                 } else {
-                    Text("Wyślij link")
+                    Text(stringResource(R.string.send_link))
                 }
             }
         },
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                enabled = !isInProgress
+                enabled = !isInProgress,
             ) {
-                Text("Anuluj")
+                Text(stringResource(R.string.cancel))
             }
-        }
+        },
     )
 }

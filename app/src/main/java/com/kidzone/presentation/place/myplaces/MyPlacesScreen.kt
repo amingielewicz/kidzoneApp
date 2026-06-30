@@ -36,10 +36,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.kidzone.R
 import com.kidzone.domain.model.Place
 import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
@@ -48,18 +50,6 @@ import com.kidzone.presentation.common.KidZoneSpacing
 
 /**
  * Lista miejsc dodanych przez aktualnie zalogowanego usera.
- *
- * Karty są takim samym wzorcem co w [com.kidzone.presentation.place.list.PlaceListScreen],
- * ale prostszym: bez filtrów (kategorii, udogodnień), bez bottom nav-u.
- * Świadomie zduplikowaliśmy komponent karty zamiast wyciągać go do
- * `presentation/common`, bo karta na PlaceListScreen ma już dziwną
- * logikę (gwiazdka tylko gdy reviewsCount>0) i wyciąganie zwiększyłoby
- * powierzchnię publicznego API komponentu o flagi sterujące. Na 2 użycia
- * "rule of three" jeszcze nie zadziałała.
- *
- * Edycja / usuwanie miejsca odbywa się z poziomu [PlaceDetailsScreen],
- * dokąd nawigujemy po kliknięciu karty. Nie duplikujemy DropdownMenu
- * "Edytuj/Usuń" tutaj.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -75,12 +65,12 @@ fun MyPlacesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Moje miejsca") },
+                title = { Text(stringResource(R.string.my_places)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Wstecz"
+                            contentDescription = stringResource(R.string.back)
                         )
                     }
                 }
@@ -149,15 +139,16 @@ private fun EmptyState() {
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "Nie dodałaś/eś jeszcze żadnego miejsca",
+            text = stringResource(R.string.empty_title_added_by_me_logged_in),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "Użyj przycisku „Dodaj miejsce” na ekranie głównym, by dodać pierwszą lokalizację.",
+            text = stringResource(R.string.empty_my_places_subtitle),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
     }
 }
@@ -174,7 +165,7 @@ private fun MyPlaceCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(
-                onClickLabel = "Otwórz szczegóły miejsca",
+                onClickLabel = stringResource(R.string.map_open_place_details_label),
                 role = Role.Button,
                 onClick = onClick
             )

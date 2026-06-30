@@ -6,7 +6,6 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,39 +41,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.kidzone.R
+import com.kidzone.utils.UiText
 import kotlinx.coroutines.launch
 
 /**
  * Modal bottom sheet z formularzem edycji profilu.
- *
- * Pola:
- *  - Avatar – klikalny, wybór z galerii przez nowy
- *    [ActivityResultContracts.PickVisualMedia]. Działa od Androida 4.4
- *    (compat-mode w starszych systemach), nie wymaga żadnych uprawnień
- *    runtime'owych. Dopóki user nie wybierze nowego zdjęcia, pokazuje
- *    obecny [currentAvatarUrl].
- *  - Login (nick) – wymagany, używany jako autor opinii i miejsc.
- *  - Imię, Nazwisko – opcjonalne dane osobowe.
- *
- * Sheet sam **nie wykonuje** zapisu ani uploadu – woła [onSave] z lokalnymi
- * wartościami i ewentualnym [Uri] nowego avatara. ProfileViewModel
- * wykonuje upload + Firestore write i zarządza spinnerem przez
- * [isSaving]. Błąd zapisu prezentujemy jako [errorMessage] u dołu –
- * sheet pozostaje otwarty, użytkownik może spróbować ponownie.
- *
- * Rotacja: dane formularza są trzymane w `rememberSaveable`, więc obrót
- * ekranu w trakcie edycji nie zgubi wpisanych wartości. `pendingAvatarUri`
- * NIE jest saveable (zwykłe `remember`), bo lokalny URI z Photo Pickera
- * traci uprawnienie po zniszczeniu Activity – zachowanie go między
- * rotacjami i tak nic by nie dało.
  */
+@Suppress("LongParameterList", "LongMethod", "FunctionNaming")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProfileSheet(
@@ -83,14 +67,13 @@ fun EditProfileSheet(
     initialLastName: String,
     currentAvatarUrl: String?,
     isSaving: Boolean,
-    errorMessage: String?,
+    errorMessage: UiText?,
     onDismiss: () -> Unit,
-    onSave: (displayName: String, firstName: String, lastName: String, newAvatarUri: Uri?) -> Unit
+    onSave: (displayName: String, firstName: String, lastName: String, newAvatarUri: Uri?) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
-    // Stan formularza – saveable, żeby przeżył rotację.
     var displayName by rememberSaveable(initialDisplayName) {
         mutableStateOf(initialDisplayName)
     }
@@ -100,137 +83,118 @@ fun EditProfileSheet(
     var lastName by rememberSaveable(initialLastName) {
         mutableStateOf(initialLastName)
     }
-    // Lokalnie wybrany avatar – jeszcze nie wgrany. Tracimy go po
-    // dismissie sheet'a (intencjonalnie – Cancel = wyrzuć wybór).
     var pendingAvatarUri by remember { mutableStateOf<Uri?>(null) }
 
-    // Modern photo picker – brak konieczności pytania o READ_MEDIA_IMAGES.
     val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
+        contract = ActivityResultContracts.PickVisualMedia(),
     ) { uri: Uri? ->
-        if (uri != null) {
-            pendingAvatarUri = uri
-        }
+        uri?.let { pendingAvatarUri = it }
     }
 
-    // Walidacja: login (display name) jest wymagany. Imię/nazwisko mogą
-    // być puste – traktujemy je jako opcjonalne pola personalne.
     val isFormValid = displayName.trim().isNotBlank()
 
     ModalBottomSheet(
         onDismissRequest = {
-            // W trakcie zapisu nie pozwalamy zamknąć (uniknij gubienia
-            // spinnera / nieoczekiwanego dismissa), użytkownik widzi
-            // "Zapisywanie..." i czeka.
             if (!isSaving) onDismiss()
         },
-        sheetState = sheetState
+        sheetState = sheetState,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 24.dp)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(rememberScrollState()),
         ) {
             Text(
-                text = "Edytuj profil",
+                text = stringResource(R.string.edit_profile),
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(16.dp))
 
-            // --- Avatar (klikalny, otwiera photo picker) ---
             Box(
                 modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 AvatarPicker(
                     pendingUri = pendingAvatarUri,
                     fallbackUrl = currentAvatarUrl,
                     enabled = !isSaving,
-                    onClick = {
-                        photoPickerLauncher.launch(
-                            PickVisualMediaRequest(
-                                ActivityResultContracts.PickVisualMedia.ImageOnly
-                            )
-                        )
-                    }
-                )
+                ) {
+                    photoPickerLauncher.launch(
+                        PickVisualMediaRequest(
+                            ActivityResultContracts.PickVisualMedia.ImageOnly,
+                        ),
+                    )
+                }
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "Kliknij avatar, by zmienić zdjęcie",
+                text = stringResource(R.string.click_to_change_avatar),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 4.dp),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                textAlign = TextAlign.Center,
             )
 
             Spacer(Modifier.height(20.dp))
 
-            // --- Login (publiczny nick) ---
             OutlinedTextField(
                 value = displayName,
                 onValueChange = { displayName = it },
-                label = { RequiredFieldLabel("Login (publiczny nick)") },
+                label = { RequiredFieldLabel(stringResource(R.string.login_nick_label)) },
                 supportingText = {
                     if (displayName.isBlank()) {
-                        Text("Pole wymagane")
+                        Text(stringResource(R.string.field_required))
                     } else {
-                        Text("Widoczny w opiniach, miejscach i rankingu")
+                        Text(stringResource(R.string.username_helper))
                     }
                 },
                 singleLine = true,
-                isError = displayName.isNotEmpty() && displayName.isBlank(),
+                isError = displayName.trim().isEmpty(),
                 enabled = !isSaving,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
 
             Spacer(Modifier.height(8.dp))
 
-            // --- Imię ---
             OutlinedTextField(
                 value = firstName,
                 onValueChange = { firstName = it },
-                label = { Text("Imię") },
+                label = { Text(stringResource(R.string.first_name)) },
                 singleLine = true,
                 enabled = !isSaving,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
 
             Spacer(Modifier.height(8.dp))
 
-            // --- Nazwisko ---
             OutlinedTextField(
                 value = lastName,
                 onValueChange = { lastName = it },
-                label = { Text("Nazwisko") },
+                label = { Text(stringResource(R.string.last_name)) },
                 singleLine = true,
                 enabled = !isSaving,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
 
             errorMessage?.let { msg ->
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = msg,
+                    text = msg.asString(),
                     color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
 
             Spacer(Modifier.height(20.dp))
 
-            // --- Akcje (Anuluj / Zapisz) ---
             Row(modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(
                     onClick = {
-                        // Wykorzystujemy `scope` z rememberCoroutineScope,
-                        // żeby gładko zamknąć animację sheet'a przed
-                        // wywołaniem callbacku rodzica.
                         scope.launch {
                             sheetState.hide()
                         }.invokeOnCompletion { onDismiss() }
@@ -238,9 +202,9 @@ fun EditProfileSheet(
                     enabled = !isSaving,
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp)
+                        .height(48.dp),
                 ) {
-                    Text("Anuluj")
+                    Text(stringResource(R.string.cancel))
                 }
                 Spacer(Modifier.width(8.dp))
                 Button(
@@ -249,22 +213,22 @@ fun EditProfileSheet(
                             displayName.trim(),
                             firstName.trim(),
                             lastName.trim(),
-                            pendingAvatarUri
+                            pendingAvatarUri,
                         )
                     },
                     enabled = !isSaving && isFormValid,
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp)
+                        .height(48.dp),
                 ) {
                     if (isSaving) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
                             strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary
+                            color = MaterialTheme.colorScheme.onPrimary,
                         )
                     } else {
-                        Text("Zapisz")
+                        Text(stringResource(R.string.save_changes))
                     }
                 }
             }
@@ -272,19 +236,13 @@ fun EditProfileSheet(
     }
 }
 
-/**
- * Klikalny okrągły avatar z lekkim badge'em "kamerki" w prawym dolnym
- * rogu – sygnalizuje, że da się go wymienić. Priorytet źródła obrazu:
- * 1. [pendingUri] – właśnie wybrane lokalnie (jeszcze nie wgrane do Storage),
- * 2. [fallbackUrl] – aktualny avatar usera z Firestore,
- * 3. placeholder – ikona aparatu na tle primary container.
- */
+@Suppress("FunctionNaming")
 @Composable
 private fun AvatarPicker(
     pendingUri: Uri?,
     fallbackUrl: String?,
     enabled: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     val avatarSize = 96.dp
     Box(modifier = Modifier.size(avatarSize)) {
@@ -293,60 +251,66 @@ private fun AvatarPicker(
                 .size(avatarSize)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primaryContainer)
-                .clickable(enabled = enabled, onClickLabel = "Zmień avatar", role = Role.Button, onClick = onClick),
-            contentAlignment = Alignment.Center
+                .clickable(
+                    enabled = enabled,
+                    onClickLabel = stringResource(R.string.change_avatar_label),
+                    role = Role.Button,
+                    onClick = onClick,
+                ),
+            contentAlignment = Alignment.Center,
         ) {
-            when {
-                pendingUri != null -> {
-                    AsyncImage(
-                        model = pendingUri,
-                        contentDescription = "Wybrany avatar",
-                        modifier = Modifier
-                            .size(avatarSize)
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-                !fallbackUrl.isNullOrBlank() -> {
-                    AsyncImage(
-                        model = fallbackUrl,
-                        contentDescription = "Aktualny avatar",
-                        modifier = Modifier
-                            .size(avatarSize)
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-                else -> {
-                    Icon(
-                        imageVector = Icons.Filled.PhotoCamera,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(40.dp)
-                    )
-                }
-            }
+            AvatarImageContent(pendingUri, fallbackUrl, avatarSize)
         }
-        // Mały "FAB-like" badge z ikoną kamerki – afordancja "klikalne".
         Box(
             modifier = Modifier
                 .size(28.dp)
                 .align(Alignment.BottomEnd)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primary),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Filled.PhotoCamera,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(16.dp),
             )
         }
     }
 }
 
-/** Etykieta wymaganego pola – tekst + czerwona gwiazdka (spójnie z RegisterScreen). */
+@Suppress("FunctionNaming")
+@Composable
+private fun AvatarImageContent(pendingUri: Uri?, fallbackUrl: String?, avatarSize: Dp) {
+    when {
+        pendingUri != null -> {
+            AsyncImage(
+                model = pendingUri,
+                contentDescription = stringResource(R.string.selected_avatar_desc),
+                modifier = Modifier.size(avatarSize).clip(CircleShape),
+                contentScale = ContentScale.Crop,
+            )
+        }
+        !fallbackUrl.isNullOrBlank() -> {
+            AsyncImage(
+                model = fallbackUrl,
+                contentDescription = stringResource(R.string.current_avatar_desc),
+                modifier = Modifier.size(avatarSize).clip(CircleShape),
+                contentScale = ContentScale.Crop,
+            )
+        }
+        else -> {
+            Icon(
+                imageVector = Icons.Filled.PhotoCamera,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(40.dp),
+            )
+        }
+    }
+}
+
+@Suppress("FunctionNaming")
 @Composable
 private fun RequiredFieldLabel(text: String) {
     val errorColor = MaterialTheme.colorScheme.error
@@ -356,6 +320,6 @@ private fun RequiredFieldLabel(text: String) {
             withStyle(SpanStyle(color = errorColor)) {
                 append(" *")
             }
-        }
+        },
     )
 }

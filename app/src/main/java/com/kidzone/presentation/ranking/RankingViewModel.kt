@@ -11,6 +11,8 @@ import com.kidzone.presentation.common.BadgeContext
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.computeBadges
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.UiText
+import com.kidzone.utils.toPlacesErrorMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -20,6 +22,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+private val RANKING_ERROR_FALLBACK = UiText.StringResource(com.kidzone.R.string.error_fetch_list)
 
 /**
  * ViewModel zakładki Ranking.
@@ -54,7 +58,7 @@ class RankingViewModel @Inject constructor(
         val topUsers: List<User> = emptyList(),
         val userBadges: Map<String, List<UserBadge>> = emptyMap(),
         val isLoading: Boolean = true,
-        val errorMessage: String? = null
+        val errorMessage: UiText? = null
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -105,12 +109,16 @@ class RankingViewModel @Inject constructor(
                 .filter { it.placesAddedCount > 0 || it.reviewsCount > 0 }
                 .take(performanceConfig.rankingTopLimit)
 
-            // Łączymy komunikaty błędów z obu fetchów – jeśli np. użytkownicy
-            // się wczytali a miejsca nie, pokażemy błąd nie tracąc danych.
-            val error = listOfNotNull(
-                (placesResult as? OpResult.Failure)?.error?.message,
-                (usersResult as? OpResult.Failure)?.error?.message
-            ).joinToString("\n").ifBlank { null }
+            // Łączymy komunikaty błędów z obu fetchów
+            val error = when {
+                placesResult is OpResult.Failure && usersResult is OpResult.Failure ->
+                    placesResult.error.toPlacesErrorMessage(RANKING_ERROR_FALLBACK)
+                placesResult is OpResult.Failure ->
+                    placesResult.error.toPlacesErrorMessage(RANKING_ERROR_FALLBACK)
+                usersResult is OpResult.Failure ->
+                    usersResult.error.toPlacesErrorMessage(RANKING_ERROR_FALLBACK)
+                else -> null
+            }
 
             // Precomputuj odznaki per user z pełnym BadgeContext (rank w
             // rankingu userów + najlepsza pozycja jakiegokolwiek miejsca

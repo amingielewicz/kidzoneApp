@@ -309,7 +309,7 @@ fun LoginScreen(
                         state.message?.let { msg ->
                             Spacer(Modifier.height(4.dp))
                             MessageBanner(
-                                text = msg,
+                                text = msg.asString(),
                                 isError = state.isMessageError
                             )
                         }

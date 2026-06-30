@@ -1,6 +1,7 @@
 package com.kidzone.presentation.profile
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,47 +25,45 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.kidzone.R
+import com.kidzone.presentation.auth.rememberGoogleSignInLauncher
+import com.kidzone.utils.UiText
 
 /**
  * Dialog potwierdzenia usunięcia konta.
- *
- * Obsługuje dwa typy kont:
- *  - **Email/password:** pole hasła dla reauth
- *  - **Google:** przycisk "Zaloguj się przez Google" (Credential Manager)
- *
- * @param isGoogleUser true gdy `signInProvider == GOOGLE`
- * @param onConfirm callback dla email/password (z hasłem)
- * @param onConfirmGoogle callback dla Google (z idToken)
  */
+@Suppress("LongParameterList", "LongMethod", "FunctionNaming")
 @Composable
 fun DeleteAccountDialog(
     placesCount: Int,
     reviewsCount: Int,
     isInProgress: Boolean,
-    errorMessage: String?,
+    errorMessage: UiText?,
     isGoogleUser: Boolean = false,
     onDismiss: () -> Unit,
     onConfirm: (currentPassword: String) -> Unit = {},
-    onConfirmGoogle: (idToken: String) -> Unit = {}
+    onConfirmGoogle: (idToken: String) -> Unit = {},
 ) {
     var password by rememberSaveable { mutableStateOf("") }
     var showPassword by rememberSaveable { mutableStateOf(false) }
     val isFormValid = if (isGoogleUser) true else password.isNotBlank()
-    val context = androidx.compose.ui.platform.LocalContext.current
 
-    // Google Sign-In launcher for reauth
     val googleSignInLauncher = if (isGoogleUser) {
-        com.kidzone.presentation.auth.rememberGoogleSignInLauncher(
+        rememberGoogleSignInLauncher(
             onTokenReceived = { idToken -> onConfirmGoogle(idToken) },
-            onError = { /* Handled by errorMessage from VM */ }
+            onError = { /* Handled by errorMessage from VM */ },
         )
-    } else null
+    } else {
+        null
+    }
 
     AlertDialog(
         onDismissRequest = { if (!isInProgress) onDismiss() },
@@ -72,53 +71,49 @@ fun DeleteAccountDialog(
             Icon(
                 imageVector = Icons.Filled.Warning,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.error
+                tint = MaterialTheme.colorScheme.error,
             )
         },
-        title = { Text("Usunąć konto?") },
+        title = { Text(stringResource(R.string.delete_account)) },
         text = {
             Column {
                 Text(
-                    text = "Operacja jest nieodwracalna. Po usunięciu konta:",
-                    style = MaterialTheme.typography.bodyMedium
+                    text = stringResource(R.string.delete_account_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.height(8.dp))
-                BulletLine(text = "Twoje dane osobowe (profil, email, avatar) zostaną usunięte")
+                BulletLine(text = stringResource(R.string.delete_account_bullet_1))
                 BulletLine(
-                    text = "Twoje opinie ($reviewsCount) zostaną zanonimizowane - " +
-                            "treść pozostanie, autor zmieni się na \"Nieaktywny użytkownik\""
-
+                    text = stringResource(R.string.delete_account_bullet_2, reviewsCount),
                 )
                 BulletLine(
-                    text = "Twoje miejsca ($placesCount) pozostaną widoczne, " +
-                        "ale bez powiązania z Twoim kontem"
+                    text = stringResource(R.string.delete_account_bullet_3, placesCount),
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "Treści tworzone przez Ciebie stanowią wartość dla społeczności " +
-                        "i pozostaną dostępne w formie zanonimizowanej (zgodnie z RODO).",
+                    text = stringResource(R.string.delete_account_gdpr_info),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(12.dp))
 
                 if (isGoogleUser) {
                     Text(
-                        text = "Zaloguj się ponownie przez Google, aby potwierdzić usunięcie konta:",
+                        text = stringResource(R.string.delete_account_confirm_google),
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
                     )
                 } else {
                     Text(
-                        text = "Wpisz aktualne hasło, aby potwierdzić:",
+                        text = stringResource(R.string.delete_account_confirm_password),
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
                     )
                     Spacer(Modifier.height(4.dp))
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
-                        label = { Text("Aktualne hasło") },
+                        label = { Text(stringResource(R.string.current_password)) },
                         singleLine = true,
                         enabled = !isInProgress,
                         visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
@@ -126,24 +121,28 @@ fun DeleteAccountDialog(
                         trailingIcon = {
                             IconButton(
                                 onClick = { showPassword = !showPassword },
-                                enabled = !isInProgress
+                                enabled = !isInProgress,
                             ) {
                                 Icon(
                                     imageVector = if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                    contentDescription = if (showPassword) "Ukryj hasło" else "Pokaż hasło"
+                                    contentDescription = if (showPassword) {
+                                        stringResource(R.string.hide_password)
+                                    } else {
+                                        stringResource(R.string.show_password)
+                                    },
                                 )
                             }
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
 
                 if (errorMessage != null) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = errorMessage,
+                        text = errorMessage.asString(),
                         color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
@@ -159,59 +158,38 @@ fun DeleteAccountDialog(
                 },
                 enabled = isFormValid && !isInProgress,
                 colors = ButtonDefaults.textButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error
-                )
+                    contentColor = MaterialTheme.colorScheme.error,
+                ),
             ) {
                 if (isInProgress) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
                         strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.error
+                        color = MaterialTheme.colorScheme.error,
                     )
                 } else {
-                    Text(if (isGoogleUser) "Potwierdź przez Google" else "Usuń konto")
+                    Text(
+                        if (isGoogleUser) stringResource(R.string.confirm_google_button)
+                        else stringResource(R.string.delete_account),
+                    )
                 }
             }
         },
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                enabled = !isInProgress
+                enabled = !isInProgress,
             ) {
-                Text("Anuluj")
+                Text(stringResource(R.string.cancel))
             }
-        }
+        },
     )
 }
 
 @Composable
 private fun BulletLine(text: String) {
-    Text(
-        text = "•  $text",
-        style = MaterialTheme.typography.bodyMedium
-    )
-}
-
-/**
- * Polska deklinacja liczebnikowa: 1 → [one], 2..4 → [few], reszta → [many].
- *
- * Reguła zgodna z Unicode CLDR `pl`:
- *  - one: n == 1
- *  - few: n%10 in 2..4 && n%100 not in 12..14
- *  - many: pozostałe
- *
- * Używane w komunikacie ostrzegawczym ("3 opinie zostaną usunięte" /
- * "5 opinii zostanie usuniętych"). Trzymane lokalnie w pliku, bo to
- * jedyne miejsce w aplikacji, gdzie tego potrzebujemy – wyciągniemy
- * do utility'ki, gdy pojawi się drugi konsument.
- */
-private fun pluralize(count: Int, one: String, few: String, many: String): String {
-    val n = kotlin.math.abs(count)
-    val mod10 = n % 10
-    val mod100 = n % 100
-    return when {
-        n == 1 -> one
-        mod10 in 2..4 && mod100 !in 12..14 -> few
-        else -> many
+    Row {
+        Text(text = "•  ", style = MaterialTheme.typography.bodyMedium)
+        Text(text = text, style = MaterialTheme.typography.bodyMedium)
     }
 }

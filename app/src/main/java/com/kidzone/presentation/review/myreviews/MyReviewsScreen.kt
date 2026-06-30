@@ -51,11 +51,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.kidzone.R
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.EmptyState as KidZoneEmptyState
 import com.kidzone.presentation.common.style
@@ -65,17 +67,6 @@ import java.util.Locale
 
 /**
  * Lista opinii wystawionych przez aktualnie zalogowanego usera.
- *
- * Każda karta:
- *  - klikalna w całości – nawiguje do [PlaceDetailsScreen],
- *  - ma overflow menu (3 kropki) z opcją "Usuń",
- *  - pokazuje nazwę miejsca, gwiazdki, fragment komentarza, datę.
- *
- * Usuwanie wymaga potwierdzenia (`AlertDialog`) – delete jest nieodwracalny
- * i wpływa na średnią ocenę miejsca, więc lepiej zapytać.
- *
- * Świadomie nie wyciągamy karty do `presentation/common` – patrz analogiczna
- * decyzja w [MyPlacesScreen].
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -92,12 +83,12 @@ fun MyReviewsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Moje opinie") },
+                title = { Text(stringResource(R.string.my_reviews)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Wstecz"
+                            contentDescription = stringResource(R.string.back)
                         )
                     }
                 }
@@ -163,8 +154,8 @@ fun MyReviewsScreen(
 private fun EmptyState() {
     KidZoneEmptyState(
         icon = Icons.Filled.RateReview,
-        title = "Nie masz jeszcze opinii",
-        message = "Otwórz dowolne miejsce z listy lub mapy i dodaj swoją pierwszą opinię."
+        title = stringResource(R.string.empty_my_reviews_title),
+        message = stringResource(R.string.empty_my_reviews_subtitle)
     )
 }
 
@@ -183,7 +174,7 @@ private fun MyReviewCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(
-                onClickLabel = "Otwórz szczegóły miejsca",
+                onClickLabel = stringResource(R.string.map_open_place_details_label),
                 role = Role.Button,
                 onClick = onClick
             ),
@@ -203,7 +194,7 @@ private fun MyReviewCard(
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = item.placeName ?: "Miejsce niedostępne",
+                        text = item.placeName ?: stringResource(R.string.place_unavailable),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         fontStyle = if (item.placeName == null) FontStyle.Italic else FontStyle.Normal,
@@ -220,7 +211,7 @@ private fun MyReviewCard(
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(
                             imageVector = Icons.Filled.MoreVert,
-                            contentDescription = "Więcej opcji"
+                            contentDescription = stringResource(R.string.more_options)
                         )
                     }
                     DropdownMenu(
@@ -228,7 +219,7 @@ private fun MyReviewCard(
                         onDismissRequest = { menuExpanded = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Usuń") },
+                            text = { Text(stringResource(R.string.delete)) },
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Filled.Delete,
@@ -282,17 +273,13 @@ private fun StarRow(rating: Int) {
     }
 }
 
-/**
- * "Dodano DD.MM.YYYY" lub "Edytowano DD.MM.YYYY" – ta druga gdy
- * `updatedAtMillis > createdAtMillis`. Spójne z konwencją w
- * PlaceDetailsScreen (label "edytowana").
- */
+@Composable
 private fun formatReviewDate(review: com.kidzone.domain.model.Review): String {
-    val formatter = SimpleDateFormat("dd.MM.yyyy", Locale("pl", "PL"))
+    val formatter = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
     return if (review.updatedAtMillis > review.createdAtMillis) {
-        "Edytowano ${formatter.format(Date(review.updatedAtMillis))}"
+        stringResource(R.string.edited_date, formatter.format(Date(review.updatedAtMillis)))
     } else {
-        "Dodano ${formatter.format(Date(review.createdAtMillis))}"
+        stringResource(R.string.added_date, formatter.format(Date(review.createdAtMillis)))
     }
 }
 
@@ -305,13 +292,10 @@ private fun ConfirmDeleteReviewDialog(
 ) {
     AlertDialog(
         onDismissRequest = { if (!isDeleting) onDismiss() },
-        title = { Text("Usunąć opinię?") },
+        title = { Text(stringResource(R.string.delete_review_title)) },
         text = {
             Column {
-                Text(
-                    "Twoja opinia zostanie trwale usunięta. Średnia ocena " +
-                        "miejsca przeliczy się na nowo."
-                )
+                Text(stringResource(R.string.delete_review_confirmation))
                 if (errorMessage != null) {
                     Spacer(Modifier.height(8.dp))
                     Text(
@@ -337,13 +321,13 @@ private fun ConfirmDeleteReviewDialog(
                         color = MaterialTheme.colorScheme.error
                     )
                 } else {
-                    Text("Usuń")
+                    Text(stringResource(R.string.delete))
                 }
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss, enabled = !isDeleting) {
-                Text("Anuluj")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
