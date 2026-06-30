@@ -14,6 +14,18 @@ Społecznościowa aplikacja mobilna dla rodziców — odkrywaj, dodawaj i ocenia
 | Node.js (Functions) | **22** |
 | Firebase CLI | najnowsza (`npm i -g firebase-tools`) |
 
+## 📚 Dokumentacja
+
+Główna dokumentacja techniczna, produktowa i release'owa znajduje się w [`docs/README.md`](./docs/README.md).
+
+Najważniejsze sekcje:
+
+- [`docs/architecture/`](./docs/architecture/) — architektura, data flow, Firebase i mapy.
+- [`docs/development/`](./docs/development/) — coding guidelines, UI/UX, performance, security i testy.
+- [`docs/product/`](./docs/product/) — checklisty UI/UX, zasady projektowe i decyzje produktowe.
+- [`docs/release/`](./docs/release/) — GO/NO-GO, release process, versioning, hotfix i Play Store.
+- [`docs/operations/`](./docs/operations/) — monitoring, Firebase operations, incident response i backupy.
+
 ## 📱 Funkcje
 
 ### Dla użytkowników:
@@ -215,7 +227,7 @@ VERSION_CODE=1
 3. Uruchom Android CI (green check)
 4. Uruchom signed release workflow
 
-Szczegóły: [docs/versioning.md](./docs/versioning.md)
+Szczegóły: [docs/release/VERSIONING.md](./docs/release/VERSIONING.md)
 
 ## 🚀 Setup
 
@@ -361,8 +373,14 @@ Szczegóły: [SECURITY_REVIEW.md](./SECURITY_REVIEW.md) • [docs/firebase-secur
 ├── gradle/libs.versions.toml     # Version catalog (all deps in one place)
 ├── version.properties            # VERSION_NAME + VERSION_CODE
 ├── detekt.yml                    # Static analysis config
-├── docs/                         # Dokumentacja dodatkowa
-│   ├── versioning.md             # Szczegóły systemu wersjonowania
+├── docs/                         # Engineering Handbook + dokumentacja dodatkowa
+│   ├── README.md                 # Indeks dokumentacji
+│   ├── architecture/             # Architektura i data flow
+│   ├── development/              # Standardy developmentu
+│   ├── operations/               # Monitoring, incident response, backups
+│   ├── product/                  # UI/UX checklisty i decyzje produktowe
+│   ├── release/                  # Release process, GO/NO-GO, versioning
+│   ├── versioning.md             # Starsze szczegóły systemu wersjonowania
 │   ├── firebase-security-plan.md # Plan bezpieczeństwa Firebase
 │   └── milestones/               # Dokumentacja kamieni milowych
 ├── firestore.rules
