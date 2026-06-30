@@ -1,5 +1,6 @@
 package com.kidzone.presentation.ranking
 
+import com.kidzone.R
 import com.kidzone.data.remote.PerformanceConfig
 import com.kidzone.data.remote.PerformanceConfigProvider
 import com.kidzone.domain.repository.AuthRepository
@@ -8,6 +9,7 @@ import com.kidzone.presentation.common.UserBadge
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.UiText
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -74,18 +76,16 @@ class RankingViewModelTest {
     }
 
     @Test
-    fun `combines repository error messages and clears loading`() = runTest {
+    fun `sets error on failure and clears loading`() = runTest {
         coEvery { placeRepository.getTopPlaces(limit = 200) } returns
             OpResult.failure(RuntimeException("places failed"))
-        coEvery { authRepository.getTopUsers(limit = 200) } returns
-            OpResult.failure(RuntimeException("users failed"))
 
         val viewModel = createViewModel()
         advanceUntilIdle()
 
         assertEquals(emptyList<Any>(), viewModel.uiState.value.topPlaces)
-        assertEquals(emptyList<Any>(), viewModel.uiState.value.topUsers)
-        assertEquals("places failed\nusers failed", viewModel.uiState.value.errorMessage)
+        assertTrue(viewModel.uiState.value.errorMessage is UiText.StringResource)
+        assertEquals(R.string.error_fetch_list, (viewModel.uiState.value.errorMessage as UiText.StringResource).resId)
         assertFalse(viewModel.uiState.value.isLoading)
     }
 

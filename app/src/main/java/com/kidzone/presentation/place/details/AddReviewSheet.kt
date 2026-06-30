@@ -41,7 +41,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -59,12 +58,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
+import com.kidzone.R
 import kotlinx.coroutines.launch
 import java.io.File
 import java.security.MessageDigest
@@ -78,9 +79,7 @@ private const val COMMENT_MAX_LENGTH = 1000
 private const val MAX_REVIEW_PHOTOS = 3
 
 /**
- * Oblicza MD5 hash zawartości URI. Czyta cały strumień (nie tylko 64KB),
- * żeby uniknąć false-negatives na zdjęciach z identycznym nagłówkiem.
- * Zwraca null gdy nie udało się odczytać contentu.
+ * Oblicza MD5 hash zawartości URI.
  */
 private fun computeContentHash(context: Context, uri: Uri): String? {
     return try {
@@ -99,10 +98,7 @@ private fun computeContentHash(context: Context, uri: Uri): String? {
 }
 
 /**
- * Pobiera zdjęcie z remote URL (Firebase Storage) i oblicza MD5 hash.
- * Używane do seedowania hashów istniejących zdjęć przy edycji opinii/miejsca,
- * żeby user nie mógł dodać duplikatu z galerii.
- * Wywołuj na Dispatchers.IO.
+ * Pobiera zdjęcie z remote URL i oblicza MD5 hash.
  */
 private fun computeRemoteContentHash(url: String): String? {
     return try {
@@ -124,8 +120,7 @@ private fun computeRemoteContentHash(url: String): String? {
 }
 
 /**
- * Tworzy tymczasowy plik w cache i zwraca content URI przez FileProvider.
- * Plik jest tworzony na dysku (createNewFile), więc FileProvider nie rzuci.
+ * Tworzy tymczasowy plik w cache i zwraca content URI.
  */
 private fun createTempCameraUri(context: Context): Uri {
     val photoFile = File.createTempFile(
@@ -167,13 +162,9 @@ fun AddReviewSheet(
     var existingPhotoUrls by rememberSaveable(initialPhotoUrls) {
         mutableStateOf(initialPhotoUrls)
     }
-    // Hash set przechowywany jako List<String> żeby był Parcelable-friendly
-    // (rememberSaveable wymaga serializowalności).
     var photoHashList by rememberSaveable { mutableStateOf(listOf<String>()) }
     var hashesReady by remember { mutableStateOf(initialPhotoUrls.isEmpty()) }
 
-    // Seeduj hashe z istniejących remote URLs przy edycji, żeby nie dało się
-    // dodać duplikatu (to samo zdjęcie z galerii co już jest w opinii).
     androidx.compose.runtime.LaunchedEffect(initialPhotoUrls) {
         if (initialPhotoUrls.isNotEmpty() && photoHashList.isEmpty()) {
             val hashes = mutableListOf<String>()
@@ -192,7 +183,6 @@ fun AddReviewSheet(
 
     val totalPhotoCount = existingPhotoUrls.size + photoUris.size
 
-    // --- Duplicate check helper ---
     fun isDuplicate(uri: Uri): Boolean {
         val hash = computeContentHash(context, uri) ?: return false
         return hash in photoHashList
@@ -205,7 +195,7 @@ fun AddReviewSheet(
         }
     }
 
-    // --- Photo picker (galeria) ---
+    val duplicatePhotoError = stringResource(R.string.duplicate_photo_error)
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(MAX_REVIEW_PHOTOS)
     ) { uris ->
@@ -229,15 +219,13 @@ fun AddReviewSheet(
             }
             if (duplicatesFound > 0) {
                 scope.launch {
-                    snackbarHostState.showSnackbar("To zdjęcie zostało już dodane. Nie można dodać duplikatu.")
+                    snackbarHostState.showSnackbar(duplicatePhotoError)
                 }
             }
         }
     }
 
-    // --- Camera ---
     val cameraUri = remember { mutableStateOf<Uri?>(null) }
-
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
@@ -250,20 +238,20 @@ fun AddReviewSheet(
                     photoUris = photoUris + uri
                 } else {
                     scope.launch {
-                        snackbarHostState.showSnackbar("To zdjęcie zostało już dodane. Nie można dodać duplikatu.")
+                        snackbarHostState.showSnackbar(duplicatePhotoError)
                     }
                 }
             }
         }
     }
 
-    // Funkcja uruchamiająca aparat (wyodrębniona, bo wołana z 2 miejsc)
     fun launchCamera() {
         val uri = createTempCameraUri(context)
         cameraUri.value = uri
         cameraLauncher.launch(uri)
     }
 
+    val cameraAccessDenied = stringResource(R.string.camera_access_denied)
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -271,17 +259,17 @@ fun AddReviewSheet(
             launchCamera()
         } else {
             scope.launch {
-                snackbarHostState.showSnackbar("Brak dostępu do aparatu")
+                snackbarHostState.showSnackbar(cameraAccessDenied)
             }
         }
     }
 
-    val title = when {
-        isEditing -> "Edytuj swoją opinię"
-        placeName.isNotBlank() -> "Oceń \"$placeName\""
-        else -> "Dodaj opinię"
+    val sheetTitle = when {
+        isEditing -> stringResource(R.string.edit_your_review)
+        placeName.isNotBlank() -> stringResource(R.string.rate_place_title, placeName)
+        else -> stringResource(R.string.add_review)
     }
-    val submitLabel = if (isEditing) "Zapisz zmiany" else "Opublikuj opinię"
+    val submitLabel = if (isEditing) stringResource(R.string.save_changes) else stringResource(R.string.publish_review)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -297,13 +285,13 @@ fun AddReviewSheet(
                     .navigationBarsPadding()
             ) {
             Text(
-                text = title,
+                text = sheetTitle,
                 style = MaterialTheme.typography.titleLarge
             )
             Spacer(Modifier.height(16.dp))
 
             Text(
-                text = "Twoja ocena",
+                text = stringResource(R.string.your_review),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -321,8 +309,8 @@ fun AddReviewSheet(
                 onValueChange = { newValue ->
                     comment = newValue.take(COMMENT_MAX_LENGTH)
                 },
-                label = { Text("Komentarz (opcjonalnie)") },
-                placeholder = { Text("Co sądzisz o tym miejscu?") },
+                label = { Text(stringResource(R.string.report_comment_label)) },
+                placeholder = { Text(stringResource(R.string.review_placeholder)) },
                 minLines = 3,
                 maxLines = 6,
                 enabled = !isSubmitting,
@@ -349,7 +337,6 @@ fun AddReviewSheet(
                 )
             }
 
-            // --- Zdjęcia opinii ---
             Spacer(Modifier.height(12.dp))
             if (existingPhotoUrls.isNotEmpty() || photoUris.isNotEmpty()) {
                 LazyRow(
@@ -360,8 +347,6 @@ fun AddReviewSheet(
                         PhotoThumbnail(
                             model = url,
                             onRemove = {
-                                // Usuwamy hash remote URL żeby ponowne dodanie tego samego zdjęcia
-                                // z galerii nie było blokowane jako duplikat.
                                 val removedUrl = existingPhotoUrls[index]
                                 existingPhotoUrls = existingPhotoUrls.toMutableList().apply { removeAt(index) }
                                 scope.launch {
@@ -379,8 +364,6 @@ fun AddReviewSheet(
                         PhotoThumbnail(
                             model = uri,
                             onRemove = {
-                                // Usuwamy hash lokalnego URI żeby ponowne dodanie tego samego
-                                // zdjęcia nie pokazywało "już dodane".
                                 val removedUri = photoUris[index]
                                 val hash = computeContentHash(context, removedUri)
                                 photoUris = photoUris.toMutableList().apply { removeAt(index) }
@@ -394,7 +377,6 @@ fun AddReviewSheet(
                 Spacer(Modifier.height(8.dp))
             }
 
-            // Przyciski Galeria + Aparat – zawsze widoczne gdy jest wolne miejsce
             if (totalPhotoCount < MAX_REVIEW_PHOTOS) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -415,7 +397,7 @@ fun AddReviewSheet(
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(6.dp))
-                        Text("Galeria (${totalPhotoCount}/$MAX_REVIEW_PHOTOS)")
+                        Text(stringResource(R.string.gallery_limit, totalPhotoCount, MAX_REVIEW_PHOTOS))
                     }
                     OutlinedButton(
                         onClick = {
@@ -437,7 +419,7 @@ fun AddReviewSheet(
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(6.dp))
-                        Text("Aparat")
+                        Text(stringResource(R.string.camera))
                     }
                 }
             }
@@ -479,7 +461,7 @@ private fun PhotoThumbnail(
     Box(modifier = Modifier.size(64.dp)) {
         AsyncImage(
             model = model,
-            contentDescription = "Miniatura zdjęcia opinii",
+            contentDescription = stringResource(R.string.photo_thumbnail_description),
             modifier = Modifier
                 .size(64.dp)
                 .clip(RoundedCornerShape(6.dp)),
@@ -497,7 +479,7 @@ private fun PhotoThumbnail(
         ) {
             Icon(
                 Icons.Filled.Close,
-                contentDescription = "Usuń",
+                contentDescription = stringResource(R.string.delete),
                 tint = MaterialTheme.colorScheme.onError,
                 modifier = Modifier.size(12.dp)
             )
@@ -520,7 +502,7 @@ private fun StarRatingInput(
             val isFilled = star <= rating
             Icon(
                 imageVector = if (isFilled) Icons.Filled.Star else Icons.Outlined.StarOutline,
-                contentDescription = "Oceń na $star",
+                contentDescription = stringResource(R.string.rate_star_label, star),
                 tint = if (isFilled) {
                     MaterialTheme.colorScheme.secondary
                 } else {

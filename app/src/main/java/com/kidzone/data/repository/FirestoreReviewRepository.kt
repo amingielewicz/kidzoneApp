@@ -1,7 +1,6 @@
 package com.kidzone.data.repository
 
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
 import com.kidzone.data.local.ReviewDao
 import com.kidzone.data.local.ReviewEntity
 import com.kidzone.data.remote.FirestoreCollections
@@ -24,11 +23,6 @@ import javax.inject.Singleton
 
 /**
  * Implementacja [ReviewRepository] oparta o Firestore + Room cache.
- *
- * Wzorzec offline-first (analogiczny do FirestorePlaceRepository):
- *  - Room jest lokalnym source, UI obserwuje Flow z Room.
- *  - Firestore snapshot listener w tle synchronizuje dane do Room.
- *  - Przy błędzie sieci UI nadal widzi ostatnio zcache'owane opinie.
  */
 @Singleton
 class FirestoreReviewRepository @Inject constructor(
@@ -42,11 +36,9 @@ class FirestoreReviewRepository @Inject constructor(
             return@channelFlow
         }
 
-        // 1. Room jako local source – emitujemy z niego do kanału.
         val localFlow = reviewDao.observeByPlace(placeId)
 
-        // 2. Firestore snapshot listener – aktualizuje Room w tle.
-        val syncJob = launch {
+        launch {
             val firestoreFlow = callbackFlow {
                 val registration = reviewsCollection()
                     .whereEqualTo("placeId", placeId)
@@ -65,16 +57,11 @@ class FirestoreReviewRepository @Inject constructor(
                 awaitClose { registration.remove() }
             }
             firestoreFlow.collect { reviews ->
-                // Sync do Room: nadpisz cache dla tego placeId
                 reviewDao.deleteByPlace(placeId)
                 reviewDao.upsertAll(reviews.map(ReviewEntity::fromDomain))
             }
         }
 
-        // 3. Emituj dane z Room (re-emituje automatycznie po upsert z synca).
-        //    Filtrujemy reportedAsSpam klient-side – Room nie ma tego pola
-        //    (nie cache'ujemy spamu, bo deleteByPlace + upsertAll z przefiltrowaną
-        //    listą już to załatwia).
         localFlow.collectLatest { entities ->
             trySend(entities.map { it.toDomain() })
         }
@@ -86,11 +73,9 @@ class FirestoreReviewRepository @Inject constructor(
             return@channelFlow
         }
 
-        // 1. Room jako local source.
         val localFlow = reviewDao.observeByUser(userId)
 
-        // 2. Firestore snapshot listener – sync do Room.
-        val syncJob = launch {
+        launch {
             val firestoreFlow = callbackFlow {
                 val registration = reviewsCollection()
                     .whereEqualTo("userId", userId)
@@ -108,8 +93,6 @@ class FirestoreReviewRepository @Inject constructor(
                 awaitClose { registration.remove() }
             }
             firestoreFlow.collect { reviews ->
-                // Upsert all – nie czyścimy tu bo user może mieć opinie
-                // w różnych miejscach, a observeByUser zwraca wszystkie.
                 reviewDao.upsertAll(reviews.map(ReviewEntity::fromDomain))
             }
         }
@@ -124,7 +107,7 @@ class FirestoreReviewRepository @Inject constructor(
         require(review.placeId.isNotBlank()) { "Review.placeId nie może być puste" }
         require(review.rating in 1..5) { "Review.rating musi być w zakresie 1..5" }
         require(review.comment.length <= AppConfig.REVIEW_COMMENT_MAX_LENGTH) {
-            "Review.comment przekracza limit $AppConfig.REVIEW_COMMENT_MAX_LENGTH znaków"
+            "Review.comment przekracza limit ${AppConfig.REVIEW_COMMENT_MAX_LENGTH} znaków"
         }
 
         val reviewRef = reviewsCollection().document()
@@ -154,7 +137,7 @@ class FirestoreReviewRepository @Inject constructor(
         require(review.id.isNotBlank()) { "Review.id musi być znane przy update" }
         require(review.rating in 1..5) { "Review.rating musi być w zakresie 1..5" }
         require(review.comment.length <= AppConfig.REVIEW_COMMENT_MAX_LENGTH) {
-            "Review.comment przekracza limit $AppConfig.REVIEW_COMMENT_MAX_LENGTH znaków"
+            "Review.comment przekracza limit ${AppConfig.REVIEW_COMMENT_MAX_LENGTH} znaków"
         }
 
         val updatedReview = review.copy(updatedAtMillis = System.currentTimeMillis())
@@ -188,14 +171,13 @@ class FirestoreReviewRepository @Inject constructor(
         require(reviewId.isNotBlank()) { "reviewId nie może być puste" }
         require(reporterId.isNotBlank()) { "reporterId nie może być puste" }
 
-        // Sprawdź czy użytkownik już zgłosił tę opinię (1 zgłoszenie na użytkownika na cel)
         val existing = firestore.collection(FirestoreCollections.REVIEW_REPORTS)
             .whereEqualTo("reporterId", reporterId)
             .whereEqualTo("reviewId", reviewId)
             .get()
             .await()
         if (existing.documents.isNotEmpty()) {
-            throw IllegalStateException("Już zgłosiłeś tę opinię")
+            throw AlreadyReportedException()
         }
 
         val reportData = mapOf(
@@ -213,11 +195,7 @@ class FirestoreReviewRepository @Inject constructor(
             true
         }
         if (completed == null) {
-            OpResult.failure(
-                java.util.concurrent.TimeoutException(
-                    "Wysłanie zgłoszenia trwa zbyt długo. Spróbuj ponownie."
-                )
-            )
+            OpResult.failure(java.util.concurrent.TimeoutException("Przekroczono czas oczekiwania"))
         } else {
             OpResult.success(Unit)
         }
@@ -261,7 +239,8 @@ class FirestoreReviewRepository @Inject constructor(
     private fun <T> offlineSyncDisabledFailure(): OpResult<T> =
         OpResult.failure(OfflineReviewSyncDisabledException())
 
-    private class OfflineReviewSyncDisabledException : IllegalStateException(
+    class OfflineReviewSyncDisabledException : IllegalStateException(
         "Nie udało się zapisać opinii offline. Sprawdź połączenie i spróbuj ponownie."
     )
+    class AlreadyReportedException : IllegalStateException("Już zgłosiłeś tę opinię")
 }

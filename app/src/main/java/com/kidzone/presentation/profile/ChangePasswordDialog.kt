@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.kidzone.R
 import com.kidzone.presentation.common.passwordRequirementText
 import com.kidzone.utils.PasswordPolicy
+import com.kidzone.utils.UiText
 
 /**
  * Dialog zmiany hasła.
@@ -61,10 +62,11 @@ import com.kidzone.utils.PasswordPolicy
  * (rememberSaveable jest scope'owany do composition, dialog znika
  * z drzewa gdy `isOpen=false`).
  */
+@Suppress("LongMethod", "FunctionNaming")
 @Composable
 fun ChangePasswordDialog(
     isInProgress: Boolean,
-    errorMessage: String?,
+    errorMessage: UiText?,
     onDismiss: () -> Unit,
     onConfirm: (currentPassword: String, newPassword: String) -> Unit
 ) {
@@ -131,7 +133,7 @@ fun ChangePasswordDialog(
                 if (errorMessage != null) {
                     Spacer(Modifier.size(8.dp))
                     Text(
-                        text = errorMessage,
+                        text = errorMessage.asString(),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyMedium
                     )

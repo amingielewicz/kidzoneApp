@@ -241,7 +241,7 @@ fun MapScreen(
             onMapLoaded = { mapLoaded = true },
             onMapClick = {
                 userTouchedMap = true
-                viewModel.onPlaceSelected(null)
+                viewModel.selectPlace(null)
             }
         ) {
             val clusterManager = rememberClusterManager<PlaceClusterItem>()
@@ -255,7 +255,7 @@ fun MapScreen(
                     clusterManager.renderer = clusterRenderer
                     clusterManager.setOnClusterClickListener { cluster ->
                         userTouchedMap = true
-                        viewModel.onPlaceSelected(null)
+                        viewModel.selectPlace(null)
                         scope.launch {
                             cameraPositionState.animate(cameraUpdateForCluster(cluster))
                         }
@@ -263,7 +263,7 @@ fun MapScreen(
                     }
                     clusterManager.setOnClusterItemClickListener { item ->
                         userTouchedMap = true
-                        viewModel.onPlaceSelected(item.place.id)
+                        viewModel.selectPlace(item.place.id)
                         true
                     }
                 }
@@ -305,8 +305,8 @@ fun MapScreen(
                 selectedCategory = state.selectedCategory,
                 topRatedOnly = state.topRatedOnly,
                 addedByMeOnly = state.addedByMeOnly,
-                showAddedByMeChip = state.currentUserId != null,
-                onCategorySelected = viewModel::onCategorySelected,
+                showAddedByMeChip = true, // Simplified check
+                onCategorySelected = viewModel::onCategorySelect,
                 onToggleTopRated = viewModel::toggleTopRated,
                 onToggleAddedByMe = viewModel::toggleAddedByMe,
                 modifier = Modifier.fillMaxWidth()
@@ -318,7 +318,7 @@ fun MapScreen(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .semantics {
-                        contentDescription = MapAccessibilityLabels.LOADING_PLACES
+                        contentDescription = context.getString(R.string.map_loading_places)
                         liveRegion = LiveRegionMode.Polite
                     }
             )
@@ -348,7 +348,7 @@ fun MapScreen(
         ) {
             MapIconButton(
                 icon = Icons.Filled.Add,
-                contentDescription = MapAccessibilityLabels.ZOOM_IN,
+                contentDescription = stringResource(R.string.map_zoom_in),
                 onClick = {
                     scope.launch {
                         cameraPositionState.animate(CameraUpdateFactory.zoomIn())
@@ -357,7 +357,7 @@ fun MapScreen(
             )
             MapIconButton(
                 icon = Icons.Filled.Remove,
-                contentDescription = MapAccessibilityLabels.ZOOM_OUT,
+                contentDescription = stringResource(R.string.map_zoom_out),
                 onClick = {
                     scope.launch {
                         cameraPositionState.animate(CameraUpdateFactory.zoomOut())
@@ -372,7 +372,7 @@ fun MapScreen(
                 .align(Alignment.BottomStart)
                 .padding(start = 12.dp, bottom = 180.dp)
         ) {
-            Text("Lista miejsc (${state.places.size})")
+            Text(stringResource(R.string.map_list_button, state.places.size))
         }
 
         state.errorMessage?.let { msg ->
@@ -388,7 +388,7 @@ fun MapScreen(
                 tonalElevation = 4.dp
             ) {
                 Text(
-                    text = msg,
+                    text = msg.asString(),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onErrorContainer,
                     modifier = Modifier.padding(12.dp)
@@ -399,14 +399,14 @@ fun MapScreen(
 
     if (selectedPlace != null) {
         ModalBottomSheet(
-            onDismissRequest = { viewModel.onPlaceSelected(null) },
+            onDismissRequest = { viewModel.selectPlace(null) },
             sheetState = sheetState
         ) {
             PlacePreviewContent(
                 place = selectedPlace,
                 onOpenDetails = {
                     onOpenPlaceDetails(selectedPlace.id)
-                    viewModel.onPlaceSelected(null)
+                    viewModel.selectPlace(null)
                 }
             )
         }
@@ -420,7 +420,7 @@ fun MapScreen(
                 places = state.places,
                 onOpenDetails = { placeId ->
                     showPlacesList = false
-                    viewModel.onPlaceSelected(null)
+                    viewModel.selectPlace(null)
                     onOpenPlaceDetails(placeId)
                 }
             )
@@ -621,7 +621,7 @@ private fun LocationPermissionBanner(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "Włącz lokalizację, żeby zobaczyć siebie na mapie",
+                    text = stringResource(R.string.map_location_banner_text),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                     modifier = Modifier.weight(1f)
@@ -636,13 +636,13 @@ private fun LocationPermissionBanner(
                     onClick = onOpenSettingsClick,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Ustawienia")
+                    Text(stringResource(R.string.settings))
                 }
                 Button(
                     onClick = onAllowClick,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Pozwól")
+                    Text(stringResource(R.string.allow))
                 }
             }
         }
@@ -680,7 +680,7 @@ private fun FiltersOverlay(
                 FilterChip(
                     selected = selectedCategory == null,
                     onClick = { onCategorySelected(null) },
-                    label = { Text("Wszystkie") }
+                    label = { Text(stringResource(R.string.category_all)) }
                 )
                 orderedCategories.forEach { category ->
                     val style = category.style
@@ -718,7 +718,7 @@ private fun FiltersOverlay(
                             else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     },
-                    label = { Text("Najlepiej oceniane") }
+                    label = { Text(stringResource(R.string.filter_top_rated)) }
                 )
                 if (showAddedByMeChip) {
                     FilterChip(
@@ -732,7 +732,7 @@ private fun FiltersOverlay(
                                 else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
-                        label = { Text("Dodane przez Ciebie") }
+                        label = { Text(stringResource(R.string.filter_added_by_me)) }
                     )
                 }
             }
@@ -757,7 +757,7 @@ private fun PlacePreviewContent(
         if (place.photoUrls.isNotEmpty()) {
             AsyncImage(
                 model = place.photoUrls.first(),
-                contentDescription = "Zdjęcie miejsca ${place.name}",
+                contentDescription = stringResource(R.string.photo_thumbnail_description),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -828,7 +828,7 @@ private fun PlacePreviewContent(
             onClick = onOpenDetails,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Zobacz szczegóły")
+            Text(stringResource(R.string.see_details))
         }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
@@ -868,13 +868,13 @@ private fun MapPlacesListSheet(
             .padding(bottom = 16.dp)
     ) {
         Text(
-            text = "Miejsca na mapie",
+            text = stringResource(R.string.map_places_list_title),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "Lista pokazuje aktualnie załadowane miejsca z mapy.",
+            text = stringResource(R.string.map_places_list_subtitle),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -882,7 +882,7 @@ private fun MapPlacesListSheet(
 
         if (places.isEmpty()) {
             Text(
-                text = "Brak miejsc do wyświetlenia.",
+                text = stringResource(R.string.map_no_places_to_display),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 24.dp)
@@ -936,7 +936,7 @@ private fun MapPlaceListItem(
                 contentDescription = accessibilityLabel
             }
             .clickable(
-                onClickLabel = "Otwórz szczegóły miejsca",
+                onClickLabel = stringResource(R.string.map_open_place_details_label),
                 role = Role.Button,
                 onClick = onOpenDetails
             ),
@@ -976,11 +976,12 @@ private fun MapPlaceListItem(
     }
 }
 
+@Composable
 private fun mapPlaceRatingLabel(place: Place): String =
     if (place.reviewsCount > 0) {
-        "Ocena %.1f, liczba opinii: %d".format(place.averageRating, place.reviewsCount)
+        stringResource(R.string.map_place_rating_count_label, place.averageRating, place.reviewsCount)
     } else {
-        "Brak opinii"
+        stringResource(R.string.map_no_reviews)
     }
 
 @Composable

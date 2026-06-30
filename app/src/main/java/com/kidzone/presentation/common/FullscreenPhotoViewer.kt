@@ -32,7 +32,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.kidzone.R
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
@@ -136,7 +138,7 @@ fun FullscreenPhotoViewer(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Flag,
-                        contentDescription = "Zgłoś zdjęcie"
+                        contentDescription = stringResource(R.string.report_photo)
                     )
                 }
             }
@@ -159,7 +161,7 @@ fun FullscreenPhotoViewer(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Delete,
-                        contentDescription = "Usuń zdjęcie"
+                        contentDescription = stringResource(R.string.delete_photo)
                     )
                 }
             }

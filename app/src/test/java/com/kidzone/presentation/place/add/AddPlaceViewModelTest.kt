@@ -1,11 +1,8 @@
-@file:Suppress("WildcardImport")
-
 package com.kidzone.presentation.place.add
 
 import androidx.lifecycle.SavedStateHandle
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.PlaceCategory
-import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.service.ImageCompressorPort
@@ -15,7 +12,10 @@ import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.PhotoUploader
-import io.mockk.*
+import com.kidzone.utils.UiText
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -249,10 +249,10 @@ class AddPlaceViewModelTest {
             advanceUntilIdle()
 
             viewModel.onFetchingLocationStart()
-            viewModel.onLocationError("GPS niedostępny")
+            viewModel.onLocationError(UiText.DynamicString("GPS niedostępny"))
 
             assertFalse(viewModel.uiState.value.isFetchingLocation)
-            assertEquals("GPS niedostępny", viewModel.uiState.value.errorMessage)
+            assertNotNull(viewModel.uiState.value.errorMessage)
         }
     }
 

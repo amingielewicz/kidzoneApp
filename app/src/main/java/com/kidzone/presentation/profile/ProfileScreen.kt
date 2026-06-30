@@ -67,6 +67,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
@@ -102,24 +103,6 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Profil zalogowanego użytkownika.
- *
- * Sekcje (z góry):
- *  1. **Header** – duży avatar + login (nick) + e-mail; przycisk "Edytuj profil"
- *     otwiera [EditProfileSheet].
- *  2. **Dane osobowe** – imię i nazwisko (jeśli wypełnione). Sekcja
- *     ukrywa się, gdy oba pola są puste.
- *  3. **Statystyki** – liczba dodanych miejsc i opinii, oraz data dołączenia.
- *  4. **Moje treści** – linki do "Moje miejsca" i "Moje opinie".
- *  5. **Odznaki** – wszystkie progi (zdobyte + niezdobyte) z opisami.
- *  6. **Konto i bezpieczeństwo** – zmiana hasła, zmiana e-maila, usunięcie
- *     konta. Pokazujemy tylko dla [SignInProvider.EMAIL_PASSWORD].
- *  7. **Ustawienia** – polityka prywatności i wylogowanie.
- *
- * @param onOpenMyPlaces nawigacja do ekranu z listą własnych miejsc
- * @param onOpenMyReviews nawigacja do ekranu z listą własnych opinii
- * @param onSignOut wylogowanie, ale też **usunięcie konta** zachowuje się
- *   tak samo (ostatecznie i tak wraca na ekran logowania – współdzielimy
- *   callback, żeby nie wprowadzać drugiego)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod", "LongParameterList")
@@ -130,36 +113,33 @@ fun ProfileScreen(
     onOpenMyReviews: () -> Unit,
     scrollToSection: String = "",
     onLocaleChanged: () -> Unit = {},
-    viewModel: ProfileViewModel = hiltViewModel()
+    viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val user by viewModel.user.collectAsState()
     val ui by viewModel.uiState.collectAsState()
 
-    // Haptic feedback for newly earned badges
+    val context = LocalContext.current
     val haptic = rememberHapticFeedback()
     val reducedMotionEnabled = rememberReducedMotionEnabled()
     LaunchedEffect(ui.newlyEarnedBadges) {
         if (ui.newlyEarnedBadges.isNotEmpty()) haptic.reward()
     }
 
-    // Auto-refresh po przywróceniu internetu
     val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
     var previousNetworkStatus by remember { mutableStateOf(networkStatus) }
     LaunchedEffect(networkStatus) {
-        if (previousNetworkStatus == com.kidzone.presentation.common.NetworkStatus.UNAVAILABLE
-            && networkStatus == com.kidzone.presentation.common.NetworkStatus.AVAILABLE
+        if ((previousNetworkStatus == com.kidzone.presentation.common.NetworkStatus.UNAVAILABLE)
+            && (networkStatus == com.kidzone.presentation.common.NetworkStatus.AVAILABLE)
         ) {
             viewModel.refreshProfile()
         }
         previousNetworkStatus = networkStatus
     }
 
-    // Snackbar pokazujemy dla informacji typu "Hasło zmienione" /
-    // "Wysłaliśmy link na nowy adres". Po pokazaniu czyścimy stan.
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(ui.accountActionInfo) {
         val msg = ui.accountActionInfo ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(msg)
+        snackbarHostState.showSnackbar(msg.asString(context))
         viewModel.consumeAccountActionInfo()
     }
 
@@ -167,7 +147,7 @@ fun ProfileScreen(
         PullToRefreshBox(
             isRefreshing = ui.isRefreshing,
             onRefresh = { viewModel.refreshProfile() },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         ) {
             if (user == null) {
                 ProfileSkeleton()
@@ -191,7 +171,7 @@ fun ProfileScreen(
                     onNotificationPrefs = viewModel::openNotificationPrefs,
                     selectedLanguage = ui.selectedLanguage,
                     onLanguageSettings = viewModel::openLanguageDialog,
-                    onSignOut = { viewModel.signOut(onSignOut) }
+                    onSignOut = { viewModel.signOut(onSignOut) },
                 )
             }
         }
@@ -202,11 +182,9 @@ fun ProfileScreen(
                 .align(Alignment.BottomCenter)
                 .semantics {
                     liveRegion = LiveRegionMode.Polite
-                }
+                },
         )
     }
-
-    // --- Dialogi i sheety ---
 
     if (ui.isEditOpen && user != null) {
         EditProfileSheet(
@@ -219,7 +197,7 @@ fun ProfileScreen(
             onDismiss = viewModel::dismissEditSheet,
             onSave = { displayName, firstName, lastName, newAvatarUri ->
                 viewModel.saveProfile(displayName, firstName, lastName, newAvatarUri)
-            }
+            },
         )
     }
 
@@ -239,7 +217,7 @@ fun ProfileScreen(
         NotificationPreferencesDialog(
             currentPrefs = ui.notificationPrefs,
             onSave = viewModel::saveNotificationPrefs,
-            onDismiss = viewModel::dismissNotificationPrefs
+            onDismiss = viewModel::dismissNotificationPrefs,
         )
     }
 
@@ -250,7 +228,7 @@ fun ProfileScreen(
                 viewModel.saveLanguage(language)
                 onLocaleChanged()
             },
-            onDismiss = viewModel::dismissLanguageDialog
+            onDismiss = viewModel::dismissLanguageDialog,
         )
     }
 
@@ -259,7 +237,7 @@ fun ProfileScreen(
             isInProgress = ui.isAccountActionInProgress,
             errorMessage = ui.accountActionError,
             onDismiss = viewModel::dismissChangePassword,
-            onConfirm = viewModel::changePassword
+            onConfirm = viewModel::changePassword,
         )
     }
 
@@ -269,7 +247,7 @@ fun ProfileScreen(
             isInProgress = ui.isAccountActionInProgress,
             errorMessage = ui.accountActionError,
             onDismiss = viewModel::dismissChangeEmail,
-            onConfirm = viewModel::changeEmail
+            onConfirm = viewModel::changeEmail,
         )
     }
 
@@ -279,35 +257,29 @@ fun ProfileScreen(
             reviewsCount = user!!.reviewsCount,
             isInProgress = ui.isAccountActionInProgress,
             errorMessage = ui.accountActionError,
-            isGoogleUser = ui.signInProvider == com.kidzone.domain.repository.SignInProvider.GOOGLE,
+            isGoogleUser = ui.signInProvider == SignInProvider.GOOGLE,
             onDismiss = viewModel::dismissDeleteAccount,
             onConfirm = { password ->
                 viewModel.deleteAccount(password, onDeleted = onSignOut)
             },
             onConfirmGoogle = { idToken ->
                 viewModel.deleteAccountGoogle(idToken, onDeleted = onSignOut)
-            }
+            },
         )
     }
 
-    // Info-dialog: lista wszystkich odznak + opisy progów. Wywoływany
-    // z ikony "?" przy nagłówku sekcji "Odznaki". Bierzemy z VM-owego
-    // `obtainedBadges`, żeby highlight w dialogu zgadzał się z chipami
-    // na karcie (uwzględnia też ranking-based badges, które mogłyby się
-    // nie zgodzić z naiwnym `user.computeBadges()` bez kontekstu).
     if (ui.isBadgesInfoOpen && user != null) {
         BadgesInfoDialog(
             obtained = ui.obtainedBadges.toSet(),
-            onDismiss = viewModel::dismissBadgesInfo
+            onDismiss = viewModel::dismissBadgesInfo,
         )
     }
 
-    // Dialog gratulacyjny po zdobyciu nowych odznak – zbiorczy, scrollowalny.
     if (ui.newlyEarnedBadges.isNotEmpty()) {
         BadgeEarnedDialog(
             badges = ui.newlyEarnedBadges,
             reducedMotionEnabled = reducedMotionEnabled,
-            onDismiss = viewModel::consumeNewlyEarnedBadge
+            onDismiss = viewModel::consumeNewlyEarnedBadge,
         )
     }
 }
@@ -333,15 +305,12 @@ private fun ProfileContent(
     onNotificationPrefs: () -> Unit,
     selectedLanguage: AppLanguage,
     onLanguageSettings: () -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
 ) {
     val lazyListState = rememberLazyListState()
 
-    // Auto-scroll do sekcji "Odznaki" gdy user wchodzi z push notification
     LaunchedEffect(scrollToSection) {
         if (scrollToSection == "badges") {
-            // Indeks BadgesCard w LazyColumn:
-            // 0: Header, 1: PersonalInfo (warunkowy), 2: Stats, 3: MyContent, 4/5: Badges
             val hasPersonalInfo = user.firstName.isNotBlank() || user.lastName.isNotBlank()
             val badgesIndex = if (hasPersonalInfo) 4 else 3
             lazyListState.animateScrollToItem(badgesIndex)
@@ -352,7 +321,7 @@ private fun ProfileContent(
         state = lazyListState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item { ProfileHeaderCard(user = user, userRank = userRank, onEdit = onEdit) }
 
@@ -367,21 +336,18 @@ private fun ProfileContent(
                 placesCount = user.placesAddedCount,
                 reviewsCount = user.reviewsCount,
                 onOpenMyPlaces = onOpenMyPlaces,
-                onOpenMyReviews = onOpenMyReviews
+                onOpenMyReviews = onOpenMyReviews,
             )
         }
 
         item { BadgesCard(obtainedBadges = obtainedBadges, onOpenInfo = onOpenBadgesInfo) }
 
-        // Sekcja "Konto i bezpieczeństwo":
-        // - Email/password: zmiana hasła, zmiana e-maila, usunięcie konta
-        // - Google: tylko usunięcie konta (hasło/email zarządzane przez Google)
         item {
             AccountSecurityCard(
                 showPasswordAndEmail = signInProvider == SignInProvider.EMAIL_PASSWORD,
                 onChangePassword = onChangePassword,
                 onChangeEmail = onChangeEmail,
-                onDeleteAccount = onDeleteAccount
+                onDeleteAccount = onDeleteAccount,
             )
         }
 
@@ -393,40 +359,36 @@ private fun ProfileContent(
                 onNotificationPrefs = onNotificationPrefs,
                 selectedLanguage = selectedLanguage,
                 onLanguageSettings = onLanguageSettings,
-                onSignOut = onSignOut
+                onSignOut = onSignOut,
             )
         }
     }
 }
 
-// --- Header --------------------------------------------------------------
-
+@Suppress("LongMethod", "FunctionNaming")
 @Composable
 private fun ProfileHeaderCard(
     user: User,
     userRank: Int?,
-    onEdit: () -> Unit
+    onEdit: () -> Unit,
 ) {
     KidZoneCard(modifier = Modifier.fillMaxWidth()) {
-        // Box zamiast samej Column - potrzebujemy warstwy do nakładki
-        // (plakietka TOP w prawym górnym rogu) niezależnej od centralnej
-        // kolumny z avatarem / nazwą / akcją "Edytuj profil".
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp)
+                .padding(20.dp),
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 ProfileAvatar(avatarUrl = user.avatarUrl, size = 96.dp)
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = user.name.ifBlank { "Użytkownik" },
+                    text = user.name.ifBlank { stringResource(R.string.default_user_name) },
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 if (user.email.isNotBlank()) {
                     Spacer(Modifier.height(2.dp))
@@ -435,13 +397,13 @@ private fun ProfileHeaderCard(
                             imageVector = Icons.Filled.Email,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(14.dp),
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
                             text = user.email,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -450,43 +412,36 @@ private fun ProfileHeaderCard(
                     onClick = onEdit,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp)
+                        .height(44.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Edit,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("Edytuj profil")
+                    Text(stringResource(R.string.edit_profile))
                 }
             }
 
-            // Plakietka rangi w TOP 100 - tylko jeśli user mieści się
-            // w pierwszej setce. VM trzyma userRank ograniczony do tej
-            // puli (BADGE_RANK_POOL=100 w computeBadgeContext), ale dla
-            // bezpieczeństwa dorzucamy tu jeszcze guard.
-            //
-            // Kolor gwiazdki: gold dla 1..3, silver dla 4..10, zielony
-            // (brand-secondary) dla 11..100 - logika w [RankBadge].
             if (userRank != null && userRank in 1..USER_RANK_BADGE_LIMIT) {
                 RankBadge(
                     rank = userRank,
-                    label = "TOP 100",
-                    modifier = Modifier.align(Alignment.TopEnd)
+                    label = stringResource(R.string.top_100_label),
+                    modifier = Modifier.align(Alignment.TopEnd),
                 )
             }
         }
     }
 }
 
-/** Górny próg rangi, dla której pokazujemy plakietkę "TOP" na profilu. */
 private const val USER_RANK_BADGE_LIMIT = 100
 
+@Suppress("FunctionNaming")
 @Composable
 private fun ProfileAvatar(
     avatarUrl: String?,
-    size: androidx.compose.ui.unit.Dp
+    size: androidx.compose.ui.unit.Dp,
 ) {
     if (avatarUrl.isNullOrBlank()) {
         Box(
@@ -494,13 +449,13 @@ private fun ProfileAvatar(
                 .size(size)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Filled.Person,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(size / 2)
+                modifier = Modifier.size(size / 2),
             )
         }
     } else {
@@ -511,28 +466,28 @@ private fun ProfileAvatar(
                 .size(size)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Crop,
         )
     }
 }
 
-// --- Personal info -------------------------------------------------------
-
+@Suppress("FunctionNaming")
 @Composable
 private fun PersonalInfoCard(user: User) {
-    SectionCard(title = "Dane osobowe") {
+    SectionCard(title = stringResource(R.string.personal_info_title)) {
         if (user.firstName.isNotBlank()) {
-            InfoRow(label = "Imię", value = user.firstName)
+            InfoRow(label = stringResource(R.string.first_name), value = user.firstName)
         }
         if (user.lastName.isNotBlank()) {
             if (user.firstName.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))
             }
-            InfoRow(label = "Nazwisko", value = user.lastName)
+            InfoRow(label = stringResource(R.string.last_name), value = user.lastName)
         }
     }
 }
 
+@Suppress("FunctionNaming")
 @Composable
 private fun InfoRow(label: String, value: String) {
     Row {
@@ -540,151 +495,133 @@ private fun InfoRow(label: String, value: String) {
             text = label,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(100.dp)
+            modifier = Modifier.width(100.dp),
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium
+            fontWeight = FontWeight.Medium,
         )
     }
 }
 
-// --- Stats ---------------------------------------------------------------
-
+@Suppress("FunctionNaming")
 @Composable
 private fun StatsCard(user: User) {
-    SectionCard(title = "Statystyki") {
+    SectionCard(title = stringResource(R.string.stats_title)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceAround
+            horizontalArrangement = Arrangement.SpaceAround,
         ) {
             StatItem(
                 icon = Icons.Filled.Place,
                 value = user.placesAddedCount.toString(),
-                label = "Miejsc"
+                label = stringResource(R.string.stats_places),
             )
             StatItem(
                 icon = Icons.Filled.RateReview,
                 value = user.reviewsCount.toString(),
-                label = "Opinii"
+                label = stringResource(R.string.stats_reviews),
             )
         }
         if (user.createdAtMillis > 0L) {
             Spacer(Modifier.height(12.dp))
             HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "W kidZone od ${formatDate(user.createdAtMillis)}",
+                text = stringResource(R.string.member_since, formatDate(user.createdAtMillis)),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                textAlign = TextAlign.Center,
             )
         }
     }
 }
 
+@Suppress("FunctionNaming")
 @Composable
 private fun StatItem(
     icon: ImageVector,
     value: String,
-    label: String
+    label: String,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(28.dp)
+            modifier = Modifier.size(28.dp),
         )
         Spacer(Modifier.height(4.dp))
         Text(
             text = value,
             style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
         )
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
-// --- Moje treści ---------------------------------------------------------
-
+@Suppress("FunctionNaming")
 @Composable
 private fun MyContentCard(
     placesCount: Int,
     reviewsCount: Int,
     onOpenMyPlaces: () -> Unit,
-    onOpenMyReviews: () -> Unit
+    onOpenMyReviews: () -> Unit,
 ) {
-    SectionCard(title = "Moje treści") {
+    SectionCard(title = stringResource(R.string.my_content_title)) {
         ProfileNavRow(
             icon = Icons.Filled.Place,
-            label = "Moje miejsca",
+            label = stringResource(R.string.my_places),
             trailingText = placesCount.toString(),
-            onClick = onOpenMyPlaces
+            onClick = onOpenMyPlaces,
         )
         Spacer(Modifier.height(4.dp))
         ProfileNavRow(
             icon = Icons.Filled.RateReview,
-            label = "Moje opinie",
+            label = stringResource(R.string.my_reviews),
             trailingText = reviewsCount.toString(),
-            onClick = onOpenMyReviews
+            onClick = onOpenMyReviews,
         )
     }
 }
 
-// --- Badges --------------------------------------------------------------
-
-/**
- * Sekcja "Odznaki" na profilu.
- *
- * Pokazujemy tylko **zdobyte** odznaki (jako [BadgesRow] z półprzezroczystym
- * tłem chipów w kolorze odznaki). Po prawej stronie nagłówka ikona "?"
- * otwiera [BadgesInfoDialog] z pełną listą dostępnych odznak i opisem,
- * jak je zdobyć - dzięki temu user widzi swoje progresy bez ściany
- * "wyszarzonych" niezdobytych odznak na ekranie.
- *
- * Empty state: tekst "Nie masz jeszcze żadnych odznak. Sprawdź jak je zdobyć!"
- * - sam tooltip `?` służy jako CTA, więc nie potrzebujemy osobnego buttona.
- *
- * @param obtainedBadges już zdobyte odznaki, wyliczone w VM z uwzględnieniem
- *   kontekstu rankingowego (zob. ProfileViewModel.computeBadgeContext).
- */
+@Suppress("FunctionNaming")
 @Composable
 private fun BadgesCard(
     obtainedBadges: List<UserBadge>,
-    onOpenInfo: () -> Unit
+    onOpenInfo: () -> Unit,
 ) {
     SectionCard(
-        title = "Odznaki",
+        title = stringResource(R.string.badges_title),
         leadingIcon = Icons.Filled.EmojiEvents,
         trailing = {
             IconButton(
                 onClick = onOpenInfo,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(32.dp),
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.HelpOutline,
-                    contentDescription = "Jak zdobyć odznaki?",
+                    contentDescription = stringResource(R.string.how_to_earn_badges),
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
                 )
             }
-        }
+        },
     ) {
         if (obtainedBadges.isEmpty()) {
             Text(
-                text = "Nie masz jeszcze żadnych odznak. Kliknij \"?\" obok, " +
-                    "żeby sprawdzić, jak je zdobyć.",
+                text = stringResource(R.string.no_badges_message),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
             BadgesRow(badges = obtainedBadges)
@@ -692,21 +629,11 @@ private fun BadgesCard(
     }
 }
 
-/**
- * Dialog z listą wszystkich odznak (zdobyte + niezdobyte) + opisem
- * progów. Używamy ikony +/- w opisach progów - kolorowo dla zdobytych
- * (pełen kolor odznaki), wyszarzone dla pozostałych.
- *
- * Lista jest scrollowalna pionowo - przy 15+ odznakach nie zmieści się
- * cała na ekranie telefonu, a Material 3 AlertDialog domyślnie tnie
- * overflow zamiast scrollować. `verticalScroll` na wewnętrznej Column
- * to najprostszy wzorzec, który nie wymaga LazyColumn (ten ostatni
- * konfliktuje z mierzeniem wysokości w AlertDialog).
- */
+@Suppress("FunctionNaming")
 @Composable
 private fun BadgesInfoDialog(
     obtained: Set<UserBadge>,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -714,106 +641,91 @@ private fun BadgesInfoDialog(
             Icon(
                 imageVector = Icons.Filled.EmojiEvents,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
+                tint = MaterialTheme.colorScheme.primary,
             )
         },
-        title = { Text("Jak zdobyć odznaki?") },
+        title = { Text(stringResource(R.string.badges_info_title)) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    text = "Aktywność w aplikacji nagradzamy odznakami. " +
-                        "Im więcej miejsc i opinii dodasz, tym więcej odznak zdobędziesz.",
+                    text = stringResource(R.string.badges_info_body),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 UserBadge.entries.forEach { badge ->
                     BadgeRowItem(
                         badge = badge,
-                        highlighted = badge in obtained
+                        highlighted = badge in obtained,
                     )
                 }
             }
         },
         confirmButton = {
             androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text("Rozumiem")
+                Text(stringResource(R.string.i_understand))
             }
-        }
+        },
     )
 }
 
-/**
- * Dialog gratulacyjny pokazywany, gdy user właśnie zdobył nową odznakę.
- *
- * Wizualnie: duża okrągła ikona w kolorze odznaki + nazwa + krótki opis
- * jakie warunki spełnił. Pokazywany jeden naraz - jeśli user wbił kilka
- * odznak (np. backfill licznika reviews), kolejne czekają w VM-owym
- * buforze i pojawią się po zamknięciu poprzedniego.
- *
- * Wszystkie teksty (title + content) są wyśrodkowane horyzontalnie -
- * standardowy AlertDialog M3 trzyma title po lewej, ale dla okna typu
- * "achievement unlock" symetria czyta się znacznie lepiej. Tylko
- * confirmButton zostaje w naturalnej pozycji (prawy dolny róg dialogu).
- *
- * Świadomie blokujący - user musi kliknąć "Super!" żeby zamknąć, bo to
- * pozytywne wydarzenie powinno się wyróżnić względem zwykłej nawigacji.
- */
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
 private fun BadgeEarnedDialog(
     badges: List<UserBadge>,
     reducedMotionEnabled: Boolean,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
-    // Używamy podstawowego Dialogu z wyłączoną domyślną szerokością,
-    // aby Box mógł zająć cały ekran i Konfetti nie było przycinane do okna dialogu.
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
-            // Replikacja wyglądu AlertDialog (M3)
             Card(
                 modifier = Modifier
                     .fillMaxWidth(0.9f)
                     .padding(24.dp),
                 shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
             ) {
                 Column(
                     modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Box(
                         modifier = Modifier
                             .size(64.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             imageVector = Icons.Filled.EmojiEvents,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(36.dp),
                         )
                     }
 
                     Spacer(Modifier.height(20.dp))
 
+                    val congratsText = if (badges.size == 1) {
+                        stringResource(R.string.congratulations)
+                    } else {
+                        "${stringResource(R.string.congratulations)} (${badges.size})"
+                    }
                     Text(
-                        text = if (badges.size == 1) "Gratulacje!" else "Gratulacje! (${badges.size})",
+                        text = congratsText,
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
 
                     Spacer(Modifier.height(16.dp))
@@ -823,15 +735,15 @@ private fun BadgeEarnedDialog(
                             .fillMaxWidth()
                             .heightIn(max = 320.dp)
                             .verticalScroll(rememberScrollState()),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(
-                            text = if (badges.size == 1) "Zdoby\u0142a\u015B/e\u015B now\u0105 odznak\u0119:"
-                            else "Zdoby\u0142a\u015B/e\u015B nowe odznaki:",
+                            text = if (badges.size == 1) stringResource(R.string.earned_new_badge)
+                            else stringResource(R.string.earned_new_badges),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
                         )
                         Spacer(Modifier.height(16.dp))
                         badges.forEach { badge ->
@@ -839,20 +751,20 @@ private fun BadgeEarnedDialog(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .size(44.dp)
                                         .clip(CircleShape)
                                         .background(badge.color.copy(alpha = 0.2f)),
-                                    contentAlignment = Alignment.Center
+                                    contentAlignment = Alignment.Center,
                                 ) {
                                     Icon(
                                         imageVector = badge.icon,
                                         contentDescription = null,
                                         tint = badge.color,
-                                        modifier = Modifier.size(24.dp)
+                                        modifier = Modifier.size(24.dp),
                                     )
                                 }
                                 Spacer(Modifier.width(16.dp))
@@ -861,12 +773,12 @@ private fun BadgeEarnedDialog(
                                         text = badge.label,
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = badge.color
+                                        color = badge.color,
                                     )
                                     Text(
                                         text = badge.description,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                             }
@@ -877,23 +789,21 @@ private fun BadgeEarnedDialog(
 
                     androidx.compose.material3.TextButton(
                         onClick = onDismiss,
-                        modifier = Modifier.align(Alignment.End)
+                        modifier = Modifier.align(Alignment.End),
                     ) {
                         Text(
-                            text = "Super!",
+                            text = stringResource(R.string.great),
                             style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                 }
             }
 
             if (!reducedMotionEnabled) {
-                // --- SPEKTAKULARNE KONFETTI NA WIERZCHU ---
                 KonfettiView(
                     modifier = Modifier.fillMaxSize(),
                     parties = listOf(
-                        // Burst from left
                         Party(
                             speed = 10f,
                             maxSpeed = 35f,
@@ -904,12 +814,11 @@ private fun BadgeEarnedDialog(
                                 0xFFFFC93C.toInt(),
                                 0xFF1E88E5.toInt(),
                                 0xFF43A047.toInt(),
-                                0xFFFFFFFF.toInt()
+                                0xFFFFFFFF.toInt(),
                             ),
                             emitter = Emitter(duration = 2, TimeUnit.SECONDS).perSecond(40),
-                            position = Position.Relative(0.0, 0.4)
+                            position = Position.Relative(0.0, 0.4),
                         ),
-                        // Burst from right
                         Party(
                             speed = 10f,
                             maxSpeed = 35f,
@@ -920,12 +829,11 @@ private fun BadgeEarnedDialog(
                                 0xFFFFC93C.toInt(),
                                 0xFF1E88E5.toInt(),
                                 0xFF43A047.toInt(),
-                                0xFFFFFFFF.toInt()
+                                0xFFFFFFFF.toInt(),
                             ),
                             emitter = Emitter(duration = 2, TimeUnit.SECONDS).perSecond(40),
-                            position = Position.Relative(1.0, 0.4)
+                            position = Position.Relative(1.0, 0.4),
                         ),
-                        // Rain from top
                         Party(
                             speed = 0f,
                             maxSpeed = 20f,
@@ -934,56 +842,50 @@ private fun BadgeEarnedDialog(
                             spread = 360,
                             colors = listOf(0xFFFFC93C.toInt(), 0xFFFFFFFF.toInt()),
                             emitter = Emitter(duration = 3, TimeUnit.SECONDS).perSecond(25),
-                            position = Position.Relative(0.5, -0.1)
-                        )
-                    )
+                            position = Position.Relative(0.5, -0.1),
+                        ),
+                    ),
                 )
             }
         }
     }
 }
 
-// --- Konto i bezpieczeństwo ---------------------------------------------
-
+@Suppress("FunctionNaming")
 @Composable
 private fun AccountSecurityCard(
     showPasswordAndEmail: Boolean = true,
     onChangePassword: () -> Unit,
     onChangeEmail: () -> Unit,
-    onDeleteAccount: () -> Unit
+    onDeleteAccount: () -> Unit,
 ) {
-    SectionCard(title = "Konto i bezpieczeństwo") {
+    SectionCard(title = stringResource(R.string.account_security_title)) {
         if (showPasswordAndEmail) {
             ProfileNavRow(
                 icon = Icons.Filled.Lock,
-                label = "Zmień hasło",
-                onClick = onChangePassword
+                label = stringResource(R.string.change_password_title),
+                onClick = onChangePassword,
             )
             Spacer(Modifier.height(4.dp))
             ProfileNavRow(
                 icon = Icons.Filled.AlternateEmail,
-                label = "Zmień adres e-mail",
-                onClick = onChangeEmail
+                label = stringResource(R.string.change_email),
+                onClick = onChangeEmail,
             )
             Spacer(Modifier.height(4.dp))
         }
-        // "Usuń konto" jest celowo wyróżnione kolorem error – działanie
-        // nieodwracalne, użytkownik powinien świadomie się zatrzymać przed
-        // kliknięciem. Konsekwencje pokażemy w dialogu potwierdzenia.
         ProfileNavRow(
             icon = Icons.Filled.DeleteForever,
-            label = "Usuń konto",
+            label = stringResource(R.string.delete_account),
             iconTint = MaterialTheme.colorScheme.error,
             labelColor = MaterialTheme.colorScheme.error,
-            onClick = onDeleteAccount
+            onClick = onDeleteAccount,
         )
     }
 }
 
-// --- Settings ------------------------------------------------------------
-
-@Composable
 @Suppress("FunctionNaming", "LongParameterList")
+@Composable
 private fun SettingsCard(
     onTermsOfService: () -> Unit,
     onPrivacyPolicy: () -> Unit,
@@ -991,50 +893,50 @@ private fun SettingsCard(
     onNotificationPrefs: () -> Unit,
     selectedLanguage: AppLanguage,
     onLanguageSettings: () -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
 ) {
     SectionCard(title = stringResource(R.string.settings)) {
         ProfileNavRow(
             icon = Icons.Filled.Language,
             label = stringResource(R.string.language_settings_title),
             trailingText = stringResource(selectedLanguage.labelRes),
-            onClick = onLanguageSettings
+            onClick = onLanguageSettings,
         )
         Spacer(Modifier.height(4.dp))
         ProfileNavRow(
             icon = Icons.Filled.Notifications,
             label = stringResource(R.string.notification_settings),
-            onClick = onNotificationPrefs
+            onClick = onNotificationPrefs,
         )
         Spacer(Modifier.height(4.dp))
         ProfileNavRow(
             icon = Icons.Filled.Gavel,
             label = stringResource(R.string.terms_of_service),
-            onClick = onTermsOfService
+            onClick = onTermsOfService,
         )
         Spacer(Modifier.height(4.dp))
         ProfileNavRow(
             icon = Icons.Filled.PrivacyTip,
             label = stringResource(R.string.privacy_policy),
-            onClick = onPrivacyPolicy
+            onClick = onPrivacyPolicy,
         )
         Spacer(Modifier.height(4.dp))
         ProfileNavRow(
             icon = Icons.Filled.Email,
             label = stringResource(R.string.contact_support),
-            onClick = onContact
+            onClick = onContact,
         )
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
             onClick = onSignOut,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
+                .height(48.dp),
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.Logout,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(18.dp),
             )
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.sign_out))
@@ -1045,7 +947,7 @@ private fun SettingsCard(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -1059,7 +961,7 @@ private fun ContactSupportDialog(onDismiss: () -> Unit) {
             Icon(
                 imageVector = Icons.Filled.Email,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
+                tint = MaterialTheme.colorScheme.primary,
             )
         },
         title = { Text(stringResource(R.string.contact_support_title)) },
@@ -1067,20 +969,20 @@ private fun ContactSupportDialog(onDismiss: () -> Unit) {
             Column {
                 Text(
                     text = stringResource(R.string.contact_support_body),
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = AppConfig.PRIVACY_CONTACT_EMAIL,
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
                     text = stringResource(R.string.contact_support_hint),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },
@@ -1088,7 +990,7 @@ private fun ContactSupportDialog(onDismiss: () -> Unit) {
             TextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.close))
             }
-        }
+        },
     )
 }
 
@@ -1097,7 +999,7 @@ private fun ContactSupportDialog(onDismiss: () -> Unit) {
 private fun LanguageSettingsDialog(
     selectedLanguage: AppLanguage,
     onSelectLanguage: (AppLanguage) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1110,19 +1012,19 @@ private fun LanguageSettingsDialog(
                             .fillMaxWidth()
                             .clickable(
                                 role = Role.RadioButton,
-                                onClick = { onSelectLanguage(language) }
+                                onClick = { onSelectLanguage(language) },
                             )
                             .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(
                             selected = language == selectedLanguage,
-                            onClick = { onSelectLanguage(language) }
+                            onClick = { onSelectLanguage(language) },
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = stringResource(language.labelRes),
-                            style = MaterialTheme.typography.bodyLarge
+                            style = MaterialTheme.typography.bodyLarge,
                         )
                     }
                 }
@@ -1132,28 +1034,19 @@ private fun LanguageSettingsDialog(
             TextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.close))
             }
-        }
+        },
     )
 }
 
-/**
- * Klikalny wiersz "ikona + tekst + chevron" lub "ikona + tekst + cyfra".
- *
- * Używany w sekcjach Moje treści, Konto, Ustawienia, żeby spójnie
- * sygnalizować przejście do innego ekranu / dialogu.
- *
- * @param trailingText opcjonalny tekst po prawej (np. liczba elementów).
- *   Gdy null – pokazujemy chevron `>` jako sygnał "kliknij i zobacz".
- */
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
-@Suppress("FunctionNaming")
 internal fun ProfileNavRow(
     icon: ImageVector,
     label: String,
     onClick: () -> Unit,
     trailingText: String? = null,
     iconTint: Color = MaterialTheme.colorScheme.primary,
-    labelColor: Color = MaterialTheme.colorScheme.onSurface
+    labelColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     Row(
         modifier = Modifier
@@ -1162,30 +1055,30 @@ internal fun ProfileNavRow(
             .clickable(
                 onClickLabel = label,
                 role = Role.Button,
-                onClick = onClick
+                onClick = onClick,
             )
             .semantics(mergeDescendants = true) {}
             .padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = iconTint,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(20.dp),
         )
         Spacer(Modifier.width(12.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
             color = labelColor,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         )
         if (trailingText != null) {
             Text(
                 text = trailingText,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.width(4.dp))
         }
@@ -1193,19 +1086,18 @@ internal fun ProfileNavRow(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(20.dp),
         )
     }
 }
 
-// --- Helpers -------------------------------------------------------------
-
+@Suppress("FunctionNaming")
 @Composable
 private fun SectionCard(
     title: String,
     leadingIcon: ImageVector? = null,
     trailing: (@Composable () -> Unit)? = null,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     KidZoneCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -1215,7 +1107,7 @@ private fun SectionCard(
                         imageVector = leadingIcon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(20.dp),
                     )
                     Spacer(Modifier.width(8.dp))
                 }
@@ -1223,7 +1115,7 @@ private fun SectionCard(
                     text = title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 )
                 trailing?.invoke()
             }
@@ -1234,34 +1126,34 @@ private fun SectionCard(
 }
 
 private fun formatDate(millis: Long): String {
-    val formatter = SimpleDateFormat("dd.MM.yyyy", Locale("pl", "PL"))
+    val formatter = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
     return formatter.format(Date(millis))
 }
 
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 private fun ProfileSkeleton() {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Header Skeleton
         Card(
             modifier = Modifier.fillMaxWidth(),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Box(
                     modifier = Modifier
                         .size(96.dp)
                         .clip(CircleShape)
-                        .shimmerEffect()
+                        .shimmerEffect(),
                 )
                 Spacer(Modifier.height(12.dp))
                 Box(
@@ -1269,7 +1161,7 @@ private fun ProfileSkeleton() {
                         .width(150.dp)
                         .height(24.dp)
                         .clip(MaterialTheme.shapes.small)
-                        .shimmerEffect()
+                        .shimmerEffect(),
                 )
                 Spacer(Modifier.height(8.dp))
                 Box(
@@ -1277,7 +1169,7 @@ private fun ProfileSkeleton() {
                         .width(200.dp)
                         .height(16.dp)
                         .clip(MaterialTheme.shapes.small)
-                        .shimmerEffect()
+                        .shimmerEffect(),
                 )
                 Spacer(Modifier.height(16.dp))
                 Box(
@@ -1285,21 +1177,20 @@ private fun ProfileSkeleton() {
                         .fillMaxWidth()
                         .height(44.dp)
                         .clip(MaterialTheme.shapes.extraLarge)
-                        .shimmerEffect()
+                        .shimmerEffect(),
                 )
             }
         }
 
-        // Stats Card Skeleton
         Card(
             modifier = Modifier.fillMaxWidth(),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceAround
+                horizontalArrangement = Arrangement.SpaceAround,
             ) {
                 repeat(2) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1307,7 +1198,7 @@ private fun ProfileSkeleton() {
                             modifier = Modifier
                                 .size(28.dp)
                                 .clip(CircleShape)
-                                .shimmerEffect()
+                                .shimmerEffect(),
                         )
                         Spacer(Modifier.height(8.dp))
                         Box(
@@ -1315,17 +1206,16 @@ private fun ProfileSkeleton() {
                                 .width(40.dp)
                                 .height(20.dp)
                                 .clip(MaterialTheme.shapes.small)
-                                .shimmerEffect()
+                                .shimmerEffect(),
                         )
                     }
                 }
             }
         }
 
-        // Content Card Skeleton
         Card(
             modifier = Modifier.fillMaxWidth(),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Box(
@@ -1333,7 +1223,7 @@ private fun ProfileSkeleton() {
                         .width(100.dp)
                         .height(20.dp)
                         .clip(MaterialTheme.shapes.small)
-                        .shimmerEffect()
+                        .shimmerEffect(),
                 )
                 Spacer(Modifier.height(16.dp))
                 repeat(2) {
@@ -1341,13 +1231,13 @@ private fun ProfileSkeleton() {
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Box(
                             modifier = Modifier
                                 .size(24.dp)
                                 .clip(CircleShape)
-                                .shimmerEffect()
+                                .shimmerEffect(),
                         )
                         Spacer(Modifier.width(12.dp))
                         Box(
@@ -1355,7 +1245,7 @@ private fun ProfileSkeleton() {
                                 .weight(1f)
                                 .height(20.dp)
                                 .clip(MaterialTheme.shapes.small)
-                                .shimmerEffect()
+                                .shimmerEffect(),
                         )
                     }
                 }

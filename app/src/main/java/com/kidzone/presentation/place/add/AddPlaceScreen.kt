@@ -88,16 +88,11 @@ import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.presentation.common.style
 import com.kidzone.presentation.common.rememberHapticFeedback
+import com.kidzone.utils.UiText
 import kotlinx.coroutines.launch
 
 /**
  * Ekran dodawania nowego miejsca – formularz zapisywany do Firestore.
- *
- *  - nazwa, opis, kategoria, adres – pola tekstowe
- *  - GPS przez przycisk "Pobierz moją lokalizację" (uses FusedLocationClient,
- *    z permission requestem przy pierwszym użyciu)
- *  - udogodnienia jako FilterChips (multi-select)
- *  - przycisk "Zapisz miejsce" enabled tylko gdy formularz ważny
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -112,13 +107,9 @@ fun AddPlaceScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val haptic = rememberHapticFeedback()
 
-    // Po pomyślnym zapisie – wracamy poziom wyżej. W trybie create
-    // dodatkowo przekazujemy współrzędne nowego pinu, żeby Main mógł
-    // wycentrować na nim mapę.
     LaunchedEffect(state.isSaved) {
         if (state.isSaved) {
             haptic.success()
-            // Trigger in-app review if threshold reached (3rd place added)
             if (state.shouldRequestReview) {
                 val activity = context as? android.app.Activity
                 if (activity != null) {
@@ -130,31 +121,27 @@ fun AddPlaceScreen(
         }
     }
 
-    // Komunikat o duplikatach zdjęć
     LaunchedEffect(state.photoDuplicateMessage) {
         val msg = state.photoDuplicateMessage
         if (msg != null) {
-            snackbarHostState.showSnackbar(msg)
+            snackbarHostState.showSnackbar(msg.asString(context))
             viewModel.consumePhotoDuplicateMessage()
         }
     }
 
-    // Launcher prośby o uprawnienie lokalizacji.
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
             coroutineScope.launch { fetchAndSetLocation(context, viewModel) }
         } else {
-            viewModel.onLocationError("Brak uprawnienia do lokalizacji")
+            viewModel.onLocationError(UiText.StringResource(R.string.location_permission_denied))
         }
     }
 
-    // Photo picker – max 5 zdjęć jednocześnie.
     var photoHashSet by remember { mutableStateOf(setOf<String>()) }
     var placeHashesReady by remember { mutableStateOf(!state.isEditMode) }
 
-    // Seeduj hashe z istniejących remote URLs przy edycji miejsca
     androidx.compose.runtime.LaunchedEffect(state.existingPhotoUrls) {
         if (state.existingPhotoUrls.isNotEmpty() && photoHashSet.isEmpty()) {
             val hashes = mutableSetOf<String>()
@@ -171,11 +158,11 @@ fun AddPlaceScreen(
         placeHashesReady = true
     }
 
+    val duplicatePhotoError = stringResource(R.string.duplicate_photo_error)
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(MAX_PLACE_PHOTOS)
     ) { uris ->
         if (uris.isNotEmpty()) {
-            // Deduplikacja na bazie content hash
             val accepted = mutableListOf<Uri>()
             val hashes = photoHashSet.toMutableSet()
             var duplicatesFound = 0
@@ -194,13 +181,12 @@ fun AddPlaceScreen(
             }
             if (duplicatesFound > 0) {
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar("To zdjęcie zostało już dodane. Nie można dodać duplikatu.")
+                    snackbarHostState.showSnackbar(duplicatePhotoError)
                 }
             }
         }
     }
 
-    // Camera launcher
     val placeCameraUri = remember { mutableStateOf<Uri?>(null) }
     val placeCameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
@@ -213,7 +199,7 @@ fun AddPlaceScreen(
                 viewModel.addPhotos(listOf(uri))
             } else {
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar("To zdjęcie zostało już dodane. Nie można dodać duplikatu.")
+                    snackbarHostState.showSnackbar(duplicatePhotoError)
                 }
             }
         }
@@ -225,6 +211,7 @@ fun AddPlaceScreen(
         placeCameraLauncher.launch(uri)
     }
 
+    val cameraAccessDenied = stringResource(R.string.camera_access_denied)
     val placeCameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -232,25 +219,23 @@ fun AddPlaceScreen(
             launchPlaceCamera()
         } else {
             coroutineScope.launch {
-                snackbarHostState.showSnackbar("Brak dostępu do aparatu")
+                snackbarHostState.showSnackbar(cameraAccessDenied)
             }
         }
     }
-
-
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = if (state.isEditMode) "Edytuj miejsce"
+                        text = if (state.isEditMode) stringResource(R.string.edit_place_title)
                         else stringResource(R.string.add_place)
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Wróć")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
@@ -265,21 +250,15 @@ fun AddPlaceScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.Top
         ) {
-            // --- Nazwa (wymagana) ---
             val nameHasError = state.hasTriedToSave && state.name.isBlank()
-            // Title Case (KeyboardCapitalization.Words) - "Plac Zabaw Kasztanowa"
-            // wygląda lepiej niż "plac zabaw kasztanowa". Klawiatura sama
-            // zacznie każde słowo dużą literą; ostateczna normalizacja
-            // (np. gdy user wpisze małą po autocorrect) zachodzi w VM
-            // przy zapisie - patrz AddPlaceViewModel.save().
             OutlinedTextField(
                 value = state.name,
                 onValueChange = viewModel::onNameChange,
-                label = { RequiredFieldLabel("Nazwa miejsca") },
+                label = { RequiredFieldLabel(stringResource(R.string.place_name_label)) },
                 singleLine = true,
                 supportingText = {
                     val requiredText = if (state.name.isBlank()) {
-                        "Pole wymagane. "
+                        stringResource(R.string.field_required) + ". "
                     } else {
                         ""
                     }
@@ -294,20 +273,17 @@ fun AddPlaceScreen(
                     .fillMaxWidth()
                     .semantics {
                         if (nameHasError) {
-                            error("Pole wymagane")
+                            error(context.getString(R.string.field_required))
                         }
                     }
             )
 
             Spacer(Modifier.height(8.dp))
 
-            // --- Opis ---
-            // Sentences - duża litera tylko po kropce, jak w naturalnym
-            // tekście opisowym ("Fajny park z kacikiem dla maluchow.").
             OutlinedTextField(
                 value = state.description,
                 onValueChange = viewModel::onDescriptionChange,
-                label = { Text("Opis") },
+                label = { Text(stringResource(R.string.place_description_label)) },
                 minLines = 2,
                 maxLines = 5,
                 enabled = !state.isSaving,
@@ -319,7 +295,6 @@ fun AddPlaceScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            // --- Kategoria (dropdown) ---
             CategoryDropdown(
                 selected = state.category,
                 onSelected = viewModel::onCategoryChange,
@@ -330,8 +305,6 @@ fun AddPlaceScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // --- Lokalizacja GPS (wymagana) – nad adresem, by po pobraniu
-            // GPS adres mógł zostać wypełniony przez reverse geocoding ---
             LocationSection(
                 latitude = state.latitude,
                 longitude = state.longitude,
@@ -346,13 +319,12 @@ fun AddPlaceScreen(
                 enabled = !state.isSaving
             )
 
-            // Info pod przyciskiem GPS
             Spacer(Modifier.height(6.dp))
             Text(
                 text = if (state.latitude == null || state.longitude == null) {
-                    "Lokalizacja jest wymagana. Pobierz GPS w miejscu, które dodajesz."
+                    stringResource(R.string.location_required_hint)
                 } else {
-                    "Lokalizacja pobrana. Możesz zapisać miejsce."
+                    stringResource(R.string.location_fetched_hint)
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = if (state.latitude == null || state.longitude == null) {
@@ -367,7 +339,6 @@ fun AddPlaceScreen(
                     }
             )
 
-            // --- Miejsca w pobliżu (ochrona przed duplikatami) ---
             if (state.nearbyPlaces.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 NearbyPlacesList(places = state.nearbyPlaces)
@@ -375,14 +346,12 @@ fun AddPlaceScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // --- Adres (read-only, wypełniany przez reverse geocoding po
-            // pobraniu lokalizacji GPS). Użytkownik nie może edytować ręcznie. ---
             OutlinedTextField(
                 value = state.address,
                 onValueChange = { /* read-only */ },
-                label = { Text("Adres") },
+                label = { Text(stringResource(R.string.address_label)) },
                 supportingText = {
-                    Text("Uzupełnia się automatycznie po pobraniu lokalizacji")
+                    Text(stringResource(R.string.address_auto_hint))
                 },
                 singleLine = true,
                 readOnly = true,
@@ -392,9 +361,8 @@ fun AddPlaceScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // --- Udogodnienia (FilterChips) – filtrowane po wybranej kategorii ---
             Text(
-                text = "Udogodnienia",
+                text = stringResource(R.string.amenities_label),
                 style = MaterialTheme.typography.titleMedium
             )
             Spacer(Modifier.height(8.dp))
@@ -406,11 +374,10 @@ fun AddPlaceScreen(
                 enabled = !state.isSaving
             )
 
-            // --- Komunikat błędu ---
             state.errorMessage?.let { msg ->
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = msg,
+                    text = msg.asString(),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.semantics {
@@ -421,26 +388,22 @@ fun AddPlaceScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            // --- Zdjęcia ---
             Text(
-                text = "Zdjęcia (${state.photoUris.size + state.existingPhotoUrls.size}/$MAX_PLACE_PHOTOS)",
+                text = stringResource(R.string.photos_with_count, state.photoUris.size + state.existingPhotoUrls.size),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(Modifier.height(8.dp))
 
-            // Miniaturki istniejących zdjęć (edycja)
             if (state.existingPhotoUrls.isNotEmpty() || state.photoUris.isNotEmpty()) {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Istniejące (już uploadowane)
                     itemsIndexed(state.existingPhotoUrls) { index, url ->
                         PhotoThumbnail(
                             model = url,
                             onRemove = {
-                                // Usuwamy hash żeby ponowne dodanie tego samego zdjęcia nie było blokowane
                                 val removedUrl = state.existingPhotoUrls[index]
                                 viewModel.removeExistingPhoto(index)
                                 coroutineScope.launch {
@@ -455,12 +418,10 @@ fun AddPlaceScreen(
                             enabled = !state.isSaving
                         )
                     }
-                    // Nowe (lokalne URI)
                     itemsIndexed(state.photoUris) { index, uri ->
                         PhotoThumbnail(
                             model = uri,
                             onRemove = {
-                                // Usuwamy hash żeby ponowne dodanie tego samego zdjęcia nie było blokowane
                                 val removedUri = state.photoUris[index]
                                 val hash = computePlacePhotoHash(context, removedUri)
                                 viewModel.removeNewPhoto(index)
@@ -475,7 +436,6 @@ fun AddPlaceScreen(
                 Spacer(Modifier.height(8.dp))
             }
 
-            // Przyciski Galeria + Aparat
             if (state.canAddMorePhotos) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -496,7 +456,7 @@ fun AddPlaceScreen(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(Modifier.width(6.dp))
-                        Text("Galeria")
+                        Text(stringResource(R.string.gallery))
                     }
                     OutlinedButton(
                         onClick = {
@@ -506,7 +466,7 @@ fun AddPlaceScreen(
                             if (hasPerm) {
                                 launchPlaceCamera()
                             } else {
-                                placeCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                placeCameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
                             }
                         },
                         enabled = !state.isSaving && placeHashesReady,
@@ -518,7 +478,7 @@ fun AddPlaceScreen(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(Modifier.width(6.dp))
-                        Text("Aparat")
+                        Text(stringResource(R.string.camera))
                     }
                 }
             }
@@ -527,7 +487,7 @@ fun AddPlaceScreen(
                 Spacer(Modifier.height(8.dp))
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 Text(
-                    text = "Przesyłanie zdjęć...",
+                    text = stringResource(R.string.uploading_photos),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -535,7 +495,6 @@ fun AddPlaceScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            // --- Przycisk zapisu ---
             Button(
                 onClick = viewModel::save,
                 enabled = !state.isSaving && !state.isLoadingPlace && state.isFormValid,
@@ -549,8 +508,8 @@ fun AddPlaceScreen(
                     )
                 } else {
                     Text(
-                        text = if (state.isEditMode) "Zaktualizuj miejsce"
-                        else "Zapisz miejsce"
+                        text = if (state.isEditMode) stringResource(R.string.update_place_action)
+                        else stringResource(R.string.save_place_action)
                     )
                 }
             }
@@ -559,7 +518,6 @@ fun AddPlaceScreen(
         }
     }
 
-    // --- Dialog ostrzeżenia o potencjalnym duplikacie ---
     val duplicateCandidate = state.duplicateCandidate
     if (state.showDuplicateWarning && duplicateCandidate != null) {
         DuplicateWarningDialog(
@@ -570,35 +528,28 @@ fun AddPlaceScreen(
     }
 }
 
-/**
- * Pobiera GPS przez [fetchCurrentLocation], a następnie best-effort
- * reverse-geocoduje współrzędne na adres przez [reverseGeocode].
- * Wszystko propaguje jednym wołaniem do ViewModelu, dzięki czemu spinner
- * znika jednorazowo (a nie miga między fazami).
- */
 private suspend fun fetchAndSetLocation(
     context: android.content.Context,
     viewModel: AddPlaceViewModel
 ) {
     viewModel.onFetchingLocationStart()
 
-    // Sprawdź najpierw czy usługa lokalizacji jest w ogóle włączona
     if (!isLocationServiceEnabled(context)) {
-        viewModel.onLocationError(LOCATION_SERVICE_DISABLED_MESSAGE)
+        viewModel.onLocationError(UiText.StringResource(R.string.error_location_service_disabled))
         return
     }
 
     try {
         val coords = fetchCurrentLocation(context)
         if (coords == null) {
-            viewModel.onLocationError(LOCATION_TIMEOUT_USER_MESSAGE)
+            viewModel.onLocationError(UiText.StringResource(R.string.error_location_timeout))
             return
         }
         val address = runCatching { reverseGeocode(context, coords.first, coords.second) }
             .getOrNull()
         viewModel.onLocationFetched(coords.first, coords.second, address)
     } catch (e: Exception) {
-        viewModel.onLocationError(LOCATION_TIMEOUT_USER_MESSAGE)
+        viewModel.onLocationError(UiText.StringResource(R.string.error_location_timeout))
     }
 }
 
@@ -620,7 +571,7 @@ private fun CategoryDropdown(
             value = stringResource(selected.labelRes),
             onValueChange = {},
             readOnly = true,
-            label = { Text("Kategoria") },
+            label = { Text(stringResource(R.string.category_label)) },
             leadingIcon = {
                 Icon(
                     imageVector = selectedStyle.icon,
@@ -687,9 +638,9 @@ private fun LocationSection(
                 Spacer(Modifier.size(8.dp))
                 Text(
                     text = if (latitude != null && longitude != null) {
-                        "Aktualizuj lokalizację"
+                        stringResource(R.string.update_location_action)
                     } else {
-                        "Pobierz moją lokalizację *"
+                        stringResource(R.string.fetch_location_action)
                     }
                 )
             }
@@ -705,19 +656,6 @@ private fun LocationSection(
     }
 }
 
-/**
- * Siatka FilterChip-ów do multi-select udogodnień, filtrowana po [category].
- *
- * Sortowanie chipów:
- *  1. najczęściej używane na początku (wg [amenityFrequency] - mapa
- *     liczby miejsc, w których dane udogodnienie jest zaznaczone),
- *  2. tiebreak: kolejność z enuma (tj. logiczne grupowanie z [Amenity]).
- *
- * Gdy mapa jest pusta (świeży start, brak miejsc w bazie, błąd fetcha) -
- * spadamy na kolejność z enuma. Dzięki temu ekran nie czeka na asynchroniczny
- * count, tylko płynnie przechodzi z "logicznej" kolejności do
- * "od najczęstszego" gdy frequency dotrze.
- */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AmenitiesGrid(
@@ -750,7 +688,6 @@ private fun AmenitiesGrid(
     }
 }
 
-/** Tekst etykiety + czerwona gwiazdka, do wymaganych pól. */
 @Composable
 private fun RequiredFieldLabel(text: String) {
     val errorColor = MaterialTheme.colorScheme.error
@@ -764,11 +701,6 @@ private fun RequiredFieldLabel(text: String) {
     )
 }
 
-
-/**
- * Mini-lista istniejących miejsc w pobliżu, wyświetlana po pobraniu GPS.
- * Pomaga użytkownikowi zauważyć, że podobne miejsce już istnieje.
- */
 @Composable
 private fun NearbyPlacesList(places: List<AddPlaceViewModel.NearbyPlace>) {
     Surface(
@@ -778,7 +710,7 @@ private fun NearbyPlacesList(places: List<AddPlaceViewModel.NearbyPlace>) {
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
-                text = "Miejsca w pobli\u017Cu:",
+                text = stringResource(R.string.nearby_places_label),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -793,7 +725,7 @@ private fun NearbyPlacesList(places: List<AddPlaceViewModel.NearbyPlace>) {
                 ) {
                     Icon(
                         imageVector = style.icon,
-                        contentDescription = "Kategoria",
+                        contentDescription = stringResource(R.string.category_label),
                         tint = style.color,
                         modifier = Modifier.size(16.dp)
                     )
@@ -815,10 +747,6 @@ private fun NearbyPlacesList(places: List<AddPlaceViewModel.NearbyPlace>) {
     }
 }
 
-/**
- * Dialog ostrzegawczy wyświetlany gdy w promieniu 100m od pobranej lokalizacji
- * istnieje już miejsce tej samej kategorii (potencjalny duplikat).
- */
 @Composable
 private fun DuplicateWarningDialog(
     candidate: AddPlaceViewModel.NearbyPlace,
@@ -831,46 +759,45 @@ private fun DuplicateWarningDialog(
         icon = {
             Icon(
                 imageVector = style.icon,
-                contentDescription = "Ikona kategorii",
+                contentDescription = null,
                 tint = style.color
             )
         },
-        title = { Text("Potencjalny duplikat") },
+        title = { Text(stringResource(R.string.duplicate_warning_title)) },
         text = {
             Text(
-                text = "W pobli\u017Cu (~${candidate.distanceMeters}m) istnieje ju\u017C miejsce " +
-                    "\u201E${candidate.name}\u201D (${stringResource(candidate.category.labelRes)}). " +
-                    "Czy na pewno chcesz doda\u0107 nowe?"
+                text = stringResource(
+                    R.string.duplicate_warning_message,
+                    candidate.distanceMeters,
+                    candidate.name,
+                    stringResource(candidate.category.labelRes)
+                )
             )
         },
         confirmButton = {
             Button(onClick = onConfirm) {
-                Text("Dodaj mimo to")
+                Text(stringResource(R.string.duplicate_warning_confirm))
             }
         },
         dismissButton = {
             OutlinedButton(onClick = onDismiss) {
-                Text("Anuluj")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
 }
 
-
-/**
- * Miniaturka zdjęcia z przyciskiem "X" do usunięcia.
- * Akceptuje zarówno [android.net.Uri] (nowe) jak i [String] URL (istniejące).
- */
+@Suppress("FunctionNaming")
 @Composable
 private fun PhotoThumbnail(
-    model: Any, // Uri lub String URL
+    model: Any,
     onRemove: () -> Unit,
     enabled: Boolean = true
 ) {
     Box(modifier = Modifier.size(80.dp)) {
         AsyncImage(
             model = model,
-            contentDescription = "Miniatura zdjęcia",
+            contentDescription = stringResource(R.string.photo_thumbnail_description),
             modifier = Modifier
                 .size(80.dp)
                 .clip(RoundedCornerShape(8.dp)),
@@ -889,7 +816,7 @@ private fun PhotoThumbnail(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Close,
-                    contentDescription = "Usuń zdjęcie",
+                    contentDescription = stringResource(R.string.remove_photo_description),
                     tint = MaterialTheme.colorScheme.onError,
                     modifier = Modifier.size(14.dp)
                 )
@@ -898,10 +825,6 @@ private fun PhotoThumbnail(
     }
 }
 
-
-/**
- * Oblicza MD5 hash zawartości URI do detekcji duplikatów zdjęć.
- */
 private fun computePlacePhotoHash(context: android.content.Context, uri: Uri): String? {
     return try {
         val inputStream = context.contentResolver.openInputStream(uri) ?: return null
@@ -918,9 +841,6 @@ private fun computePlacePhotoHash(context: android.content.Context, uri: Uri): S
     }
 }
 
-/**
- * Tworzy tymczasowy plik dla zdjęcia z aparatu i zwraca content URI.
- */
 private fun createPlaceCameraUri(context: android.content.Context): Uri {
     val photoFile = File.createTempFile(
         "place_camera_",
@@ -934,12 +854,6 @@ private fun createPlaceCameraUri(context: android.content.Context): Uri {
     )
 }
 
-
-/**
- * Pobiera zdjęcie z remote URL i oblicza MD5 hash.
- * Używane do seedowania hashów istniejących zdjęć przy edycji miejsca.
- * Wywołuj na Dispatchers.IO.
- */
 private fun computeRemotePlacePhotoHash(url: String): String? {
     return try {
         val connection = java.net.URL(url).openConnection()

@@ -2,11 +2,12 @@ package com.kidzone.presentation.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kidzone.R
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.PasswordPolicy
-import com.kidzone.utils.SERVER_TEMPORARY_ERROR_MESSAGE
+import com.kidzone.utils.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,14 +29,13 @@ class RegisterViewModel @Inject constructor(
         val email: String = "",
         val password: String = "",
         val isLoading: Boolean = false,
-        val errorMessage: String? = null,
-        val successMessage: String? = null,
+        val errorMessage: UiText? = null,
+        val successMessage: UiText? = null,
         val isRegistered: Boolean = false
     ) {
         val isNameValid: Boolean
             get() = name.trim().isNotBlank()
 
-        /** Prosta walidacja formatu – Firebase i tak zweryfikuje server-side. */
         val isEmailValid: Boolean
             get() = email.trim().let { trimmed ->
                 trimmed.contains('@') &&
@@ -46,7 +46,6 @@ class RegisterViewModel @Inject constructor(
         val isPasswordValid: Boolean
             get() = PasswordPolicy.isValid(password)
 
-        /** Wszystkie pola spełniają warunki – można klikać "Zarejestruj się". */
         val isFormValid: Boolean
             get() = isNameValid && isEmailValid && isPasswordValid
     }
@@ -74,19 +73,19 @@ class RegisterViewModel @Inject constructor(
 
         when {
             name.isBlank() -> {
-                _uiState.update { it.copy(errorMessage = "Podaj imię / nazwę użytkownika") }
+                _uiState.update { it.copy(errorMessage = UiText.StringResource(R.string.error_enter_username)) }
                 return
             }
             email.isBlank() -> {
-                _uiState.update { it.copy(errorMessage = "Podaj e-mail") }
+                _uiState.update { it.copy(errorMessage = UiText.StringResource(R.string.error_enter_email)) }
                 return
             }
             password.isBlank() -> {
-                _uiState.update { it.copy(errorMessage = "Podaj hasło") }
+                _uiState.update { it.copy(errorMessage = UiText.StringResource(R.string.error_enter_password)) }
                 return
             }
             !PasswordPolicy.isValid(password) -> {
-                _uiState.update { it.copy(errorMessage = PasswordPolicy.DEFAULT_ERROR_MESSAGE) }
+                _uiState.update { it.copy(errorMessage = UiText.StringResource(R.string.error_weak_password)) }
                 return
             }
         }
@@ -94,7 +93,6 @@ class RegisterViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             val result = authRepository.registerWithEmail(name, email, password)
-            // Po rejestracji wyloguj – user musi potwierdzić email zanim się zaloguje.
             if (result is OpResult.Success) {
                 authRepository.signOut()
             }
@@ -103,7 +101,7 @@ class RegisterViewModel @Inject constructor(
                     is OpResult.Success -> it.copy(
                         isLoading = false,
                         isRegistered = true,
-                        successMessage = "Konto utworzone! Sprawdź skrzynkę e-mail i kliknij link weryfikacyjny, aby się zalogować."
+                        successMessage = UiText.StringResource(R.string.register_success_message)
                     )
                     is OpResult.Failure -> it.copy(
                         isLoading = false,
@@ -114,8 +112,8 @@ class RegisterViewModel @Inject constructor(
         }
     }
 
-    private fun mapError(throwable: Throwable): String = when (throwable) {
-        is AuthException -> throwable.message ?: "Nieznany błąd"
-        else -> SERVER_TEMPORARY_ERROR_MESSAGE
+    private fun mapError(throwable: Throwable): UiText = when (throwable) {
+        is AuthException -> UiText.StringResource(throwable.messageRes)
+        else -> UiText.StringResource(R.string.error_unknown)
     }
 }

@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -34,6 +35,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.kidzone.R
 import com.kidzone.presentation.place.add.isLocationServiceEnabled
 
 @Composable
@@ -87,7 +89,7 @@ fun NoInternetBanner(modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "Brak po\u0142\u0105czenia z internetem. Oczekiwanie na sie\u0107\u2026",
+                text = stringResource(R.string.no_internet_banner),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 modifier = Modifier.weight(1f)
@@ -120,7 +122,7 @@ fun GpsDisabledBanner(modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "Lokalizacja wy\u0142\u0105czona. W\u0142\u0105cz GPS w ustawieniach.",
+                text = stringResource(R.string.gps_disabled_banner),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onTertiaryContainer,
                 modifier = Modifier.weight(1f)
@@ -129,17 +131,14 @@ fun GpsDisabledBanner(modifier: Modifier = Modifier) {
                 val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
                 context.startActivity(intent)
             }) {
-                Text("W\u0142\u0105cz", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.enable), style = MaterialTheme.typography.labelMedium)
             }
         }
     }
 }
 
 /**
- * Banner "Ustalanie lokalizacji…" – wyświetlany gdy GPS jest włączony i
- * uprawnienie nadane, ale lokalizacja nie została jeszcze ustalona (np.
- * zimny start GPS, słaby sygnał w budynku). Informuje usera, że apka
- * aktywnie próbuje uzyskać fix.
+ * Banner "Ustalanie lokalizacji…"
  */
 @Composable
 fun GpsAcquiringBanner(modifier: Modifier = Modifier) {
@@ -163,7 +162,7 @@ fun GpsAcquiringBanner(modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "Ustalanie lokalizacji\u2026",
+                text = stringResource(R.string.gps_acquiring_banner),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier.weight(1f)

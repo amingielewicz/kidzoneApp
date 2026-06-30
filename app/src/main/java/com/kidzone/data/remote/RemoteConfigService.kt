@@ -27,7 +27,7 @@ class RemoteConfigService @Inject constructor(
         remoteConfig.setDefaultsAsync(
             mapOf(
                 "maintenance_mode" to false,
-                "maintenance_message" to "Aplikacja jest chwilowo niedostępna. Spróbuj ponownie później.",
+                "maintenance_message" to "",
                 "max_photos_per_place" to 10L,
                 "max_review_length" to 500L,
                 "enable_subscriptions" to false,

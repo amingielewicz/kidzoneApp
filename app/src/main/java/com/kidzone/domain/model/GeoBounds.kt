@@ -2,6 +2,11 @@
 
 package com.kidzone.domain.model
 
+import com.kidzone.utils.GeoHash
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.max
+
 /**
  * Prostokątny obszar mapy. Długości geograficzne mogą przecinać południk 180°.
  */
@@ -37,5 +42,30 @@ data class GeoBounds(
         } else {
             longitude >= west || longitude <= east
         }
+    }
+
+    /**
+     * Sprawdza czy prostokąt jest podobny (do de-bounce ruchów mapy).
+     */
+    fun isSimilarTo(other: GeoBounds, threshold: Double = 0.001): Boolean {
+        return abs(north - other.north) < threshold &&
+            abs(east - other.east) < threshold &&
+            abs(south - other.south) < threshold &&
+            abs(west - other.west) < threshold
+    }
+
+    /**
+     * Generuje prefiks geohasha dla centrum z precyzją zależną od rozmiaru.
+     */
+    fun geohashPrefix(): String {
+        val latSpan = north - south
+        val lngSpan = if (west <= east) east - west else 360.0 - west + east
+        val radiusKm = max(latSpan * 111.0, lngSpan * 111.0 * cos(Math.toRadians(centerLatitude))) / 2.0
+        val precision = when {
+            radiusKm < 10 -> 5
+            radiusKm < 50 -> 4
+            else -> 3
+        }
+        return GeoHash.encode(centerLatitude, centerLongitude, precision)
     }
 }

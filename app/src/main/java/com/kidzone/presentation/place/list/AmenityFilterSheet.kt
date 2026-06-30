@@ -40,20 +40,22 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.annotation.StringRes
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.R
 
 /**
  * Pojedyncza sekcja w sheecie filtrów udogodnień.
  *
- * @property title tytuł sekcji wyświetlany w headerze
+ * @property titleRes id zasobu tytułu sekcji wyświetlanego w headerze
  * @property amenities lista udogodnień należących do sekcji
  * @property matchingCategories kategorie dla których ta sekcja jest istotna –
  *   gdy aktualnie wybrana kategoria do nich pasuje, sekcja jest auto-rozwinięta.
  *   Pusty zbiór = sekcja "ogólna" (zawsze może być relevant).
  */
 private data class AmenitySection(
-    val title: String,
+    @StringRes val titleRes: Int,
     val amenities: List<Amenity>,
     val matchingCategories: Set<PlaceCategory>
 )
@@ -63,7 +65,7 @@ private data class AmenitySection(
 // Park → Atrakcja. Spójne z chipami kategorii na ekranie listy.
 private val SHEET_SECTIONS: List<AmenitySection> = listOf(
     AmenitySection(
-        title = "Ogólne",
+        titleRes = R.string.amenity_section_general,
         amenities = listOf(
             Amenity.CHANGING_TABLE,
             Amenity.TOILET,
@@ -78,7 +80,7 @@ private val SHEET_SECTIONS: List<AmenitySection> = listOf(
         matchingCategories = emptySet()
     ),
     AmenitySection(
-        title = "Plac zabaw",
+        titleRes = R.string.amenity_section_playground,
         amenities = listOf(
             Amenity.FENCING,
             Amenity.SOFT_SURFACE,
@@ -91,7 +93,7 @@ private val SHEET_SECTIONS: List<AmenitySection> = listOf(
         matchingCategories = setOf(PlaceCategory.PLAYGROUND)
     ),
     AmenitySection(
-        title = "Sala zabaw",
+        titleRes = R.string.amenity_section_play_room,
         amenities = listOf(
             Amenity.AGE_ZONES,
             Amenity.ANIMATOR,
@@ -104,7 +106,7 @@ private val SHEET_SECTIONS: List<AmenitySection> = listOf(
         matchingCategories = setOf(PlaceCategory.PLAY_ROOM)
     ),
     AmenitySection(
-        title = "Kawiarnia / Restauracja",
+        titleRes = R.string.amenity_section_food,
         amenities = listOf(
             Amenity.KIDS_MENU,
             Amenity.HIGH_CHAIR,
@@ -120,7 +122,7 @@ private val SHEET_SECTIONS: List<AmenitySection> = listOf(
         matchingCategories = setOf(PlaceCategory.CAFE, PlaceCategory.RESTAURANT)
     ),
     AmenitySection(
-        title = "Park",
+        titleRes = R.string.amenity_section_park,
         amenities = listOf(
             Amenity.PICNIC_AREA,
             Amenity.SAFE_PATHS,
@@ -131,7 +133,7 @@ private val SHEET_SECTIONS: List<AmenitySection> = listOf(
         matchingCategories = setOf(PlaceCategory.PARK)
     ),
     AmenitySection(
-        title = "Atrakcja",
+        titleRes = R.string.amenity_section_attraction,
         amenities = listOf(
             Amenity.STROLLER_RENTAL,
             Amenity.REST_AREAS,
@@ -145,17 +147,6 @@ private val SHEET_SECTIONS: List<AmenitySection> = listOf(
 
 /**
  * Bottom sheet z filtrami udogodnień.
- *
- * Zachowanie zależy od wybranej kategorii:
- *  - **Wszystkie** (selectedCategory = null): pokazuje WSZYSTKIE udogodnienia
- *    pogrupowane w sekcje (jak dotychczas).
- *  - **Konkretna kategoria** (np. Plac zabaw): pokazuje tylko udogodnienia
- *    pasujące do tej kategorii (sprawdza [Amenity.applicableCategories]).
- *    Udogodnienia "wspólne" (Przewijak, Czysta toaleta itp.) są zawsze
- *    widoczne, bo ich `applicableCategories` zawiera wszystkie/większość
- *    kategorii.
- *
- * @param totalResultsCount aktualna liczba miejsc po wszystkich filtrach
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -185,13 +176,13 @@ fun AmenityFilterSheet(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Filtry udogodnień",
+                    text = stringResource(R.string.amenity_filters_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
                 if (selectedAmenities.isNotEmpty()) {
                     TextButton(onClick = onClearAll) {
-                        Text("Wyczyść (${selectedAmenities.size})")
+                        Text(stringResource(R.string.clear_with_count, selectedAmenities.size))
                     }
                 }
             }
@@ -205,23 +196,17 @@ fun AmenityFilterSheet(
                     .weight(1f, fill = false)
                     .verticalScroll(rememberScrollState())
             ) {
-                // Filtruj sekcje – gdy wybrana kategoria, pokazujemy tylko
-                // sekcje pasujące do niej (+ sekcję "Ogólne" zawsze).
                 val visibleSections = remember(selectedCategory) {
                     if (selectedCategory == null) {
                         SHEET_SECTIONS
                     } else {
                         SHEET_SECTIONS.filter { section ->
-                            // "Ogólne" (matchingCategories = empty) zawsze widoczne
                             section.matchingCategories.isEmpty() ||
                                 selectedCategory in section.matchingCategories
                         }
                     }
                 }
 
-                // Filtruj udogodnienia wewnątrz sekcji – gdy kategoria jest
-                // wybrana, pokaż tylko te amenities które mają tę kategorię
-                // w swoich applicableCategories.
                 val sectionsWithFilteredAmenities = remember(selectedCategory, visibleSections) {
                     if (selectedCategory == null) {
                         visibleSections
@@ -236,14 +221,11 @@ fun AmenityFilterSheet(
                     }
                 }
 
-                // Stan rozwinięcia per sekcja – init zależnie od selectedCategory.
                 val expandedMap = remember(selectedCategory) {
-                    mutableStateMapOf<String, Boolean>().apply {
+                    mutableStateMapOf<Int, Boolean>().apply {
                         sectionsWithFilteredAmenities.forEach { section ->
-                            // Gdy kategoria wybrana – auto-expand pasujące sekcje.
-                            // Gdy "Wszystkie" – auto-expand sekcję "Ogólne".
                             put(
-                                section.title,
+                                section.titleRes,
                                 if (selectedCategory == null) {
                                     section.matchingCategories.isEmpty() // Ogólne
                                 } else {
@@ -257,9 +239,9 @@ fun AmenityFilterSheet(
                 sectionsWithFilteredAmenities.forEach { section ->
                     SectionItem(
                         section = section,
-                        expanded = expandedMap[section.title] ?: false,
+                        expanded = expandedMap[section.titleRes] ?: false,
                         onToggleExpand = {
-                            expandedMap[section.title] = !(expandedMap[section.title] ?: false)
+                            expandedMap[section.titleRes] = !(expandedMap[section.titleRes] ?: false)
                         },
                         selectedAmenities = selectedAmenities,
                         onAmenityToggled = onAmenityToggled
@@ -278,7 +260,7 @@ fun AmenityFilterSheet(
                     .padding(vertical = 12.dp),
                 colors = ButtonDefaults.buttonColors()
             ) {
-                Text("Pokaż wyniki ($totalResultsCount)")
+                Text(stringResource(R.string.show_results_with_count, totalResultsCount))
             }
         }
     }
@@ -301,6 +283,7 @@ private fun SectionItem(
 ) {
     val selectedInSection = section.amenities.count { it in selectedAmenities }
     val rotation by animateFloatAsState(if (expanded) 180f else 0f, label = "chevronRotation")
+    val title = stringResource(section.titleRes)
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -309,9 +292,9 @@ private fun SectionItem(
                 .heightIn(min = 48.dp)
                 .clickable(
                     onClickLabel = if (expanded) {
-                        "Zwiń ${section.title}"
+                        stringResource(R.string.collapse_section, title)
                     } else {
-                        "Rozwiń ${section.title}"
+                        stringResource(R.string.expand_section, title)
                     },
                     role = Role.Button,
                     onClick = onToggleExpand
@@ -320,7 +303,7 @@ private fun SectionItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = section.title,
+                text = title,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f)
@@ -352,7 +335,6 @@ private fun SectionItem(
 
         AnimatedVisibility(visible = expanded) {
             val context = androidx.compose.ui.platform.LocalContext.current
-            // Udogodnienia w sekcji alfabetycznie po polskim labelu
             val sortedAmenities = remember(section, context) {
                 section.amenities.sortedBy { context.getString(it.labelRes).lowercase() }
             }

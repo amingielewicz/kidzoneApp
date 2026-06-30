@@ -88,13 +88,6 @@ private data class PlaceCardAnimation(
 
 /**
  * Ekran "Start" – pierwsza zakładka po zalogowaniu.
- *
- * Sekcje (w kolejności):
- *  1. Hero – kolorowe powitanie z taglinem.
- *  2. CTA do mapy – pełnoszerokościowa karta zachęcająca do otwarcia mapy.
- *  3. "Blisko Ciebie" – LazyRow z miejscami w okolicy.
- *  4. "Top miejsca" – LazyRow z najwyżej ocenianymi miejscami w pobliżu.
- *  5. "Ostatnio dodane w okolicy" – nowe miejsca z ostatnich 14 dni.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
@@ -128,9 +121,6 @@ fun HomeScreen(
         }
     }
 
-    // Refresh permission flag gdy ekran wraca na pierwszy plan – user mógł
-    // pójść do Settings i włączyć/wyłączyć lokalizację, a my chcemy mieć
-    // aktualny stan w UI bez restartu.
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -147,7 +137,6 @@ fun HomeScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // GPS banners - fixed at the top of the content
             if (state.locationGranted && !gpsEnabled) {
                 GpsDisabledBanner()
             }
@@ -240,7 +229,7 @@ fun HomeScreen(
                 state.errorMessage?.let { msg ->
                     item {
                         Text(
-                            text = msg,
+                            text = msg.asString(),
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(horizontal = 16.dp)
@@ -252,17 +241,6 @@ fun HomeScreen(
     }
 }
 
-/**
- * Hero ekranu Start - powitanie + tagline na tle gradientu w brand-blue.
- *
- * Wizualnie celowo "uniesiony": nie pełnoszerokościowy bar przyklejony do
- * krawędzi ekranu, tylko karta z marginesami po bokach i zaokrąglonymi
- * rogami. Daje to "troszkę węższy" niebieski blok z tekstem, który
- * lepiej dialoguje z kartami "Top miejsca" / "Blisko Ciebie" pod spodem
- * (one też mają boczne paddingi 16 dp). Tekst wewnątrz dodatkowo nie
- * rozciąga się na 100% szerokości karty - ograniczamy go do ~88%, żeby
- * długie taglines nie dotykały prawej krawędzi gradientu.
- */
 @Composable
 private fun HeroSection() {
     Box(
@@ -283,8 +261,6 @@ private fun HeroSection() {
         contentAlignment = Alignment.CenterStart
     ) {
         Column(
-            // ~88% szerokości karty - tekst zostaje czytelny, a niebieski blok
-            // wygląda "troszkę węższy" niż gdyby napis biegł od krawędzi do krawędzi.
             modifier = Modifier.fillMaxWidth(0.88f)
         ) {
             Text(
@@ -304,23 +280,22 @@ private fun HeroSection() {
     }
 }
 
-/**
- * CTA do mapy – pełnoszerokościowa karta z ikoną Map i strzałką w prawo.
- * Kliknięcie woła [onClick] (= przełączenie taba na Map w MainScreen).
- */
 @Composable
 private fun OpenMapCta(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val desc = stringResource(R.string.home_open_map_description)
+    val label = stringResource(R.string.home_open_map)
+
     Card(
         modifier = modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
-                contentDescription = "Otwórz mapę i zobacz miejsca w okolicy"
+                contentDescription = desc
             }
             .clickable(
-                onClickLabel = "Otwórz mapę",
+                onClickLabel = label,
                 role = Role.Button,
                 onClick = onClick
             ),
@@ -338,7 +313,7 @@ private fun OpenMapCta(
         ) {
             Icon(
                 imageVector = Icons.Filled.Map,
-                contentDescription = "Otwórz mapę",
+                contentDescription = label,
                 modifier = Modifier.size(32.dp)
             )
             Spacer(Modifier.width(16.dp))
@@ -355,7 +330,7 @@ private fun OpenMapCta(
             }
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = "Przejdź do mapy"
+                contentDescription = stringResource(R.string.home_go_to_map)
             )
         }
     }
@@ -432,10 +407,6 @@ private fun HorizontalPlacesRow(
     }
 }
 
-/**
- * Karta pojedynczego miejsca w sekcji – lekki kafelek z badge kategorii,
- * nazwą i oceną.
- */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun PlaceCard(
@@ -446,9 +417,10 @@ private fun PlaceCard(
 ) {
     val place = item.place
     val categoryLabel = stringResource(place.category.labelRes)
-    val distanceLabel = item.distanceKm?.let { ", ${formatDistance(it)} od Ciebie" }.orEmpty()
+    val distanceLabel = item.distanceKm?.let {
+        ", ${stringResource(R.string.distance_away, formatDistance(it))}"
+    }.orEmpty()
     val ratingLabel = place.ratingAccessibilityLabel()
-    // Prefix keys to avoid duplicates on the same screen (e.g. Nearby vs Top)
     val animationKey = if (keyPrefix.isBlank()) "" else "${keyPrefix}_"
 
     KidZoneCard(
@@ -459,7 +431,7 @@ private fun PlaceCard(
                 contentDescription = "${place.name}, $categoryLabel$distanceLabel, $ratingLabel"
             }
             .clickable(
-                onClickLabel = "Otwórz szczegóły miejsca",
+                onClickLabel = stringResource(R.string.map_open_place_details_label),
                 role = Role.Button,
                 onClick = onClick
             )
@@ -507,7 +479,7 @@ private fun PlaceCard(
                     place.reviewsCount > 0 -> {
                         Icon(
                             imageVector = Icons.Filled.Star,
-                            contentDescription = "Ocena",
+                            contentDescription = stringResource(R.string.rating),
                             tint = MaterialTheme.colorScheme.tertiary,
                             modifier = Modifier.size(16.dp)
                         )
@@ -545,25 +517,24 @@ private fun DistanceLabel(distanceKm: Double) {
     }
 }
 
+@Composable
 private fun formatDistance(km: Double): String = when {
     km < 1.0 -> {
         val meters = (km * 1000).toInt()
         val rounded = ((meters + 25) / 50) * 50
-        "$rounded m"
+        stringResource(R.string.distance_m, rounded)
     }
-    km < 100.0 -> "%.1f km".format(km)
-    else -> "%d km".format(km.toInt())
+    km < 100.0 -> stringResource(R.string.distance_km, km)
+    else -> stringResource(R.string.distance_km_integer, km.toInt())
 }
 
+@Composable
 private fun Place.ratingAccessibilityLabel(): String = when {
-    reviewsCount > 0 -> "ocena %.1f, liczba opinii %d".format(averageRating, reviewsCount)
-    isNewWithoutReviews() -> "nowe miejsce bez opinii"
-    else -> "brak opinii"
+    reviewsCount > 0 -> stringResource(R.string.rating_accessibility_label, averageRating, reviewsCount)
+    isNewWithoutReviews() -> stringResource(R.string.new_place_no_reviews)
+    else -> stringResource(R.string.map_no_reviews)
 }
 
-/**
- * Skeleton loader for PlaceCard.
- */
 @Composable
 private fun PlaceCardSkeleton() {
     KidZoneCard(
