@@ -1,6 +1,8 @@
 package com.kidzone.data.repository
 
+import android.content.Context
 import android.net.Uri
+import androidx.glance.appwidget.updateAll
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
@@ -21,6 +23,8 @@ import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.SignInProvider
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
+import com.kidzone.widget.NearbyPlacesWidget
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -44,10 +48,12 @@ import javax.inject.Singleton
  * FirebaseUser.
  */
 @Singleton
+@Suppress("LargeClass")
 class FirebaseAuthRepository @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
-    private val firebaseStorage: FirebaseStorage
+    private val firebaseStorage: FirebaseStorage,
+    @ApplicationContext private val appContext: Context
 ) : AuthRepository {
 
     override val currentUser: Flow<User?> = callbackFlow {
@@ -246,6 +252,7 @@ class FirebaseAuthRepository @Inject constructor(
             } catch (_: Exception) { /* best-effort */ }
         }
         firebaseAuth.signOut()
+        clearWidgetLocationState()
     }
 
     override suspend fun getUserById(userId: String): OpResult<User> = try {
@@ -568,9 +575,21 @@ class FirebaseAuthRepository @Inject constructor(
 
         // 5) Konto Auth
         user.delete().await()
+        clearWidgetLocationState()
     }
 
     // --- helpers ---
+
+    private suspend fun clearWidgetLocationState() {
+        runCatching {
+            appContext.getSharedPreferences(NearbyPlacesWidget.LOCATION_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .remove(NearbyPlacesWidget.KEY_LAST_LAT)
+                .remove(NearbyPlacesWidget.KEY_LAST_LNG)
+                .apply()
+            NearbyPlacesWidget().updateAll(appContext)
+        }
+    }
 
     override suspend fun recordBadgesEarned(
         badgeNames: List<String>
@@ -864,6 +883,7 @@ class FirebaseAuthRepository @Inject constructor(
                     "Twoje konto jest zablokowane do $date."
                 }
                 firebaseAuth.signOut()
+                clearWidgetLocationState()
                 throw AuthException.AccountBanned(message, reason)
             }
         } catch (e: AuthException.AccountBanned) {

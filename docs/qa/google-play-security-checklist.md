@@ -88,11 +88,11 @@ Nie zamyka to ręcznych gate'ów w Firebase Console, Google Play Console ani tes
 
 | Punkt | Status | Dowód / link |
 | --- | --- | --- |
-| Widget nie pokazuje prywatnych danych po logout. | Do poprawy | #294 |
-| Widget nie pokazuje prywatnych danych po delete account. | Do poprawy | #294 |
-| Widget działa bez lokalizacji i bez cache. | Do poprawy | #294 |
-| Widget nie odświeża się nadmiernie po broadcastach. | Do poprawy | #294 |
-| Treść widgetu na ekranie blokady jest zaakceptowana dla pierwszego release. | Do poprawy | #294 |
+| Widget nie pokazuje prywatnych danych po logout. | Do poprawy | #294, `docs/qa/widget-privacy-checklist.md` |
+| Widget nie pokazuje prywatnych danych po delete account. | Do poprawy | #294, `docs/qa/widget-privacy-checklist.md` |
+| Widget działa bez lokalizacji i bez cache. | Do poprawy | #294, `docs/qa/widget-privacy-checklist.md` |
+| Widget nie odświeża się nadmiernie po broadcastach. | Do poprawy | #294, `docs/qa/widget-privacy-checklist.md` |
+| Treść widgetu na ekranie blokady jest zaakceptowana dla pierwszego release. | Do poprawy | #294, `docs/qa/widget-privacy-checklist.md` |
 
 ## 8. Manual smoke i accessibility
 
