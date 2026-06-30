@@ -124,7 +124,7 @@ fun PlaceDetailsScreen(
     var reviewToReport by remember { mutableStateOf<Review?>(null) }
     var showSuggestEditSheet by remember { mutableStateOf(false) }
     var showLocationCorrectionDialog by remember { mutableStateOf(false) }
-    
+
     var fullscreenPhotos by remember { mutableStateOf<List<String>>(emptyList()) }
     var fullscreenPhotoIndex by remember { mutableStateOf(0) }
     var fullscreenPhotosAreMine by remember { mutableStateOf(false) }

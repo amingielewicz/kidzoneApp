@@ -134,7 +134,7 @@ class ProfileViewModelTest {
         @Test
         fun `user flow emits user data when logged in`() = runTest {
             val testUser = TestFixtures.user(id = "uid-1", name = "Jan")
-            
+
             viewModel = createAndObserve()
             advanceUntilIdle()
 

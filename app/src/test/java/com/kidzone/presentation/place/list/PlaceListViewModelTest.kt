@@ -160,18 +160,18 @@ class PlaceListViewModelTest {
         fun `loadMore appends items from next page`() = runTest {
             val firstPage = samplePlaces
             val secondPage = listOf(TestFixtures.place(id = "p4"))
-            
+
             coEvery {
                 placeRepository.getPlacesPage(any(), null, any(), any())
             } returns OpResult.success(PagedResult(firstPage, "cursor-1"))
-            
+
             coEvery {
                 placeRepository.getPlacesPage(any(), "cursor-1", any(), any())
             } returns OpResult.success(PagedResult(secondPage, null))
 
             viewModel = createAndObserve()
             advanceUntilIdle()
-            
+
             assertEquals(3, viewModel.uiState.value.places.size)
             assertTrue(viewModel.uiState.value.hasMore)
 
