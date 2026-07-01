@@ -63,11 +63,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.kidzone.R
+import com.kidzone.presentation.common.createCameraImageUri
 import kotlinx.coroutines.launch
-import java.io.File
 import java.security.MessageDigest
 
 /**
@@ -117,22 +116,6 @@ private fun computeRemoteContentHash(url: String): String? {
     } catch (_: Exception) {
         null
     }
-}
-
-/**
- * Tworzy tymczasowy plik w cache i zwraca content URI.
- */
-private fun createTempCameraUri(context: Context): Uri {
-    val photoFile = File.createTempFile(
-        "review_camera_",
-        ".jpg",
-        context.cacheDir
-    )
-    return FileProvider.getUriForFile(
-        context,
-        "${context.packageName}.fileprovider",
-        photoFile
-    )
 }
 
 /**
@@ -225,12 +208,12 @@ fun AddReviewSheet(
         }
     }
 
-    val cameraUri = remember { mutableStateOf<Uri?>(null) }
+    var cameraUriString by rememberSaveable { mutableStateOf<String?>(null) }
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
-        if (success && cameraUri.value != null) {
-            val uri = cameraUri.value!!
+        val uri = cameraUriString?.let(Uri::parse)
+        if (success && uri != null) {
             val currentTotal = existingPhotoUrls.size + photoUris.size
             if (currentTotal < MAX_REVIEW_PHOTOS) {
                 if (!isDuplicate(uri)) {
@@ -243,12 +226,27 @@ fun AddReviewSheet(
                 }
             }
         }
+        cameraUriString = null
     }
 
+    val cameraUnavailable = stringResource(R.string.camera_unavailable)
     fun launchCamera() {
-        val uri = createTempCameraUri(context)
-        cameraUri.value = uri
-        cameraLauncher.launch(uri)
+        val uri = createCameraImageUri(context, "review_camera_")
+        if (uri == null) {
+            scope.launch {
+                snackbarHostState.showSnackbar(cameraUnavailable)
+            }
+            return
+        }
+        cameraUriString = uri.toString()
+        runCatching {
+            cameraLauncher.launch(uri)
+        }.onFailure {
+            cameraUriString = null
+            scope.launch {
+                snackbarHostState.showSnackbar(cameraUnavailable)
+            }
+        }
     }
 
     val cameraAccessDenied = stringResource(R.string.camera_access_denied)

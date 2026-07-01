@@ -7,8 +7,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
-import java.io.File
 import java.security.MessageDigest
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -64,6 +62,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,6 +85,7 @@ import coil.compose.AsyncImage
 import com.kidzone.R
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.presentation.common.createCameraImageUri
 import com.kidzone.presentation.common.style
 import com.kidzone.presentation.common.rememberHapticFeedback
 import com.kidzone.utils.UiText
@@ -187,12 +187,12 @@ fun AddPlaceScreen(
         }
     }
 
-    val placeCameraUri = remember { mutableStateOf<Uri?>(null) }
+    var placeCameraUriString by rememberSaveable { mutableStateOf<String?>(null) }
     val placeCameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
-        if (success && placeCameraUri.value != null) {
-            val uri = placeCameraUri.value!!
+        val uri = placeCameraUriString?.let(Uri::parse)
+        if (success && uri != null) {
             val hash = computePlacePhotoHash(context, uri)
             if (hash == null || hash !in photoHashSet) {
                 if (hash != null) photoHashSet = photoHashSet + hash
@@ -203,12 +203,27 @@ fun AddPlaceScreen(
                 }
             }
         }
+        placeCameraUriString = null
     }
 
+    val cameraUnavailable = stringResource(R.string.camera_unavailable)
     fun launchPlaceCamera() {
-        val uri = createPlaceCameraUri(context)
-        placeCameraUri.value = uri
-        placeCameraLauncher.launch(uri)
+        val uri = createCameraImageUri(context, "place_camera_")
+        if (uri == null) {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(cameraUnavailable)
+            }
+            return
+        }
+        placeCameraUriString = uri.toString()
+        runCatching {
+            placeCameraLauncher.launch(uri)
+        }.onFailure {
+            placeCameraUriString = null
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(cameraUnavailable)
+            }
+        }
     }
 
     val cameraAccessDenied = stringResource(R.string.camera_access_denied)
@@ -839,19 +854,6 @@ private fun computePlacePhotoHash(context: android.content.Context, uri: Uri): S
     } catch (_: Exception) {
         null
     }
-}
-
-private fun createPlaceCameraUri(context: android.content.Context): Uri {
-    val photoFile = File.createTempFile(
-        "place_camera_",
-        ".jpg",
-        context.cacheDir
-    )
-    return FileProvider.getUriForFile(
-        context,
-        "${context.packageName}.fileprovider",
-        photoFile
-    )
 }
 
 private fun computeRemotePlacePhotoHash(url: String): String? {

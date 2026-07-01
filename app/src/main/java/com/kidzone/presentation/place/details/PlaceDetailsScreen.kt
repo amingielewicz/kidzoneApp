@@ -66,6 +66,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,6 +86,7 @@ import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.model.User
 import com.kidzone.presentation.common.CategoryIcon
+import com.kidzone.presentation.common.createCameraImageUri
 import com.kidzone.presentation.common.RankBadge
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.style
@@ -143,33 +145,45 @@ fun PlaceDetailsScreen(
         }
     }
 
-    val placeCameraUri = remember { androidx.compose.runtime.mutableStateOf<android.net.Uri?>(null) }
+    var placeCameraUriString by rememberSaveable { mutableStateOf<String?>(null) }
     val placeCameraLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.TakePicture()
     ) { success ->
-        if (success && placeCameraUri.value != null) {
-            viewModel.addPhotoToPlace(placeCameraUri.value!!)
+        val uri = placeCameraUriString?.let(Uri::parse)
+        if (success && uri != null) {
+            viewModel.addPhotoToPlace(uri)
+        }
+        placeCameraUriString = null
+    }
+    val cameraUnavailable = stringResource(R.string.camera_unavailable)
+    fun launchPlaceCamera() {
+        val uri = createCameraImageUri(context, "place_camera_")
+        if (uri == null) {
+            scope.launch {
+                snackbarHostState.showSnackbar(cameraUnavailable)
+            }
+            return
+        }
+        placeCameraUriString = uri.toString()
+        runCatching {
+            placeCameraLauncher.launch(uri)
+        }.onFailure {
+            placeCameraUriString = null
+            scope.launch {
+                snackbarHostState.showSnackbar(cameraUnavailable)
+            }
         }
     }
-    fun launchPlaceCamera() {
-        val photoFile = java.io.File.createTempFile(
-            "place_camera_",
-            ".jpg",
-            context.cacheDir
-        )
-        val uri = androidx.core.content.FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            photoFile
-        )
-        placeCameraUri.value = uri
-        placeCameraLauncher.launch(uri)
-    }
+    val cameraAccessDenied = stringResource(R.string.camera_access_denied)
     val placeCameraPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
             launchPlaceCamera()
+        } else {
+            scope.launch {
+                snackbarHostState.showSnackbar(cameraAccessDenied)
+            }
         }
     }
 
