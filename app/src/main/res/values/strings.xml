@@ -410,7 +410,7 @@
     <string name="location_required_hint">Lokalizacja jest wymagana. Pobierz GPS w miejscu, które dodajesz.</string>
     <string name="location_fetched_hint">Lokalizacja pobrana. Możesz zapisać miejsce.</string>
     <string name="address_label">Adres</string>
-    <string name="address_auto_hint">Uzupełnia się automatycznie po pobraniu lokalizacji</string>
+    <string name="address_auto_hint">Pole tylko do odczytu. Adres uzupełni się automatycznie po pobraniu lokalizacji.</string>
     <string name="amenities_label">Udogodnienia</string>
     <string name="uploading_photos">Przesyłanie zdjęć...</string>
     <string name="update_place_action">Zaktualizuj miejsce</string>

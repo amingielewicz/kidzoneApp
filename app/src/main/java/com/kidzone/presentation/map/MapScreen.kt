@@ -370,7 +370,7 @@ fun MapScreen(
             onClick = { showPlacesList = true },
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 12.dp, bottom = 180.dp)
+                .padding(start = 12.dp, bottom = 236.dp)
         ) {
             Text(stringResource(R.string.map_list_button, state.places.size))
         }

@@ -122,7 +122,9 @@ fun MainScreen(
     val showExtendedAddPlaceFab = currentRoute in setOf(
         Route.Home.path,
         Route.Map.path,
-        Route.PlaceList.path
+        Route.PlaceList.path,
+        Route.Ranking.path,
+        Route.Profile.path
     )
 
     var locationPermissionGranted by remember {
@@ -158,6 +160,13 @@ fun MainScreen(
     // a my chcemy, by MapScreen otrzymał współrzędne i sam je skonsumował, gdy
     // zakończy animację kamery.
     var pendingMapFocus by remember { mutableStateOf<LatLng?>(null) }
+    var pendingRankingTab by remember { mutableStateOf(rankingTab) }
+
+    LaunchedEffect(rankingTab) {
+        if (rankingTab.isNotBlank()) {
+            pendingRankingTab = rankingTab
+        }
+    }
 
     // Rejestruj FCM token po zalogowaniu – Application.onCreate() może
     // nie mieć uid (cold start bez sesji). Tu user jest na pewno zalogowany.
@@ -335,6 +344,7 @@ fun MainScreen(
                 composable(Route.Ranking.path) {
                     RankingScreen(
                         onOpenPlaceDetails = onOpenPlaceDetails,
+                        initialTab = pendingRankingTab,
                         sharedTransitionScope = sharedTransitionScope,
                         animatedContentScope = animatedContentScope
                     )
