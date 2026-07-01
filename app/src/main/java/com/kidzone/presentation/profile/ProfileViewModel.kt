@@ -8,6 +8,7 @@ import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.repository.SignInProvider
 import com.kidzone.domain.service.BadgePreferences
+import com.kidzone.domain.usecase.NotificationPrefsUseCase
 import com.kidzone.i18n.AppLanguage
 import com.kidzone.i18n.LanguagePreferences
 import com.kidzone.presentation.common.BadgeContext
@@ -17,12 +18,16 @@ import com.kidzone.utils.OpResult
 import com.kidzone.utils.UiText
 import com.kidzone.utils.toUploadErrorMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -35,11 +40,13 @@ private const val FLOW_SUBSCRIPTION_TIMEOUT_MS = 5000L
 /**
  * ViewModel profilu użytkownika.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val placeRepository: PlaceRepository,
     private val badgePreferences: BadgePreferences,
+    private val notificationPrefsUseCase: NotificationPrefsUseCase,
     private val languagePreferences: LanguagePreferences
 ) : ViewModel() {
 
@@ -71,7 +78,13 @@ class ProfileViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    private val userContext = authRepository.currentUser.map { user ->
+    private val richUser = authRepository.currentUser
+        .flatMapLatest { current ->
+            if (current == null) flowOf(null) else authRepository.observeUser(current.id)
+        }
+        .catch { emit(null) }
+
+    private val userContext = richUser.map { user ->
         if (user == null) return@map null to BadgeContext()
 
         coroutineScope {
@@ -301,22 +314,31 @@ class ProfileViewModel @Inject constructor(
     fun openContact() { _uiState.update { it.copy(isContactOpen = true) } }
     fun dismissContact() { _uiState.update { it.copy(isContactOpen = false) } }
 
-    fun openNotificationPrefs() { _uiState.update { it.copy(isNotificationPrefsOpen = true) } }
+    fun openNotificationPrefs() {
+        _uiState.update { it.copy(isNotificationPrefsOpen = true) }
+        loadNotificationPrefs()
+    }
+
     fun dismissNotificationPrefs() { _uiState.update { it.copy(isNotificationPrefsOpen = false) } }
 
     fun saveNotificationPrefs(prefs: NotificationPrefs) {
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(isAccountActionInProgress = true, notificationPrefs = prefs)
-            }
-            // authRepository.updateNotificationPrefs(prefs) // Implementation pending
+            _uiState.update { it.copy(isAccountActionInProgress = true) }
+            notificationPrefsUseCase.save(prefs)
             _uiState.update {
                 it.copy(
                     isAccountActionInProgress = false,
                     isNotificationPrefsOpen = false,
-                    accountActionInfo = UiText.DynamicString("Preferences saved")
+                    notificationPrefs = prefs
                 )
             }
+        }
+    }
+
+    private fun loadNotificationPrefs() {
+        viewModelScope.launch {
+            val prefs = notificationPrefsUseCase.load()
+            _uiState.update { it.copy(notificationPrefs = prefs) }
         }
     }
 

@@ -7,6 +7,7 @@ import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.repository.SignInProvider
 import com.kidzone.domain.service.BadgePreferences
+import com.kidzone.domain.usecase.NotificationPrefsUseCase
 import com.kidzone.i18n.AppLanguage
 import com.kidzone.i18n.LanguagePreferences
 import com.kidzone.testutil.MainDispatcherRule
@@ -50,6 +51,7 @@ class ProfileViewModelTest {
     private lateinit var authRepository: AuthRepository
     private lateinit var placeRepository: PlaceRepository
     private lateinit var badgePreferences: BadgePreferences
+    private lateinit var notificationPrefsUseCase: NotificationPrefsUseCase
     private lateinit var languagePreferences: LanguagePreferences
     private lateinit var viewModel: ProfileViewModel
 
@@ -60,6 +62,7 @@ class ProfileViewModelTest {
         authRepository = mockk(relaxed = true)
         placeRepository = mockk(relaxed = true)
         badgePreferences = mockk(relaxed = true)
+        notificationPrefsUseCase = mockk(relaxed = true)
         languagePreferences = mockk(relaxed = true)
 
         every { badgePreferences.getSeenBadges(any()) } returns emptySet()
@@ -68,9 +71,11 @@ class ProfileViewModelTest {
 
         every { authRepository.currentUser } returns currentUserFlow
         coEvery { authRepository.getCurrentSignInProvider() } returns SignInProvider.EMAIL_PASSWORD
-        coEvery { authRepository.observeUser(any()) } returns flowOf(null)
+        every { authRepository.observeUser(any()) } returns currentUserFlow
         coEvery { placeRepository.getTopPlaces(any()) } returns OpResult.success(emptyList())
         coEvery { authRepository.getTopUsers(any()) } returns OpResult.success(emptyList())
+        coEvery { notificationPrefsUseCase.load() } returns NotificationPrefs()
+        coEvery { notificationPrefsUseCase.save(any()) } returns true
     }
 
     private fun kotlinx.coroutines.test.TestScope.createAndObserve(): ProfileViewModel {
@@ -78,6 +83,7 @@ class ProfileViewModelTest {
             authRepository,
             placeRepository,
             badgePreferences,
+            notificationPrefsUseCase,
             languagePreferences
         )
         // Activate flows
@@ -518,6 +524,51 @@ class ProfileViewModelTest {
             assertFalse(viewModel.uiState.value.isLanguageDialogOpen)
             assertEquals(AppLanguage.ENGLISH, viewModel.uiState.value.selectedLanguage)
             verify { languagePreferences.setLanguage(AppLanguage.ENGLISH) }
+        }
+
+        @Test
+        fun `openNotificationPrefs loads persisted preferences`() = runTest {
+            val prefs = NotificationPrefs(
+                newReviewOnMyPlace = false,
+                newBadgeEarned = true,
+                newPhotoOnMyPlace = false,
+                rankings = true,
+                emailNotificationsEnabled = false
+            )
+            coEvery { notificationPrefsUseCase.load() } returns prefs
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            viewModel.openNotificationPrefs()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.uiState.value.isNotificationPrefsOpen)
+            assertEquals(prefs, viewModel.uiState.value.notificationPrefs)
+            coVerify { notificationPrefsUseCase.load() }
+        }
+
+        @Test
+        fun `saveNotificationPrefs persists preferences and closes dialog`() = runTest {
+            val prefs = NotificationPrefs(
+                newReviewOnMyPlace = false,
+                newBadgeEarned = false,
+                newPhotoOnMyPlace = true,
+                rankings = false,
+                emailNotificationsEnabled = false
+            )
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            viewModel.openNotificationPrefs()
+            viewModel.saveNotificationPrefs(prefs)
+            advanceUntilIdle()
+
+            coVerify { notificationPrefsUseCase.save(prefs) }
+            assertFalse(viewModel.uiState.value.isNotificationPrefsOpen)
+            assertFalse(viewModel.uiState.value.isAccountActionInProgress)
+            assertEquals(prefs, viewModel.uiState.value.notificationPrefs)
         }
 
         @Test

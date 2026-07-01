@@ -62,7 +62,7 @@ class MapViewModelTest {
         val viewModel = createAndObserve()
         viewModel.onViewportChanged(warsaw)
         advanceUntilIdle()
-        
+
         viewModel.onViewportChanged(krakow)
         advanceTimeBy(100)
         viewModel.onViewportChanged(warsaw)
@@ -81,7 +81,7 @@ class MapViewModelTest {
         coEvery {
             placeRepository.getPlacesInBounds(warsaw, PlaceCategory.PLAYGROUND, LIMIT)
         } returns OpResult.success(listOf(playground))
-        
+
         val viewModel = createAndObserve()
         viewModel.onViewportChanged(warsaw)
         advanceUntilIdle()
@@ -90,6 +90,27 @@ class MapViewModelTest {
 
         coVerify(exactly = 1) { placeRepository.getPlacesInBounds(warsaw, PlaceCategory.PLAYGROUND, LIMIT) }
         assertEquals(listOf(playground), viewModel.uiState.value.places)
+    }
+
+    @Test
+    fun `retry refetches same viewport after failure`() = runTest {
+        val place = TestFixtures.place(id = "retry-place")
+        coEvery {
+            placeRepository.getPlacesInBounds(warsaw, null, LIMIT)
+        } returnsMany listOf(
+            OpResult.failure(RuntimeException("network")),
+            OpResult.success(listOf(place))
+        )
+
+        val viewModel = createAndObserve()
+        viewModel.onViewportChanged(warsaw)
+        advanceUntilIdle()
+
+        viewModel.retry()
+        advanceUntilIdle()
+
+        coVerify(exactly = 2) { placeRepository.getPlacesInBounds(warsaw, null, LIMIT) }
+        assertEquals(listOf(place), viewModel.uiState.value.places)
     }
 
     private fun kotlinx.coroutines.test.TestScope.createAndObserve(): MapViewModel {

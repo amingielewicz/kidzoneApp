@@ -63,6 +63,7 @@ class MapViewModel @Inject constructor(
     private val addedByMeOnly = MutableStateFlow(false)
     private val selectedPlaceId = MutableStateFlow<String?>(null)
     private val viewport = MutableStateFlow<GeoBounds?>(null)
+    private val retryRequest = MutableStateFlow(0)
 
     private sealed interface PlacesLoad {
         data class Loading(val previous: List<Place>) : PlacesLoad
@@ -82,12 +83,15 @@ class MapViewModel @Inject constructor(
 
     private data class CacheEntry(val places: List<Place>, val createdAtMillis: Long)
 
-    private val placesLoad = viewport
-        .filterNotNull()
-        .distinctUntilChanged { old, new -> old.isSimilarTo(new) }
-        .debounce(VIEWPORT_DEBOUNCE_MS)
-        .combine(selectedCategory) { bounds, category -> bounds to category }
-        .flatMapLatest { (bounds, category) ->
+    private val placesLoad = combine(
+        viewport
+            .filterNotNull()
+            .distinctUntilChanged { old, new -> old.isSimilarTo(new) }
+            .debounce(VIEWPORT_DEBOUNCE_MS),
+        selectedCategory,
+        retryRequest
+    ) { bounds, category, retry -> Triple(bounds, category, retry) }
+        .flatMapLatest { (bounds, category, _) ->
             val cacheKey = "${category?.name ?: "all"}_${bounds.geohashPrefix()}"
             val cached = viewportCache[cacheKey]
 
@@ -177,10 +181,6 @@ class MapViewModel @Inject constructor(
     }
 
     fun retry() {
-        val current = viewport.value
-        if (current != null) {
-            viewport.value = null
-            viewport.value = current
-        }
+        if (viewport.value != null) retryRequest.update { it + 1 }
     }
 }
