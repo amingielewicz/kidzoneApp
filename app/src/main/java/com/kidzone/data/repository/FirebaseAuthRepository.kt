@@ -15,6 +15,7 @@ import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
+import com.kidzone.data.local.KidZoneDatabase
 import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.UserDto
 import com.kidzone.data.remote.dto.UserPrivateDto
@@ -23,15 +24,16 @@ import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.SignInProvider
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
-import com.kidzone.data.local.KidZoneDatabase
 import com.kidzone.widget.NearbyPlacesWidget
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -88,7 +90,9 @@ class FirebaseAuthRepository @Inject constructor(
                 includeLegacyPrivateFallback = shouldObservePrivateProfile
             )
             if (user != null && user.isBanned) {
-                firebaseAuth.signOut()
+                launch {
+                    signOutAndClearLocalSessionState()
+                }
                 trySend(null)
             } else {
                 trySend(user)
@@ -130,7 +134,7 @@ class FirebaseAuthRepository @Inject constructor(
                 // Wyślij ponownie link weryfikacyjny (na wypadek gdyby stary wygasł)
                 runCatching { firebaseUser.sendEmailVerification().await() }
                 // Wyloguj – nie pozwól na dostęp do apki
-                firebaseAuth.signOut()
+                signOutAndClearLocalSessionState()
                 throw AuthException.EmailNotVerified
             }
 
@@ -237,7 +241,7 @@ class FirebaseAuthRepository @Inject constructor(
             ?: throw IllegalStateException("Nie udało się zalogować w celu wysłania weryfikacji")
         user.sendEmailVerification().await()
         // Wyloguj z powrotem – user nie powinien mieć sesji bez weryfikacji
-        firebaseAuth.signOut()
+        signOutAndClearLocalSessionState()
     }
 
     override suspend fun signOut() {
@@ -255,13 +259,7 @@ class FirebaseAuthRepository @Inject constructor(
                     .await()
             } catch (_: Exception) { /* best-effort */ }
         }
-        firebaseAuth.signOut()
-        runCatching {
-            withContext(Dispatchers.IO) {
-                database.clearAllTables()
-            }
-        }
-        clearWidgetLocationState()
+        signOutAndClearLocalSessionState()
     }
 
     override suspend fun refreshUser(): OpResult<Unit> = runFirebase {
@@ -589,15 +587,30 @@ class FirebaseAuthRepository @Inject constructor(
 
         // 5) Konto Auth
         user.delete().await()
+        clearLocalSessionState()
+    }
+
+    // --- helpers ---
+
+    private suspend fun signOutAndClearLocalSessionState() {
+        firebaseAuth.signOut()
+        clearLocalSessionState()
+    }
+
+    private suspend fun clearLocalSessionState() {
+        clearRoomCache()
+        clearWidgetLocationState()
+    }
+
+    private suspend fun clearRoomCache() {
         runCatching {
             withContext(Dispatchers.IO) {
                 database.clearAllTables()
             }
+        }.onFailure { error ->
+            Timber.w(error, "Failed to clear Room cache during auth cleanup")
         }
-        clearWidgetLocationState()
     }
-
-    // --- helpers ---
 
     private suspend fun clearWidgetLocationState() {
         runCatching {
@@ -607,6 +620,8 @@ class FirebaseAuthRepository @Inject constructor(
                 .remove(NearbyPlacesWidget.KEY_LAST_LNG)
                 .apply()
             NearbyPlacesWidget().updateAll(appContext)
+        }.onFailure { error ->
+            Timber.w(error, "Failed to clear widget location state during auth cleanup")
         }
     }
 
@@ -901,8 +916,7 @@ class FirebaseAuthRepository @Inject constructor(
                         .format(java.util.Date(bannedUntil))
                     "Twoje konto jest zablokowane do $date."
                 }
-                firebaseAuth.signOut()
-                clearWidgetLocationState()
+                signOutAndClearLocalSessionState()
                 throw AuthException.AccountBanned(message, reason)
             }
         } catch (e: AuthException.AccountBanned) {
