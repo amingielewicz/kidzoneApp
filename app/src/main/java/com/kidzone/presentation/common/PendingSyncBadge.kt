@@ -23,7 +23,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.kidzone.R
 import com.kidzone.sync.SyncManager
 
 /**
@@ -59,7 +61,7 @@ fun PendingSyncBadge(
         ) {
             Icon(
                 imageVector = Icons.Default.CloudOff,
-                contentDescription = "Oczekujące zmiany",
+                contentDescription = stringResource(R.string.pending_changes),
                 modifier = Modifier.size(14.dp),
                 tint = MaterialTheme.colorScheme.onTertiaryContainer
             )

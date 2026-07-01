@@ -26,7 +26,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.kidzone.R
 import com.kidzone.presentation.place.add.LOCATION_SERVICE_DISABLED_MESSAGE
 import com.kidzone.presentation.place.add.LOCATION_TIMEOUT_USER_MESSAGE
 import com.kidzone.presentation.place.add.fetchCurrentLocation
@@ -49,6 +51,7 @@ fun LocationCorrectionDialog(
     var isFetching by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
+    val locationPermissionDenied = stringResource(R.string.location_permission_denied)
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -60,7 +63,7 @@ fun LocationCorrectionDialog(
                 }
             }
         } else {
-            errorMessage = "Brak uprawnienia do lokalizacji"
+            errorMessage = locationPermissionDenied
         }
     }
 
@@ -73,12 +76,11 @@ fun LocationCorrectionDialog(
                 tint = MaterialTheme.colorScheme.primary
             )
         },
-        title = { Text("Koryguj lokalizacj\u0119") },
+        title = { Text(stringResource(R.string.correct_location)) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Pobierz aktualn\u0105 lokalizacj\u0119 GPS, aby zaproponowa\u0107 " +
-                        "poprawn\u0105 pozycj\u0119 tego miejsca na mapie.",
+                    text = stringResource(R.string.location_correction_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -107,7 +109,10 @@ fun LocationCorrectionDialog(
                     } else {
                         Icon(Icons.Filled.MyLocation, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.size(8.dp))
-                        Text(if (latitude != null) "Aktualizuj lokalizacj\u0119" else "Pobierz lokalizacj\u0119")
+                        Text(
+                            if (latitude != null) stringResource(R.string.update_location_action)
+                            else stringResource(R.string.fetch_location)
+                        )
                     }
                 }
 
@@ -133,10 +138,10 @@ fun LocationCorrectionDialog(
             Button(
                 onClick = { if (latitude != null && longitude != null) onSubmit(latitude!!, longitude!!, address) },
                 enabled = latitude != null && longitude != null
-            ) { Text("Wy\u015Blij korekt\u0119") }
+            ) { Text(stringResource(R.string.submit_correction)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Anuluj") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }

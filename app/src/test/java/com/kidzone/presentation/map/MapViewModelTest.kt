@@ -1,9 +1,9 @@
 package com.kidzone.presentation.map
 
 import com.kidzone.domain.model.GeoBounds
-import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.data.remote.PerformanceConfig
 import com.kidzone.data.remote.PerformanceConfigProvider
+import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.testutil.MainDispatcherRule
@@ -32,7 +32,7 @@ class MapViewModelTest {
         @JvmField
         @RegisterExtension
         val mainDispatcherRule = MainDispatcherRule(UnconfinedTestDispatcher())
-        private const val LIMIT = 1000
+        private const val LIMIT = 500 // Current default in MapViewModel
     }
 
     private lateinit var placeRepository: PlaceRepository
@@ -46,10 +46,10 @@ class MapViewModelTest {
     fun setUp() {
         placeRepository = mockk(relaxed = true)
         authRepository = mockk(relaxed = true)
-        performanceConfigProvider = object : PerformanceConfigProvider {
-            override val performanceConfig: PerformanceConfig = PerformanceConfig()
-        }
+        performanceConfigProvider = mockk(relaxed = true)
         every { authRepository.currentUser } returns MutableStateFlow(null)
+        every { performanceConfigProvider.performanceConfig } returns
+            PerformanceConfig(mapMarkersLimit = LIMIT)
         coEvery {
             placeRepository.getPlacesInBounds(any(), any(), any())
         } returns OpResult.success(emptyList())
@@ -68,13 +68,13 @@ class MapViewModelTest {
         val viewModel = createAndObserve()
         viewModel.onViewportChanged(warsaw)
         advanceUntilIdle()
-        
+
         viewModel.onViewportChanged(krakow)
         advanceTimeBy(100)
         viewModel.onViewportChanged(warsaw)
         advanceTimeBy(100)
         viewModel.onViewportChanged(krakow)
-        advanceTimeBy(350) // Więcej niż debounce (300)
+        advanceTimeBy(350) // More than debounce (300)
         advanceUntilIdle()
 
         coVerify(exactly = 1) { placeRepository.getPlacesInBounds(warsaw, null, LIMIT) }
@@ -87,15 +87,36 @@ class MapViewModelTest {
         coEvery {
             placeRepository.getPlacesInBounds(warsaw, PlaceCategory.PLAYGROUND, LIMIT)
         } returns OpResult.success(listOf(playground))
-        
+
         val viewModel = createAndObserve()
         viewModel.onViewportChanged(warsaw)
         advanceUntilIdle()
-        viewModel.onCategorySelected(PlaceCategory.PLAYGROUND)
+        viewModel.onCategorySelect(PlaceCategory.PLAYGROUND)
         advanceUntilIdle()
 
         coVerify(exactly = 1) { placeRepository.getPlacesInBounds(warsaw, PlaceCategory.PLAYGROUND, LIMIT) }
         assertEquals(listOf(playground), viewModel.uiState.value.places)
+    }
+
+    @Test
+    fun `retry refetches same viewport after failure`() = runTest {
+        val place = TestFixtures.place(id = "retry-place")
+        coEvery {
+            placeRepository.getPlacesInBounds(warsaw, null, LIMIT)
+        } returnsMany listOf(
+            OpResult.failure(RuntimeException("network")),
+            OpResult.success(listOf(place))
+        )
+
+        val viewModel = createAndObserve()
+        viewModel.onViewportChanged(warsaw)
+        advanceUntilIdle()
+
+        viewModel.retry()
+        advanceUntilIdle()
+
+        coVerify(exactly = 2) { placeRepository.getPlacesInBounds(warsaw, null, LIMIT) }
+        assertEquals(listOf(place), viewModel.uiState.value.places)
     }
 
     private fun kotlinx.coroutines.test.TestScope.createAndObserve(): MapViewModel {

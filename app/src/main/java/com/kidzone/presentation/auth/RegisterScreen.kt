@@ -117,7 +117,10 @@ fun RegisterScreen(
                 title = { /* tytuł świadomie pusty - hierarchia w karcie */ },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Wstecz")
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -305,7 +308,7 @@ fun RegisterScreen(
 
                         state.errorMessage?.let { msg ->
                             Spacer(Modifier.height(12.dp))
-                            ErrorMessageBanner(text = msg)
+                            ErrorMessageBanner(text = msg.asString())
                         }
 
                         // Po rejestracji: komunikat o weryfikacji emaila

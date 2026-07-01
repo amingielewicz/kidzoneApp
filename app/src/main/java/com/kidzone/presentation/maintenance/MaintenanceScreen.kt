@@ -15,15 +15,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.kidzone.R
 
 /**
  * Ekran wyświetlany gdy Remote Config `maintenance_mode` == true.
- *
- * Blokuje całą nawigację — user widzi komunikat i nie może nic zrobić
- * dopóki backend nie wyłączy flagi (kolejny fetchAndActivate przy
- * ponownym uruchomieniu apki).
  */
 @Composable
 fun MaintenanceScreen(message: String) {
@@ -42,13 +40,15 @@ fun MaintenanceScreen(message: String) {
         )
         Spacer(modifier = Modifier.height(24.dp))
         Text(
-            text = "Przerwa techniczna",
+            text = stringResource(R.string.maintenance_title),
             style = MaterialTheme.typography.headlineMedium,
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = message,
+            // Wiadomość z Remote Config może być już zlokalizowana po stronie serwera,
+            // ale jeśli fetch zawiedzie, używamy domyślnego klucza (obsłużone w VM/Service).
+            text = message.ifBlank { stringResource(R.string.maintenance_message) },
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant

@@ -96,6 +96,7 @@ import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.hasLocationPermission
+import com.kidzone.R
 import kotlinx.coroutines.launch
 
 /**
@@ -264,7 +265,7 @@ fun PlaceListScreen(
 
         CategoryFilterBar(
             selectedCategory = state.selectedCategory,
-            onCategorySelected = viewModel::onCategorySelected
+            onCategorySelected = viewModel::onCategorySelect
         )
 
         FilterAndSortBar(
@@ -310,7 +311,7 @@ fun PlaceListScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = state.errorMessage!!,
+                        text = state.errorMessage!!.asString(),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -327,10 +328,10 @@ fun PlaceListScreen(
                     message = emptyMessageFor(state),
                     action = if (canClearFilters) {
                         EmptyStateAction(
-                            label = "Wyczyść filtry",
+                            label = stringResource(R.string.clear_filters),
                             onClick = {
                                 viewModel.onSearchQueryChange("")
-                                viewModel.onCategorySelected(null)
+                                viewModel.onCategorySelect(null)
                                 viewModel.onAmenitiesCleared()
                             }
                         )
@@ -429,29 +430,31 @@ fun PlaceListScreen(
     }
 }
 
+@Composable
 private fun emptyMessageFor(
     state: PlaceListViewModel.UiState
 ): String = when {
     state.sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME && state.currentUserId == null ->
-        "Po zalogowaniu zobaczysz tu miejsca dodane przez Ciebie."
+        stringResource(R.string.empty_added_by_me_logged_out)
     state.sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME ->
-        "Gdy dodasz miejsce, pojawi się tutaj razem z opiniami i statusem."
+        stringResource(R.string.empty_added_by_me_logged_in)
     state.searchQuery.isNotBlank() ->
-        "Spróbuj krótszej frazy albo wyczyść filtry, żeby wrócić do pełnej listy."
+        stringResource(R.string.empty_search_query)
     state.selectedCategory != null || state.selectedAmenities.isNotEmpty() ->
-        "Zmień kategorię lub udogodnienia, jeśli chcesz poszerzyć wyniki."
-    else -> "Dodaj pierwsze miejsce z ekranu głównego albo sprawdź ponownie później."
+        stringResource(R.string.empty_filters)
+    else -> stringResource(R.string.empty_default)
 }
 
+@Composable
 private fun emptyTitleFor(state: PlaceListViewModel.UiState): String = when {
     state.sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME && state.currentUserId == null ->
-        "Zaloguj się, żeby zobaczyć swoje miejsca"
+        stringResource(R.string.empty_title_added_by_me_logged_out)
     state.sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME ->
-        "Nie masz jeszcze dodanych miejsc"
-    state.searchQuery.isNotBlank() -> "Brak wyników wyszukiwania"
+        stringResource(R.string.empty_title_added_by_me_logged_in)
+    state.searchQuery.isNotBlank() -> stringResource(R.string.empty_title_search)
     state.selectedCategory != null || state.selectedAmenities.isNotEmpty() ->
-        "Brak miejsc dla wybranych filtrów"
-    else -> "Nie znaleźliśmy miejsc"
+        stringResource(R.string.empty_title_filters)
+    else -> stringResource(R.string.empty_title_default)
 }
 
 /**
@@ -481,7 +484,7 @@ private fun SearchBar(
             localText = it
             onQueryChange(it)
         },
-        placeholder = { Text("Szukaj miejsca po nazwie\u2026") },
+        placeholder = { Text(stringResource(R.string.search_placeholder)) },
         leadingIcon = {
             Icon(
                 imageVector = Icons.Filled.Search,
@@ -494,7 +497,7 @@ private fun SearchBar(
                 IconButton(onClick = { onQueryChange("") }) {
                     Icon(
                         imageVector = Icons.Filled.Close,
-                        contentDescription = "Wyczy\u015B\u0107 wyszukiwanie",
+                        contentDescription = stringResource(R.string.clear_search),
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -525,7 +528,7 @@ private fun CategoryFilterBar(
         FilterChip(
             selected = selectedCategory == null,
             onClick = { onCategorySelected(null) },
-            label = { Text("Wszystkie") }
+            label = { Text(stringResource(R.string.category_all)) }
         )
         PlaceCategory.entries.forEach { category ->
             val style = category.style
@@ -561,6 +564,7 @@ private fun FilterAndSortBar(
     onOpenFilterSheet: () -> Unit,
     onSortOrderChange: (PlaceListViewModel.SortOrder) -> Unit
 ) {
+    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -572,11 +576,11 @@ private fun FilterAndSortBar(
         // 1. Button "Filtry" (ikona Tune z badge liczbą aktywnych filtrów)
         BadgedBox(
             modifier = Modifier.semantics {
-                contentDescription = "Filtry"
+                contentDescription = context.getString(R.string.filters)
                 stateDescription = if (advancedFiltersCount > 0) {
-                    "Aktywne filtry: $advancedFiltersCount"
+                    context.getString(R.string.active_filters_count, advancedFiltersCount)
                 } else {
-                    "Brak aktywnych filtrów"
+                    context.getString(R.string.no_active_filters)
                 }
             },
             badge = {
@@ -598,7 +602,7 @@ private fun FilterAndSortBar(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Tune,
-                    contentDescription = "Filtry"
+                    contentDescription = stringResource(R.string.filters)
                 )
             }
         }
@@ -632,7 +636,7 @@ private fun SortChip(
     Box {
         AssistChip(
             onClick = { expanded = true },
-            label = { Text("Sortuj: ${current.label}") },
+            label = { Text(stringResource(R.string.sort_prefix, stringResource(current.labelRes))) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Sort,
@@ -659,7 +663,7 @@ private fun SortChip(
                 val enabled = !(option == PlaceListViewModel.SortOrder.ADDED_BY_ME &&
                     !currentUserSignedIn)
                 DropdownMenuItem(
-                    text = { Text(option.label) },
+                    text = { Text(stringResource(option.labelRes)) },
                     enabled = enabled,
                     onClick = {
                         onChange(option)
@@ -698,14 +702,14 @@ private fun EnableLocationForSortingBanner(onAllowClick: () -> Unit) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "Włącz lokalizację, by sortować miejsca po odległości.",
+                text = stringResource(R.string.location_sorting_rationale),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onTertiaryContainer,
                 modifier = Modifier.weight(1f)
             )
             Spacer(Modifier.width(8.dp))
             TextButton(onClick = onAllowClick) {
-                Text("Pozwól")
+                Text(stringResource(R.string.allow))
             }
         }
     }
@@ -724,11 +728,13 @@ private fun PlaceCard(
 ) {
     val categoryLabel = stringResource(place.category.labelRes)
     val distanceLabel = if (showDistance && distanceKm != null) {
-        ", ${formatDistance(distanceKm)} od Ciebie"
+        ", ${stringResource(R.string.distance_away, formatDistance(distanceKm))}"
     } else {
         ""
     }
-    val addressLabel = place.address.takeIf { it.isNotBlank() }?.let { ", adres: $it" }.orEmpty()
+    val addressLabel = place.address.takeIf { it.isNotBlank() }?.let {
+        ", ${stringResource(R.string.address_prefix, it)}"
+    }.orEmpty()
     val ratingLabel = place.ratingAccessibilityLabel()
 
     KidZoneCard(
@@ -738,7 +744,7 @@ private fun PlaceCard(
                 contentDescription = "${place.name}, $categoryLabel$distanceLabel$addressLabel, $ratingLabel"
             }
             .clickable(
-                onClickLabel = "Otwórz szczegóły miejsca",
+                onClickLabel = stringResource(R.string.map_open_place_details_label),
                 role = Role.Button,
                 onClick = onClick
             )
@@ -830,27 +836,22 @@ private fun PlaceCard(
     }
 }
 
-/**
- * Formatuje odległość w km do user-friendly stringu:
- *  - < 1 km: w metrach z zaokrągleniem do 50 m ("420 m"),
- *  - >= 1 km: z 1 miejscem po przecinku ("3.5 km"),
- *  - >= 100 km: bez ułamka ("125 km") - taka rozdzielczość nie ma znaczenia
- *    dla user experience na liście miejsc dla dzieci.
- */
+@Composable
 private fun formatDistance(km: Double): String = when {
     km < 1.0 -> {
         val meters = (km * 1000).toInt()
         val rounded = ((meters + 25) / 50) * 50
-        "$rounded m"
+        stringResource(R.string.distance_m, rounded)
     }
-    km < 100.0 -> "%.1f km".format(km)
-    else -> "%d km".format(km.toInt())
+    km < 100.0 -> stringResource(R.string.distance_km, km)
+    else -> stringResource(R.string.distance_km_integer, km.toInt())
 }
 
+@Composable
 private fun Place.ratingAccessibilityLabel(): String = when {
-    reviewsCount > 0 -> "ocena %.1f, liczba opinii %d".format(averageRating, reviewsCount)
-    isNewWithoutReviews() -> "nowe miejsce bez opinii"
-    else -> "brak opinii"
+    reviewsCount > 0 -> stringResource(R.string.rating_accessibility_label, averageRating, reviewsCount)
+    isNewWithoutReviews() -> stringResource(R.string.new_place_no_reviews)
+    else -> stringResource(R.string.map_no_reviews)
 }
 
 /** Odległość w km między dwoma punktami (formuła haversine). */

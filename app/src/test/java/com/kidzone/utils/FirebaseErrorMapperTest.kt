@@ -2,10 +2,12 @@ package com.kidzone.utils
 
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.storage.StorageException
+import com.kidzone.R
 import io.mockk.every
 import io.mockk.mockk
 import java.io.IOException
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class FirebaseErrorMapperTest {
@@ -19,7 +21,8 @@ class FirebaseErrorMapperTest {
 
         val message = error.toPlacesErrorMessage(FALLBACK)
 
-        assertEquals(FIRESTORE_PERMISSION_ERROR_MESSAGE, message)
+        assertTrue(message is UiText.StringResource)
+        assertEquals(R.string.error_permission_denied, (message as UiText.StringResource).resId)
     }
 
     @Test
@@ -31,7 +34,8 @@ class FirebaseErrorMapperTest {
 
         val message = error.toPlacesErrorMessage(FALLBACK)
 
-        assertEquals(FIRESTORE_CONFIGURATION_ERROR_MESSAGE, message)
+        assertTrue(message is UiText.StringResource)
+        assertEquals(R.string.error_config_update, (message as UiText.StringResource).resId)
     }
 
     @Test
@@ -40,7 +44,8 @@ class FirebaseErrorMapperTest {
 
         val message = error.toPlacesErrorMessage(FALLBACK)
 
-        assertEquals(NETWORK_ERROR_MESSAGE, message)
+        assertTrue(message is UiText.StringResource)
+        assertEquals(R.string.error_no_internet, (message as UiText.StringResource).resId)
     }
 
     @Test
@@ -49,7 +54,8 @@ class FirebaseErrorMapperTest {
 
         val message = error.toPlacesErrorMessage(FALLBACK)
 
-        assertEquals(NETWORK_ERROR_MESSAGE, message)
+        assertTrue(message is UiText.StringResource)
+        assertEquals(R.string.error_no_internet, (message as UiText.StringResource).resId)
     }
 
     @Test
@@ -67,7 +73,8 @@ class FirebaseErrorMapperTest {
 
         val message = error.toUploadErrorMessage()
 
-        assertEquals(STORAGE_PERMISSION_ERROR_MESSAGE, message)
+        assertTrue(message is UiText.StringResource)
+        assertEquals(R.string.error_storage_permission, (message as UiText.StringResource).resId)
     }
 
     @Test
@@ -76,7 +83,8 @@ class FirebaseErrorMapperTest {
 
         val message = error.toUploadErrorMessage()
 
-        assertEquals(STORAGE_RETRY_LIMIT_ERROR_MESSAGE, message)
+        assertTrue(message is UiText.StringResource)
+        assertEquals(R.string.error_storage_retry_limit, (message as UiText.StringResource).resId)
     }
 
     @Test
@@ -85,7 +93,8 @@ class FirebaseErrorMapperTest {
 
         val message = error.toUploadErrorMessage()
 
-        assertEquals(NETWORK_ERROR_MESSAGE, message)
+        assertTrue(message is UiText.StringResource)
+        assertEquals(R.string.error_no_internet, (message as UiText.StringResource).resId)
     }
 
     @Test
@@ -94,7 +103,8 @@ class FirebaseErrorMapperTest {
 
         val message = error.toUploadErrorMessage()
 
-        assertEquals(UPLOAD_ERROR_MESSAGE, message)
+        assertTrue(message is UiText.StringResource)
+        assertEquals(R.string.error_upload_failed, (message as UiText.StringResource).resId)
     }
 
     private fun storageException(errorCode: Int): StorageException {
@@ -104,6 +114,6 @@ class FirebaseErrorMapperTest {
     }
 
     private companion object {
-        const val FALLBACK = "Nie udało się wczytać miejsc"
+        val FALLBACK = UiText.DynamicString("fallback")
     }
 }

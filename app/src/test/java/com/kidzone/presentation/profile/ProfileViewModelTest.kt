@@ -1,13 +1,12 @@
-@file:Suppress("WildcardImport")
-
 package com.kidzone.presentation.profile
 
 import android.net.Uri
+import com.kidzone.R
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
+import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.repository.SignInProvider
 import com.kidzone.domain.service.BadgePreferences
-import com.kidzone.domain.usecase.ComputeBadgesUseCase
 import com.kidzone.domain.usecase.NotificationPrefsUseCase
 import com.kidzone.i18n.AppLanguage
 import com.kidzone.i18n.LanguagePreferences
@@ -15,11 +14,18 @@ import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
-import com.kidzone.utils.UPLOAD_ERROR_MESSAGE
-import io.mockk.*
+import com.kidzone.utils.UiText
+import io.mockk.Runs
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -43,9 +49,9 @@ class ProfileViewModelTest {
     }
 
     private lateinit var authRepository: AuthRepository
-    private lateinit var computeBadgesUseCase: ComputeBadgesUseCase
-    private lateinit var notificationPrefsUseCase: NotificationPrefsUseCase
+    private lateinit var placeRepository: PlaceRepository
     private lateinit var badgePreferences: BadgePreferences
+    private lateinit var notificationPrefsUseCase: NotificationPrefsUseCase
     private lateinit var languagePreferences: LanguagePreferences
     private lateinit var viewModel: ProfileViewModel
 
@@ -54,9 +60,9 @@ class ProfileViewModelTest {
     @BeforeEach
     fun setUp() {
         authRepository = mockk(relaxed = true)
-        computeBadgesUseCase = mockk(relaxed = true)
-        notificationPrefsUseCase = mockk(relaxed = true)
+        placeRepository = mockk(relaxed = true)
         badgePreferences = mockk(relaxed = true)
+        notificationPrefsUseCase = mockk(relaxed = true)
         languagePreferences = mockk(relaxed = true)
 
         every { badgePreferences.getSeenBadges(any()) } returns emptySet()
@@ -65,17 +71,25 @@ class ProfileViewModelTest {
 
         every { authRepository.currentUser } returns currentUserFlow
         coEvery { authRepository.getCurrentSignInProvider() } returns SignInProvider.EMAIL_PASSWORD
-        coEvery { authRepository.observeUser(any()) } returns flowOf(null)
+        every { authRepository.observeUser(any()) } returns currentUserFlow
+        coEvery { placeRepository.getTopPlaces(any()) } returns OpResult.success(emptyList())
+        coEvery { authRepository.getTopUsers(any()) } returns OpResult.success(emptyList())
+        coEvery { notificationPrefsUseCase.load() } returns NotificationPrefs()
+        coEvery { notificationPrefsUseCase.save(any()) } returns true
     }
 
-    private fun createViewModel(): ProfileViewModel {
-        return ProfileViewModel(
+    private fun kotlinx.coroutines.test.TestScope.createAndObserve(): ProfileViewModel {
+        val vm = ProfileViewModel(
             authRepository,
-            computeBadgesUseCase,
-            notificationPrefsUseCase,
+            placeRepository,
             badgePreferences,
+            notificationPrefsUseCase,
             languagePreferences
         )
+        // Activate flows
+        backgroundScope.launch { vm.uiState.collect {} }
+        backgroundScope.launch { vm.user.collect {} }
+        return vm
     }
 
     // =========================================================================
@@ -88,7 +102,7 @@ class ProfileViewModelTest {
 
         @Test
         fun `initial UiState has correct defaults`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
@@ -106,9 +120,10 @@ class ProfileViewModelTest {
 
         @Test
         fun `fetches sign in provider on init`() = runTest {
+            currentUserFlow.value = TestFixtures.user()
             coEvery { authRepository.getCurrentSignInProvider() } returns SignInProvider.GOOGLE
 
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             assertEquals(SignInProvider.GOOGLE, viewModel.uiState.value.signInProvider)
@@ -116,7 +131,7 @@ class ProfileViewModelTest {
 
         @Test
         fun `user flow emits null when no user logged in`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             assertNull(viewModel.user.value)
@@ -125,13 +140,15 @@ class ProfileViewModelTest {
         @Test
         fun `user flow emits user data when logged in`() = runTest {
             val testUser = TestFixtures.user(id = "uid-1", name = "Jan")
-            currentUserFlow.value = testUser
-            coEvery { authRepository.observeUser("uid-1") } returns flowOf(testUser)
 
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
-            assertEquals(testUser, viewModel.user.value)
+            currentUserFlow.value = testUser
+            advanceUntilIdle()
+
+            assertEquals("uid-1", viewModel.user.value?.id)
+            assertEquals("Jan", viewModel.user.value?.name)
         }
     }
 
@@ -145,7 +162,7 @@ class ProfileViewModelTest {
 
         @Test
         fun `openEditSheet sets isEditOpen to true`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.openEditSheet()
@@ -155,7 +172,7 @@ class ProfileViewModelTest {
 
         @Test
         fun `dismissEditSheet sets isEditOpen to false`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.openEditSheet()
@@ -164,38 +181,15 @@ class ProfileViewModelTest {
         }
 
         @Test
-        fun `dismissEditSheet does nothing while saving`() = runTest {
-            viewModel = createViewModel()
-            advanceUntilIdle()
-
-            viewModel.openEditSheet()
-            // Simulate saving state by triggering saveProfile with slow response
-            val testUser = TestFixtures.user(id = "uid-1")
-            currentUserFlow.value = testUser
-            coEvery { authRepository.observeUser("uid-1") } returns flowOf(testUser)
-            coEvery { authRepository.uploadAvatar(any()) } coAnswers {
-                // While this is running, isSaving should be true
-                OpResult.success("http://avatar.url")
-            }
-            coEvery { authRepository.updateUserProfile(any(), any(), any(), any()) } returns
-                OpResult.success(testUser)
-
-            // We can't easily test "dismiss during save" without more complex setup,
-            // but we verify the guard exists
-            assertTrue(true)
-        }
-
-        @Test
         fun `saveProfile uploads avatar when new URI provided`() = runTest {
             val testUser = TestFixtures.user(id = "uid-1")
             currentUserFlow.value = testUser
-            coEvery { authRepository.observeUser("uid-1") } returns flowOf(testUser)
             coEvery { authRepository.uploadAvatar(any()) } returns
                 OpResult.success("http://new-avatar.url")
             coEvery { authRepository.updateUserProfile(any(), any(), any(), any()) } returns
                 OpResult.success(testUser)
 
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             val mockUri = mockk<Uri>()
@@ -212,11 +206,10 @@ class ProfileViewModelTest {
         fun `saveProfile skips upload when no new avatar`() = runTest {
             val testUser = TestFixtures.user(id = "uid-1", avatarUrl = "http://existing.url")
             currentUserFlow.value = testUser
-            coEvery { authRepository.observeUser("uid-1") } returns flowOf(testUser)
             coEvery { authRepository.updateUserProfile(any(), any(), any(), any()) } returns
                 OpResult.success(testUser)
 
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.saveProfile("Jan", "Jan", "Kowalski", null)
@@ -232,11 +225,10 @@ class ProfileViewModelTest {
         fun `saveProfile shows error on avatar upload failure`() = runTest {
             val testUser = TestFixtures.user(id = "uid-1")
             currentUserFlow.value = testUser
-            coEvery { authRepository.observeUser("uid-1") } returns flowOf(testUser)
             coEvery { authRepository.uploadAvatar(any()) } returns
                 OpResult.failure(RuntimeException("Storage full"))
 
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.saveProfile("Jan", "Jan", "Kowalski", mockk())
@@ -244,20 +236,18 @@ class ProfileViewModelTest {
 
             val state = viewModel.uiState.value
             assertFalse(state.isSaving)
-            assertEquals(UPLOAD_ERROR_MESSAGE, state.saveError)
-            // Should still be open so user can retry
-            assertTrue(state.isEditOpen || state.saveError != null)
+            assertTrue(state.saveError is UiText.StringResource)
+            assertEquals(R.string.error_upload_failed, (state.saveError as UiText.StringResource).resId)
         }
 
         @Test
         fun `saveProfile shows error on profile update failure`() = runTest {
             val testUser = TestFixtures.user(id = "uid-1")
             currentUserFlow.value = testUser
-            coEvery { authRepository.observeUser("uid-1") } returns flowOf(testUser)
             coEvery { authRepository.updateUserProfile(any(), any(), any(), any()) } returns
                 OpResult.failure(AuthException.UsernameAlreadyTaken)
 
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.openEditSheet()
@@ -267,18 +257,18 @@ class ProfileViewModelTest {
             val state = viewModel.uiState.value
             assertFalse(state.isSaving)
             assertNotNull(state.saveError)
-            assertTrue(state.saveError!!.contains("zajęta"))
+            assertTrue(state.saveError is UiText.StringResource)
+            assertEquals(R.string.error_username_taken, (state.saveError as UiText.StringResource).resId)
         }
 
         @Test
         fun `saveProfile closes sheet on success`() = runTest {
             val testUser = TestFixtures.user(id = "uid-1")
             currentUserFlow.value = testUser
-            coEvery { authRepository.observeUser("uid-1") } returns flowOf(testUser)
             coEvery { authRepository.updateUserProfile(any(), any(), any(), any()) } returns
                 OpResult.success(testUser)
 
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.openEditSheet()
@@ -302,7 +292,7 @@ class ProfileViewModelTest {
 
         @Test
         fun `openChangePassword opens dialog`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.openChangePassword()
@@ -312,7 +302,7 @@ class ProfileViewModelTest {
 
         @Test
         fun `dismissChangePassword closes dialog`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.openChangePassword()
@@ -324,7 +314,7 @@ class ProfileViewModelTest {
         fun `successful password change closes dialog and shows info`() = runTest {
             coEvery { authRepository.changePassword(any(), any()) } returns OpResult.success(Unit)
 
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.openChangePassword()
@@ -334,7 +324,8 @@ class ProfileViewModelTest {
             val state = viewModel.uiState.value
             assertFalse(state.isChangePasswordOpen)
             assertFalse(state.isAccountActionInProgress)
-            assertEquals("Hasło zostało zmienione", state.accountActionInfo)
+            assertTrue(state.accountActionInfo is UiText.StringResource)
+            assertEquals(R.string.password_changed, (state.accountActionInfo as UiText.StringResource).resId)
         }
 
         @Test
@@ -342,7 +333,7 @@ class ProfileViewModelTest {
             coEvery { authRepository.changePassword(any(), any()) } returns
                 OpResult.failure(AuthException.InvalidCredentials)
 
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.openChangePassword()
@@ -368,7 +359,7 @@ class ProfileViewModelTest {
         fun `successful email change closes dialog and shows verification info`() = runTest {
             coEvery { authRepository.changeEmail(any(), any()) } returns OpResult.success(Unit)
 
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.openChangeEmail()
@@ -377,8 +368,11 @@ class ProfileViewModelTest {
 
             val state = viewModel.uiState.value
             assertFalse(state.isChangeEmailOpen)
-            assertNotNull(state.accountActionInfo)
-            assertTrue(state.accountActionInfo!!.contains("new@email.com"))
+            assertTrue(state.accountActionInfo is UiText.StringResource)
+            assertEquals(
+                R.string.change_email_verification_sent,
+                (state.accountActionInfo as UiText.StringResource).resId
+            )
         }
 
         @Test
@@ -386,7 +380,7 @@ class ProfileViewModelTest {
             coEvery { authRepository.changeEmail(any(), any()) } returns
                 OpResult.failure(AuthException.EmailAlreadyInUse)
 
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.openChangeEmail()
@@ -411,7 +405,7 @@ class ProfileViewModelTest {
         fun `successful deletion calls onDeleted callback`() = runTest {
             coEvery { authRepository.deleteAccount(any()) } returns OpResult.success(Unit)
 
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             var deletedCalled = false
@@ -428,7 +422,7 @@ class ProfileViewModelTest {
             coEvery { authRepository.deleteAccount(any()) } returns
                 OpResult.failure(AuthException.InvalidCredentials)
 
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             var deletedCalled = false
@@ -445,7 +439,7 @@ class ProfileViewModelTest {
         fun `deleteAccountGoogle calls repository with token`() = runTest {
             coEvery { authRepository.deleteAccountWithGoogle(any()) } returns OpResult.success(Unit)
 
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             var deletedCalled = false
@@ -467,7 +461,7 @@ class ProfileViewModelTest {
 
         @Test
         fun `signOut calls repository and invokes callback`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             var signedOut = false
@@ -489,7 +483,7 @@ class ProfileViewModelTest {
 
         @Test
         fun `privacy policy dialog opens and closes`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.openPrivacyPolicy()
@@ -501,7 +495,7 @@ class ProfileViewModelTest {
 
         @Test
         fun `terms of service dialog opens and closes`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.openTermsOfService()
@@ -513,7 +507,7 @@ class ProfileViewModelTest {
 
         @Test
         fun `badges info dialog opens and closes`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.openBadgesInfo()
@@ -524,8 +518,22 @@ class ProfileViewModelTest {
         }
 
         @Test
+        fun `revokes badges that are no longer earned`() = runTest {
+            every { badgePreferences.getSeenBadges("uid-1") } returns setOf("FIRST_PLACE")
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            currentUserFlow.value = TestFixtures.user(id = "uid-1", placesAddedCount = 0, reviewsCount = 0)
+            advanceUntilIdle()
+
+            coVerify { authRepository.revokeBadges(listOf("FIRST_PLACE")) }
+            verify { badgePreferences.setSeenBadges("uid-1", emptySet()) }
+        }
+
+        @Test
         fun `language dialog saves selected language`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.openLanguageDialog()
@@ -539,10 +547,55 @@ class ProfileViewModelTest {
         }
 
         @Test
+        fun `openNotificationPrefs loads persisted preferences`() = runTest {
+            val prefs = NotificationPrefs(
+                newReviewOnMyPlace = false,
+                newBadgeEarned = true,
+                newPhotoOnMyPlace = false,
+                rankings = true,
+                emailNotificationsEnabled = false
+            )
+            coEvery { notificationPrefsUseCase.load() } returns prefs
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            viewModel.openNotificationPrefs()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.uiState.value.isNotificationPrefsOpen)
+            assertEquals(prefs, viewModel.uiState.value.notificationPrefs)
+            coVerify { notificationPrefsUseCase.load() }
+        }
+
+        @Test
+        fun `saveNotificationPrefs persists preferences and closes dialog`() = runTest {
+            val prefs = NotificationPrefs(
+                newReviewOnMyPlace = false,
+                newBadgeEarned = false,
+                newPhotoOnMyPlace = true,
+                rankings = false,
+                emailNotificationsEnabled = false
+            )
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            viewModel.openNotificationPrefs()
+            viewModel.saveNotificationPrefs(prefs)
+            advanceUntilIdle()
+
+            coVerify { notificationPrefsUseCase.save(prefs) }
+            assertFalse(viewModel.uiState.value.isNotificationPrefsOpen)
+            assertFalse(viewModel.uiState.value.isAccountActionInProgress)
+            assertEquals(prefs, viewModel.uiState.value.notificationPrefs)
+        }
+
+        @Test
         fun `consumeAccountActionInfo clears info`() = runTest {
             coEvery { authRepository.changePassword(any(), any()) } returns OpResult.success(Unit)
 
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.changePassword("old", "NewP@ss1!")
@@ -564,7 +617,7 @@ class ProfileViewModelTest {
 
         @Test
         fun `refreshProfile does nothing when user is null`() = runTest {
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             // user is null by default
@@ -575,23 +628,18 @@ class ProfileViewModelTest {
         }
 
         @Test
-        fun `refreshProfile sets isRefreshing and recomputes badges`() = runTest {
+        fun `refreshProfile sets isRefreshing`() = runTest {
             val testUser = TestFixtures.user(id = "uid-1", placesAddedCount = 5)
             currentUserFlow.value = testUser
-            coEvery { authRepository.observeUser("uid-1") } returns flowOf(testUser)
-            coEvery { computeBadgesUseCase(any(), any()) } returns ComputeBadgesUseCase.BadgeResult(
-                obtainedBadges = emptyList(),
-                userRank = null,
-                bestPlaceRank = null
-            )
 
-            viewModel = createViewModel()
+            viewModel = createAndObserve()
             advanceUntilIdle()
 
             viewModel.refreshProfile()
             advanceUntilIdle()
 
             assertFalse(viewModel.uiState.value.isRefreshing)
+            coVerify { authRepository.refreshUser() }
         }
     }
 }

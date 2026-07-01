@@ -2,82 +2,56 @@ package com.kidzone.utils
 
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.storage.StorageException
+import com.kidzone.R
 import java.io.IOException
 
-const val NETWORK_ERROR_MESSAGE =
-    "Brak połączenia z internetem. Sprawdź sieć i spróbuj ponownie."
-
-const val SERVER_TEMPORARY_ERROR_MESSAGE =
-    "Nie udało się połączyć z serwerem. Spróbuj ponownie za chwilę."
-
-const val FIRESTORE_PERMISSION_ERROR_MESSAGE =
-    "Nie masz uprawnień do tych danych. Zaloguj się ponownie."
-
-const val FIRESTORE_CONFIGURATION_ERROR_MESSAGE =
-    "Dane wymagają aktualizacji konfiguracji. Spróbuj ponownie później."
-
-const val FIRESTORE_QUOTA_ERROR_MESSAGE =
-    "Usługa jest chwilowo przeciążona. Spróbuj ponownie za moment."
-
-const val UPLOAD_ERROR_MESSAGE =
-    "Nie udało się wgrać zdjęcia. Spróbuj ponownie."
-
-const val STORAGE_PERMISSION_ERROR_MESSAGE =
-    "Nie masz uprawnień do tego pliku. Zaloguj się ponownie."
-
-const val STORAGE_QUOTA_ERROR_MESSAGE =
-    "Nie udało się wgrać zdjęcia, bo usługa jest chwilowo przeciążona. Spróbuj ponownie później."
-
-const val STORAGE_RETRY_LIMIT_ERROR_MESSAGE =
-    "Nie udało się wgrać zdjęcia przez niestabilne połączenie. Spróbuj ponownie."
-
-fun Throwable.toPlacesErrorMessage(fallback: String): String {
+fun Throwable.toPlacesErrorMessage(fallback: UiText): UiText {
     val firestoreError = findCause<FirebaseFirestoreException>()
     if (firestoreError != null) {
         return firestoreError.toFirestoreMessage(fallback)
     }
 
     return if (hasCause<IOException>()) {
-        NETWORK_ERROR_MESSAGE
+        UiText.StringResource(R.string.error_no_internet)
     } else {
         fallback
     }
 }
 
-fun Throwable.toUploadErrorMessage(fallback: String = UPLOAD_ERROR_MESSAGE): String {
+fun Throwable.toUploadErrorMessage(fallback: UiText = UiText.StringResource(R.string.error_upload_failed)): UiText {
     val storageError = findCause<StorageException>()
     if (storageError != null) {
         return storageError.toStorageMessage(fallback)
     }
 
     return if (hasCause<IOException>()) {
-        NETWORK_ERROR_MESSAGE
+        UiText.StringResource(R.string.error_no_internet)
     } else {
         fallback
     }
 }
 
-private fun FirebaseFirestoreException.toFirestoreMessage(fallback: String): String =
+private fun FirebaseFirestoreException.toFirestoreMessage(fallback: UiText): UiText =
     when (code) {
         FirebaseFirestoreException.Code.PERMISSION_DENIED,
-        FirebaseFirestoreException.Code.UNAUTHENTICATED -> FIRESTORE_PERMISSION_ERROR_MESSAGE
+        FirebaseFirestoreException.Code.UNAUTHENTICATED -> UiText.StringResource(R.string.error_permission_denied)
 
         FirebaseFirestoreException.Code.UNAVAILABLE,
         FirebaseFirestoreException.Code.DEADLINE_EXCEEDED,
-        FirebaseFirestoreException.Code.ABORTED -> SERVER_TEMPORARY_ERROR_MESSAGE
+        FirebaseFirestoreException.Code.ABORTED -> UiText.StringResource(R.string.error_server_temporary)
 
-        FirebaseFirestoreException.Code.FAILED_PRECONDITION -> FIRESTORE_CONFIGURATION_ERROR_MESSAGE
-        FirebaseFirestoreException.Code.RESOURCE_EXHAUSTED -> FIRESTORE_QUOTA_ERROR_MESSAGE
+        FirebaseFirestoreException.Code.FAILED_PRECONDITION -> UiText.StringResource(R.string.error_config_update)
+        FirebaseFirestoreException.Code.RESOURCE_EXHAUSTED -> UiText.StringResource(R.string.error_quota_exceeded)
         else -> fallback
     }
 
-private fun StorageException.toStorageMessage(fallback: String): String =
+private fun StorageException.toStorageMessage(fallback: UiText): UiText =
     when (errorCode) {
         StorageException.ERROR_NOT_AUTHENTICATED,
-        StorageException.ERROR_NOT_AUTHORIZED -> STORAGE_PERMISSION_ERROR_MESSAGE
+        StorageException.ERROR_NOT_AUTHORIZED -> UiText.StringResource(R.string.error_storage_permission)
 
-        StorageException.ERROR_QUOTA_EXCEEDED -> STORAGE_QUOTA_ERROR_MESSAGE
-        StorageException.ERROR_RETRY_LIMIT_EXCEEDED -> STORAGE_RETRY_LIMIT_ERROR_MESSAGE
+        StorageException.ERROR_QUOTA_EXCEEDED -> UiText.StringResource(R.string.error_storage_quota)
+        StorageException.ERROR_RETRY_LIMIT_EXCEEDED -> UiText.StringResource(R.string.error_storage_retry_limit)
         else -> fallback
     }
 

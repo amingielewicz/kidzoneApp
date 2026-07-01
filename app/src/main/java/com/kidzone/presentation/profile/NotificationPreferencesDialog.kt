@@ -18,8 +18,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.kidzone.R
 
 data class NotificationPrefs(
     val newReviewOnMyPlace: Boolean = true,
@@ -39,67 +41,67 @@ fun NotificationPreferencesDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Powiadomienia") },
+        title = { Text(stringResource(R.string.notifications_title)) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Powiadomienia push",
+                    text = stringResource(R.string.push_notifications_section),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Wybierz, o czym chcesz by\u0107 powiadamiany:",
+                    text = stringResource(R.string.notification_preferences_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(16.dp))
                 NotificationToggle(
-                    title = "Nowa opinia o moim miejscu",
-                    description = "Kto\u015B wystawi\u0142 opini\u0119 o miejscu, kt\u00F3re doda\u0142e\u015B",
+                    title = stringResource(R.string.pref_new_review_title),
+                    description = stringResource(R.string.pref_new_review_desc),
                     checked = prefs.newReviewOnMyPlace,
                     onCheckedChange = { prefs = prefs.copy(newReviewOnMyPlace = it) }
                 )
                 NotificationToggle(
-                    title = "Nowa odznaka",
-                    description = "Zdoby\u0142e\u015B lub straci\u0142e\u015B odznak\u0119",
+                    title = stringResource(R.string.pref_new_badge_title),
+                    description = stringResource(R.string.pref_new_badge_desc),
                     checked = prefs.newBadgeEarned,
                     onCheckedChange = { prefs = prefs.copy(newBadgeEarned = it) }
                 )
                 NotificationToggle(
-                    title = "Zdj\u0119cia w moim miejscu",
-                    description = "Kto\u015B doda\u0142 lub usun\u0105\u0142 zdj\u0119cie z miejsca, kt\u00F3re doda\u0142e\u015B",
+                    title = stringResource(R.string.pref_new_photo_title),
+                    description = stringResource(R.string.pref_new_photo_desc),
                     checked = prefs.newPhotoOnMyPlace,
                     onCheckedChange = { prefs = prefs.copy(newPhotoOnMyPlace = it) }
                 )
                 NotificationToggle(
-                    title = "Rankingi",
-                    description = "Zdobywasz w rankingu TOP 10 / TOP 3 / podium",
+                    title = stringResource(R.string.pref_rankings_title),
+                    description = stringResource(R.string.pref_rankings_desc),
                     checked = prefs.rankings,
                     onCheckedChange = { prefs = prefs.copy(rankings = it) }
                 )
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    text = "Powiadomienia email",
+                    text = stringResource(R.string.email_notifications_section),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(Modifier.height(8.dp))
                 NotificationToggle(
-                    title = "Powiadomienia email",
-                    description = "Otrzymuj emaile o blokadzie konta, usuni\u0119ciu opinii, miejsc i zdj\u0119\u0107",
+                    title = stringResource(R.string.email_notifications_section),
+                    description = stringResource(R.string.pref_email_notifs_desc),
                     checked = prefs.emailNotificationsEnabled,
                     onCheckedChange = { prefs = prefs.copy(emailNotificationsEnabled = it) }
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(prefs) }) { Text("Zapisz") }
+            TextButton(onClick = { onSave(prefs) }) { Text(stringResource(R.string.save_changes)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Anuluj") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }

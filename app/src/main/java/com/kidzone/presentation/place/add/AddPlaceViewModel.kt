@@ -3,6 +3,7 @@ package com.kidzone.presentation.place.add
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kidzone.R
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
@@ -14,6 +15,8 @@ import com.kidzone.review.InAppReviewManager
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.PhotoUploader
 import com.kidzone.utils.TextNormalization
+import com.kidzone.utils.UiText
+import com.kidzone.utils.toPlacesErrorMessage
 import com.kidzone.utils.toUploadErrorMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import android.net.Uri
@@ -84,7 +87,7 @@ class AddPlaceViewModel @Inject constructor(
         val isFetchingLocation: Boolean = false,
         val isLoadingPlace: Boolean = false,
         val isSaving: Boolean = false,
-        val errorMessage: String? = null,
+        val errorMessage: UiText? = null,
         val isSaved: Boolean = false,
         val savedNewLatitude: Double? = null,
         val savedNewLongitude: Double? = null,
@@ -111,7 +114,7 @@ class AddPlaceViewModel @Inject constructor(
         /** True podczas uploadu zdjęć. */
         val isUploadingPhotos: Boolean = false,
         /** Komunikat o duplikatach (event jednorazowy, konsumowany przez UI). */
-        val photoDuplicateMessage: String? = null,
+        val photoDuplicateMessage: UiText? = null,
         /** True after user attempted to save an invalid form. */
         val hasTriedToSave: Boolean = false,
         /** True when in-app review should be requested. */
@@ -225,8 +228,7 @@ class AddPlaceViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isLoadingPlace = false,
-                            errorMessage = result.error.message
-                                ?: "Nie udało się wczytać miejsca do edycji"
+                            errorMessage = UiText.StringResource(R.string.error_load_place)
                         )
                     }
                 }
@@ -334,7 +336,7 @@ class AddPlaceViewModel @Inject constructor(
         }
     }
 
-    fun onLocationError(message: String) {
+    fun onLocationError(message: UiText) {
         _uiState.update { it.copy(isFetchingLocation = false, errorMessage = message) }
     }
 
@@ -349,7 +351,7 @@ class AddPlaceViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     hasTriedToSave = true,
-                    errorMessage = "Wypełnij wymagane pola i pobierz lokalizację"
+                    errorMessage = UiText.StringResource(R.string.error_fill_required_fields)
                 )
             }
             return
@@ -473,7 +475,7 @@ class AddPlaceViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isSaving = false,
-                        errorMessage = "Musisz być zalogowany, by dodać miejsce"
+                        errorMessage = UiText.StringResource(R.string.error_must_be_logged_in)
                     )
                 }
                 return@launch
@@ -527,7 +529,7 @@ class AddPlaceViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isSaving = false,
-                        photoDuplicateMessage = "To zdjęcie zostało już dodane. Nie można dodać duplikatu."
+                        photoDuplicateMessage = UiText.StringResource(R.string.duplicate_photo_error)
                     )
                 }
                 return@launch
@@ -535,7 +537,7 @@ class AddPlaceViewModel @Inject constructor(
                 // Część zdjęć pominięta – kontynuujemy zapis z resztą
                 _uiState.update {
                     it.copy(
-                        photoDuplicateMessage = "To zdjęcie zostało już dodane. Nie można dodać duplikatu."
+                        photoDuplicateMessage = UiText.StringResource(R.string.duplicate_photo_error)
                     )
                 }
             }
@@ -612,9 +614,10 @@ class AddPlaceViewModel @Inject constructor(
                     }
                     is OpResult.Failure -> it.copy(
                         isSaving = false,
-                        errorMessage = result.error.message
-                            ?: if (state.isEditMode) "Błąd aktualizacji miejsca"
-                            else "Błąd zapisu miejsca"
+                        errorMessage = result.error.toPlacesErrorMessage(
+                            if (state.isEditMode) UiText.StringResource(R.string.error_update_place)
+                            else UiText.StringResource(R.string.error_save_place)
+                        )
                     )
                 }
             }

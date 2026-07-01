@@ -64,6 +64,11 @@ interface AuthRepository {
     suspend fun signOut()
 
     /**
+     * Odświeża dane aktualnie zalogowanego użytkownika (np. status weryfikacji e-mail).
+     */
+    suspend fun refreshUser(): OpResult<Unit>
+
+    /**
      * Pobiera dokument użytkownika z kolekcji `users`.
      *
      * Używane np. na ekranie szczegółów miejsca, żeby pokazać

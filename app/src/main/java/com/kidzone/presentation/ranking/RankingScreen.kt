@@ -40,7 +40,6 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -51,7 +50,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -59,8 +57,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.User
@@ -74,6 +70,7 @@ import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.chronologicalOrder
 import com.kidzone.presentation.common.shimmerEffect
+import com.kidzone.R
 
 private const val PODIUM_FIRST_CONTAINER = 0xFFFFF8E1
 private const val PODIUM_FIRST_BORDER = 0xFFFFD54F
@@ -83,14 +80,6 @@ private const val PODIUM_SECOND_BORDER = 0xFFB0BEC5
 
 /**
  * Ranking miejsc i użytkowników.
- *
- * Dwie zakładki w [PrimaryTabRow]:
- *  - **Miejsca** – top miejsc wg [Place.averageRating] (do 100 pozycji),
- *  - **Użytkownicy** – top najbardziej aktywnych użytkowników (do 100 pozycji).
- *
- * Odświeżanie:
- *  - Automatycznie przy każdym wejściu na zakładkę (ON_RESUME).
- *  - Pull-to-refresh (swipe w dół).
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -102,11 +91,9 @@ fun RankingScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    // Zachowujemy stan przewijania osobno dla każdej zakładki
     val placesListState = rememberLazyListState()
     val usersListState = rememberLazyListState()
 
-    // Auto-refresh po przywróceniu internetu
     val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
     var previousNetworkStatus by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(networkStatus) }
     androidx.compose.runtime.LaunchedEffect(networkStatus) {
@@ -125,13 +112,13 @@ fun RankingScreen(
             Tab(
                 selected = selectedTab == 0,
                 onClick = { selectedTab = 0 },
-                text = { Text("Miejsca") },
+                text = { Text(stringResource(R.string.ranking_tab_places)) },
                 icon = { Icon(Icons.Filled.EmojiEvents, contentDescription = null) }
             )
             Tab(
                 selected = selectedTab == 1,
                 onClick = { selectedTab = 1 },
-                text = { Text("Użytkownicy") },
+                text = { Text(stringResource(R.string.ranking_tab_users)) },
                 icon = { Icon(Icons.Filled.Person, contentDescription = null) }
             )
         }
@@ -144,7 +131,7 @@ fun RankingScreen(
             state.errorMessage != null && state.topPlaces.isEmpty() && state.topUsers.isEmpty() -> {
                 FullScreenCentered {
                     Text(
-                        text = state.errorMessage!!,
+                        text = state.errorMessage!!.asString(),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -189,8 +176,8 @@ private fun TopPlacesList(
     if (places.isEmpty()) {
         EmptyState(
             icon = Icons.Filled.EmojiEvents,
-            title = "Ranking miejsc jest jeszcze pusty",
-            message = "Dodaj opinię do miejsca, a najwyżej oceniane lokalizacje pojawią się tutaj."
+            title = stringResource(R.string.ranking_empty_places_title),
+            message = stringResource(R.string.ranking_empty_places_message)
         )
         return
     }
@@ -223,8 +210,8 @@ private fun TopUsersList(
     if (users.isEmpty()) {
         EmptyState(
             icon = Icons.Filled.Person,
-            title = "Ranking użytkowników jest jeszcze pusty",
-            message = "Aktywność pojawi się po dodaniu pierwszych miejsc, opinii lub zdjęć."
+            title = stringResource(R.string.ranking_empty_users_title),
+            message = stringResource(R.string.ranking_empty_users_message)
         )
         return
     }
@@ -237,8 +224,7 @@ private fun TopUsersList(
     ) {
         item {
             Text(
-                text = "Przytrzymaj ikon\u0119 odznaki, aby zobaczy\u0107 jej nazw\u0119. " +
-                    "Wszystkie odznaki do zdobycia znajdziesz w Profilu \u2192 Odznaki \u2192 \u201E?\u201D",
+                text = stringResource(R.string.ranking_badges_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 4.dp)
@@ -262,7 +248,20 @@ private fun TopPlaceCard(
     animatedContentScope: AnimatedContentScope? = null
 ) {
     val categoryLabel = stringResource(place.category.labelRes)
-    val addressLabel = place.address.takeIf { it.isNotBlank() }?.let { ", adres: $it" }.orEmpty()
+    val addressLabel = place.address.takeIf { it.isNotBlank() }?.let {
+        ", ${stringResource(R.string.address_prefix, it)}"
+    }.orEmpty()
+    val desc = stringResource(
+        R.string.ranking_place_content_description,
+        position,
+        place.name,
+        categoryLabel,
+        addressLabel,
+        place.averageRating,
+        place.reviewsCount
+    )
+    val openDetailsLabel = stringResource(R.string.map_open_place_details_label)
+
     val highlight = when (position) {
         1 -> PodiumHighlight(
             containerColor = Color(PODIUM_FIRST_CONTAINER),
@@ -282,11 +281,10 @@ private fun TopPlaceCard(
     val cardModifier = Modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
-                contentDescription = "Pozycja $position, ${place.name}, $categoryLabel$addressLabel, " +
-                    "ocena %.1f, liczba opinii %d".format(place.averageRating, place.reviewsCount)
+                contentDescription = desc
             }
             .clickable(
-                onClickLabel = "Otwórz szczegóły miejsca",
+                onClickLabel = openDetailsLabel,
                 role = Role.Button,
                 onClick = onClick
             )
@@ -379,7 +377,7 @@ private fun TopPlaceCardContent(
                     )
                 }
                 Text(
-                    text = "${place.reviewsCount} opinii",
+                    text = stringResource(R.string.reviews_count_label, place.reviewsCount),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -393,12 +391,20 @@ private fun TopUserCard(
     user: User,
     badges: List<UserBadge>
 ) {
-    val userName = user.name.ifBlank { "Użytkownik" }
+    val userName = user.name.ifBlank { stringResource(R.string.default_user_name) }
     val badgesLabel = if (badges.isEmpty()) {
-        "brak odznak"
+        stringResource(R.string.no_badges)
     } else {
-        "liczba odznak ${badges.size}"
+        stringResource(R.string.badges_count_label, badges.size)
     }
+    val desc = stringResource(
+        R.string.ranking_user_content_description,
+        position,
+        userName,
+        user.placesAddedCount,
+        user.reviewsCount,
+        badgesLabel
+    )
 
     val highlight = when (position) {
         1 -> PodiumHighlight(
@@ -419,8 +425,7 @@ private fun TopUserCard(
     val cardModifier = Modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
-                contentDescription = "Pozycja $position, $userName, " +
-                    "${user.placesAddedCount} miejsc, ${user.reviewsCount} opinii, $badgesLabel"
+                contentDescription = desc
             }
 
     if (highlight == null) {
@@ -454,13 +459,13 @@ private fun TopUserCardContent(
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = user.name.ifBlank { "U\u017Cytkownik" },
+                        text = user.name.ifBlank { stringResource(R.string.default_user_name) },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 2
                     )
                     Text(
-                        text = "${user.placesAddedCount} miejsc \u00B7 ${user.reviewsCount} opinii",
+                        text = stringResource(R.string.user_activity_summary, user.placesAddedCount, user.reviewsCount),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

@@ -12,8 +12,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.kidzone.R
 
 /**
  * Dialog z regulaminem kidZone.
@@ -24,101 +26,68 @@ fun TermsOfServiceDialog(onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Zamknij")
+                Text(stringResource(R.string.close))
             }
         },
-        title = { Text("Regulamin użytkowania") },
+        title = { Text(stringResource(R.string.terms_of_service)) },
         text = {
             Column(
                 modifier = Modifier
                     .heightIn(max = 480.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                SectionTitle2("1. Zasady ogólne")
-                Text(
-                    "Aplikacja kidZone służy do dzielenia się informacjami o miejscach " +
-                        "przyjaznych dzieciom. Korzystając z niej, zobowiązujesz się do " +
-                        "przestrzegania niniejszego Regulaminu."
-                )
+                SectionTitle2(stringResource(R.string.tos_section_1_title))
+                Text(stringResource(R.string.tos_section_1_body))
                 Spacer(Modifier.height(12.dp))
 
-                SectionTitle2("2. Konto")
-                Text(
-                    "Każdy użytkownik może posiadać jedno konto. Jesteś odpowiedzialny " +
-                        "za bezpieczeństwo swoich danych logowania. Możesz usunąć konto " +
-                        "w dowolnym momencie w Profilu, w sekcji Konto i bezpieczeństwo. " +
-                        "Publiczna instrukcja usuwania konta jest dostępna pod adresem " +
-                        "https://playground-705e7162.web.app/account-deletion."
-                )
+                SectionTitle2(stringResource(R.string.tos_section_2_title))
+                Text(stringResource(R.string.tos_section_2_body))
                 Spacer(Modifier.height(12.dp))
 
-                SectionTitle2("3. Zasady zachowania")
-                Text("Zobowiązujesz się do:")
+                SectionTitle2(stringResource(R.string.tos_section_3_title))
+                Text(stringResource(R.string.tos_section_3_intro))
                 Spacer(Modifier.height(4.dp))
-                BulletPoint2("Publikowania prawdziwych informacji o miejscach")
-                BulletPoint2("Wyrażania opinii kulturalnie i merytorycznie")
-                BulletPoint2("Szanowania innych użytkowników")
-                BulletPoint2("Niepublikowania treści obraźliwych, spamu ani reklam")
-                BulletPoint2("Niedodawania nieodpowiednich zdjęć")
-                BulletPoint2("Niemanipulowania rankingami i odznakami")
+                BulletPoint2(stringResource(R.string.tos_section_3_bullet_1))
+                BulletPoint2(stringResource(R.string.tos_section_3_bullet_2))
+                BulletPoint2(stringResource(R.string.tos_section_3_bullet_3))
+                BulletPoint2(stringResource(R.string.tos_section_3_bullet_4))
+                BulletPoint2(stringResource(R.string.tos_section_3_bullet_5))
+                BulletPoint2(stringResource(R.string.tos_section_3_bullet_6))
                 Spacer(Modifier.height(12.dp))
 
-                SectionTitle2("4. Blokada konta")
+                SectionTitle2(stringResource(R.string.tos_section_4_title))
                 Text(
-                    "Naruszenie Regulaminu może skutkować blokadą konta. Blokada " +
-                        "może być czasowa (na określoną liczbę dni) lub bezpowrotna " +
-                        "(permanentna). Zablokowany użytkownik nie może się zalogować " +
-                        "do aplikacji. O blokadzie zostaniesz poinformowany emailem " +
-                        "z podaniem powodu.",
+                    text = stringResource(R.string.tos_section_4_body),
                     color = MaterialTheme.colorScheme.error
                 )
                 Spacer(Modifier.height(8.dp))
-                Text("Blokada może nastąpić w szczególności za:")
+                Text(stringResource(R.string.tos_section_4_intro))
                 Spacer(Modifier.height(4.dp))
-                BulletPoint2("Dodawanie fałszywych informacji")
-                BulletPoint2("Publikowanie treści obraźliwych lub spamu")
-                BulletPoint2("Nękanie innych użytkowników")
-                BulletPoint2("Dodawanie nieodpowiednich zdjęć")
-                BulletPoint2("Tworzenie wielu kont w celu obejścia blokady")
+                BulletPoint2(stringResource(R.string.tos_section_4_bullet_1))
+                BulletPoint2(stringResource(R.string.tos_section_4_bullet_2))
+                BulletPoint2(stringResource(R.string.tos_section_4_bullet_3))
+                BulletPoint2(stringResource(R.string.tos_section_4_bullet_4))
+                BulletPoint2(stringResource(R.string.tos_section_4_bullet_5))
                 Spacer(Modifier.height(12.dp))
 
-                SectionTitle2("5. Usunięcie treści")
-                Text(
-                    "Administrator może usunąć miejsce, opinię lub zdjęcie naruszające " +
-                        "Regulamin. O usunięciu zostaniesz poinformowany emailem z powodem."
-                )
+                SectionTitle2(stringResource(R.string.tos_section_5_title))
+                Text(stringResource(R.string.tos_section_5_body))
                 Spacer(Modifier.height(12.dp))
 
-                SectionTitle2("6. Treści użytkowników")
-                Text(
-                    "Dodając treści, oświadczasz, że masz prawo do ich publikacji. " +
-                        "Po usunięciu konta Twoje opinie zostaną zanonimizowane, " +
-                        "a dodane miejsca mogą pozostać widoczne, jeżeli nie zawierają " +
-                        "danych osobowych i są częścią publicznej bazy miejsc."
-                )
+                SectionTitle2(stringResource(R.string.tos_section_6_title))
+                Text(stringResource(R.string.tos_section_6_body))
                 Spacer(Modifier.height(12.dp))
 
-                SectionTitle2("7. Zdjęcia dzieci i osób trzecich")
-                Text(
-                    "Nie publikuj zdjęć dzieci ani osób trzecich bez wszystkich wymaganych " +
-                        "zgód. Zdjęcia naruszające prywatność, wizerunek lub bezpieczeństwo " +
-                        "dziecka mogą zostać usunięte po zgłoszeniu."
-                )
+                SectionTitle2(stringResource(R.string.tos_section_7_title))
+                Text(stringResource(R.string.tos_section_7_body))
                 Spacer(Modifier.height(12.dp))
 
-                SectionTitle2("8. Odpowiedzialność")
-                Text(
-                    "kidZone nie ponosi odpowiedzialności za treści publikowane " +
-                        "przez użytkowników ani nie gwarantuje ich aktualności."
-                )
+                SectionTitle2(stringResource(R.string.tos_section_8_title))
+                Text(stringResource(R.string.tos_section_8_body))
                 Spacer(Modifier.height(12.dp))
 
-                SectionTitle2("9. Zmiany Regulaminu")
-                Text(
-                    "O istotnych zmianach Regulaminu zostaniesz poinformowany " +
-                        "w aplikacji lub emailem. Dalsze korzystanie z aplikacji " +
-                        "oznacza akceptację nowych warunków."
-                )
+                SectionTitle2(stringResource(R.string.tos_section_9_title))
+                Text(stringResource(R.string.tos_section_9_body))
             }
         }
     )
