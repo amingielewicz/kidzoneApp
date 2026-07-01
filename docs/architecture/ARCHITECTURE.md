@@ -1,12 +1,21 @@
+<<<<<<< HEAD
 # Architecture Handbook
 
 ## Cel
 
 Ten dokument opisuje docelową architekturę aplikacji KidZone i zasady utrzymania jej w ryzach podczas rozwoju.
+=======
+# Architecture Overview
+
+## Cel
+
+Dokument opisuje wysokopoziomową architekturę KidZone oraz główne zasady projektowania aplikacji.
+>>>>>>> 7f3496a (docs: add architecture overview)
 
 ## Warstwy
 
 ```text
+<<<<<<< HEAD
 Presentation -> Domain -> Data -> Framework
 ```
 
@@ -89,3 +98,78 @@ Każdy flow danych musi mieć obsługę:
 - [ ] Modele domenowe są oddzielone od DTO.
 - [ ] Ekran ma kompletny UiState.
 - [ ] Błędy są obsłużone jawnie.
+=======
+Presentation
+Domain
+Data
+Framework
+```
+
+## Presentation
+
+Odpowiada za:
+
+- ekrany Compose,
+- ViewModel,
+- UI state,
+- obsługę akcji użytkownika,
+- prezentację błędów i stanów ładowania.
+
+Presentation nie powinna zawierać logiki biznesowej.
+
+## Domain
+
+Odpowiada za:
+
+- modele domenowe,
+- use case,
+- interfejsy repozytoriów,
+- reguły biznesowe niezależne od Firebase i Androida.
+
+Domain nie zależy od frameworków.
+
+## Data
+
+Odpowiada za:
+
+- implementacje repozytoriów,
+- integracje z Firebase,
+- Room cache,
+- mapowanie DTO na modele domenowe,
+- synchronizację danych.
+
+## Framework
+
+Odpowiada za:
+
+- Firebase SDK,
+- Google Maps,
+- Android Services,
+- Hilt,
+- WorkManager,
+- platformowe API Androida.
+
+## Kierunek zależności
+
+```text
+Presentation -> Domain <- Data -> Framework
+```
+
+Zależności powinny iść do środka, czyli w stronę Domain.
+
+## Zasady
+
+- Domain pozostaje niezależny.
+- ViewModel nie zna implementacji Firebase.
+- Composable nie wykonuje zapytań do repozytoriów.
+- Data mapuje modele zewnętrzne na modele domenowe.
+- Framework jest szczegółem implementacyjnym.
+
+## Checklist
+
+- [ ] Logika biznesowa jest poza UI.
+- [ ] Domain nie importuje Android/Firebase.
+- [ ] ViewModel korzysta z use case albo repozytorium przez interfejs.
+- [ ] DTO nie przeciekają do UI.
+- [ ] Błędy są mapowane na stan UI.
+>>>>>>> 7f3496a (docs: add architecture overview)

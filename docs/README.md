@@ -44,6 +44,25 @@ product documentation for kidZone.
 - [UI checklist](product/UI_CHECKLIST.md)
 - [UX checklist](product/UX_CHECKLIST.md)
 
+## Architecture
+
+- [Architecture overview](architecture/ARCHITECTURE.md)
+- [Clean Architecture](architecture/CLEAN_ARCHITECTURE.md)
+- [Modules](architecture/MODULES.md)
+- [Dependency rules](architecture/DEPENDENCY_RULES.md)
+- [Data flow](architecture/DATA_FLOW.md)
+- [State management](architecture/STATE_MANAGEMENT.md)
+- [Error handling](architecture/ERROR_HANDLING.md)
+- [Observability](architecture/OBSERVABILITY.md)
+
+## Architecture Decision Records
+
+- [ADR-001: Clean Architecture](architecture/ADR/ADR-001-clean-architecture.md)
+- [ADR-002: Compose Navigation](architecture/ADR/ADR-002-compose-navigation.md)
+- [ADR-003: Firebase](architecture/ADR/ADR-003-firebase.md)
+- [ADR-004: StateFlow](architecture/ADR/ADR-004-stateflow.md)
+- [ADR-005: Offline strategy](architecture/ADR/ADR-005-offline-strategy.md)
+
 ## Release and QA
 
 - [Release process](release.md)
