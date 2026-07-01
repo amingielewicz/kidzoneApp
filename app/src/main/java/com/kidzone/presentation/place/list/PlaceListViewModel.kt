@@ -253,20 +253,15 @@ class PlaceListViewModel @Inject constructor(
         list: List<Place>,
         params: FilterParams
     ): List<Place> {
-        val filtered = list.filter { p ->
-            val matchesQuery = params.query.isBlank() || p.name.contains(params.query, ignoreCase = true)
-            val matchesCategory = params.category == null || p.category == params.category
-            val matchesAmenities = params.amenities.isEmpty() || p.amenities.containsAll(params.amenities)
-            matchesQuery && matchesCategory && matchesAmenities
-        }
+        val filtered = list.filter { place -> place.matchesFilters(params) }
 
         val comparator = when (params.order) {
             SortOrder.RECENTLY_ADDED -> compareByDescending<Place> { it.createdAtMillis }
-            SortOrder.ADDED_BY_ME -> compareByDescending<Place> { it.ownerUserId == params.userId }
-                .thenByDescending { it.createdAtMillis }
+            SortOrder.ADDED_BY_ME -> compareByDescending<Place> { it.createdAtMillis }
             SortOrder.BEST_RATED -> compareByDescending<Place> { it.averageRating }
                 .thenByDescending { it.reviewsCount }
-            SortOrder.WORST_RATED -> compareBy<Place> { it.averageRating }
+            SortOrder.WORST_RATED -> compareBy<Place> { it.reviewsCount == 0 }
+                .thenBy { it.averageRating }
                 .thenByDescending { it.reviewsCount }
             SortOrder.NEAREST -> if (params.location != null) {
                 compareBy<Place> { distance(it.latitude, it.longitude, params.location.first, params.location.second) }
@@ -276,6 +271,15 @@ class PlaceListViewModel @Inject constructor(
         }
 
         return filtered.sortedWith(comparator)
+    }
+
+    private fun Place.matchesFilters(params: FilterParams): Boolean {
+        val matchesQuery = params.query.isBlank() || name.contains(params.query, ignoreCase = true)
+        val matchesCategory = params.category == null || category == params.category
+        val matchesAmenities = params.amenities.isEmpty() || amenities.containsAll(params.amenities)
+        val matchesOwner = params.order != SortOrder.ADDED_BY_ME ||
+            params.userId?.let { ownerUserId == it } == true
+        return matchesQuery && matchesCategory && matchesAmenities && matchesOwner
     }
 
     private data class FilterParams(
