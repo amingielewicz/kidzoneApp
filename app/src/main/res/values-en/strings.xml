@@ -385,6 +385,8 @@
     <string name="report_review">Report review</string>
     <string name="edited_with_date">· edited %1$s</string>
     <string name="average_rating">Average rating</string>
+    <string name="error_owner_cannot_review">You cannot review your own place</string>
+    <string name="error_invalid_rating">Choose a rating from 1 to 5</string>
     <string name="star_count_label">%1$d stars</string>
     <string name="delete_place_title">Delete place?</string>
     <string name="delete_place_confirmation">\"%1$s\" will be permanently deleted. Are you sure you want to continue?</string>
@@ -542,6 +544,12 @@
     <string name="email_already_set">This is your current address</string>
     <string name="email_verification_hint">We will send a verification link to the new address</string>
     <string name="send_link">Send link</string>
+    <string name="profile_update_failed">Failed to save profile</string>
+    <string name="password_changed">Password changed</string>
+    <string name="change_email_verification_sent">Verification link sent to %1$s. Click it to confirm the address change.</string>
+    <string name="account_action_failed">Failed to complete action</string>
+    <string name="delete_account_failed">Failed to delete account</string>
+    <string name="error_unauthorized">You do not have permission to perform this action</string>
     <string name="empty_my_reviews_title">You don\'t have any reviews yet</string>
     <string name="empty_my_reviews_subtitle">Open any place from the list or map and add your first review.</string>
     <string name="place_unavailable">Place unavailable</string>

@@ -3,6 +3,7 @@ package com.kidzone.presentation.profile
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kidzone.R
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
@@ -14,6 +15,7 @@ import com.kidzone.i18n.LanguagePreferences
 import com.kidzone.presentation.common.BadgeContext
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.computeBadges
+import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.UiText
 import com.kidzone.utils.toUploadErrorMessage
@@ -184,7 +186,7 @@ class ProfileViewModel @Inject constructor(
                     is OpResult.Success -> it.copy(isSaving = false, isEditOpen = false)
                     is OpResult.Failure -> it.copy(
                         isSaving = false,
-                        saveError = UiText.DynamicString(result.error.message ?: "Update failed")
+                        saveError = result.error.toAuthUiText(R.string.profile_update_failed)
                     )
                 }
             }
@@ -198,7 +200,9 @@ class ProfileViewModel @Inject constructor(
     }
 
     fun dismissChangePassword() {
-        _uiState.update { it.copy(isChangePasswordOpen = false) }
+        if (!_uiState.value.isAccountActionInProgress) {
+            _uiState.update { it.copy(isChangePasswordOpen = false, accountActionError = null) }
+        }
     }
 
     fun changePassword(current: String, new: String) {
@@ -210,11 +214,11 @@ class ProfileViewModel @Inject constructor(
                     is OpResult.Success -> it.copy(
                         isAccountActionInProgress = false,
                         isChangePasswordOpen = false,
-                        accountActionInfo = UiText.DynamicString("Password changed")
+                        accountActionInfo = UiText.StringResource(R.string.password_changed)
                     )
                     is OpResult.Failure -> it.copy(
                         isAccountActionInProgress = false,
-                        accountActionError = UiText.DynamicString(result.error.message ?: "Action failed")
+                        accountActionError = result.error.toAuthUiText(R.string.account_action_failed)
                     )
                 }
             }
@@ -226,7 +230,9 @@ class ProfileViewModel @Inject constructor(
     }
 
     fun dismissChangeEmail() {
-        _uiState.update { it.copy(isChangeEmailOpen = false) }
+        if (!_uiState.value.isAccountActionInProgress) {
+            _uiState.update { it.copy(isChangeEmailOpen = false, accountActionError = null) }
+        }
     }
 
     fun changeEmail(password: String, newEmail: String) {
@@ -238,11 +244,11 @@ class ProfileViewModel @Inject constructor(
                     is OpResult.Success -> it.copy(
                         isAccountActionInProgress = false,
                         isChangeEmailOpen = false,
-                        accountActionInfo = UiText.DynamicString("Verification link sent to $newEmail")
+                        accountActionInfo = UiText.StringResource(R.string.change_email_verification_sent, newEmail)
                     )
                     is OpResult.Failure -> it.copy(
                         isAccountActionInProgress = false,
-                        accountActionError = UiText.DynamicString(result.error.message ?: "Action failed")
+                        accountActionError = result.error.toAuthUiText(R.string.account_action_failed)
                     )
                 }
             }
@@ -272,10 +278,12 @@ class ProfileViewModel @Inject constructor(
                 onDeleted()
             } else {
                 _uiState.update {
-                    val msg = (result as? OpResult.Failure)?.error?.message ?: "Delete failed"
                     it.copy(
                         isAccountActionInProgress = false,
-                        accountActionError = UiText.DynamicString(msg)
+                        accountActionError = (result as? OpResult.Failure)
+                            ?.error
+                            ?.toAuthUiText(R.string.delete_account_failed)
+                            ?: UiText.StringResource(R.string.delete_account_failed)
                     )
                 }
             }
@@ -293,10 +301,12 @@ class ProfileViewModel @Inject constructor(
                 onDeleted()
             } else {
                 _uiState.update {
-                    val msg = (result as? OpResult.Failure)?.error?.message ?: "Delete failed"
                     it.copy(
                         isAccountActionInProgress = false,
-                        accountActionError = UiText.DynamicString(msg)
+                        accountActionError = (result as? OpResult.Failure)
+                            ?.error
+                            ?.toAuthUiText(R.string.delete_account_failed)
+                            ?: UiText.StringResource(R.string.delete_account_failed)
                     )
                 }
             }
@@ -361,20 +371,41 @@ class ProfileViewModel @Inject constructor(
 
     private fun detectNewBadges(userId: String, currentBadges: List<UserBadge>): List<UserBadge> {
         val seenNames = badgePreferences.getSeenBadges(userId)
-        val currentNames = currentBadges.map { it.name }.toSet()
-        val newlyEarned = currentBadges.filter { it.name !in seenNames }
+        val seen = seenNames.mapNotNull { runCatching { UserBadge.valueOf(it) }.getOrNull() }.toSet()
+        val current = currentBadges.toSet()
+        val newlyEarned = (current - seen).sortedBy { it.ordinal }
+        val revoked = seen - current
 
         if (newlyEarned.isNotEmpty()) {
-            badgePreferences.setSeenBadges(userId, seenNames + currentNames)
-            // Persist also to Firestore so other devices know
             viewModelScope.launch {
                 authRepository.recordBadgesEarned(newlyEarned.map { it.name })
             }
         }
+
+        if (revoked.isNotEmpty()) {
+            _uiState.update { state ->
+                state.copy(newlyEarnedBadges = state.newlyEarnedBadges.filter { it !in revoked })
+            }
+            viewModelScope.launch {
+                authRepository.revokeBadges(revoked.map { it.name })
+            }
+        }
+
+        if (seen != current) {
+            badgePreferences.setSeenBadges(userId, current.map { it.name }.toSet())
+        }
+
         return newlyEarned
     }
 
     fun consumeAccountActionInfo() {
         _uiState.update { it.copy(accountActionInfo = null) }
     }
+
+    private fun Throwable.toAuthUiText(fallbackRes: Int): UiText =
+        when (this) {
+            is AuthException.AccountBanned -> UiText.DynamicString(banMessage)
+            is AuthException -> UiText.StringResource(messageRes.takeIf { it != 0 } ?: fallbackRes)
+            else -> UiText.StringResource(fallbackRes)
+        }
 }

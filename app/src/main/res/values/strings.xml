@@ -387,6 +387,8 @@
     <string name="report_review">Zgłoś opinię</string>
     <string name="edited_with_date">· edytowana %1$s</string>
     <string name="average_rating">Średnia ocena</string>
+    <string name="error_owner_cannot_review">Nie możesz dodać opinii do własnego miejsca</string>
+    <string name="error_invalid_rating">Wybierz ocenę od 1 do 5</string>
     <string name="star_count_label">%1$d gwiazdek</string>
     <string name="delete_place_title">Usunąć miejsce?</string>
     <string name="delete_place_confirmation">\"%1$s\" zostanie nieodwracalnie usunięte z bazy. Czy na pewno chcesz kontynuować?</string>
@@ -544,6 +546,12 @@
     <string name="email_already_set">To jest Twój aktualny adres</string>
     <string name="email_verification_hint">Wyślemy link weryfikacyjny na nowy adres</string>
     <string name="send_link">Wyślij link</string>
+    <string name="profile_update_failed">Nie udało się zapisać profilu</string>
+    <string name="password_changed">Hasło zostało zmienione</string>
+    <string name="change_email_verification_sent">Wysłaliśmy link weryfikacyjny na: %1$s. Kliknij w niego, by potwierdzić zmianę adresu.</string>
+    <string name="account_action_failed">Nie udało się wykonać akcji</string>
+    <string name="delete_account_failed">Nie udało się usunąć konta</string>
+    <string name="error_unauthorized">Nie masz uprawnień do wykonania tej akcji</string>
     <string name="empty_my_reviews_title">Nie masz jeszcze opinii</string>
     <string name="empty_my_reviews_subtitle">Otwórz dowolne miejsce z listy lub mapy i dodaj swoją pierwszą opinię.</string>
     <string name="place_unavailable">Miejsce niedostępne</string>

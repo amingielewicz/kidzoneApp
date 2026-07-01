@@ -3,6 +3,7 @@ package com.kidzone.presentation.map
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.R
+import com.kidzone.data.remote.PerformanceConfigProvider
 import com.kidzone.domain.model.GeoBounds
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
@@ -31,7 +32,6 @@ import javax.inject.Inject
 
 private const val VIEWPORT_DEBOUNCE_MS = 300L
 private const val VIEWPORT_CACHE_SIZE = 20
-private const val MAP_PLACES_LIMIT = 500
 private const val CACHE_EXPIRATION_MS = 600_000L
 private const val FLOW_SUBSCRIPTION_TIMEOUT_MS = 5000L
 private const val TOP_RATED_THRESHOLD = 4.0
@@ -45,7 +45,8 @@ private val MAP_ERROR_FALLBACK = UiText.StringResource(R.string.error_fetch_plac
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 class MapViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val performanceConfigProvider: PerformanceConfigProvider
 ) : ViewModel() {
 
     data class UiState(
@@ -100,7 +101,8 @@ class MapViewModel @Inject constructor(
             } else {
                 flow<PlacesLoad> {
                     emit(PlacesLoad.Loading(lastPlaces))
-                    when (val result = placeRepository.getPlacesInBounds(bounds, category, MAP_PLACES_LIMIT)) {
+                    val limit = performanceConfigProvider.performanceConfig.mapMarkersLimit
+                    when (val result = placeRepository.getPlacesInBounds(bounds, category, limit)) {
                         is OpResult.Success -> {
                             viewportCache[cacheKey] = CacheEntry(result.data, System.currentTimeMillis())
                             emit(PlacesLoad.Success(result.data))

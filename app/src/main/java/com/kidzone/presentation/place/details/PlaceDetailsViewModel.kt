@@ -210,7 +210,7 @@ class PlaceDetailsViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isDeleting = false,
-                        deleteErrorMessage = UiText.DynamicString("Unauthorized")
+                        deleteErrorMessage = UiText.StringResource(R.string.error_unauthorized)
                     )
                 }
                 return@launch
@@ -305,13 +305,13 @@ class PlaceDetailsViewModel @Inject constructor(
         }
         if (user.id == place.ownerUserId) {
             _uiState.update {
-                it.copy(addReviewError = UiText.DynamicString("Owner cannot review"))
+                it.copy(addReviewError = UiText.StringResource(R.string.error_owner_cannot_review))
             }
             return
         }
         if (rating !in 1..5) {
             _uiState.update {
-                it.copy(addReviewError = UiText.DynamicString("Invalid rating"))
+                it.copy(addReviewError = UiText.StringResource(R.string.error_invalid_rating))
             }
             return
         }

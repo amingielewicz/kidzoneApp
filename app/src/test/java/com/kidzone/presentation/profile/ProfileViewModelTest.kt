@@ -257,7 +257,8 @@ class ProfileViewModelTest {
             val state = viewModel.uiState.value
             assertFalse(state.isSaving)
             assertNotNull(state.saveError)
-            assertTrue(state.saveError is UiText.DynamicString)
+            assertTrue(state.saveError is UiText.StringResource)
+            assertEquals(R.string.error_username_taken, (state.saveError as UiText.StringResource).resId)
         }
 
         @Test
@@ -323,7 +324,8 @@ class ProfileViewModelTest {
             val state = viewModel.uiState.value
             assertFalse(state.isChangePasswordOpen)
             assertFalse(state.isAccountActionInProgress)
-            assertTrue(state.accountActionInfo is UiText.DynamicString)
+            assertTrue(state.accountActionInfo is UiText.StringResource)
+            assertEquals(R.string.password_changed, (state.accountActionInfo as UiText.StringResource).resId)
         }
 
         @Test
@@ -366,7 +368,11 @@ class ProfileViewModelTest {
 
             val state = viewModel.uiState.value
             assertFalse(state.isChangeEmailOpen)
-            assertNotNull(state.accountActionInfo)
+            assertTrue(state.accountActionInfo is UiText.StringResource)
+            assertEquals(
+                R.string.change_email_verification_sent,
+                (state.accountActionInfo as UiText.StringResource).resId
+            )
         }
 
         @Test
@@ -509,6 +515,20 @@ class ProfileViewModelTest {
 
             viewModel.dismissBadgesInfo()
             assertFalse(viewModel.uiState.value.isBadgesInfoOpen)
+        }
+
+        @Test
+        fun `revokes badges that are no longer earned`() = runTest {
+            every { badgePreferences.getSeenBadges("uid-1") } returns setOf("FIRST_PLACE")
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            currentUserFlow.value = TestFixtures.user(id = "uid-1", placesAddedCount = 0, reviewsCount = 0)
+            advanceUntilIdle()
+
+            coVerify { authRepository.revokeBadges(listOf("FIRST_PLACE")) }
+            verify { badgePreferences.setSeenBadges("uid-1", emptySet()) }
         }
 
         @Test
