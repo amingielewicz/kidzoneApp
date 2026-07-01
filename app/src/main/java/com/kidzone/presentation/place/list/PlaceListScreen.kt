@@ -372,7 +372,7 @@ fun PlaceListScreen(
                             animationSource = "list"
                         )
                     }
-                    if (state.hasMore) {
+                    if (state.isLoadingMore) {
                         item {
                             Box(
                                 modifier = Modifier
@@ -398,7 +398,7 @@ fun PlaceListScreen(
                     derivedStateOf {
                         val lastVisible = lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
                         val totalItems = lazyListState.layoutInfo.totalItemsCount
-                        lastVisible >= totalItems - 3 && state.hasMore
+                        lastVisible >= totalItems - 3 && state.hasMore && !state.isLoadingMore
                     }
                 }
                 LaunchedEffect(shouldLoadMore.value) {
