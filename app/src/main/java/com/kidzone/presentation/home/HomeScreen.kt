@@ -203,9 +203,7 @@ fun HomeScreen(
                     }
                 }
 
-                if (state.locationGranted &&
-                    (state.isRecentlyAddedLoading || state.recentlyAddedPlaces.isNotEmpty())
-                ) {
+                if (state.locationGranted) {
                     item {
                         SectionHeader(
                             title = stringResource(R.string.home_recent_nearby_places),

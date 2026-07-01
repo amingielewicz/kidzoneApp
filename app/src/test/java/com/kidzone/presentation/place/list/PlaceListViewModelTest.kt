@@ -168,17 +168,27 @@ class PlaceListViewModelTest {
         }
 
         @Test
-        fun `onSearchQueryChange triggers refresh from repository`() = runTest {
+        fun `onSearchQueryChange filters locally without repository refresh`() = runTest {
             viewModel = createAndObserve()
             advanceUntilIdle()
             clearMocks(placeRepository, answers = false)
 
-            viewModel.onSearchQueryChange("test")
+            viewModel.onSearchQueryChange("restauracja")
             advanceUntilIdle()
 
-            coVerify {
-                placeRepository.getPlacesPage(any(), null, any(), "test")
-            }
+            assertEquals(listOf("p2"), viewModel.uiState.value.places.map { it.id })
+            coVerify(exactly = 0) { placeRepository.getPlacesPage(any(), any(), any(), any()) }
+        }
+
+        @Test
+        fun `onSearchQueryChange ignores case`() = runTest {
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            viewModel.onSearchQueryChange("RESTAURACJA")
+            advanceUntilIdle()
+
+            assertEquals(listOf("p2"), viewModel.uiState.value.places.map { it.id })
         }
     }
 

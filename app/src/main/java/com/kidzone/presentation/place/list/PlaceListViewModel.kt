@@ -231,7 +231,6 @@ class PlaceListViewModel @Inject constructor(
 
     fun onSearchQueryChange(query: String) {
         searchQuery.value = query
-        refresh()
     }
 
     fun saveScrollPosition(firstVisibleItemIndex: Int, firstVisibleItemScrollOffset: Int) {

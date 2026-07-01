@@ -329,7 +329,13 @@ private fun ProfileContent(
             item { PersonalInfoCard(user = user) }
         }
 
-        item { StatsCard(user = user) }
+        item {
+            StatsCard(
+                user = user,
+                onOpenMyPlaces = onOpenMyPlaces,
+                onOpenMyReviews = onOpenMyReviews,
+            )
+        }
 
         item {
             MyContentCard(
@@ -507,7 +513,11 @@ private fun InfoRow(label: String, value: String) {
 
 @Suppress("FunctionNaming")
 @Composable
-private fun StatsCard(user: User) {
+private fun StatsCard(
+    user: User,
+    onOpenMyPlaces: () -> Unit,
+    onOpenMyReviews: () -> Unit,
+) {
     SectionCard(title = stringResource(R.string.stats_title)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -517,11 +527,15 @@ private fun StatsCard(user: User) {
                 icon = Icons.Filled.Place,
                 value = user.placesAddedCount.toString(),
                 label = stringResource(R.string.stats_places),
+                onClick = onOpenMyPlaces,
+                modifier = Modifier.weight(1f),
             )
             StatItem(
                 icon = Icons.Filled.RateReview,
                 value = user.reviewsCount.toString(),
                 label = stringResource(R.string.stats_reviews),
+                onClick = onOpenMyReviews,
+                modifier = Modifier.weight(1f),
             )
         }
         if (user.createdAtMillis > 0L) {
@@ -547,8 +561,19 @@ private fun StatItem(
     icon: ImageVector,
     value: String,
     label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = modifier
+            .clickable(
+                onClickLabel = label,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Icon(
             imageVector = icon,
             contentDescription = null,

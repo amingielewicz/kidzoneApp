@@ -85,6 +85,7 @@ private const val PODIUM_SECOND_BORDER = 0xFFB0BEC5
 @Composable
 fun RankingScreen(
     onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
+    initialTab: String = "",
     viewModel: RankingViewModel = hiltViewModel(),
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedContentScope: AnimatedContentScope? = null
@@ -106,6 +107,13 @@ fun RankingScreen(
     }
 
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    androidx.compose.runtime.LaunchedEffect(initialTab) {
+        selectedTab = when (initialTab) {
+            "users" -> 1
+            "places" -> 0
+            else -> selectedTab
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         PrimaryTabRow(selectedTabIndex = selectedTab) {
