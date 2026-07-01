@@ -49,6 +49,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -74,9 +76,10 @@ import com.kidzone.R
 
 private const val PODIUM_FIRST_CONTAINER = 0xFFFFF8E1
 private const val PODIUM_FIRST_BORDER = 0xFFFFD54F
-private const val PODIUM_THIRD_CONTAINER = 0xFFFFF3E0
-private const val PODIUM_THIRD_BORDER = 0xFFD7A86E
+private const val PODIUM_THIRD_CONTAINER = 0xFFF1D2B6
+private const val PODIUM_THIRD_BORDER = 0xFFB66A35
 private const val PODIUM_SECOND_BORDER = 0xFFB0BEC5
+private const val RANKING_SWIPE_THRESHOLD_PX = 80f
 
 /**
  * Ranking miejsc i użytkowników.
@@ -150,7 +153,24 @@ fun RankingScreen(
                 PullToRefreshBox(
                     isRefreshing = state.isLoading,
                     onRefresh = { viewModel.refresh(forceShowLoading = true) },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(selectedTab) {
+                            var dragDistance = 0f
+                            detectHorizontalDragGestures(
+                                onDragEnd = {
+                                    when {
+                                        dragDistance <= -RANKING_SWIPE_THRESHOLD_PX && selectedTab == 0 -> selectedTab = 1
+                                        dragDistance >= RANKING_SWIPE_THRESHOLD_PX && selectedTab == 1 -> selectedTab = 0
+                                    }
+                                    dragDistance = 0f
+                                },
+                                onDragCancel = { dragDistance = 0f },
+                                onHorizontalDrag = { _, dragAmount ->
+                                    dragDistance += dragAmount
+                                }
+                            )
+                        }
                 ) {
                     when (selectedTab) {
                         0 -> TopPlacesList(

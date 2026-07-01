@@ -1,5 +1,7 @@
 package com.kidzone.presentation.profile
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -47,6 +49,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -980,6 +983,24 @@ private fun SettingsCard(
 @Composable
 @Suppress("FunctionNaming")
 private fun ContactSupportDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var subject by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf("") }
+
+    fun sendContactMessage() {
+        val intent = Intent(Intent.ACTION_SENDTO).apply {
+            data = Uri.parse("mailto:${AppConfig.PRIVACY_CONTACT_EMAIL}")
+            putExtra(Intent.EXTRA_SUBJECT, subject.ifBlank { context.getString(R.string.contact_support_default_subject) })
+            putExtra(Intent.EXTRA_TEXT, message)
+        }
+        runCatching {
+            context.startActivity(
+                Intent.createChooser(intent, context.getString(R.string.contact_support_send_chooser))
+            )
+        }
+        onDismiss()
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
@@ -997,23 +1018,37 @@ private fun ContactSupportDialog(onDismiss: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    text = AppConfig.PRIVACY_CONTACT_EMAIL,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold,
+                OutlinedTextField(
+                    value = subject,
+                    onValueChange = { subject = it },
+                    label = { Text(stringResource(R.string.contact_support_subject_label)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = stringResource(R.string.contact_support_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = message,
+                    onValueChange = { message = it },
+                    label = { Text(stringResource(R.string.contact_support_message_label)) },
+                    minLines = 4,
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingText = {
+                        Text(stringResource(R.string.contact_support_hint))
+                    }
                 )
             }
         },
         confirmButton = {
+            TextButton(
+                onClick = ::sendContactMessage,
+                enabled = message.isNotBlank()
+            ) {
+                Text(stringResource(R.string.contact_support_send))
+            }
+        },
+        dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.close))
+                Text(stringResource(R.string.cancel))
             }
         },
     )

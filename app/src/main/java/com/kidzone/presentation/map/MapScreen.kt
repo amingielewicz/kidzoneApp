@@ -314,14 +314,30 @@ fun MapScreen(
         }
 
         if (state.isLoading && state.places.isEmpty()) {
-            CircularProgressIndicator(
+            Surface(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .semantics {
                         contentDescription = context.getString(R.string.map_loading_places)
                         liveRegion = LiveRegionMode.Polite
-                    }
-            )
+                    },
+                shape = MaterialTheme.shapes.medium,
+                tonalElevation = 6.dp,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                    Text(
+                        text = stringResource(R.string.map_loading_places),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
         }
 
         MapMyLocationButton(
@@ -372,7 +388,12 @@ fun MapScreen(
                 .align(Alignment.BottomStart)
                 .padding(start = 12.dp, bottom = 236.dp)
         ) {
-            Text(stringResource(R.string.map_list_button, state.places.size))
+            val countLabel = if (state.isPlaceCountCapped) {
+                stringResource(R.string.map_place_count_capped, state.places.size)
+            } else {
+                state.places.size.toString()
+            }
+            Text(stringResource(R.string.map_list_button, countLabel))
         }
 
         state.errorMessage?.let { msg ->
