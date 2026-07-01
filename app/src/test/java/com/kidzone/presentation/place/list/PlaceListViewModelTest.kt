@@ -48,14 +48,21 @@ class PlaceListViewModelTest {
 
     private val samplePlaces = listOf(
         TestFixtures.place(id = "p1", name = "Plac Zabaw A", category = PlaceCategory.PLAYGROUND,
+            ownerUserId = "user-1",
             averageRating = 4.5, reviewsCount = 10, createdAtMillis = 1000L,
             latitude = 52.23, longitude = 21.01, amenities = setOf(Amenity.PARKING)),
         TestFixtures.place(id = "p2", name = "Restauracja B", category = PlaceCategory.RESTAURANT,
+            ownerUserId = "user-2",
             averageRating = 3.0, reviewsCount = 5, createdAtMillis = 2000L,
             latitude = 52.24, longitude = 21.02, amenities = setOf(Amenity.TOILET)),
         TestFixtures.place(id = "p3", name = "Park C", category = PlaceCategory.PARK,
+            ownerUserId = "user-1",
             averageRating = 5.0, reviewsCount = 20, createdAtMillis = 3000L,
             latitude = 52.25, longitude = 21.03, amenities = setOf(Amenity.PARKING, Amenity.TOILET)),
+        TestFixtures.place(id = "p4", name = "Nowe bez ocen", category = PlaceCategory.PARK,
+            ownerUserId = "user-3",
+            averageRating = 0.0, reviewsCount = 0, createdAtMillis = 4000L,
+            latitude = 52.26, longitude = 21.04),
     )
 
     @BeforeEach
@@ -88,7 +95,7 @@ class PlaceListViewModelTest {
 
             val state = viewModel.uiState.value
             assertFalse(state.isLoading)
-            assertEquals(3, state.places.size)
+            assertEquals(4, state.places.size)
         }
 
         @Test
@@ -113,9 +120,32 @@ class PlaceListViewModelTest {
             advanceUntilIdle()
 
             val places = viewModel.uiState.value.places
-            assertEquals("p3", places[0].id)
-            assertEquals("p2", places[1].id)
-            assertEquals("p1", places[2].id)
+            assertEquals("p4", places[0].id)
+            assertEquals("p3", places[1].id)
+            assertEquals("p2", places[2].id)
+            assertEquals("p1", places[3].id)
+        }
+
+        @Test
+        fun `ADDED_BY_ME filters out places owned by other users`() = runTest {
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.ADDED_BY_ME)
+            advanceUntilIdle()
+
+            assertEquals(listOf("p3", "p1"), viewModel.uiState.value.places.map { it.id })
+        }
+
+        @Test
+        fun `WORST_RATED puts places without reviews last`() = runTest {
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.WORST_RATED)
+            advanceUntilIdle()
+
+            assertEquals(listOf("p2", "p1", "p3", "p4"), viewModel.uiState.value.places.map { it.id })
         }
     }
 
@@ -159,7 +189,7 @@ class PlaceListViewModelTest {
         @Test
         fun `loadMore appends items from next page`() = runTest {
             val firstPage = samplePlaces
-            val secondPage = listOf(TestFixtures.place(id = "p4"))
+            val secondPage = listOf(TestFixtures.place(id = "p5"))
 
             coEvery {
                 placeRepository.getPlacesPage(any(), null, any(), any())
@@ -172,13 +202,13 @@ class PlaceListViewModelTest {
             viewModel = createAndObserve()
             advanceUntilIdle()
 
-            assertEquals(3, viewModel.uiState.value.places.size)
+            assertEquals(4, viewModel.uiState.value.places.size)
             assertTrue(viewModel.uiState.value.hasMore)
 
             viewModel.loadMore()
             advanceUntilIdle()
 
-            assertEquals(4, viewModel.uiState.value.places.size)
+            assertEquals(5, viewModel.uiState.value.places.size)
             assertFalse(viewModel.uiState.value.hasMore)
         }
     }
