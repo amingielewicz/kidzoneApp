@@ -23,9 +23,12 @@ import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.SignInProvider
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
+import com.kidzone.data.local.KidZoneDatabase
 import com.kidzone.widget.NearbyPlacesWidget
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
@@ -53,6 +56,7 @@ class FirebaseAuthRepository @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
     private val firebaseStorage: FirebaseStorage,
+    private val database: KidZoneDatabase,
     @ApplicationContext private val appContext: Context
 ) : AuthRepository {
 
@@ -252,6 +256,11 @@ class FirebaseAuthRepository @Inject constructor(
             } catch (_: Exception) { /* best-effort */ }
         }
         firebaseAuth.signOut()
+        runCatching {
+            withContext(Dispatchers.IO) {
+                database.clearAllTables()
+            }
+        }
         clearWidgetLocationState()
     }
 
@@ -580,6 +589,11 @@ class FirebaseAuthRepository @Inject constructor(
 
         // 5) Konto Auth
         user.delete().await()
+        runCatching {
+            withContext(Dispatchers.IO) {
+                database.clearAllTables()
+            }
+        }
         clearWidgetLocationState()
     }
 
