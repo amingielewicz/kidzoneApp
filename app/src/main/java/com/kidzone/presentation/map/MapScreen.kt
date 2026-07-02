@@ -386,7 +386,7 @@ fun MapScreen(
             onClick = { showPlacesList = true },
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 12.dp, bottom = 292.dp)
+                .padding(start = 12.dp, bottom = 348.dp)
         ) {
             val countLabel = if (state.isPlaceCountCapped) {
                 stringResource(R.string.map_place_count_capped, state.places.size)
