@@ -11,6 +11,7 @@ import com.kidzone.domain.service.BadgePreferences
 import com.kidzone.domain.usecase.NotificationPrefsUseCase
 import com.kidzone.i18n.AppLanguage
 import com.kidzone.i18n.LanguagePreferences
+import com.kidzone.presentation.common.UserBadge
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.AuthException
@@ -519,6 +520,39 @@ class ProfileViewModelTest {
 
             viewModel.dismissBadgesInfo()
             assertFalse(viewModel.uiState.value.isBadgesInfoOpen)
+        }
+
+        @Test
+        fun `new badge dialog stays visible until user dismisses it`() = runTest {
+            val userWithBadge = TestFixtures.user(id = "uid-1", placesAddedCount = 1)
+            every { badgePreferences.getSeenBadges("uid-1") } returns emptySet()
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            currentUserFlow.value = userWithBadge
+            advanceUntilIdle()
+
+            assertEquals(
+                listOf(UserBadge.FIRST_PLACE),
+                viewModel.uiState.value.newlyEarnedBadges
+            )
+            verify(exactly = 0) { badgePreferences.setSeenBadges("uid-1", any()) }
+
+            currentUserFlow.value = userWithBadge.copy(name = "Jan po odświeżeniu")
+            advanceUntilIdle()
+
+            assertEquals(
+                listOf(UserBadge.FIRST_PLACE),
+                viewModel.uiState.value.newlyEarnedBadges
+            )
+            verify(exactly = 0) { badgePreferences.setSeenBadges("uid-1", any()) }
+            coVerify(exactly = 1) { authRepository.recordBadgesEarned(listOf("FIRST_PLACE")) }
+
+            viewModel.consumeNewlyEarnedBadge()
+
+            assertTrue(viewModel.uiState.value.newlyEarnedBadges.isEmpty())
+            verify { badgePreferences.setSeenBadges("uid-1", setOf("FIRST_PLACE")) }
         }
 
         @Test

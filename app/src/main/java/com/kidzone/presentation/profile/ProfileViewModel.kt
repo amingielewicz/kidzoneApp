@@ -86,6 +86,9 @@ class ProfileViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+    private var pendingSeenBadgesUserId: String? = null
+    private var pendingSeenBadgeNames: Set<String> = emptySet()
+    private var pendingNewBadgeNames: Set<String> = emptySet()
 
     private val richUser = authRepository.currentUser
         .flatMapLatest { current ->
@@ -453,6 +456,13 @@ class ProfileViewModel @Inject constructor(
     fun dismissBadgesInfo() { _uiState.update { it.copy(isBadgesInfoOpen = false) } }
 
     fun consumeNewlyEarnedBadge() {
+        val userId = pendingSeenBadgesUserId
+        if (userId != null && pendingSeenBadgeNames.isNotEmpty()) {
+            badgePreferences.setSeenBadges(userId, pendingSeenBadgeNames)
+        }
+        pendingSeenBadgesUserId = null
+        pendingSeenBadgeNames = emptySet()
+        pendingNewBadgeNames = emptySet()
         _uiState.update { it.copy(newlyEarnedBadges = emptyList()) }
     }
 
@@ -464,9 +474,16 @@ class ProfileViewModel @Inject constructor(
         val revoked = seen - current
 
         if (newlyEarned.isNotEmpty()) {
-            viewModelScope.launch {
-                authRepository.recordBadgesEarned(newlyEarned.map { it.name })
+            val newBadgeNames = newlyEarned.map { it.name }.toSet()
+            pendingSeenBadgesUserId = userId
+            pendingSeenBadgeNames = current.map { it.name }.toSet()
+            if (pendingNewBadgeNames != newBadgeNames) {
+                pendingNewBadgeNames = newBadgeNames
+                viewModelScope.launch {
+                    authRepository.recordBadgesEarned(newlyEarned.map { it.name })
+                }
             }
+            return newlyEarned
         }
 
         if (revoked.isNotEmpty()) {
