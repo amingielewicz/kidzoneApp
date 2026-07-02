@@ -86,6 +86,7 @@ private const val RANKING_SWIPE_THRESHOLD_PX = 80f
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
+@Suppress("LongMethod", "CyclomaticComplexMethod")
 fun RankingScreen(
     onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
     initialTab: String = "",
@@ -160,8 +161,10 @@ fun RankingScreen(
                             detectHorizontalDragGestures(
                                 onDragEnd = {
                                     when {
-                                        dragDistance <= -RANKING_SWIPE_THRESHOLD_PX && selectedTab == 0 -> selectedTab = 1
-                                        dragDistance >= RANKING_SWIPE_THRESHOLD_PX && selectedTab == 1 -> selectedTab = 0
+                                        dragDistance <= -RANKING_SWIPE_THRESHOLD_PX &&
+                                            selectedTab == 0 -> selectedTab = 1
+                                        dragDistance >= RANKING_SWIPE_THRESHOLD_PX &&
+                                            selectedTab == 1 -> selectedTab = 0
                                     }
                                     dragDistance = 0f
                                 },

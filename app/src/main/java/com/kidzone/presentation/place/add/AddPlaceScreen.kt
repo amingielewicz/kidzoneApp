@@ -706,6 +706,7 @@ private fun RequiredFieldLabel(text: String) {
 }
 
 @Composable
+@Suppress("FunctionNaming")
 private fun AddressReadOnlyCard(address: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),

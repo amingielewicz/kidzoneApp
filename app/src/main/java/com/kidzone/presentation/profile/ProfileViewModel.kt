@@ -331,11 +331,18 @@ class ProfileViewModel @Inject constructor(
     fun openContact() { _uiState.update { it.copy(isContactOpen = true) } }
     fun dismissContact() { _uiState.update { it.copy(isContactOpen = false) } }
 
+    @Suppress("LongMethod")
     fun submitContactMessage(subject: String, message: String) {
         val cleanSubject = subject.trim()
         val cleanMessage = message.trim()
-        if (cleanSubject.length < CONTACT_SUBJECT_MIN_LENGTH || cleanMessage.length < CONTACT_MESSAGE_MIN_LENGTH) {
-            _uiState.update { it.copy(accountActionError = UiText.StringResource(R.string.contact_support_validation_error)) }
+        if (cleanSubject.length < CONTACT_SUBJECT_MIN_LENGTH ||
+            cleanMessage.length < CONTACT_MESSAGE_MIN_LENGTH
+        ) {
+            _uiState.update {
+                it.copy(
+                    accountActionError = UiText.StringResource(R.string.contact_support_validation_error)
+                )
+            }
             return
         }
 

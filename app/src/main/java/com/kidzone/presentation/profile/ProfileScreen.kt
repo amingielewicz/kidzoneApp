@@ -990,7 +990,7 @@ private fun SettingsCard(
 }
 
 @Composable
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod")
 private fun ContactSupportDialog(
     isSubmitting: Boolean,
     errorMessage: UiText?,
