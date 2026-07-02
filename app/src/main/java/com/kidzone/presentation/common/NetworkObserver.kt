@@ -18,28 +18,30 @@ fun observeNetworkStatus(context: Context): Flow<NetworkStatus> = callbackFlow {
     val connectivityManager =
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
-    // Check initial state
-    val currentNetwork = connectivityManager.activeNetwork
-    val capabilities = connectivityManager.getNetworkCapabilities(currentNetwork)
-    val initialStatus =
-        if (capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true) {
+    fun currentStatus(): NetworkStatus =
+        if (connectivityManager.hasValidatedInternet()) {
             NetworkStatus.AVAILABLE
         } else {
             NetworkStatus.UNAVAILABLE
         }
-    trySend(initialStatus)
+
+    trySend(currentStatus())
 
     val callback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
-            trySend(NetworkStatus.AVAILABLE)
+            trySend(currentStatus())
         }
 
         override fun onLost(network: Network) {
-            trySend(NetworkStatus.UNAVAILABLE)
+            trySend(currentStatus())
+        }
+
+        override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
+            trySend(currentStatus())
         }
 
         override fun onUnavailable() {
-            trySend(NetworkStatus.UNAVAILABLE)
+            trySend(currentStatus())
         }
     }
 
@@ -53,7 +55,11 @@ fun observeNetworkStatus(context: Context): Flow<NetworkStatus> = callbackFlow {
 
 fun isNetworkAvailable(context: Context): Boolean {
     val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    val network = cm.activeNetwork ?: return false
-    val capabilities = cm.getNetworkCapabilities(network) ?: return false
-    return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    return cm.hasValidatedInternet()
+}
+
+private fun ConnectivityManager.hasValidatedInternet(): Boolean {
+    val capabilities = activeNetwork?.let(::getNetworkCapabilities)
+    return capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true &&
+        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
 }

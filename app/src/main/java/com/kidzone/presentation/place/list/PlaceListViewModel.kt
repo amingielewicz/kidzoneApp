@@ -32,6 +32,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 private const val LIST_PAGE_SIZE = 15
+private const val SEARCH_PREFETCH_PAGE_SIZE = 500
 private val LIST_ERROR_FALLBACK = UiText.StringResource(R.string.error_fetch_list)
 private val LIST_MORE_ERROR_FALLBACK = UiText.StringResource(R.string.error_fetch_more)
 
@@ -87,6 +88,7 @@ class PlaceListViewModel @Inject constructor(
 
     // Flag helping to restore scroll position when returning from details
     private var isReturningFromDetails = false
+    private var isPrefetchingSearchPool = false
     var savedScrollIndex = 0
         private set
     var savedScrollOffset = 0
@@ -232,7 +234,30 @@ class PlaceListViewModel @Inject constructor(
     }
 
     fun onSearchQueryChange(query: String) {
+        val wasBlank = searchQuery.value.isBlank()
         searchQuery.value = query
+        if (wasBlank && query.isNotBlank()) {
+            prefetchSearchPool()
+        }
+    }
+
+    private fun prefetchSearchPool() {
+        val current = _lastResult.value
+        if (current?.hasMore != true || isPrefetchingSearchPool) return
+
+        viewModelScope.launch {
+            isPrefetchingSearchPool = true
+            val result = placeRepository.getPlacesPage(
+                pageSize = SEARCH_PREFETCH_PAGE_SIZE,
+                cursor = null,
+                category = selectedCategory.value,
+                query = null
+            )
+            if (result is OpResult.Success) {
+                _lastResult.value = result.data
+            }
+            isPrefetchingSearchPool = false
+        }
     }
 
     fun saveScrollPosition(firstVisibleItemIndex: Int, firstVisibleItemScrollOffset: Int) {
