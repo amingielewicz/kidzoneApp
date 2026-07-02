@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.Normalizer
+import java.util.Locale
 import javax.inject.Inject
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -30,11 +32,13 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 private const val LIST_PAGE_SIZE = 15
+private const val SEARCH_PREFETCH_PAGE_SIZE = 500
 private val LIST_ERROR_FALLBACK = UiText.StringResource(R.string.error_fetch_list)
 private val LIST_MORE_ERROR_FALLBACK = UiText.StringResource(R.string.error_fetch_more)
 
 private const val FLOW_SUBSCRIPTION_TIMEOUT_MS = 5000L
 private const val EARTH_RADIUS_KM = 6371.0
+private const val SEARCH_CONTAINS_RANK_OFFSET = 100
 
 /**
  * ViewModel listy miejsc.
@@ -85,6 +89,7 @@ class PlaceListViewModel @Inject constructor(
 
     // Flag helping to restore scroll position when returning from details
     private var isReturningFromDetails = false
+    private var isPrefetchingSearchPool = false
     var savedScrollIndex = 0
         private set
     var savedScrollOffset = 0
@@ -140,7 +145,7 @@ class PlaceListViewModel @Inject constructor(
             isLoading = paged == null && error == null,
             isRefreshing = refreshing,
             errorMessage = error,
-            hasMore = paged?.hasMore ?: false,
+            hasMore = query.isBlank() && (paged?.hasMore ?: false),
             isLoadingMore = loadingMore,
             totalCount = paged?.items?.size ?: 0,
             searchQuery = query
@@ -168,39 +173,46 @@ class PlaceListViewModel @Inject constructor(
     }
 
     fun loadMore() {
+        if (searchQuery.value.isNotBlank()) return
+
         val current = _lastResult.value
         if (current?.nextCursor == null || _isLoadingMore.value) return
 
         viewModelScope.launch {
             _isLoadingMore.value = true
-            loadPage(current.nextCursor)
+            val loaded = loadPage(current.nextCursor)
+            if (!loaded) {
+                _lastResult.value = _lastResult.value?.copy(nextCursor = null, hasMore = false)
+            }
             _isLoadingMore.value = false
         }
     }
 
-    private suspend fun loadPage(cursor: String?) {
+    private suspend fun loadPage(cursor: String?): Boolean {
         val result = placeRepository.getPlacesPage(
             pageSize = LIST_PAGE_SIZE,
             cursor = cursor,
             category = selectedCategory.value,
             query = searchQuery.value
         )
-        when (result) {
+        return when (result) {
             is OpResult.Success -> {
                 if (cursor == null) {
-                    _lastResult.value = result.data
+                    _lastResult.value = result.data.copy(items = result.data.items.distinctBy { it.id })
                 } else {
                     val prev = _lastResult.value
                     _lastResult.value = PagedResult(
-                        items = prev?.items.orEmpty() + result.data.items,
+                        items = (prev?.items.orEmpty() + result.data.items).distinctBy { it.id },
                         nextCursor = result.data.nextCursor
                     )
                 }
+                true
             }
             is OpResult.Failure -> {
                 _errorMessage.value = result.error.toPlacesErrorMessage(
                     if (cursor == null) LIST_ERROR_FALLBACK else LIST_MORE_ERROR_FALLBACK
                 )
+                false
             }
         }
     }
@@ -230,7 +242,30 @@ class PlaceListViewModel @Inject constructor(
     }
 
     fun onSearchQueryChange(query: String) {
+        val wasBlank = searchQuery.value.isBlank()
         searchQuery.value = query
+        if (wasBlank && query.isNotBlank()) {
+            prefetchSearchPool()
+        }
+    }
+
+    private fun prefetchSearchPool() {
+        val current = _lastResult.value
+        if (current?.hasMore != true || isPrefetchingSearchPool) return
+
+        viewModelScope.launch {
+            isPrefetchingSearchPool = true
+            val result = placeRepository.getPlacesPage(
+                pageSize = SEARCH_PREFETCH_PAGE_SIZE,
+                cursor = null,
+                category = selectedCategory.value,
+                query = null
+            )
+            if (result is OpResult.Success) {
+                _lastResult.value = result.data.copy(items = result.data.items.distinctBy { it.id })
+            }
+            isPrefetchingSearchPool = false
+        }
     }
 
     fun saveScrollPosition(firstVisibleItemIndex: Int, firstVisibleItemScrollOffset: Int) {
@@ -269,16 +304,38 @@ class PlaceListViewModel @Inject constructor(
             }
         }
 
-        return filtered.sortedWith(comparator)
+        return if (params.query.isBlank()) {
+            filtered.sortedWith(comparator)
+        } else {
+            filtered.sortedWith(compareBy<Place> { it.searchRank(params.query) }.then(comparator))
+        }
     }
 
     private fun Place.matchesFilters(params: FilterParams): Boolean {
-        val matchesQuery = params.query.isBlank() || name.contains(params.query, ignoreCase = true)
+        val normalizedName = name.normalizedForSearch()
+        val normalizedQuery = params.query.normalizedForSearch()
+        val matchesQuery = normalizedQuery.isBlank() || normalizedName.contains(normalizedQuery)
         val matchesCategory = params.category == null || category == params.category
         val matchesAmenities = params.amenities.isEmpty() || amenities.containsAll(params.amenities)
         val matchesOwner = params.order != SortOrder.ADDED_BY_ME ||
             params.userId?.let { ownerUserId == it } == true
         return matchesQuery && matchesCategory && matchesAmenities && matchesOwner
+    }
+
+    private fun Place.searchRank(query: String): Int {
+        val normalizedName = name.normalizedForSearch()
+        val normalizedQuery = query.normalizedForSearch()
+        val wordPrefixIndex = normalizedName
+            .split(" ")
+            .indexOfFirst { it.startsWith(normalizedQuery) }
+        val matchIndex = normalizedName.indexOf(normalizedQuery)
+
+        return when {
+            normalizedName.startsWith(normalizedQuery) -> 0
+            wordPrefixIndex >= 0 -> 1 + wordPrefixIndex
+            matchIndex >= 0 -> SEARCH_CONTAINS_RANK_OFFSET + matchIndex
+            else -> Int.MAX_VALUE
+        }
     }
 
     private data class FilterParams(
@@ -299,4 +356,10 @@ class PlaceListViewModel @Inject constructor(
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
         return EARTH_RADIUS_KM * c
     }
+
+    private fun String.normalizedForSearch(): String =
+        Normalizer.normalize(this, Normalizer.Form.NFD)
+            .replace("\\p{Mn}+".toRegex(), "")
+            .replace("ł", "l", ignoreCase = true)
+            .lowercase(Locale("pl", "PL"))
 }

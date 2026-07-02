@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -34,7 +35,6 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -119,12 +119,10 @@ fun MainScreen(
     val currentRoute = backStackEntry?.destination?.route
     val context = LocalContext.current
     val networkStatus by rememberNetworkStatus()
-    val showExtendedAddPlaceFab = currentRoute in setOf(
+    val showAddPlaceFab = currentRoute in setOf(
         Route.Home.path,
         Route.Map.path,
-        Route.PlaceList.path,
-        Route.Ranking.path,
-        Route.Profile.path
+        Route.PlaceList.path
     )
 
     var locationPermissionGranted by remember {
@@ -251,20 +249,24 @@ fun MainScreen(
             }
         },
         floatingActionButton = {
-            if (showExtendedAddPlaceFab) {
+            if (showAddPlaceFab) {
                 ExtendedFloatingActionButton(
                     onClick = onOpenAddPlace,
+                    modifier = Modifier.height(48.dp),
                     icon = {
-                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Icon(
+                            imageVector = Icons.Filled.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                     },
                     text = {
-                        Text(stringResource(R.string.add_place))
+                        Text(
+                            text = stringResource(R.string.add_place),
+                            style = MaterialTheme.typography.labelLarge
+                        )
                     }
                 )
-            } else {
-                FloatingActionButton(onClick = onOpenAddPlace) {
-                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add_place))
-                }
             }
         }
     ) { padding ->

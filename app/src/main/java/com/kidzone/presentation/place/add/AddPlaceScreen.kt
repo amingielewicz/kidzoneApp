@@ -75,6 +75,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.clip
@@ -361,18 +362,7 @@ fun AddPlaceScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            OutlinedTextField(
-                value = state.address,
-                onValueChange = { /* read-only */ },
-                label = { Text(stringResource(R.string.address_label)) },
-                supportingText = {
-                    Text(stringResource(R.string.address_auto_hint))
-                },
-                singleLine = true,
-                readOnly = true,
-                enabled = !state.isSaving,
-                modifier = Modifier.fillMaxWidth()
-            )
+            AddressReadOnlyCard(address = state.address)
 
             Spacer(Modifier.height(16.dp))
 
@@ -717,6 +707,43 @@ private fun RequiredFieldLabel(text: String) {
 }
 
 @Composable
+@Suppress("FunctionNaming")
+private fun AddressReadOnlyCard(address: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 1.dp,
+        color = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.MyLocation,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp)
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = stringResource(R.string.address_label),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = address.ifBlank { stringResource(R.string.address_auto_placeholder) },
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun NearbyPlacesList(places: List<AddPlaceViewModel.NearbyPlace>) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -749,7 +776,8 @@ private fun NearbyPlacesList(places: List<AddPlaceViewModel.NearbyPlace>) {
                         text = place.name,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.weight(1f),
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = "${place.distanceMeters}m",

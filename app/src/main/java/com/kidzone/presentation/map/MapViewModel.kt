@@ -56,6 +56,7 @@ class MapViewModel @Inject constructor(
         val addedByMeOnly: Boolean = false,
         val selectedPlaceId: String? = null,
         val isLoading: Boolean = false,
+        val isPlaceCountCapped: Boolean = false,
         val errorMessage: UiText? = null
     )
 
@@ -150,6 +151,8 @@ class MapViewModel @Inject constructor(
             val matchesAddedByMe = !addedByMe || (user != null && place.ownerUserId == user.id)
             matchesTopRated && matchesAddedByMe
         }
+        val markerLimit = performanceConfigProvider.performanceConfig.mapMarkersLimit
+        val isPlaceCountCapped = rawPlaces.size >= markerLimit && filtered.size == rawPlaces.size
 
         UiState(
             places = filtered,
@@ -158,6 +161,7 @@ class MapViewModel @Inject constructor(
             addedByMeOnly = addedByMe,
             selectedPlaceId = selectedId,
             isLoading = load is PlacesLoad.Loading,
+            isPlaceCountCapped = isPlaceCountCapped,
             errorMessage = if (load is PlacesLoad.Error) load.message else null
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SUBSCRIPTION_TIMEOUT_MS), UiState())

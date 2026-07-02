@@ -39,6 +39,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -76,6 +77,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -199,6 +201,7 @@ fun PlaceListScreen(
         mutableStateOf(state.selectedCategory?.name.orEmpty())
     }
     var lastAppliedSortOrder by rememberSaveable { mutableStateOf(state.sortOrder.name) }
+    var lastAppliedSearchQuery by rememberSaveable { mutableStateOf(state.searchQuery) }
     LaunchedEffect(state.selectedCategory) {
         val categoryName = state.selectedCategory?.name.orEmpty()
         if (categoryName != lastAppliedCategory) {
@@ -209,6 +212,12 @@ fun PlaceListScreen(
     LaunchedEffect(state.sortOrder) {
         if (state.sortOrder.name != lastAppliedSortOrder) {
             lastAppliedSortOrder = state.sortOrder.name
+            lazyListState.scrollToItem(0)
+        }
+    }
+    LaunchedEffect(state.searchQuery) {
+        if (state.searchQuery != lastAppliedSearchQuery) {
+            lastAppliedSearchQuery = state.searchQuery
             lazyListState.scrollToItem(0)
         }
     }
@@ -377,16 +386,10 @@ fun PlaceListScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 16.dp),
+                                    .padding(vertical = 10.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(80.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .shimmerEffect()
-                                )
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                             }
                         }
                     }
@@ -468,13 +471,11 @@ private fun SearchBar(
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Lokalny stan zapobiega "skakaniu" kursora przy aktualizacji stanu z VM
-    var localText by remember { mutableStateOf(query) }
+    var localText by rememberSaveable { mutableStateOf(query) }
 
-    // Synchronizacja, jeśli query zmieni się z zewnątrz (np. przycisk wyczyść)
     LaunchedEffect(query) {
-        if (localText != query) {
-            localText = query
+        if (query.isEmpty() && localText.isNotEmpty()) {
+            localText = ""
         }
     }
 
@@ -493,8 +494,13 @@ private fun SearchBar(
             )
         },
         trailingIcon = {
-            if (query.isNotBlank()) {
-                IconButton(onClick = { onQueryChange("") }) {
+            if (localText.isNotBlank()) {
+                IconButton(
+                    onClick = {
+                        localText = ""
+                        onQueryChange("")
+                    }
+                ) {
                     Icon(
                         imageVector = Icons.Filled.Close,
                         contentDescription = stringResource(R.string.clear_search),
@@ -765,7 +771,8 @@ private fun PlaceCard(
                         text = place.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        maxLines = 2
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Spacer(Modifier.height(KidZoneSpacing.GapTiny))
                     CategoryBadge(category = place.category)

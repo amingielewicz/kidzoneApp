@@ -12,4 +12,6 @@ object FirestoreCollections {
     const val REVIEW_REPORTS = "review_reports"
     const val PHOTO_REPORTS = "photo_reports"
     const val PLACE_CHANGE_REQUESTS = "place_change_requests"
+    const val CONTACT_MESSAGES = "contact_messages"
+    const val MAIL = "mail"
 }

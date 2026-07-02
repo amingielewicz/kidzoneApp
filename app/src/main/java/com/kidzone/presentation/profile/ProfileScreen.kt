@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -47,6 +48,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -91,7 +93,7 @@ import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.rememberHapticFeedback
 import com.kidzone.presentation.common.rememberReducedMotionEnabled
 import com.kidzone.presentation.common.shimmerEffect
-import com.kidzone.utils.AppConfig
+import com.kidzone.utils.UiText
 import nl.dionsegijn.konfetti.compose.KonfettiView
 import nl.dionsegijn.konfetti.core.Party
 import nl.dionsegijn.konfetti.core.Position
@@ -100,6 +102,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+
+private const val CONTACT_SUBJECT_MAX_LENGTH = 80
+private const val CONTACT_MESSAGE_MAX_LENGTH = 1000
+private const val CONTACT_SUBJECT_MIN_LENGTH = 3
+private const val CONTACT_MESSAGE_MIN_LENGTH = 10
 
 /**
  * Profil zalogowanego użytkownika.
@@ -210,7 +217,12 @@ fun ProfileScreen(
     }
 
     if (ui.isContactOpen) {
-        ContactSupportDialog(onDismiss = viewModel::dismissContact)
+        ContactSupportDialog(
+            isSubmitting = ui.isAccountActionInProgress,
+            errorMessage = ui.accountActionError,
+            onDismiss = viewModel::dismissContact,
+            onSubmit = viewModel::submitContactMessage,
+        )
     }
 
     if (ui.isNotificationPrefsOpen) {
@@ -978,10 +990,21 @@ private fun SettingsCard(
 }
 
 @Composable
-@Suppress("FunctionNaming")
-private fun ContactSupportDialog(onDismiss: () -> Unit) {
+@Suppress("FunctionNaming", "LongMethod")
+private fun ContactSupportDialog(
+    isSubmitting: Boolean,
+    errorMessage: UiText?,
+    onDismiss: () -> Unit,
+    onSubmit: (subject: String, message: String) -> Unit,
+) {
+    val context = LocalContext.current
+    var subject by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf("") }
+    val subjectValid = subject.trim().length >= CONTACT_SUBJECT_MIN_LENGTH
+    val messageValid = message.trim().length >= CONTACT_MESSAGE_MIN_LENGTH
+
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
         icon = {
             Icon(
                 imageVector = Icons.Filled.Email,
@@ -997,23 +1020,75 @@ private fun ContactSupportDialog(onDismiss: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    text = AppConfig.PRIVACY_CONTACT_EMAIL,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold,
+                OutlinedTextField(
+                    value = subject,
+                    onValueChange = { subject = it.take(CONTACT_SUBJECT_MAX_LENGTH) },
+                    label = { Text(stringResource(R.string.contact_support_subject_label)) },
+                    singleLine = true,
+                    isError = subject.isNotBlank() && !subjectValid,
+                    enabled = !isSubmitting,
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingText = {
+                        Text(
+                            stringResource(
+                                R.string.contact_support_subject_counter,
+                                subject.length,
+                                CONTACT_SUBJECT_MAX_LENGTH
+                            )
+                        )
+                    }
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = message,
+                    onValueChange = { message = it.take(CONTACT_MESSAGE_MAX_LENGTH) },
+                    label = { Text(stringResource(R.string.contact_support_message_label)) },
+                    minLines = 4,
+                    maxLines = 7,
+                    isError = message.isNotBlank() && !messageValid,
+                    enabled = !isSubmitting,
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingText = {
+                        Text(
+                            stringResource(
+                                R.string.contact_support_message_counter,
+                                message.length,
+                                CONTACT_MESSAGE_MAX_LENGTH
+                            )
+                        )
+                    }
+                )
+                Spacer(Modifier.height(8.dp))
                 Text(
                     text = stringResource(R.string.contact_support_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                errorMessage?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = it.asString(context),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.close))
+            TextButton(
+                onClick = { onSubmit(subject, message) },
+                enabled = subjectValid && messageValid && !isSubmitting
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Text(stringResource(R.string.contact_support_send))
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isSubmitting) {
+                Text(stringResource(R.string.cancel))
             }
         },
     )

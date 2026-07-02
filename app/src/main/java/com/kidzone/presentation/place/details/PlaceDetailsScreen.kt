@@ -76,6 +76,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
@@ -86,8 +87,10 @@ import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.model.User
 import com.kidzone.presentation.common.CategoryIcon
-import com.kidzone.presentation.common.createCameraImageUri
+import com.kidzone.presentation.common.NewPlaceBadge
 import com.kidzone.presentation.common.RankBadge
+import com.kidzone.presentation.common.createCameraImageUri
+import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.style
 import java.text.SimpleDateFormat
@@ -814,7 +817,8 @@ private fun PlaceMainCard(
                         text = place.name,
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.SemiBold,
-                        maxLines = 2
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = stringResource(place.category.labelRes),
@@ -832,37 +836,46 @@ private fun PlaceMainCard(
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.Star,
-                    contentDescription = stringResource(R.string.rating),
-                    tint = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(4.dp))
-                if (place.reviewsCount > 0) {
-                    Text(
-                        text = "%.1f".format(place.averageRating),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Star,
+                        contentDescription = stringResource(R.string.rating),
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(20.dp)
                     )
-                    Spacer(Modifier.width(8.dp))
-                    val reviewsCountText = pluralStringResource(
-                        R.plurals.reviews_count,
-                        place.reviewsCount,
-                        place.reviewsCount
-                    )
-                    Text(
-                        text = stringResource(R.string.reviews_count_short, reviewsCountText),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    Text(
-                        text = stringResource(R.string.no_ratings),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Spacer(Modifier.width(4.dp))
+                    if (place.reviewsCount > 0) {
+                        Text(
+                            text = "%.1f".format(place.averageRating),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        val reviewsCountText = pluralStringResource(
+                            R.plurals.reviews_count,
+                            place.reviewsCount,
+                            place.reviewsCount
+                        )
+                        Text(
+                            text = stringResource(R.string.reviews_count_short, reviewsCountText),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text(
+                            text = stringResource(R.string.no_ratings),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                if (place.isNewWithoutReviews()) {
+                    Spacer(Modifier.weight(1f))
+                    NewPlaceBadge()
                 }
             }
 
