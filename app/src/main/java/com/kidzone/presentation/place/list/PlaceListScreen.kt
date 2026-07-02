@@ -200,6 +200,7 @@ fun PlaceListScreen(
         mutableStateOf(state.selectedCategory?.name.orEmpty())
     }
     var lastAppliedSortOrder by rememberSaveable { mutableStateOf(state.sortOrder.name) }
+    var lastAppliedSearchQuery by rememberSaveable { mutableStateOf(state.searchQuery) }
     LaunchedEffect(state.selectedCategory) {
         val categoryName = state.selectedCategory?.name.orEmpty()
         if (categoryName != lastAppliedCategory) {
@@ -210,6 +211,12 @@ fun PlaceListScreen(
     LaunchedEffect(state.sortOrder) {
         if (state.sortOrder.name != lastAppliedSortOrder) {
             lastAppliedSortOrder = state.sortOrder.name
+            lazyListState.scrollToItem(0)
+        }
+    }
+    LaunchedEffect(state.searchQuery) {
+        if (state.searchQuery != lastAppliedSearchQuery) {
+            lastAppliedSearchQuery = state.searchQuery
             lazyListState.scrollToItem(0)
         }
     }
@@ -463,22 +470,9 @@ private fun SearchBar(
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Lokalny stan zapobiega "skakaniu" kursora przy aktualizacji stanu z VM
-    var localText by remember { mutableStateOf(query) }
-
-    // Synchronizacja, jeśli query zmieni się z zewnątrz (np. przycisk wyczyść)
-    LaunchedEffect(query) {
-        if (localText != query) {
-            localText = query
-        }
-    }
-
     OutlinedTextField(
-        value = localText,
-        onValueChange = {
-            localText = it
-            onQueryChange(it)
-        },
+        value = query,
+        onValueChange = onQueryChange,
         placeholder = { Text(stringResource(R.string.search_placeholder)) },
         leadingIcon = {
             Icon(

@@ -38,6 +38,7 @@ private val LIST_MORE_ERROR_FALLBACK = UiText.StringResource(R.string.error_fetc
 
 private const val FLOW_SUBSCRIPTION_TIMEOUT_MS = 5000L
 private const val EARTH_RADIUS_KM = 6371.0
+private const val SEARCH_CONTAINS_RANK_OFFSET = 100
 
 /**
  * ViewModel listy miejsc.
@@ -301,7 +302,11 @@ class PlaceListViewModel @Inject constructor(
             }
         }
 
-        return filtered.sortedWith(comparator)
+        return if (params.query.isBlank()) {
+            filtered.sortedWith(comparator)
+        } else {
+            filtered.sortedWith(compareBy<Place> { it.searchRank(params.query) }.then(comparator))
+        }
     }
 
     private fun Place.matchesFilters(params: FilterParams): Boolean {
@@ -313,6 +318,22 @@ class PlaceListViewModel @Inject constructor(
         val matchesOwner = params.order != SortOrder.ADDED_BY_ME ||
             params.userId?.let { ownerUserId == it } == true
         return matchesQuery && matchesCategory && matchesAmenities && matchesOwner
+    }
+
+    private fun Place.searchRank(query: String): Int {
+        val normalizedName = name.normalizedForSearch()
+        val normalizedQuery = query.normalizedForSearch()
+        val wordPrefixIndex = normalizedName
+            .split(" ")
+            .indexOfFirst { it.startsWith(normalizedQuery) }
+        val matchIndex = normalizedName.indexOf(normalizedQuery)
+
+        return when {
+            normalizedName.startsWith(normalizedQuery) -> 0
+            wordPrefixIndex >= 0 -> 1 + wordPrefixIndex
+            matchIndex >= 0 -> SEARCH_CONTAINS_RANK_OFFSET + matchIndex
+            else -> Int.MAX_VALUE
+        }
     }
 
     private data class FilterParams(

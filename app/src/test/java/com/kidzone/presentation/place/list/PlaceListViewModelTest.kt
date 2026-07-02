@@ -206,6 +206,26 @@ class PlaceListViewModelTest {
 
             assertEquals(listOf("pl1"), viewModel.uiState.value.places.map { it.id })
         }
+
+        @Test
+        fun `onSearchQueryChange sorts stronger matches first`() = runTest {
+            val weakMatch = TestFixtures.place(
+                id = "weak",
+                name = "Długość Całego Jak Cm Cc Co ich Czeka już Zł ja do jak"
+            )
+            val strongMatch = TestFixtures.place(id = "strong", name = "Łęki")
+            coEvery {
+                placeRepository.getPlacesPage(any(), any(), any(), any())
+            } returns OpResult.success(PagedResult(listOf(weakMatch, strongMatch), null))
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            viewModel.onSearchQueryChange("le")
+            advanceUntilIdle()
+
+            assertEquals(listOf("strong", "weak"), viewModel.uiState.value.places.map { it.id })
+        }
     }
 
     @Nested
