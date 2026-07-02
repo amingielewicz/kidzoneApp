@@ -73,6 +73,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -386,7 +387,7 @@ fun MapScreen(
             onClick = { showPlacesList = true },
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(start = 12.dp, top = 148.dp)
+                .padding(start = 12.dp, top = 140.dp)
         ) {
             val countLabel = if (state.isPlaceCountCapped) {
                 stringResource(R.string.map_place_count_capped, state.places.size)
@@ -800,7 +801,8 @@ private fun PlacePreviewContent(
                     text = place.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 2
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = stringResource(place.category.labelRes),
@@ -970,7 +972,8 @@ private fun MapPlaceListItem(
                 text = place.name,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 2
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
             Spacer(Modifier.height(4.dp))
             Text(

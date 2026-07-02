@@ -145,7 +145,7 @@ class PlaceListViewModel @Inject constructor(
             isLoading = paged == null && error == null,
             isRefreshing = refreshing,
             errorMessage = error,
-            hasMore = paged?.hasMore ?: false,
+            hasMore = query.isBlank() && (paged?.hasMore ?: false),
             isLoadingMore = loadingMore,
             totalCount = paged?.items?.size ?: 0,
             searchQuery = query
@@ -173,6 +173,8 @@ class PlaceListViewModel @Inject constructor(
     }
 
     fun loadMore() {
+        if (searchQuery.value.isNotBlank()) return
+
         val current = _lastResult.value
         if (current?.nextCursor == null || _isLoadingMore.value) return
 

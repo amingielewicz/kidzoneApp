@@ -77,6 +77,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -470,9 +471,20 @@ private fun SearchBar(
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var localText by rememberSaveable { mutableStateOf(query) }
+
+    LaunchedEffect(query) {
+        if (query.isEmpty() && localText.isNotEmpty()) {
+            localText = ""
+        }
+    }
+
     OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
+        value = localText,
+        onValueChange = {
+            localText = it
+            onQueryChange(it)
+        },
         placeholder = { Text(stringResource(R.string.search_placeholder)) },
         leadingIcon = {
             Icon(
@@ -482,8 +494,13 @@ private fun SearchBar(
             )
         },
         trailingIcon = {
-            if (query.isNotBlank()) {
-                IconButton(onClick = { onQueryChange("") }) {
+            if (localText.isNotBlank()) {
+                IconButton(
+                    onClick = {
+                        localText = ""
+                        onQueryChange("")
+                    }
+                ) {
                     Icon(
                         imageVector = Icons.Filled.Close,
                         contentDescription = stringResource(R.string.clear_search),
@@ -754,7 +771,8 @@ private fun PlaceCard(
                         text = place.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        maxLines = 2
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Spacer(Modifier.height(KidZoneSpacing.GapTiny))
                     CategoryBadge(category = place.category)

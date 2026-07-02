@@ -52,6 +52,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -70,7 +71,7 @@ import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.shimmerEffect
 
-private val PLACE_ROW_HEIGHT = 136.dp
+private val PLACE_ROW_HEIGHT = 152.dp
 private val PLACE_CARD_WIDTH = 164.dp
 private val PLACE_CARD_ICON_SIZE = 28.dp
 private val PLACE_CARD_CONTENT_PADDING = 12.dp
@@ -461,7 +462,8 @@ private fun PlaceCard(
                         text = place.name,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
-                        maxLines = 2
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                     item.distanceKm?.let {
                         Spacer(Modifier.height(KidZoneSpacing.GapTiny))

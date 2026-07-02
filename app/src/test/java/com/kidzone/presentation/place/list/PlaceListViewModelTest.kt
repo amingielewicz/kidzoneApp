@@ -226,6 +226,29 @@ class PlaceListViewModelTest {
 
             assertEquals(listOf("strong", "weak"), viewModel.uiState.value.places.map { it.id })
         }
+
+        @Test
+        fun `onSearchQueryChange disables pagination while searching`() = runTest {
+            coEvery {
+                placeRepository.getPlacesPage(any(), null, any(), any())
+            } returns OpResult.success(PagedResult(samplePlaces, "cursor-1"))
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            viewModel.onSearchQueryChange("plac")
+            advanceUntilIdle()
+
+            assertFalse(viewModel.uiState.value.hasMore)
+
+            clearMocks(placeRepository, answers = false)
+            viewModel.loadMore()
+            advanceUntilIdle()
+
+            coVerify(exactly = 0) {
+                placeRepository.getPlacesPage(any(), "cursor-1", any(), any())
+            }
+        }
     }
 
     @Nested

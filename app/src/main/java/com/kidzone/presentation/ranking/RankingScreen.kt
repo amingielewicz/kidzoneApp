@@ -57,6 +57,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
@@ -376,8 +377,8 @@ private fun TopPlaceCardContent(
                 Text(
                     text = place.name,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2
+                    fontWeight = FontWeight.SemiBold, maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
                 if (place.address.isNotBlank()) {
                     Spacer(Modifier.height(KidZoneSpacing.GapTiny))
