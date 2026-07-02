@@ -177,34 +177,39 @@ class PlaceListViewModel @Inject constructor(
 
         viewModelScope.launch {
             _isLoadingMore.value = true
-            loadPage(current.nextCursor)
+            val loaded = loadPage(current.nextCursor)
+            if (!loaded) {
+                _lastResult.value = _lastResult.value?.copy(nextCursor = null, hasMore = false)
+            }
             _isLoadingMore.value = false
         }
     }
 
-    private suspend fun loadPage(cursor: String?) {
+    private suspend fun loadPage(cursor: String?): Boolean {
         val result = placeRepository.getPlacesPage(
             pageSize = LIST_PAGE_SIZE,
             cursor = cursor,
             category = selectedCategory.value,
             query = searchQuery.value
         )
-        when (result) {
+        return when (result) {
             is OpResult.Success -> {
                 if (cursor == null) {
-                    _lastResult.value = result.data
+                    _lastResult.value = result.data.copy(items = result.data.items.distinctBy { it.id })
                 } else {
                     val prev = _lastResult.value
                     _lastResult.value = PagedResult(
-                        items = prev?.items.orEmpty() + result.data.items,
+                        items = (prev?.items.orEmpty() + result.data.items).distinctBy { it.id },
                         nextCursor = result.data.nextCursor
                     )
                 }
+                true
             }
             is OpResult.Failure -> {
                 _errorMessage.value = result.error.toPlacesErrorMessage(
                     if (cursor == null) LIST_ERROR_FALLBACK else LIST_MORE_ERROR_FALLBACK
                 )
+                false
             }
         }
     }
@@ -254,7 +259,7 @@ class PlaceListViewModel @Inject constructor(
                 query = null
             )
             if (result is OpResult.Success) {
-                _lastResult.value = result.data
+                _lastResult.value = result.data.copy(items = result.data.items.distinctBy { it.id })
             }
             isPrefetchingSearchPool = false
         }
@@ -332,5 +337,6 @@ class PlaceListViewModel @Inject constructor(
     private fun String.normalizedForSearch(): String =
         Normalizer.normalize(this, Normalizer.Form.NFD)
             .replace("\\p{Mn}+".toRegex(), "")
+            .replace("ł", "l", ignoreCase = true)
             .lowercase(Locale("pl", "PL"))
 }

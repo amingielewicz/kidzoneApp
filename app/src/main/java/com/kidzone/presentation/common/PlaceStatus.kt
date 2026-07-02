@@ -1,6 +1,7 @@
 package com.kidzone.presentation.common
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -25,7 +26,9 @@ fun Place.isNewWithoutReviews(nowMillis: Long = System.currentTimeMillis()): Boo
 @Composable
 fun NewPlaceBadge(modifier: Modifier = Modifier) {
     Surface(
-        modifier = modifier.widthIn(min = 44.dp),
+        modifier = modifier
+            .widthIn(min = 46.dp)
+            .heightIn(min = 24.dp),
         shape = RoundedCornerShape(KidZoneRadii.Badge),
         color = MaterialTheme.colorScheme.primaryContainer,
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -34,7 +37,7 @@ fun NewPlaceBadge(modifier: Modifier = Modifier) {
             text = "Nowe",
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp)
         )
     }
 }

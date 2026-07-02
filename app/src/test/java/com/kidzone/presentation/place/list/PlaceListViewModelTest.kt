@@ -190,6 +190,22 @@ class PlaceListViewModelTest {
 
             assertEquals(listOf("p2"), viewModel.uiState.value.places.map { it.id })
         }
+
+        @Test
+        fun `onSearchQueryChange ignores polish diacritics`() = runTest {
+            val polishPlace = TestFixtures.place(id = "pl1", name = "Łęki")
+            coEvery {
+                placeRepository.getPlacesPage(any(), any(), any(), any())
+            } returns OpResult.success(PagedResult(listOf(polishPlace), null))
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            viewModel.onSearchQueryChange("Leki")
+            advanceUntilIdle()
+
+            assertEquals(listOf("pl1"), viewModel.uiState.value.places.map { it.id })
+        }
     }
 
     @Nested
@@ -220,6 +236,50 @@ class PlaceListViewModelTest {
 
             assertEquals(5, viewModel.uiState.value.places.size)
             assertFalse(viewModel.uiState.value.hasMore)
+        }
+
+        @Test
+        fun `loadMore skips duplicated place ids from next page`() = runTest {
+            val duplicate = samplePlaces.first()
+            val newPlace = TestFixtures.place(id = "p5")
+
+            coEvery {
+                placeRepository.getPlacesPage(any(), null, any(), any())
+            } returns OpResult.success(PagedResult(samplePlaces, "cursor-1"))
+
+            coEvery {
+                placeRepository.getPlacesPage(any(), "cursor-1", any(), any())
+            } returns OpResult.success(PagedResult(listOf(duplicate, newPlace), null))
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            viewModel.loadMore()
+            advanceUntilIdle()
+
+            val ids = viewModel.uiState.value.places.map { it.id }
+            assertEquals(ids.distinct(), ids)
+            assertEquals(setOf("p1", "p2", "p3", "p4", "p5"), ids.toSet())
+        }
+
+        @Test
+        fun `loadMore stops pagination after next page failure`() = runTest {
+            coEvery {
+                placeRepository.getPlacesPage(any(), null, any(), any())
+            } returns OpResult.success(PagedResult(samplePlaces, "cursor-1"))
+
+            coEvery {
+                placeRepository.getPlacesPage(any(), "cursor-1", any(), any())
+            } returns OpResult.failure(IllegalStateException("network"))
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            viewModel.loadMore()
+            advanceUntilIdle()
+
+            assertFalse(viewModel.uiState.value.hasMore)
+            assertFalse(viewModel.uiState.value.isLoadingMore)
         }
     }
 }
