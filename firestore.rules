@@ -53,6 +53,28 @@ service cloud.firestore {
       ];
     }
 
+    function isValidContactMessage() {
+      return isSignedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.subject is string
+        && request.resource.data.subject.size() >= 3
+        && request.resource.data.subject.size() <= 80
+        && request.resource.data.message is string
+        && request.resource.data.message.size() >= 10
+        && request.resource.data.message.size() <= 1000
+        && request.resource.data.status == 'new'
+        && request.resource.data.emailRequested == true;
+    }
+
+    function isValidSupportMail() {
+      return isSignedIn()
+        && request.resource.data.to == ['bonoboczemunie@gmail.com']
+        && request.resource.data.message.subject is string
+        && request.resource.data.message.text is string
+        && request.resource.data.message.subject.size() <= 120
+        && request.resource.data.message.text.size() <= 2000;
+    }
+
     match /users/{userId} {
       allow read: if isSignedIn();
 
@@ -154,6 +176,17 @@ service cloud.firestore {
       match /placeholder {
         allow read: if isReportCollection(reportCollection);
       }
+    }
+
+    match /contact_messages/{messageId} {
+      allow create: if isValidContactMessage();
+      allow read: if isAdmin() || (isSignedIn() && resource.data.reporterId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /mail/{mailId} {
+      allow create: if isValidSupportMail();
+      allow read, update, delete: if isAdmin();
     }
   }
 }

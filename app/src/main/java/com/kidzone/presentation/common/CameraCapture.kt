@@ -8,7 +8,10 @@ import java.io.File
 private const val CAMERA_CACHE_DIR = "review_photos"
 
 fun createCameraImageUri(context: Context, filePrefix: String): Uri? = runCatching {
-    val photoDir = File(context.cacheDir, CAMERA_CACHE_DIR).apply { mkdirs() }
+    val photoDir = File(context.cacheDir, CAMERA_CACHE_DIR).apply {
+        if (!exists()) mkdirs()
+    }
+    if (!photoDir.exists() || !photoDir.canWrite()) return@runCatching null
     val photoFile = File.createTempFile(filePrefix, ".jpg", photoDir)
     FileProvider.getUriForFile(
         context,

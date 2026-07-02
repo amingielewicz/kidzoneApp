@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.Normalizer
+import java.util.Locale
 import javax.inject.Inject
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -273,7 +275,9 @@ class PlaceListViewModel @Inject constructor(
     }
 
     private fun Place.matchesFilters(params: FilterParams): Boolean {
-        val matchesQuery = params.query.isBlank() || name.contains(params.query, ignoreCase = true)
+        val normalizedName = name.normalizedForSearch()
+        val normalizedQuery = params.query.normalizedForSearch()
+        val matchesQuery = normalizedQuery.isBlank() || normalizedName.contains(normalizedQuery)
         val matchesCategory = params.category == null || category == params.category
         val matchesAmenities = params.amenities.isEmpty() || amenities.containsAll(params.amenities)
         val matchesOwner = params.order != SortOrder.ADDED_BY_ME ||
@@ -299,4 +303,9 @@ class PlaceListViewModel @Inject constructor(
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
         return EARTH_RADIUS_KM * c
     }
+
+    private fun String.normalizedForSearch(): String =
+        Normalizer.normalize(this, Normalizer.Form.NFD)
+            .replace("\\p{Mn}+".toRegex(), "")
+            .lowercase(Locale("pl", "PL"))
 }

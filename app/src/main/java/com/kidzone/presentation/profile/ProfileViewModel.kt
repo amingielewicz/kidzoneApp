@@ -1,9 +1,11 @@
 package com.kidzone.presentation.profile
 
 import android.net.Uri
+import com.google.firebase.firestore.FirebaseFirestore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.R
+import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
@@ -16,6 +18,7 @@ import com.kidzone.presentation.common.BadgeContext
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.computeBadges
 import com.kidzone.utils.AuthException
+import com.kidzone.utils.AppConfig
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.UiText
 import com.kidzone.utils.toUploadErrorMessage
@@ -34,10 +37,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 private const val RANKING_LIMIT = 100
 private const val FLOW_SUBSCRIPTION_TIMEOUT_MS = 5000L
+private const val CONTACT_SUBJECT_MIN_LENGTH = 3
+private const val CONTACT_MESSAGE_MIN_LENGTH = 10
 
 /**
  * ViewModel profilu użytkownika.
@@ -49,7 +55,8 @@ class ProfileViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
     private val badgePreferences: BadgePreferences,
     private val notificationPrefsUseCase: NotificationPrefsUseCase,
-    private val languagePreferences: LanguagePreferences
+    private val languagePreferences: LanguagePreferences,
+    private val firestore: FirebaseFirestore
 ) : ViewModel() {
 
     data class UiState(
@@ -323,6 +330,79 @@ class ProfileViewModel @Inject constructor(
 
     fun openContact() { _uiState.update { it.copy(isContactOpen = true) } }
     fun dismissContact() { _uiState.update { it.copy(isContactOpen = false) } }
+
+    fun submitContactMessage(subject: String, message: String) {
+        val cleanSubject = subject.trim()
+        val cleanMessage = message.trim()
+        if (cleanSubject.length < CONTACT_SUBJECT_MIN_LENGTH || cleanMessage.length < CONTACT_MESSAGE_MIN_LENGTH) {
+            _uiState.update { it.copy(accountActionError = UiText.StringResource(R.string.contact_support_validation_error)) }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAccountActionInProgress = true, accountActionError = null) }
+            val currentUser = user.value
+            val userId = currentUser?.id.orEmpty()
+            val createdAtMillis = System.currentTimeMillis()
+            val contactRef = firestore.collection(FirestoreCollections.CONTACT_MESSAGES).document()
+            val mailRef = firestore.collection(FirestoreCollections.MAIL).document()
+            val emailSubject = "kidZone kontakt: $cleanSubject"
+            val emailText = buildString {
+                appendLine(cleanMessage)
+                appendLine()
+                appendLine("Użytkownik: ${currentUser?.name.orEmpty().ifBlank { "nieznany" }}")
+                appendLine("Email konta: ${currentUser?.email.orEmpty().ifBlank { "brak" }}")
+                appendLine("UID: ${userId.ifBlank { "brak" }}")
+                appendLine("ID zgłoszenia: ${contactRef.id}")
+            }
+
+            runCatching {
+                firestore.runBatch { batch ->
+                    batch.set(
+                        contactRef,
+                        mapOf(
+                            "reporterId" to userId,
+                            "reporterName" to currentUser?.name.orEmpty(),
+                            "reporterEmail" to currentUser?.email.orEmpty(),
+                            "subject" to cleanSubject,
+                            "message" to cleanMessage,
+                            "status" to "new",
+                            "emailRequested" to true,
+                            "mailDocumentId" to mailRef.id,
+                            "createdAtMillis" to createdAtMillis
+                        )
+                    )
+                    batch.set(
+                        mailRef,
+                        mapOf(
+                            "to" to listOf(AppConfig.PRIVACY_CONTACT_EMAIL),
+                            "message" to mapOf(
+                                "subject" to emailSubject,
+                                "text" to emailText
+                            ),
+                            "contactMessageId" to contactRef.id,
+                            "createdAtMillis" to createdAtMillis
+                        )
+                    )
+                }.await()
+            }.onSuccess {
+                _uiState.update {
+                    it.copy(
+                        isAccountActionInProgress = false,
+                        isContactOpen = false,
+                        accountActionInfo = UiText.StringResource(R.string.contact_support_sent)
+                    )
+                }
+            }.onFailure {
+                _uiState.update {
+                    it.copy(
+                        isAccountActionInProgress = false,
+                        accountActionError = UiText.StringResource(R.string.contact_support_send_failed)
+                    )
+                }
+            }
+        }
+    }
 
     fun openNotificationPrefs() {
         _uiState.update { it.copy(isNotificationPrefsOpen = true) }
