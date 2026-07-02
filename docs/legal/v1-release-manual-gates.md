@@ -111,6 +111,7 @@ Dokument szczegolowy:
 
 ```text
 docs/legal/android-permissions-play-compliance.md
+docs/qa/android-permissions-device-matrix.md
 ```
 
 Sprawdzic na Androidzie 13+ lub 14+:

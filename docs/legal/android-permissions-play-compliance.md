@@ -1,6 +1,6 @@
 # Android permissions and Google Play compliance
 
-Powiązane issue: #274  
+Powiązane issue: #274, #303  
 Powiązane issue release: #269, #275
 
 Ostatnia aktualizacja: 2026-06-29
@@ -87,6 +87,12 @@ przez systemowy Android Photo Picker.
 ```
 
 ## Manual QA przed zamknięciem #274
+
+Szczegółowa macierz urządzeń i szablon komentarza PASS/FAIL:
+
+```text
+docs/qa/android-permissions-device-matrix.md
+```
 
 - [ ] Android 13+ notification permission: allow / deny.
 - [ ] Location permission: precise / approximate / deny.
