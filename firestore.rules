@@ -63,6 +63,7 @@ service cloud.firestore {
         && request.resource.data.message.size() >= 10
         && request.resource.data.message.size() <= 1000
         && request.resource.data.status == 'new'
+        && request.resource.data.emailStatus == 'pending'
         && request.resource.data.emailRequested == true;
     }
 

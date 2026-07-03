@@ -128,7 +128,7 @@ fun CategoryBadge(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(KidZoneRadii.Badge),
-        color = style.color.copy(alpha = 0.12f),
+        color = style.color.copy(alpha = 0.14f),
         contentColor = style.color
     ) {
         Text(
@@ -137,7 +137,7 @@ fun CategoryBadge(
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
         )
     }
 }

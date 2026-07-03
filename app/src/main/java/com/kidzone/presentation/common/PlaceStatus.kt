@@ -30,8 +30,8 @@ fun NewPlaceBadge(modifier: Modifier = Modifier) {
             .widthIn(min = 46.dp)
             .heightIn(min = 24.dp),
         shape = RoundedCornerShape(KidZoneRadii.Badge),
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
     ) {
         Text(
             text = "Nowe",

@@ -1,6 +1,6 @@
 import {onDocumentCreated, onDocumentDeleted, onDocumentUpdated} from "firebase-functions/v2/firestore";
 import {onSchedule} from "firebase-functions/v2/scheduler";
-import {onRequest} from "firebase-functions/v2/https";
+import {HttpsError, onCall, onRequest} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import * as nodemailer from "nodemailer";
@@ -35,6 +35,11 @@ type ReviewInfo = {
   authorName: string;
   placeId: string;
 };
+
+const CONTACT_SUBJECT_MIN_LENGTH = 3;
+const CONTACT_SUBJECT_MAX_LENGTH = 80;
+const CONTACT_MESSAGE_MIN_LENGTH = 10;
+const CONTACT_MESSAGE_MAX_LENGTH = 1000;
 
 function privateMessagingRef(userId: string) {
   return db.collection("users").doc(userId).collection("private").doc("messaging");
@@ -209,6 +214,106 @@ async function getReviewInfo(reviewId: string): Promise<ReviewInfo> {
     return {comment: "", rating: 0, authorName: "Nieznany", placeId: ""};
   }
 }
+
+// --- Callable: zapis formularza kontaktowego ---
+export const submitContactMessage = onCall(
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "Wymagane logowanie.");
+    }
+
+    const subject = String(request.data?.subject || "").trim();
+    const message = String(request.data?.message || "").trim();
+    if (
+      subject.length < CONTACT_SUBJECT_MIN_LENGTH ||
+      subject.length > CONTACT_SUBJECT_MAX_LENGTH ||
+      message.length < CONTACT_MESSAGE_MIN_LENGTH ||
+      message.length > CONTACT_MESSAGE_MAX_LENGTH
+    ) {
+      throw new HttpsError("invalid-argument", "Nieprawidłowa treść formularza.");
+    }
+
+    const authToken = (request.auth?.token || {}) as Record<string, unknown>;
+    const docRef = await db.collection("contact_messages").add({
+      reporterId: uid,
+      reporterName: String(authToken.name || ""),
+      reporterEmail: String(authToken.email || ""),
+      subject,
+      message,
+      status: "new",
+      emailRequested: true,
+      emailStatus: "pending",
+      createdAtMillis: Date.now(),
+    });
+
+    return {messageId: docRef.id};
+  }
+);
+
+// --- Trigger: formularz kontaktowy ---
+export const onContactMessage = onDocumentCreated(
+  {
+    document: "contact_messages/{messageId}",
+    secrets: [gmailEmail, gmailPassword, adminEmail],
+  },
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+
+    const messageId = event.params.messageId;
+    const reporterId = data.reporterId || "";
+    const reporterInfo = reporterId ? await getUserInfo(reporterId) : "Nieznany";
+    const subject = data.subject || "(brak tematu)";
+    const message = data.message || "";
+    const reporterName = data.reporterName || "";
+    const reporterEmail = data.reporterEmail || "";
+    const projectId = process.env.GCLOUD_PROJECT || "playground-705e7162";
+    const firestoreUrl =
+      `https://console.firebase.google.com/project/${projectId}/firestore/data/contact_messages/${messageId}`;
+
+    const html = wrapInTemplate("Nowa wiadomość z formularza kontaktowego", `
+      <table>
+        <tr><td>Temat:</td><td>${escapeHtml(subject)}</td></tr>
+        <tr><td>Zgłaszający:</td><td>${escapeHtml(reporterInfo)}</td></tr>
+        <tr><td>Nazwa z aplikacji:</td><td>${escapeHtml(reporterName || "(brak)")}</td></tr>
+        <tr><td>Email konta:</td><td>${escapeHtml(reporterEmail || "(brak)")}</td></tr>
+        <tr><td>UID:</td><td>${escapeHtml(reporterId || "(brak)")}</td></tr>
+      </table>
+      <h3 style="color:#1976D2; margin-top:16px;">Wiadomość:</h3>
+      <p style="white-space:pre-wrap;">${escapeHtml(message)}</p>
+      <p><a class="btn" href="${firestoreUrl}">Otwórz w Firebase Console</a></p>
+    `);
+
+    try {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
+      });
+
+      await transporter.sendMail({
+        from: `kidZone <${gmailEmail.value()}>`,
+        to: adminEmail.value(),
+        subject: `[kidZone] Kontakt: ${subject}`,
+        html,
+      });
+
+      await event.data?.ref.update({
+        emailStatus: "sent",
+        emailedAtMillis: Date.now(),
+      });
+      console.log(`Contact email sent for ${messageId}`);
+    } catch (err) {
+      await event.data?.ref.update({
+        emailStatus: "failed",
+        emailError: String(err).slice(0, 500),
+        emailFailedAtMillis: Date.now(),
+      });
+      console.error(`Contact email failed for ${messageId}:`, err);
+      throw err;
+    }
+  }
+);
 
 function mapCategory(category: string): string {
   const categories: Record<string, string> = {

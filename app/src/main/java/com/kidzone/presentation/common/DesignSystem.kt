@@ -1,5 +1,6 @@
 package com.kidzone.presentation.common
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,7 +27,7 @@ object KidZoneSpacing {
 }
 
 object KidZoneElevation {
-    val Card = 1.dp
+    val Card = 0.dp
 }
 
 val KidZoneCardPadding = PaddingValues(KidZoneSpacing.Card)
@@ -40,8 +41,9 @@ fun KidZoneCard(
         modifier = modifier,
         shape = RoundedCornerShape(KidZoneRadii.Card),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+            containerColor = MaterialTheme.colorScheme.surface
         ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         elevation = CardDefaults.cardElevation(defaultElevation = KidZoneElevation.Card),
         content = content
     )

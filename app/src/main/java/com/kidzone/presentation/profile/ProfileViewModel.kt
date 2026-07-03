@@ -1,11 +1,10 @@
 package com.kidzone.presentation.profile
 
 import android.net.Uri
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.functions.FirebaseFunctions
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.R
-import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
@@ -18,7 +17,6 @@ import com.kidzone.presentation.common.BadgeContext
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.computeBadges
 import com.kidzone.utils.AuthException
-import com.kidzone.utils.AppConfig
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.UiText
 import com.kidzone.utils.toUploadErrorMessage
@@ -44,6 +42,7 @@ private const val RANKING_LIMIT = 100
 private const val FLOW_SUBSCRIPTION_TIMEOUT_MS = 5000L
 private const val CONTACT_SUBJECT_MIN_LENGTH = 3
 private const val CONTACT_MESSAGE_MIN_LENGTH = 10
+private const val CONTACT_MESSAGE_FUNCTION = "submitContactMessage"
 
 /**
  * ViewModel profilu użytkownika.
@@ -56,7 +55,7 @@ class ProfileViewModel @Inject constructor(
     private val badgePreferences: BadgePreferences,
     private val notificationPrefsUseCase: NotificationPrefsUseCase,
     private val languagePreferences: LanguagePreferences,
-    private val firestore: FirebaseFirestore
+    private val functions: FirebaseFunctions
 ) : ViewModel() {
 
     data class UiState(
@@ -86,6 +85,9 @@ class ProfileViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+    private var pendingSeenBadgesUserId: String? = null
+    private var pendingSeenBadgeNames: Set<String> = emptySet()
+    private var pendingNewBadgeNames: Set<String> = emptySet()
 
     private val richUser = authRepository.currentUser
         .flatMapLatest { current ->
@@ -348,50 +350,12 @@ class ProfileViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isAccountActionInProgress = true, accountActionError = null) }
-            val currentUser = user.value
-            val userId = currentUser?.id.orEmpty()
-            val createdAtMillis = System.currentTimeMillis()
-            val contactRef = firestore.collection(FirestoreCollections.CONTACT_MESSAGES).document()
-            val mailRef = firestore.collection(FirestoreCollections.MAIL).document()
-            val emailSubject = "kidZone kontakt: $cleanSubject"
-            val emailText = buildString {
-                appendLine(cleanMessage)
-                appendLine()
-                appendLine("Użytkownik: ${currentUser?.name.orEmpty().ifBlank { "nieznany" }}")
-                appendLine("Email konta: ${currentUser?.email.orEmpty().ifBlank { "brak" }}")
-                appendLine("UID: ${userId.ifBlank { "brak" }}")
-                appendLine("ID zgłoszenia: ${contactRef.id}")
-            }
 
             runCatching {
-                firestore.runBatch { batch ->
-                    batch.set(
-                        contactRef,
-                        mapOf(
-                            "reporterId" to userId,
-                            "reporterName" to currentUser?.name.orEmpty(),
-                            "reporterEmail" to currentUser?.email.orEmpty(),
-                            "subject" to cleanSubject,
-                            "message" to cleanMessage,
-                            "status" to "new",
-                            "emailRequested" to true,
-                            "mailDocumentId" to mailRef.id,
-                            "createdAtMillis" to createdAtMillis
-                        )
-                    )
-                    batch.set(
-                        mailRef,
-                        mapOf(
-                            "to" to listOf(AppConfig.PRIVACY_CONTACT_EMAIL),
-                            "message" to mapOf(
-                                "subject" to emailSubject,
-                                "text" to emailText
-                            ),
-                            "contactMessageId" to contactRef.id,
-                            "createdAtMillis" to createdAtMillis
-                        )
-                    )
-                }.await()
+                functions
+                    .getHttpsCallable(CONTACT_MESSAGE_FUNCTION)
+                    .call(contactMessagePayload(cleanSubject, cleanMessage))
+                    .await()
             }.onSuccess {
                 _uiState.update {
                     it.copy(
@@ -410,6 +374,12 @@ class ProfileViewModel @Inject constructor(
             }
         }
     }
+
+    private fun contactMessagePayload(subject: String, message: String): Map<String, String> =
+        mapOf(
+            "subject" to subject,
+            "message" to message
+        )
 
     fun openNotificationPrefs() {
         _uiState.update { it.copy(isNotificationPrefsOpen = true) }
@@ -453,6 +423,13 @@ class ProfileViewModel @Inject constructor(
     fun dismissBadgesInfo() { _uiState.update { it.copy(isBadgesInfoOpen = false) } }
 
     fun consumeNewlyEarnedBadge() {
+        val userId = pendingSeenBadgesUserId
+        if (userId != null && pendingSeenBadgeNames.isNotEmpty()) {
+            badgePreferences.setSeenBadges(userId, pendingSeenBadgeNames)
+        }
+        pendingSeenBadgesUserId = null
+        pendingSeenBadgeNames = emptySet()
+        pendingNewBadgeNames = emptySet()
         _uiState.update { it.copy(newlyEarnedBadges = emptyList()) }
     }
 
@@ -464,9 +441,16 @@ class ProfileViewModel @Inject constructor(
         val revoked = seen - current
 
         if (newlyEarned.isNotEmpty()) {
-            viewModelScope.launch {
-                authRepository.recordBadgesEarned(newlyEarned.map { it.name })
+            val newBadgeNames = newlyEarned.map { it.name }.toSet()
+            pendingSeenBadgesUserId = userId
+            pendingSeenBadgeNames = current.map { it.name }.toSet()
+            if (pendingNewBadgeNames != newBadgeNames) {
+                pendingNewBadgeNames = newBadgeNames
+                viewModelScope.launch {
+                    authRepository.recordBadgesEarned(newlyEarned.map { it.name })
+                }
             }
+            return newlyEarned
         }
 
         if (revoked.isNotEmpty()) {

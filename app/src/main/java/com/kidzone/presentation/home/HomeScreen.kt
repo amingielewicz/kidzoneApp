@@ -32,6 +32,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -71,9 +72,9 @@ import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.shimmerEffect
 
-private val PLACE_ROW_HEIGHT = 152.dp
-private val PLACE_CARD_WIDTH = 164.dp
-private val PLACE_CARD_ICON_SIZE = 28.dp
+private val PLACE_ROW_HEIGHT = 164.dp
+private val PLACE_CARD_WIDTH = 176.dp
+private val PLACE_CARD_ICON_SIZE = 30.dp
 private val PLACE_CARD_CONTENT_PADDING = 12.dp
 
 private data class HomePlaceItem(
@@ -342,7 +343,7 @@ private fun SectionHeader(
 ) {
     Text(
         text = title,
-        style = MaterialTheme.typography.titleMedium,
+        style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
         modifier = modifier
     )
@@ -373,18 +374,24 @@ private fun HorizontalPlacesRow(
             }
         }
         items.isEmpty() -> {
-            Box(
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(rowHeight)
                     .padding(horizontal = 16.dp),
-                contentAlignment = Alignment.Center
+                shape = RoundedCornerShape(KidZoneRadii.Card),
+                color = MaterialTheme.colorScheme.surfaceContainerLow
             ) {
-                Text(
-                    text = emptyMessage,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = emptyMessage,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
         else -> {
@@ -472,22 +479,26 @@ private fun PlaceCard(
                 }
             }
             Row(
-                horizontalArrangement = Arrangement.spacedBy(KidZoneSpacing.GapSmall),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 when {
                     place.reviewsCount > 0 -> {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = stringResource(R.string.rating),
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(KidZoneSpacing.GapTiny))
-                        Text(
-                            text = "%.1f (%d)".format(place.averageRating, place.reviewsCount),
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = stringResource(R.string.rating),
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(KidZoneSpacing.GapTiny))
+                            Text(
+                                text = "%.1f (%d)".format(place.averageRating, place.reviewsCount),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                     place.isNewWithoutReviews() -> {
                         NewPlaceBadge()

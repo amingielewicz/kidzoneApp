@@ -755,15 +755,15 @@ private fun PlaceCard(
                 onClick = onClick
             )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
                 CategoryIcon(
                     category = place.category,
                     animationKey = "list_place_icon_${place.id}",
                     sharedTransitionScope = sharedTransitionScope,
                     animatedContentScope = animatedContentScope,
-                    size = 28.dp,
-                    iconSize = 18.dp
+                    size = 32.dp,
+                    iconSize = 19.dp
                 )
                 Spacer(Modifier.width(KidZoneSpacing.Gap))
                 Column(modifier = Modifier.weight(1f)) {
@@ -779,19 +779,27 @@ private fun PlaceCard(
                 }
                 when {
                     place.reviewsCount > 0 -> {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Filled.Star,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(Modifier.width(2.dp))
-                            Text(
-                                text = "%.1f".format(place.averageRating),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
-                            )
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Star,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(Modifier.width(3.dp))
+                                Text(
+                                    text = "%.1f".format(place.averageRating),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                     place.isNewWithoutReviews() -> {
@@ -836,7 +844,7 @@ private fun PlaceCard(
                     text = place.description,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -878,12 +886,12 @@ private fun PlaceRowSkeleton() {
     KidZoneCard(
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(28.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(8.dp))
                         .shimmerEffect()
                 )
                 Spacer(Modifier.width(12.dp))
