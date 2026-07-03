@@ -1,6 +1,6 @@
 import {onDocumentCreated, onDocumentDeleted, onDocumentUpdated} from "firebase-functions/v2/firestore";
 import {onSchedule} from "firebase-functions/v2/scheduler";
-import {onRequest} from "firebase-functions/v2/https";
+import {HttpsError, onCall, onRequest} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import * as nodemailer from "nodemailer";
@@ -35,6 +35,11 @@ type ReviewInfo = {
   authorName: string;
   placeId: string;
 };
+
+const CONTACT_SUBJECT_MIN_LENGTH = 3;
+const CONTACT_SUBJECT_MAX_LENGTH = 80;
+const CONTACT_MESSAGE_MIN_LENGTH = 10;
+const CONTACT_MESSAGE_MAX_LENGTH = 1000;
 
 function privateMessagingRef(userId: string) {
   return db.collection("users").doc(userId).collection("private").doc("messaging");
@@ -209,6 +214,42 @@ async function getReviewInfo(reviewId: string): Promise<ReviewInfo> {
     return {comment: "", rating: 0, authorName: "Nieznany", placeId: ""};
   }
 }
+
+// --- Callable: zapis formularza kontaktowego ---
+export const submitContactMessage = onCall(
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "Wymagane logowanie.");
+    }
+
+    const subject = String(request.data?.subject || "").trim();
+    const message = String(request.data?.message || "").trim();
+    if (
+      subject.length < CONTACT_SUBJECT_MIN_LENGTH ||
+      subject.length > CONTACT_SUBJECT_MAX_LENGTH ||
+      message.length < CONTACT_MESSAGE_MIN_LENGTH ||
+      message.length > CONTACT_MESSAGE_MAX_LENGTH
+    ) {
+      throw new HttpsError("invalid-argument", "Nieprawidłowa treść formularza.");
+    }
+
+    const authToken = (request.auth?.token || {}) as Record<string, unknown>;
+    const docRef = await db.collection("contact_messages").add({
+      reporterId: uid,
+      reporterName: String(authToken.name || ""),
+      reporterEmail: String(authToken.email || ""),
+      subject,
+      message,
+      status: "new",
+      emailRequested: true,
+      emailStatus: "pending",
+      createdAtMillis: Date.now(),
+    });
+
+    return {messageId: docRef.id};
+  }
+);
 
 // --- Trigger: formularz kontaktowy ---
 export const onContactMessage = onDocumentCreated(

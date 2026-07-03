@@ -1,11 +1,10 @@
 package com.kidzone.presentation.profile
 
 import android.net.Uri
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.functions.FirebaseFunctions
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.R
-import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
@@ -43,6 +42,7 @@ private const val RANKING_LIMIT = 100
 private const val FLOW_SUBSCRIPTION_TIMEOUT_MS = 5000L
 private const val CONTACT_SUBJECT_MIN_LENGTH = 3
 private const val CONTACT_MESSAGE_MIN_LENGTH = 10
+private const val CONTACT_MESSAGE_FUNCTION = "submitContactMessage"
 
 /**
  * ViewModel profilu użytkownika.
@@ -55,7 +55,7 @@ class ProfileViewModel @Inject constructor(
     private val badgePreferences: BadgePreferences,
     private val notificationPrefsUseCase: NotificationPrefsUseCase,
     private val languagePreferences: LanguagePreferences,
-    private val firestore: FirebaseFirestore
+    private val functions: FirebaseFunctions
 ) : ViewModel() {
 
     data class UiState(
@@ -350,25 +350,12 @@ class ProfileViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isAccountActionInProgress = true, accountActionError = null) }
-            val currentUser = user.value
-            val userId = currentUser?.id.orEmpty()
-            val createdAtMillis = System.currentTimeMillis()
-            val contactRef = firestore.collection(FirestoreCollections.CONTACT_MESSAGES).document()
 
             runCatching {
-                contactRef.set(
-                    mapOf(
-                        "reporterId" to userId,
-                        "reporterName" to currentUser?.name.orEmpty(),
-                        "reporterEmail" to currentUser?.email.orEmpty(),
-                        "subject" to cleanSubject,
-                        "message" to cleanMessage,
-                        "status" to "new",
-                        "emailRequested" to true,
-                        "emailStatus" to "pending",
-                        "createdAtMillis" to createdAtMillis
-                    )
-                ).await()
+                functions
+                    .getHttpsCallable(CONTACT_MESSAGE_FUNCTION)
+                    .call(contactMessagePayload(cleanSubject, cleanMessage))
+                    .await()
             }.onSuccess {
                 _uiState.update {
                     it.copy(
@@ -387,6 +374,12 @@ class ProfileViewModel @Inject constructor(
             }
         }
     }
+
+    private fun contactMessagePayload(subject: String, message: String): Map<String, String> =
+        mapOf(
+            "subject" to subject,
+            "message" to message
+        )
 
     fun openNotificationPrefs() {
         _uiState.update { it.copy(isNotificationPrefsOpen = true) }

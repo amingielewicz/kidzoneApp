@@ -1,7 +1,7 @@
 package com.kidzone.presentation.profile
 
 import android.net.Uri
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.functions.FirebaseFunctions
 import com.kidzone.R
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
@@ -55,7 +55,7 @@ class ProfileViewModelTest {
     private lateinit var badgePreferences: BadgePreferences
     private lateinit var notificationPrefsUseCase: NotificationPrefsUseCase
     private lateinit var languagePreferences: LanguagePreferences
-    private lateinit var firestore: FirebaseFirestore
+    private lateinit var functions: FirebaseFunctions
     private lateinit var viewModel: ProfileViewModel
 
     private val currentUserFlow = MutableStateFlow<User?>(null)
@@ -67,7 +67,7 @@ class ProfileViewModelTest {
         badgePreferences = mockk(relaxed = true)
         notificationPrefsUseCase = mockk(relaxed = true)
         languagePreferences = mockk(relaxed = true)
-        firestore = mockk(relaxed = true)
+        functions = mockk(relaxed = true)
 
         every { badgePreferences.getSeenBadges(any()) } returns emptySet()
         every { languagePreferences.getLanguage() } returns AppLanguage.SYSTEM
@@ -89,7 +89,7 @@ class ProfileViewModelTest {
             badgePreferences,
             notificationPrefsUseCase,
             languagePreferences,
-            firestore
+            functions
         )
         // Activate flows
         backgroundScope.launch { vm.uiState.collect {} }

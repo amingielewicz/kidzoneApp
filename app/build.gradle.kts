@@ -210,6 +210,7 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth.ktx)
     implementation(libs.firebase.firestore.ktx)
+    implementation(libs.firebase.functions.ktx)
     implementation(libs.firebase.storage.ktx)
     implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.messaging)
