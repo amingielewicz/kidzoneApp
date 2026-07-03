@@ -300,7 +300,7 @@ export function DashboardPage() {
       <Grid container spacing={3}>
         {/* Recent users */}
         <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, overflow: 'hidden' }}>
             <Box display="flex" alignItems="center" gap={1} mb={2}>
               <PersonAddIcon color="primary" />
               <Typography variant="h6" fontWeight={600}>
@@ -343,7 +343,7 @@ export function DashboardPage() {
             </Box>
             <List dense disablePadding>
               {recentPlaces.map((p) => (
-                <ListItem key={p.id} disableGutters>
+                <ListItem key={p.id} disableGutters sx={{ minWidth: 0 }}>
                   <ListItemAvatar>
                     <Avatar sx={{ width: 32, height: 32, bgcolor: '#e3f2fd' }}>
                       <PlaceIcon sx={{ fontSize: 18, color: '#1976D2' }} />
@@ -352,7 +352,12 @@ export function DashboardPage() {
                   <ListItemText
                     primary={p.name}
                     secondary={formatDate(p.createdAtMillis)}
-                    primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }}
+                    sx={{ minWidth: 0, pr: 1 }}
+                    primaryTypographyProps={{
+                      variant: 'body2',
+                      fontWeight: 500,
+                      sx: { overflowWrap: 'anywhere', wordBreak: 'break-word' },
+                    }}
                     secondaryTypographyProps={{ variant: 'caption' }}
                   />
                   {p.averageRating > 0 && <Chip label={p.averageRating.toFixed(1)} size="small" />}
@@ -369,7 +374,7 @@ export function DashboardPage() {
 
         {/* Recent reviews */}
         <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, overflow: 'hidden' }}>
             <Box display="flex" alignItems="center" gap={1} mb={2}>
               <ReviewsIcon color="primary" />
               <Typography variant="h6" fontWeight={600}>
@@ -381,8 +386,12 @@ export function DashboardPage() {
                 <ListItem key={r.id} disableGutters sx={{ alignItems: 'flex-start' }}>
                   <ListItemText
                     primary={
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <Typography variant="body2" fontWeight={500}>
+                      <Box display="flex" alignItems="center" gap={1} minWidth={0} flexWrap="wrap">
+                        <Typography
+                          variant="body2"
+                          fontWeight={500}
+                          sx={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+                        >
                           {r.authorName || 'Anonim'}
                         </Typography>
                         <Rating value={r.rating} size="small" readOnly />
