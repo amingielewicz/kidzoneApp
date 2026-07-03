@@ -210,6 +210,70 @@ async function getReviewInfo(reviewId: string): Promise<ReviewInfo> {
   }
 }
 
+// --- Trigger: formularz kontaktowy ---
+export const onContactMessage = onDocumentCreated(
+  {
+    document: "contact_messages/{messageId}",
+    secrets: [gmailEmail, gmailPassword, adminEmail],
+  },
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+
+    const messageId = event.params.messageId;
+    const reporterId = data.reporterId || "";
+    const reporterInfo = reporterId ? await getUserInfo(reporterId) : "Nieznany";
+    const subject = data.subject || "(brak tematu)";
+    const message = data.message || "";
+    const reporterName = data.reporterName || "";
+    const reporterEmail = data.reporterEmail || "";
+    const projectId = process.env.GCLOUD_PROJECT || "playground-705e7162";
+    const firestoreUrl =
+      `https://console.firebase.google.com/project/${projectId}/firestore/data/contact_messages/${messageId}`;
+
+    const html = wrapInTemplate("Nowa wiadomość z formularza kontaktowego", `
+      <table>
+        <tr><td>Temat:</td><td>${escapeHtml(subject)}</td></tr>
+        <tr><td>Zgłaszający:</td><td>${escapeHtml(reporterInfo)}</td></tr>
+        <tr><td>Nazwa z aplikacji:</td><td>${escapeHtml(reporterName || "(brak)")}</td></tr>
+        <tr><td>Email konta:</td><td>${escapeHtml(reporterEmail || "(brak)")}</td></tr>
+        <tr><td>UID:</td><td>${escapeHtml(reporterId || "(brak)")}</td></tr>
+      </table>
+      <h3 style="color:#1976D2; margin-top:16px;">Wiadomość:</h3>
+      <p style="white-space:pre-wrap;">${escapeHtml(message)}</p>
+      <p><a class="btn" href="${firestoreUrl}">Otwórz w Firebase Console</a></p>
+    `);
+
+    try {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {user: gmailEmail.value(), pass: gmailPassword.value()},
+      });
+
+      await transporter.sendMail({
+        from: `kidZone <${gmailEmail.value()}>`,
+        to: adminEmail.value(),
+        subject: `[kidZone] Kontakt: ${subject}`,
+        html,
+      });
+
+      await event.data?.ref.update({
+        emailStatus: "sent",
+        emailedAtMillis: Date.now(),
+      });
+      console.log(`Contact email sent for ${messageId}`);
+    } catch (err) {
+      await event.data?.ref.update({
+        emailStatus: "failed",
+        emailError: String(err).slice(0, 500),
+        emailFailedAtMillis: Date.now(),
+      });
+      console.error(`Contact email failed for ${messageId}:`, err);
+      throw err;
+    }
+  }
+);
+
 function mapCategory(category: string): string {
   const categories: Record<string, string> = {
     "PLAYGROUND": "Plac zabaw",

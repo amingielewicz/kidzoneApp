@@ -18,7 +18,6 @@ import com.kidzone.presentation.common.BadgeContext
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.computeBadges
 import com.kidzone.utils.AuthException
-import com.kidzone.utils.AppConfig
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.UiText
 import com.kidzone.utils.toUploadErrorMessage
@@ -355,46 +354,21 @@ class ProfileViewModel @Inject constructor(
             val userId = currentUser?.id.orEmpty()
             val createdAtMillis = System.currentTimeMillis()
             val contactRef = firestore.collection(FirestoreCollections.CONTACT_MESSAGES).document()
-            val mailRef = firestore.collection(FirestoreCollections.MAIL).document()
-            val emailSubject = "kidZone kontakt: $cleanSubject"
-            val emailText = buildString {
-                appendLine(cleanMessage)
-                appendLine()
-                appendLine("Użytkownik: ${currentUser?.name.orEmpty().ifBlank { "nieznany" }}")
-                appendLine("Email konta: ${currentUser?.email.orEmpty().ifBlank { "brak" }}")
-                appendLine("UID: ${userId.ifBlank { "brak" }}")
-                appendLine("ID zgłoszenia: ${contactRef.id}")
-            }
 
             runCatching {
-                firestore.runBatch { batch ->
-                    batch.set(
-                        contactRef,
-                        mapOf(
-                            "reporterId" to userId,
-                            "reporterName" to currentUser?.name.orEmpty(),
-                            "reporterEmail" to currentUser?.email.orEmpty(),
-                            "subject" to cleanSubject,
-                            "message" to cleanMessage,
-                            "status" to "new",
-                            "emailRequested" to true,
-                            "mailDocumentId" to mailRef.id,
-                            "createdAtMillis" to createdAtMillis
-                        )
+                contactRef.set(
+                    mapOf(
+                        "reporterId" to userId,
+                        "reporterName" to currentUser?.name.orEmpty(),
+                        "reporterEmail" to currentUser?.email.orEmpty(),
+                        "subject" to cleanSubject,
+                        "message" to cleanMessage,
+                        "status" to "new",
+                        "emailRequested" to true,
+                        "emailStatus" to "pending",
+                        "createdAtMillis" to createdAtMillis
                     )
-                    batch.set(
-                        mailRef,
-                        mapOf(
-                            "to" to listOf(AppConfig.PRIVACY_CONTACT_EMAIL),
-                            "message" to mapOf(
-                                "subject" to emailSubject,
-                                "text" to emailText
-                            ),
-                            "contactMessageId" to contactRef.id,
-                            "createdAtMillis" to createdAtMillis
-                        )
-                    )
-                }.await()
+                ).await()
             }.onSuccess {
                 _uiState.update {
                     it.copy(
