@@ -62,6 +62,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.kidzone.R
@@ -469,9 +470,10 @@ private fun PhotoThumbnail(
             onClick = onRemove,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .size(18.dp)
+                .zIndex(1f)
+                .size(16.dp)
                 .background(
-                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.92f),
                     shape = CircleShape
                 )
         ) {
@@ -479,7 +481,7 @@ private fun PhotoThumbnail(
                 Icons.Filled.Close,
                 contentDescription = stringResource(R.string.delete),
                 tint = MaterialTheme.colorScheme.onError,
-                modifier = Modifier.size(12.dp)
+                modifier = Modifier.size(10.dp)
             )
         }
     }
