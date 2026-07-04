@@ -87,9 +87,10 @@ private val DarkColors = darkColorScheme(
  *   Wyłączalne np. w ustawieniach apki jeśli user preferuje brand colors.
  */
 @Composable
+@Suppress("FunctionNaming")
 fun KidZoneTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colors = when {
