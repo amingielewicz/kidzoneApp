@@ -64,11 +64,11 @@ class FirebaseAuthRepository @Inject constructor(
 
     override val currentUser: Flow<User?> = callbackFlow {
         val listener = FirebaseAuth.AuthStateListener { auth ->
-            trySend(auth.currentUser?.toDomain())
+            trySend(auth.currentUser?.takeIf { it.canUseAppSession() }?.toDomain())
         }
         firebaseAuth.addAuthStateListener(listener)
         // Wyemituj aktualna wartosc natychmiast (listener emituje dopiero przy zmianach).
-        trySend(firebaseAuth.currentUser?.toDomain())
+        trySend(firebaseAuth.currentUser?.takeIf { it.canUseAppSession() }?.toDomain())
         awaitClose { firebaseAuth.removeAuthStateListener(listener) }
     }
 
@@ -129,8 +129,7 @@ class FirebaseAuthRepository @Inject constructor(
 
             // Blokada logowania bez potwierdzonego emaila.
             // Google Sign-In jest zwolniony (email zweryfikowany z natury).
-            // W debug buildach pomijamy weryfikację (ułatwia testowanie).
-            if (!com.kidzone.BuildConfig.DEBUG && !firebaseUser.isEmailVerified) {
+            if (!firebaseUser.canUseAppSession()) {
                 // Wyślij ponownie link weryfikacyjny (na wypadek gdyby stary wygasł)
                 runCatching { firebaseUser.sendEmailVerification().await() }
                 // Wyloguj – nie pozwól na dostęp do apki
@@ -893,6 +892,13 @@ class FirebaseAuthRepository @Inject constructor(
         email = email.orEmpty(),
         avatarUrl = photoUrl?.toString()
     )
+
+    private fun FirebaseUser.canUseAppSession(): Boolean {
+        val providerIds = providerData.map { it.providerId }.toSet()
+        val isPasswordUser = EmailAuthProvider.PROVIDER_ID in providerIds
+        val isGoogleUser = GoogleAuthProvider.PROVIDER_ID in providerIds
+        return !isPasswordUser || isGoogleUser || isEmailVerified
+    }
 
     /**
      * Sprawdza czy konto użytkownika jest zablokowane.

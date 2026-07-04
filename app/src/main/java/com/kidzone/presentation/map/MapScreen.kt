@@ -40,6 +40,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
@@ -683,6 +684,11 @@ private fun FiltersOverlay(
     modifier: Modifier = Modifier
 ) {
     val orderedCategories = PlaceCategory.entries
+    val selectedChipColors = FilterChipDefaults.filterChipColors(
+        selectedContainerColor = MaterialTheme.colorScheme.primary,
+        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+    )
 
     Surface(
         modifier = modifier,
@@ -702,18 +708,25 @@ private fun FiltersOverlay(
                 FilterChip(
                     selected = selectedCategory == null,
                     onClick = { onCategorySelected(null) },
+                    colors = selectedChipColors,
                     label = { Text(stringResource(R.string.category_all)) }
                 )
                 orderedCategories.forEach { category ->
                     val style = category.style
+                    val isSelected = selectedCategory == category
                     FilterChip(
-                        selected = selectedCategory == category,
+                        selected = isSelected,
                         onClick = { onCategorySelected(category) },
+                        colors = selectedChipColors,
                         leadingIcon = {
                             Icon(
                                 imageVector = style.icon,
                                 contentDescription = null,
-                                tint = style.color
+                                tint = if (isSelected) {
+                                    MaterialTheme.colorScheme.onPrimary
+                                } else {
+                                    style.color
+                                }
                             )
                         },
                         label = { Text(stringResource(category.labelRes)) }
@@ -732,12 +745,16 @@ private fun FiltersOverlay(
                 FilterChip(
                     selected = topRatedOnly,
                     onClick = onToggleTopRated,
+                    colors = selectedChipColors,
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Filled.Star,
                             contentDescription = null,
-                            tint = if (topRatedOnly) MaterialTheme.colorScheme.secondary
-                            else MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (topRatedOnly) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
                         )
                     },
                     label = { Text(stringResource(R.string.filter_top_rated)) }
@@ -746,12 +763,16 @@ private fun FiltersOverlay(
                     FilterChip(
                         selected = addedByMeOnly,
                         onClick = { onToggleAddedByMe() },
+                        colors = selectedChipColors,
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Filled.Person,
                                 contentDescription = null,
-                                tint = if (addedByMeOnly) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = if (addedByMeOnly) {
+                                    MaterialTheme.colorScheme.onPrimary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
                             )
                         },
                         label = { Text(stringResource(R.string.filter_added_by_me)) }

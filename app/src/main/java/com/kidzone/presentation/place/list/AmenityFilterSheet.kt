@@ -226,11 +226,7 @@ fun AmenityFilterSheet(
                         sectionsWithFilteredAmenities.forEach { section ->
                             put(
                                 section.titleRes,
-                                if (selectedCategory == null) {
-                                    section.matchingCategories.isEmpty() // Ogólne
-                                } else {
-                                    section.shouldAutoExpand(selectedCategory)
-                                }
+                                section.shouldAutoExpand(selectedCategory)
                             )
                         }
                     }
@@ -268,7 +264,7 @@ fun AmenityFilterSheet(
 
 private fun AmenitySection.shouldAutoExpand(selectedCategory: PlaceCategory?): Boolean {
     if (selectedCategory == null) return false
-    if (matchingCategories.isEmpty()) return true // "Ogólne" always expanded
+    if (matchingCategories.isEmpty()) return false
     return selectedCategory in matchingCategories
 }
 
