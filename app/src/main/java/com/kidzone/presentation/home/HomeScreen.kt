@@ -36,6 +36,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -92,7 +93,7 @@ private data class PlaceCardAnimation(
  * Ekran "Start" – pierwsza zakładka po zalogowaniu.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
-@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
+@Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
 fun HomeScreen(
     onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
@@ -124,13 +125,22 @@ fun HomeScreen(
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.refreshLocationGranted()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    var previousGpsEnabled by remember { mutableStateOf(gpsEnabled) }
+    LaunchedEffect(gpsEnabled, state.locationGranted) {
+        if (!previousGpsEnabled && gpsEnabled && state.locationGranted) {
+            viewModel.refresh()
+        }
+        previousGpsEnabled = gpsEnabled
     }
 
     PullToRefreshBox(

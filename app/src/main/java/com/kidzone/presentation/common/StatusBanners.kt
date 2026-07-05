@@ -1,3 +1,5 @@
+@file:Suppress("MagicNumber")
+
 package com.kidzone.presentation.common
 
 import android.content.Context
@@ -27,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -38,6 +41,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.kidzone.R
 import com.kidzone.presentation.place.add.isLocationServiceEnabled
+
+private val GpsDisabledContainer = Color(0xFF5E35B1)
+private val GpsDisabledContent = Color.White
+private val GpsDisabledButtonContainer = Color.White
+private val GpsDisabledButtonContent = Color(0xFF4527A0)
+
+private val GpsAcquiringContainer = Color(0xFF00796B)
+private val GpsAcquiringContent = Color.White
 
 @Composable
 fun rememberNetworkStatus(): State<NetworkStatus> {
@@ -108,7 +119,7 @@ fun GpsDisabledBanner(modifier: Modifier = Modifier) {
             .semantics {
                 liveRegion = LiveRegionMode.Polite
             },
-        color = MaterialTheme.colorScheme.primaryContainer,
+        color = GpsDisabledContainer,
         tonalElevation = 2.dp
     ) {
         Row(
@@ -118,14 +129,14 @@ fun GpsDisabledBanner(modifier: Modifier = Modifier) {
             Icon(
                 imageVector = Icons.Filled.GpsOff,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                tint = GpsDisabledContent,
                 modifier = Modifier.size(20.dp)
             )
             Spacer(Modifier.width(8.dp))
             Text(
                 text = stringResource(R.string.gps_disabled_banner),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = GpsDisabledContent,
                 modifier = Modifier.weight(1f)
             )
             Button(
@@ -134,8 +145,8 @@ fun GpsDisabledBanner(modifier: Modifier = Modifier) {
                     context.startActivity(intent)
                 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    contentColor = MaterialTheme.colorScheme.primaryContainer
+                    containerColor = GpsDisabledButtonContainer,
+                    contentColor = GpsDisabledButtonContent
                 )
             ) {
                 Text(stringResource(R.string.enable), style = MaterialTheme.typography.labelMedium)
@@ -155,7 +166,7 @@ fun GpsAcquiringBanner(modifier: Modifier = Modifier) {
             .semantics {
                 liveRegion = LiveRegionMode.Polite
             },
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        color = GpsAcquiringContainer,
         tonalElevation = 2.dp
     ) {
         Row(
@@ -165,13 +176,13 @@ fun GpsAcquiringBanner(modifier: Modifier = Modifier) {
             androidx.compose.material3.CircularProgressIndicator(
                 modifier = Modifier.size(16.dp),
                 strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                color = GpsAcquiringContent
             )
             Spacer(Modifier.width(8.dp))
             Text(
                 text = stringResource(R.string.gps_acquiring_banner),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = GpsAcquiringContent,
                 modifier = Modifier.weight(1f)
             )
         }
