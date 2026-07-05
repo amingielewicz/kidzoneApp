@@ -53,8 +53,9 @@ jobs:
         run: npm run build
 
       - name: Upload build artifact
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: admin-panel-dist
           path: admin-panel/dist/
-          retention-days: 5
+          retention-days: 1

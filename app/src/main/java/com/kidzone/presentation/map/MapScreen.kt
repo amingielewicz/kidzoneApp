@@ -112,10 +112,13 @@ import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.model.GeoBounds
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.GpsDisabledBanner
+import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
+import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.fetchCurrentLocation
 import com.kidzone.presentation.place.add.hasLocationPermission
+import com.kidzone.presentation.place.add.isLocationServiceEnabled
 
 private val DEFAULT_CAMERA_TARGET = LatLng(52.2297, 21.0122)
 private const val DEFAULT_CAMERA_ZOOM = 11f
@@ -127,6 +130,7 @@ private const val MARKER_ANCHOR_CENTER = 0.5f
 private const val SPIDERFY_RADIUS_DEGREES = 0.00012
 private const val SPIDERFY_RADIUS_STEP_DEGREES = 0.000015
 private const val SPIDERFY_MAX_EXTRA = 8
+private val MAP_TOP_OVERLAY_SPACING = 8.dp
 
 @SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class)
@@ -143,6 +147,7 @@ fun MapScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val gpsEnabled = rememberLocationServiceEnabled()
+    val networkStatus by rememberNetworkStatus()
 
     var locationPermissionGranted by remember { mutableStateOf(hasLocationPermission(context)) }
 
@@ -210,11 +215,27 @@ fun MapScreen(
         }
     }
 
+    LaunchedEffect(networkStatus) {
+        if (networkStatus == NetworkStatus.AVAILABLE) {
+            viewModel.retry()
+        }
+    }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 locationPermissionGranted = hasLocationPermission(context)
+                viewModel.retry()
+                if (locationPermissionGranted && isLocationServiceEnabled(context) && focusOn == null) {
+                    scope.launch {
+                        recenterOnUser(
+                            context = context,
+                            cameraPositionState = cameraPositionState,
+                            shouldAnimate = { !userTouchedMap }
+                        )
+                    }
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -284,7 +305,7 @@ fun MapScreen(
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
                 .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(MAP_TOP_OVERLAY_SPACING)
         ) {
             if (!locationPermissionGranted) {
                 LocationPermissionBanner(
@@ -313,6 +334,17 @@ fun MapScreen(
                 onToggleAddedByMe = viewModel::toggleAddedByMe,
                 modifier = Modifier.fillMaxWidth()
             )
+            Button(
+                onClick = { showPlacesList = true },
+                modifier = Modifier.padding(start = 4.dp)
+            ) {
+                val countLabel = if (state.isPlaceCountCapped) {
+                    stringResource(R.string.map_place_count_capped, state.places.size)
+                } else {
+                    state.places.size.toString()
+                }
+                Text(stringResource(R.string.map_list_button, countLabel))
+            }
         }
 
         if (state.isLoading && state.places.isEmpty()) {
@@ -382,20 +414,6 @@ fun MapScreen(
                     }
                 }
             )
-        }
-
-        Button(
-            onClick = { showPlacesList = true },
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 12.dp, top = 132.dp)
-        ) {
-            val countLabel = if (state.isPlaceCountCapped) {
-                stringResource(R.string.map_place_count_capped, state.places.size)
-            } else {
-                state.places.size.toString()
-            }
-            Text(stringResource(R.string.map_list_button, countLabel))
         }
 
         state.errorMessage?.let { msg ->
@@ -685,9 +703,9 @@ private fun FiltersOverlay(
 ) {
     val orderedCategories = PlaceCategory.entries
     val selectedChipColors = FilterChipDefaults.filterChipColors(
-        selectedContainerColor = MaterialTheme.colorScheme.primary,
-        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer
     )
 
     Surface(
@@ -723,7 +741,7 @@ private fun FiltersOverlay(
                                 imageVector = style.icon,
                                 contentDescription = null,
                                 tint = if (isSelected) {
-                                    MaterialTheme.colorScheme.onPrimary
+                                    MaterialTheme.colorScheme.onSecondaryContainer
                                 } else {
                                     style.color
                                 }
@@ -751,7 +769,7 @@ private fun FiltersOverlay(
                             imageVector = Icons.Filled.Star,
                             contentDescription = null,
                             tint = if (topRatedOnly) {
-                                MaterialTheme.colorScheme.onPrimary
+                                MaterialTheme.colorScheme.onSecondaryContainer
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             }
@@ -769,7 +787,7 @@ private fun FiltersOverlay(
                                 imageVector = Icons.Filled.Person,
                                 contentDescription = null,
                                 tint = if (addedByMeOnly) {
-                                    MaterialTheme.colorScheme.onPrimary
+                                    MaterialTheme.colorScheme.onSecondaryContainer
                                 } else {
                                     MaterialTheme.colorScheme.onSurfaceVariant
                                 }

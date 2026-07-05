@@ -211,7 +211,7 @@ fun MainScreen(
                     Image(
                         painter = painterResource(R.drawable.ic_launcher_foreground),
                         contentDescription = null,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(52.dp)
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(

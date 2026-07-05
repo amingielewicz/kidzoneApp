@@ -82,13 +82,14 @@ jobs:
 
       - name: Upload Dependency Check reports
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: dependency-check-reports
           path: |
             build/reports/dependency-check-report.*
             build/reports/dependency-check-gradle.log
-          retention-days: 14
+          retention-days: 3
 
       - name: Upload SARIF to code scanning
         if: always() && hashFiles('build/reports/dependency-check-report.sarif') != ''

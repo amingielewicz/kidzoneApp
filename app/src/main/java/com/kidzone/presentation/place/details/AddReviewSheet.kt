@@ -36,7 +36,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -457,31 +456,36 @@ private fun PhotoThumbnail(
     model: Any,
     onRemove: () -> Unit
 ) {
-    Box(modifier = Modifier.size(64.dp)) {
+    Box(modifier = Modifier.size(width = 68.dp, height = 72.dp)) {
         AsyncImage(
             model = model,
             contentDescription = stringResource(R.string.photo_thumbnail_description),
             modifier = Modifier
+                .align(Alignment.BottomStart)
                 .size(64.dp)
                 .clip(RoundedCornerShape(6.dp)),
             contentScale = ContentScale.Crop
         )
-        IconButton(
-            onClick = onRemove,
+        Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .zIndex(1f)
-                .size(16.dp)
+                .size(14.dp)
+                .clip(CircleShape)
                 .background(
-                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.92f),
-                    shape = CircleShape
+                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.95f)
                 )
+                .clickable(
+                    role = Role.Button,
+                    onClick = onRemove
+                ),
+            contentAlignment = Alignment.Center
         ) {
             Icon(
                 Icons.Filled.Close,
                 contentDescription = stringResource(R.string.delete),
                 tint = MaterialTheme.colorScheme.onError,
-                modifier = Modifier.size(10.dp)
+                modifier = Modifier.size(8.dp)
             )
         }
     }
