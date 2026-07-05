@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -335,16 +334,33 @@ fun MapScreen(
                 onToggleAddedByMe = viewModel::toggleAddedByMe,
                 modifier = Modifier.fillMaxWidth()
             )
-            Button(
-                onClick = { showPlacesList = true },
-                modifier = Modifier.padding(start = 4.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                val countLabel = if (state.isPlaceCountCapped) {
-                    stringResource(R.string.map_place_count_capped, state.places.size)
-                } else {
-                    state.places.size.toString()
+                Button(
+                    onClick = { showPlacesList = true },
+                    modifier = Modifier.padding(start = 4.dp)
+                ) {
+                    val countLabel = if (state.isPlaceCountCapped) {
+                        stringResource(R.string.map_place_count_capped, state.places.size)
+                    } else {
+                        state.places.size.toString()
+                    }
+                    Text(stringResource(R.string.map_list_button, countLabel))
                 }
-                Text(stringResource(R.string.map_list_button, countLabel))
+                MapMyLocationButton(
+                    onClick = {
+                        if (locationPermissionGranted) {
+                            userTouchedMap = false
+                            scope.launch { recenterOnUser(context, cameraPositionState) }
+                        } else {
+                            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                        }
+                    },
+                    modifier = Modifier.padding(end = 4.dp)
+                )
             }
         }
 
@@ -374,21 +390,6 @@ fun MapScreen(
                 }
             }
         }
-
-        MapMyLocationButton(
-            onClick = {
-                if (locationPermissionGranted) {
-                    userTouchedMap = false
-                    scope.launch { recenterOnUser(context, cameraPositionState) }
-                } else {
-                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                }
-            },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 8.dp, end = 8.dp)
-                .offset(y = 160.dp)
-        )
 
         // Customowe przyciski zoom +/- na stałej, dobrej wysokości (180dp)
         Column(
