@@ -303,8 +303,7 @@ fun MapScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .padding(8.dp),
+                .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(MAP_TOP_OVERLAY_SPACING)
         ) {
             if (!locationPermissionGranted) {
@@ -332,10 +331,14 @@ fun MapScreen(
                 onCategorySelected = viewModel::onCategorySelect,
                 onToggleTopRated = viewModel::toggleTopRated,
                 onToggleAddedByMe = viewModel::toggleAddedByMe,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
             )
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -649,24 +652,22 @@ private fun LocationPermissionBanner(
         modifier = modifier.semantics {
             liveRegion = LiveRegionMode.Polite
         },
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        shape = MaterialTheme.shapes.medium,
-        tonalElevation = 4.dp,
-        shadowElevation = 4.dp
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        tonalElevation = 2.dp
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.MyLocation,
                     contentDescription = "Lokalizacja",
-                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = stringResource(R.string.map_location_banner_text),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -679,7 +680,7 @@ private fun LocationPermissionBanner(
                     onClick = onOpenSettingsClick,
                     modifier = Modifier.weight(1f),
                     colors = TextButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 ) {
                     Text(stringResource(R.string.settings))
