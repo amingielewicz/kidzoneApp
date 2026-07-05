@@ -131,7 +131,8 @@ private const val SPIDERFY_RADIUS_DEGREES = 0.00012
 private const val SPIDERFY_RADIUS_STEP_DEGREES = 0.000015
 private const val SPIDERFY_MAX_EXTRA = 8
 private val MAP_LIST_BUTTON_TOP_DEFAULT = 132.dp
-private val MAP_LIST_BUTTON_TOP_WITH_BANNER = 184.dp
+private val MAP_LIST_BUTTON_TOP_WITH_ONE_BANNER = 196.dp
+private val MAP_LIST_BUTTON_TOP_WITH_TWO_BANNERS = 252.dp
 
 @SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class)
@@ -162,13 +163,15 @@ fun MapScreen(
     val clusterItems = remember(state.places) {
         buildPlaceClusterItems(state.places)
     }
-    val hasTopStatusBanner = networkStatus == NetworkStatus.UNAVAILABLE ||
-        !locationPermissionGranted ||
-        (locationPermissionGranted && !gpsEnabled)
-    val listButtonTopPadding = if (hasTopStatusBanner) {
-        MAP_LIST_BUTTON_TOP_WITH_BANNER
-    } else {
-        MAP_LIST_BUTTON_TOP_DEFAULT
+    val visibleStatusBannerCount =
+        listOf(
+            networkStatus == NetworkStatus.UNAVAILABLE,
+            !locationPermissionGranted || (locationPermissionGranted && !gpsEnabled)
+        ).count { it }
+    val listButtonTopPadding = when (visibleStatusBannerCount) {
+        0 -> MAP_LIST_BUTTON_TOP_DEFAULT
+        1 -> MAP_LIST_BUTTON_TOP_WITH_ONE_BANNER
+        else -> MAP_LIST_BUTTON_TOP_WITH_TWO_BANNERS
     }
 
     ReportSettledViewport(
