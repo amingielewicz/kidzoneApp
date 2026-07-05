@@ -1,3 +1,5 @@
+@file:Suppress("MagicNumber")
+
 package com.kidzone.presentation.common
 
 import androidx.compose.foundation.layout.padding
@@ -9,12 +11,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kidzone.domain.model.Place
 
 private const val NEW_PLACE_WINDOW_DAYS = 14L
 private const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
+private val NewPlaceContainerColor = Color(0xFFE3F2FD)
+private val NewPlaceContentColor = Color(0xFF0D47A1)
 
 fun Place.isNewWithoutReviews(nowMillis: Long = System.currentTimeMillis()): Boolean {
     if (reviewsCount > 0 || createdAtMillis <= 0L) return false
@@ -30,8 +35,8 @@ fun NewPlaceBadge(modifier: Modifier = Modifier) {
             .widthIn(min = 46.dp)
             .heightIn(min = 24.dp),
         shape = RoundedCornerShape(KidZoneRadii.Badge),
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+        color = NewPlaceContainerColor,
+        contentColor = NewPlaceContentColor
     ) {
         Text(
             text = "Nowe",

@@ -248,7 +248,7 @@ private fun HeroSection() {
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(20.dp))
-            .heightIn(min = 112.dp)
+            .heightIn(min = 88.dp)
             .background(
                 brush = Brush.verticalGradient(
                     listOf(
@@ -257,7 +257,7 @@ private fun HeroSection() {
                     )
                 )
             )
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(horizontal = 20.dp, vertical = 12.dp),
         contentAlignment = Alignment.CenterStart
     ) {
         Column(

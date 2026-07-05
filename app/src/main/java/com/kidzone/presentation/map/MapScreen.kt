@@ -112,10 +112,13 @@ import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.model.GeoBounds
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.GpsDisabledBanner
+import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
+import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.fetchCurrentLocation
 import com.kidzone.presentation.place.add.hasLocationPermission
+import com.kidzone.presentation.place.add.isLocationServiceEnabled
 
 private val DEFAULT_CAMERA_TARGET = LatLng(52.2297, 21.0122)
 private const val DEFAULT_CAMERA_ZOOM = 11f
@@ -127,6 +130,8 @@ private const val MARKER_ANCHOR_CENTER = 0.5f
 private const val SPIDERFY_RADIUS_DEGREES = 0.00012
 private const val SPIDERFY_RADIUS_STEP_DEGREES = 0.000015
 private const val SPIDERFY_MAX_EXTRA = 8
+private val MAP_LIST_BUTTON_TOP_DEFAULT = 132.dp
+private val MAP_LIST_BUTTON_TOP_WITH_BANNER = 184.dp
 
 @SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class)
@@ -143,6 +148,7 @@ fun MapScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val gpsEnabled = rememberLocationServiceEnabled()
+    val networkStatus by rememberNetworkStatus()
 
     var locationPermissionGranted by remember { mutableStateOf(hasLocationPermission(context)) }
 
@@ -155,6 +161,14 @@ fun MapScreen(
     val markerIconCache = rememberMarkerIcons()
     val clusterItems = remember(state.places) {
         buildPlaceClusterItems(state.places)
+    }
+    val hasTopStatusBanner = networkStatus == NetworkStatus.UNAVAILABLE ||
+        !locationPermissionGranted ||
+        (locationPermissionGranted && !gpsEnabled)
+    val listButtonTopPadding = if (hasTopStatusBanner) {
+        MAP_LIST_BUTTON_TOP_WITH_BANNER
+    } else {
+        MAP_LIST_BUTTON_TOP_DEFAULT
     }
 
     ReportSettledViewport(
@@ -210,11 +224,27 @@ fun MapScreen(
         }
     }
 
+    LaunchedEffect(networkStatus) {
+        if (networkStatus == NetworkStatus.AVAILABLE) {
+            viewModel.retry()
+        }
+    }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 locationPermissionGranted = hasLocationPermission(context)
+                viewModel.retry()
+                if (locationPermissionGranted && isLocationServiceEnabled(context) && focusOn == null) {
+                    scope.launch {
+                        recenterOnUser(
+                            context = context,
+                            cameraPositionState = cameraPositionState,
+                            shouldAnimate = { !userTouchedMap }
+                        )
+                    }
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -388,7 +418,7 @@ fun MapScreen(
             onClick = { showPlacesList = true },
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(start = 12.dp, top = 132.dp)
+                .padding(start = 12.dp, top = listButtonTopPadding)
         ) {
             val countLabel = if (state.isPlaceCountCapped) {
                 stringResource(R.string.map_place_count_capped, state.places.size)
