@@ -24,12 +24,16 @@ import java.util.concurrent.ConcurrentHashMap
 
 private val globalCategoryCache = ConcurrentHashMap<PlaceCategory, BitmapDescriptor>()
 private val globalClusterCache = ConcurrentHashMap<String, BitmapDescriptor>()
+@Suppress("MagicNumber")
+private val mapClusterContainerColor = Color(0xFFFFB74D)
+@Suppress("MagicNumber")
+private val mapClusterContentColor = Color(0xFF3E2723)
 
 @Composable
 fun rememberMarkerIcons(): MarkerIconCache {
     val density = LocalDensity.current
-    val primaryColor = androidx.compose.material3.MaterialTheme.colorScheme.primary.toArgb()
-    val onPrimaryColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary.toArgb()
+    val clusterContainerColor = mapClusterContainerColor.toArgb()
+    val clusterContentColor = mapClusterContentColor.toArgb()
     val surfaceColor = androidx.compose.material3.MaterialTheme.colorScheme.surface.toArgb()
 
     val playgroundPainter = rememberVectorPainter(PlaceCategory.PLAYGROUND.style.icon)
@@ -50,10 +54,10 @@ fun rememberMarkerIcons(): MarkerIconCache {
         PlaceCategory.OTHER to otherPainter
     )
 
-    val cache = remember(density, primaryColor, onPrimaryColor, surfaceColor) {
+    val cache = remember(density, clusterContainerColor, clusterContentColor, surfaceColor) {
         globalCategoryCache.clear()
         globalClusterCache.clear()
-        MarkerIconCache(density, primaryColor, onPrimaryColor, surfaceColor)
+        MarkerIconCache(density, clusterContainerColor, clusterContentColor, surfaceColor)
     }
 
     LaunchedEffect(cache, painters) {
@@ -107,8 +111,8 @@ fun rememberMarkerIcons(): MarkerIconCache {
 
 class MarkerIconCache(
     private val density: Density,
-    private val primaryColor: Int,
-    private val onPrimaryColor: Int,
+    private val clusterContainerColor: Int,
+    private val clusterContentColor: Int,
     private val surfaceColor: Int
 ) {
     fun getCategoryIcon(category: PlaceCategory): BitmapDescriptor {
@@ -134,7 +138,7 @@ class MarkerIconCache(
         paint.color = 0x22000000
         canvas.drawCircle(center, center + with(density) { 1.dp.toPx() }, radius, paint)
 
-        paint.color = primaryColor
+        paint.color = clusterContainerColor
         paint.style = Paint.Style.FILL
         canvas.drawCircle(center, center, radius, paint)
 
@@ -144,7 +148,7 @@ class MarkerIconCache(
         canvas.drawCircle(center, center, radius, paint)
 
         paint.style = Paint.Style.FILL
-        paint.color = onPrimaryColor
+        paint.color = clusterContentColor
         paint.textSize = with(density) { 12.dp.toPx() }
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         paint.textAlign = Paint.Align.CENTER

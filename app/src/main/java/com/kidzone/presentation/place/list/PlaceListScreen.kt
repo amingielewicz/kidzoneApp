@@ -272,18 +272,30 @@ fun PlaceListScreen(
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         )
 
-        CategoryFilterBar(
-            selectedCategory = state.selectedCategory,
-            onCategorySelected = viewModel::onCategorySelect
-        )
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.medium,
+            tonalElevation = 4.dp,
+            shadowElevation = 4.dp
+        ) {
+            Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                CategoryFilterBar(
+                    selectedCategory = state.selectedCategory,
+                    onCategorySelected = viewModel::onCategorySelect
+                )
 
-        FilterAndSortBar(
-            advancedFiltersCount = advancedAmenitiesCount,
-            sortOrder = state.sortOrder,
-            currentUserSignedIn = state.currentUserId != null,
-            onOpenFilterSheet = { showFilterSheet = true },
-            onSortOrderChange = viewModel::onSortOrderChange
-        )
+                FilterAndSortBar(
+                    advancedFiltersCount = advancedAmenitiesCount,
+                    sortOrder = state.sortOrder,
+                    currentUserSignedIn = state.currentUserId != null,
+                    onOpenFilterSheet = { showFilterSheet = true },
+                    onSortOrderChange = viewModel::onSortOrderChange
+                )
+            }
+        }
 
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
@@ -528,7 +540,7 @@ private fun CategoryFilterBar(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         FilterChip(
@@ -575,7 +587,7 @@ private fun FilterAndSortBar(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+            .padding(horizontal = 8.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
