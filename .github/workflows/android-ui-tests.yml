@@ -100,8 +100,9 @@ jobs:
 
       - name: Upload test results
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ui-test-results-api${{ matrix.api-level }}
           path: app/build/reports/androidTests/
-          retention-days: 7
+          retention-days: 1

@@ -100,23 +100,26 @@ jobs:
 
       - name: Upload test results
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: test-results
           path: app/build/reports/tests/
-          retention-days: 7
+          retention-days: 1
 
       - name: Upload lint results
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: lint-results
           path: app/build/reports/lint-results-debug.html
-          retention-days: 7
+          retention-days: 1
 
       - name: Upload debug APK
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: debug-apk
           path: app/build/outputs/apk/debug/*.apk
-          retention-days: 7
+          retention-days: 1
