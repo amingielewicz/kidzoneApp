@@ -63,7 +63,10 @@ import com.kidzone.R
 import com.kidzone.navigation.Route
 import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.NoInternetBanner
+import com.kidzone.presentation.common.NotificationPromptReason
+import com.kidzone.presentation.common.NotificationSoftPromptDialog
 import com.kidzone.presentation.common.rememberNetworkStatus
+import com.kidzone.presentation.common.shouldShowNotificationPrompt
 import com.kidzone.presentation.home.HomeScreen
 import com.kidzone.presentation.map.MapScreen
 import com.kidzone.presentation.place.list.PlaceListScreen
@@ -117,6 +120,9 @@ fun MainScreen(
     val networkStatus by rememberNetworkStatus()
     var showHomeIntro by remember {
         mutableStateOf(!prefs.getBoolean(KEY_HOME_INTRO_USED, false))
+    }
+    var notificationPromptReason by remember {
+        mutableStateOf<NotificationPromptReason?>(null)
     }
     val showAddPlaceFab = currentRoute in setOf(
         Route.Home.path,
@@ -193,6 +199,9 @@ fun MainScreen(
                 restoreState = true
             }
             Toast.makeText(context, context.getString(R.string.place_added_success), Toast.LENGTH_SHORT).show()
+            if (shouldShowNotificationPrompt(context, NotificationPromptReason.FirstPlace)) {
+                notificationPromptReason = NotificationPromptReason.FirstPlace
+            }
             onFocusConsumed()
         }
     }
@@ -320,6 +329,13 @@ fun MainScreen(
                 }
             }
         }
+    }
+
+    notificationPromptReason?.let { reason ->
+        NotificationSoftPromptDialog(
+            reason = reason,
+            onDismiss = { notificationPromptReason = null }
+        )
     }
 }
 

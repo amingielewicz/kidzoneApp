@@ -89,10 +89,13 @@ import com.kidzone.i18n.AppLanguage
 import com.kidzone.presentation.common.BadgeRowItem
 import com.kidzone.presentation.common.BadgesRow
 import com.kidzone.presentation.common.KidZoneCard
+import com.kidzone.presentation.common.NotificationPromptReason
+import com.kidzone.presentation.common.NotificationSoftPromptDialog
 import com.kidzone.presentation.common.RankBadge
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.rememberHapticFeedback
 import com.kidzone.presentation.common.rememberReducedMotionEnabled
+import com.kidzone.presentation.common.shouldShowNotificationPrompt
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.utils.UiText
 import nl.dionsegijn.konfetti.compose.KonfettiView
@@ -108,6 +111,7 @@ private const val CONTACT_SUBJECT_MAX_LENGTH = 80
 private const val CONTACT_MESSAGE_MAX_LENGTH = 1000
 private const val CONTACT_SUBJECT_MIN_LENGTH = 3
 private const val CONTACT_MESSAGE_MIN_LENGTH = 10
+private const val NOTIFICATION_PROMPT_TOP_LIMIT = 10
 
 /**
  * Profil zalogowanego użytkownika.
@@ -129,8 +133,21 @@ fun ProfileScreen(
     val context = LocalContext.current
     val haptic = rememberHapticFeedback()
     val reducedMotionEnabled = rememberReducedMotionEnabled()
+    var notificationPromptReason by remember {
+        mutableStateOf<NotificationPromptReason?>(null)
+    }
     LaunchedEffect(ui.newlyEarnedBadges) {
         if (ui.newlyEarnedBadges.isNotEmpty()) haptic.reward()
+    }
+
+    LaunchedEffect(ui.userRank, ui.newlyEarnedBadges) {
+        val reason = notificationPromptReasonFor(
+            userRank = ui.userRank,
+            hasNewBadge = ui.newlyEarnedBadges.isNotEmpty()
+        )
+        if (reason != null && shouldShowNotificationPrompt(context, reason)) {
+            notificationPromptReason = reason
+        }
     }
 
     val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
@@ -295,6 +312,25 @@ fun ProfileScreen(
             onDismiss = viewModel::consumeNewlyEarnedBadge,
         )
     }
+
+    if (ui.newlyEarnedBadges.isEmpty()) {
+        notificationPromptReason?.let { reason ->
+            NotificationSoftPromptDialog(
+                reason = reason,
+                onDismiss = { notificationPromptReason = null }
+            )
+        }
+    }
+}
+
+private fun notificationPromptReasonFor(
+    userRank: Int?,
+    hasNewBadge: Boolean
+): NotificationPromptReason? = when {
+    userRank in 1..3 -> NotificationPromptReason.Podium
+    userRank in 4..NOTIFICATION_PROMPT_TOP_LIMIT -> NotificationPromptReason.Top10
+    hasNewBadge -> NotificationPromptReason.FirstBadge
+    else -> null
 }
 
 @Composable

@@ -300,6 +300,11 @@
     <string name="notification_permission_title">Włącz powiadomienia</string>
     <string name="notification_permission_message">Bądź na bieżąco z nowościami w kidZone!</string>
     <string name="enable">Włącz</string>
+    <string name="enable_notifications">Włącz powiadomienia</string>
+    <string name="notification_prompt_first_place">Super, że dodałeś miejsce! Włącz powiadomienia, aby widzieć, kiedy inni dodadzą do niego zdjęcia lub opinię.</string>
+    <string name="notification_prompt_first_badge">Gratulacje, masz pierwszą odznakę! Włącz powiadomienia, aby nie przegapić kolejnych osiągnięć w kidZone.</string>
+    <string name="notification_prompt_top10">Jesteś w TOP 10! Włącz powiadomienia, aby wiedzieć, kiedy wskoczysz na podium albo utrzymasz miejsce w rankingu.</string>
+    <string name="notification_prompt_podium">Wskoczyłeś na podium! Włącz powiadomienia, aby śledzić swoje miejsce w rankingu.</string>
     <string name="location_permission_title">Udostępnij lokalizację</string>
     <string name="location_permission_message">Pokażemy miejsca blisko Ciebie, odległości na Start i wygodniej wycentrujemy mapę.</string>
     <string name="later">Później</string>

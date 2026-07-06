@@ -300,6 +300,11 @@
     <string name="notification_permission_title">Enable notifications</string>
     <string name="notification_permission_message">Stay up to date with what\'s new in kidZone!</string>
     <string name="enable">Enable</string>
+    <string name="enable_notifications">Enable notifications</string>
+    <string name="notification_prompt_first_place">Nice, you added a place! Enable notifications to see when others add photos or reviews to it.</string>
+    <string name="notification_prompt_first_badge">Congrats, you earned your first badge! Enable notifications so you don\'t miss your next kidZone achievements.</string>
+    <string name="notification_prompt_top10">You\'re in the TOP 10! Enable notifications to know when you reach the podium or keep your ranking position.</string>
+    <string name="notification_prompt_podium">You reached the podium! Enable notifications to follow your ranking position.</string>
     <string name="location_permission_title">Share location</string>
     <string name="location_permission_message">We\'ll show you places near you, distances on Home, and center the map more conveniently.</string>
     <string name="later">Later</string>
