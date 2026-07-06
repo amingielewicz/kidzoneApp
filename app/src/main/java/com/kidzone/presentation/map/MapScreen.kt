@@ -30,6 +30,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.GpsOff
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
@@ -354,12 +355,19 @@ fun MapScreen(
                     Text(stringResource(R.string.map_list_button, countLabel))
                 }
                 MapMyLocationButton(
+                    isLocationAvailable = locationPermissionGranted && gpsEnabled,
                     onClick = {
-                        if (locationPermissionGranted) {
-                            userTouchedMap = false
-                            scope.launch { recenterOnUser(context, cameraPositionState) }
-                        } else {
-                            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                        when {
+                            !locationPermissionGranted -> {
+                                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                            }
+                            !gpsEnabled -> {
+                                context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                            }
+                            else -> {
+                                userTouchedMap = false
+                                scope.launch { recenterOnUser(context, cameraPositionState) }
+                            }
                         }
                     },
                     modifier = Modifier.padding(end = 4.dp)
@@ -1077,7 +1085,9 @@ private fun MapIconButton(
 }
 
 @Composable
+@Suppress("FunctionNaming")
 private fun MapMyLocationButton(
+    isLocationAvailable: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1086,14 +1096,22 @@ private fun MapMyLocationButton(
         modifier = modifier.size(48.dp),
         shape = CircleShape,
         containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.primary,
+        contentColor = if (isLocationAvailable) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
         elevation = FloatingActionButtonDefaults.elevation(
             defaultElevation = 4.dp,
             pressedElevation = 8.dp
         )
     ) {
         Icon(
-            imageVector = Icons.Filled.MyLocation,
+            imageVector = if (isLocationAvailable) {
+                Icons.Filled.MyLocation
+            } else {
+                Icons.Filled.GpsOff
+            },
             contentDescription = stringResource(R.string.map_my_location),
             modifier = Modifier.size(22.dp)
         )
