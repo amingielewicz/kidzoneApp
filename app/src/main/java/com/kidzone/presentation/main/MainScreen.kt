@@ -53,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -80,6 +81,14 @@ import com.kidzone.presentation.map.MapScreen
 import com.kidzone.presentation.place.list.PlaceListScreen
 import com.kidzone.presentation.profile.ProfileScreen
 import com.kidzone.presentation.ranking.RankingScreen
+
+@Suppress("MagicNumber")
+private val NotificationBannerContainer = Color(0xFFFFF3E0)
+@Suppress("MagicNumber")
+private val NotificationBannerContent = Color(0xFF4E342E)
+@Suppress("MagicNumber")
+private val NotificationBannerButtonContainer = Color(0xFFF57C00)
+private val NotificationBannerButtonContent = Color.White
 
 /**
  * Główny shell aplikacji po zalogowaniu – zawiera własny [NavHost]
@@ -284,7 +293,13 @@ fun MainScreen(
                     rationale = PermissionRationale(
                         title = stringResource(R.string.notification_permission_title),
                         message = stringResource(R.string.notification_permission_message),
-                        primaryActionLabel = stringResource(R.string.enable)
+                        primaryActionLabel = stringResource(R.string.enable),
+                        colors = PermissionRationaleColors(
+                            container = NotificationBannerContainer,
+                            content = NotificationBannerContent,
+                            primaryActionContainer = NotificationBannerButtonContainer,
+                            primaryActionContent = NotificationBannerButtonContent
+                        )
                     ),
                     onPrimaryAction = {
                         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -381,7 +396,15 @@ private enum class BottomTab(
 private data class PermissionRationale(
     val title: String,
     val message: String,
-    val primaryActionLabel: String
+    val primaryActionLabel: String,
+    val colors: PermissionRationaleColors? = null
+)
+
+private data class PermissionRationaleColors(
+    val container: Color,
+    val content: Color,
+    val primaryActionContainer: Color,
+    val primaryActionContent: Color
 )
 
 @Suppress("FunctionNaming")
@@ -392,11 +415,17 @@ private fun PermissionRationaleBanner(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = rationale.colors ?: PermissionRationaleColors(
+        container = MaterialTheme.colorScheme.secondaryContainer,
+        content = MaterialTheme.colorScheme.onSecondaryContainer,
+        primaryActionContainer = MaterialTheme.colorScheme.primary,
+        primaryActionContent = MaterialTheme.colorScheme.onPrimary
+    )
     Surface(
         modifier = modifier.semantics {
             liveRegion = LiveRegionMode.Polite
         },
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        color = colors.container,
         tonalElevation = 2.dp
     ) {
         Column(
@@ -406,13 +435,13 @@ private fun PermissionRationaleBanner(
             Text(
                 text = rationale.title,
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = colors.content,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
                 text = rationale.message,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                color = colors.content
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -422,13 +451,19 @@ private fun PermissionRationaleBanner(
                 TextButton(
                     onClick = onDismiss,
                     colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        contentColor = colors.content
                     )
                 ) {
                     Text(stringResource(R.string.later))
                 }
                 Spacer(Modifier.width(8.dp))
-                Button(onClick = onPrimaryAction) {
+                Button(
+                    onClick = onPrimaryAction,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colors.primaryActionContainer,
+                        contentColor = colors.primaryActionContent
+                    )
+                ) {
                     Text(rationale.primaryActionLabel)
                 }
             }
