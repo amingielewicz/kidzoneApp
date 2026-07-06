@@ -362,24 +362,47 @@ fun MapScreen(
                     }
                     Text(stringResource(R.string.map_list_button, countLabel))
                 }
-                MapMyLocationButton(
-                    isLocationAvailable = locationPermissionGranted && gpsEnabled,
-                    onClick = {
-                        when {
-                            !locationPermissionGranted -> {
-                                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                            }
-                            !gpsEnabled -> {
-                                context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-                            }
-                            else -> {
-                                userTouchedMap = false
-                                scope.launch { recenterOnUser(context, cameraPositionState) }
+                Column(
+                    modifier = Modifier.padding(end = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.End
+                ) {
+                    MapMyLocationButton(
+                        isLocationAvailable = locationPermissionGranted && gpsEnabled,
+                        onClick = {
+                            when {
+                                !locationPermissionGranted -> {
+                                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                                }
+                                !gpsEnabled -> {
+                                    context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                                }
+                                else -> {
+                                    userTouchedMap = false
+                                    scope.launch { recenterOnUser(context, cameraPositionState) }
+                                }
                             }
                         }
-                    },
-                    modifier = Modifier.padding(end = 4.dp)
-                )
+                    )
+                    MapIconButton(
+                        icon = Icons.Filled.Add,
+                        contentDescription = stringResource(R.string.map_zoom_in),
+                        onClick = {
+                            scope.launch {
+                                cameraPositionState.animate(CameraUpdateFactory.zoomIn())
+                            }
+                        }
+                    )
+                    MapIconButton(
+                        icon = Icons.Filled.Remove,
+                        contentDescription = stringResource(R.string.map_zoom_out),
+                        onClick = {
+                            scope.launch {
+                                cameraPositionState.animate(CameraUpdateFactory.zoomOut())
+                            }
+                        }
+                    )
+                }
             }
         }
 
@@ -408,33 +431,6 @@ fun MapScreen(
                     )
                 }
             }
-        }
-
-        // Customowe przyciski zoom +/- na stałej, dobrej wysokości (180dp)
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 12.dp, bottom = 180.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            MapIconButton(
-                icon = Icons.Filled.Add,
-                contentDescription = stringResource(R.string.map_zoom_in),
-                onClick = {
-                    scope.launch {
-                        cameraPositionState.animate(CameraUpdateFactory.zoomIn())
-                    }
-                }
-            )
-            MapIconButton(
-                icon = Icons.Filled.Remove,
-                contentDescription = stringResource(R.string.map_zoom_out),
-                onClick = {
-                    scope.launch {
-                        cameraPositionState.animate(CameraUpdateFactory.zoomOut())
-                    }
-                }
-            )
         }
 
         state.errorMessage?.let { msg ->
