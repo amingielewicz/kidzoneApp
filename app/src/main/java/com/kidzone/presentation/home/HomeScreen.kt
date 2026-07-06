@@ -23,19 +23,20 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -55,6 +56,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -64,8 +66,6 @@ import com.kidzone.R
 import com.kidzone.domain.model.Place
 import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
-import com.kidzone.presentation.common.GpsAcquiringBanner
-import com.kidzone.presentation.common.GpsDisabledBanner
 import com.kidzone.presentation.common.KidZoneCard
 import com.kidzone.presentation.common.KidZoneRadii
 import com.kidzone.presentation.common.KidZoneSpacing
@@ -109,11 +109,10 @@ fun HomeScreen(
     val gpsEnabled = rememberLocationServiceEnabled()
     val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
 
-    // Auto-refresh po przywróceniu internetu
     var previousNetworkStatus by remember { mutableStateOf(networkStatus) }
     LaunchedEffect(networkStatus) {
-        if (previousNetworkStatus == com.kidzone.presentation.common.NetworkStatus.UNAVAILABLE
-            && networkStatus == com.kidzone.presentation.common.NetworkStatus.AVAILABLE
+        if (previousNetworkStatus == com.kidzone.presentation.common.NetworkStatus.UNAVAILABLE &&
+            networkStatus == com.kidzone.presentation.common.NetworkStatus.AVAILABLE
         ) {
             viewModel.refresh()
         }
@@ -162,19 +161,29 @@ fun HomeScreen(
                 if (showIntro) {
                     item {
                         WelcomeIntroCard(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp),
                             onClick = onOpenMap
                         )
                     }
                 }
 
-                item {
-                    SectionHeader(
-                        title = stringResource(R.string.home_nearby_places),
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
+                if (!state.locationGranted) {
+                    item {
+                        HomeLocationEmptyState(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            onEnableLocationClick = onOpenMap,
+                            onManualCityClick = onOpenMap
+                        )
+                    }
                 }
+
                 if (state.locationGranted) {
+                    item {
+                        SectionHeader(
+                            title = stringResource(R.string.home_nearby_places),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
                     item {
                         HorizontalPlacesRow(
                             items = state.nearbyPlaces.map {
@@ -187,15 +196,13 @@ fun HomeScreen(
                             keyPrefix = "nearby"
                         )
                     }
-                }
 
-                item {
-                    SectionHeader(
-                        title = stringResource(R.string.home_top_places),
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-                }
-                if (state.locationGranted) {
+                    item {
+                        SectionHeader(
+                            title = stringResource(R.string.home_top_places),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
                     item {
                         HorizontalPlacesRow(
                             items = state.topPlaces.map {
@@ -208,9 +215,7 @@ fun HomeScreen(
                             keyPrefix = "top"
                         )
                     }
-                }
 
-                if (state.locationGranted) {
                     item {
                         SectionHeader(
                             title = stringResource(R.string.home_recent_nearby_places),
@@ -253,7 +258,7 @@ private fun WelcomeIntroCard(
     onClick: () -> Unit
 ) {
     val desc = stringResource(R.string.home_find_nearby_description)
-    val label = stringResource(R.string.home_find_nearby)
+    val label = stringResource(R.string.home_enable_location)
 
     Card(
         modifier = modifier
@@ -310,16 +315,82 @@ private fun WelcomeIntroCard(
                     contentColor = MaterialTheme.colorScheme.onSecondary
                 )
             ) {
+                Icon(
+                    imageVector = Icons.Filled.MyLocation,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold
                 )
-                Spacer(Modifier.width(8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun HomeLocationEmptyState(
+    modifier: Modifier = Modifier,
+    onEnableLocationClick: () -> Unit,
+    onManualCityClick: () -> Unit
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(KidZoneRadii.Card),
+        color = MaterialTheme.colorScheme.surfaceContainerLow
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)),
+                contentAlignment = Alignment.Center
+            ) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = stringResource(R.string.home_go_to_map),
+                    imageVector = Icons.Filled.Map,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                    modifier = Modifier.size(52.dp)
+                )
+            }
+            Text(
+                text = stringResource(R.string.home_location_rationale),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Button(
+                onClick = onEnableLocationClick,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.MyLocation,
+                    contentDescription = null,
                     modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.home_enable_location))
+            }
+            TextButton(onClick = onManualCityClick) {
+                Text(
+                    text = stringResource(R.string.home_manual_city_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
                 )
             }
         }
