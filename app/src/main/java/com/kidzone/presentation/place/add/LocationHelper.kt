@@ -18,7 +18,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
 /**
  * Maks. czas oczekiwania na fix GPS / fused location (ms).
@@ -94,32 +93,48 @@ suspend fun fetchCurrentLocation(context: Context): Pair<Double, Double>? {
     // Sprawdzenie czy usługa lokalizacji jest włączona — bez tego
     // FusedLocationClient i tak zwróci timeout, ale komunikat będzie
     // jaśniejszy ("Lokalizacja wyłączona" zamiast "Problem z ustaleniem").
-    if (!isLocationServiceEnabled(context)) return null
+    if (!hasLocationPermission(context) || !isLocationServiceEnabled(context)) return null
 
     return withTimeoutOrNull(LOCATION_TIMEOUT_MS) {
         suspendCancellableCoroutine<Pair<Double, Double>?> { cont ->
             val client = LocationServices.getFusedLocationProviderClient(context)
             val cts = CancellationTokenSource()
 
-            client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
-                .addOnSuccessListener { location ->
-                    if (location != null) {
-                        cont.resume(location.latitude to location.longitude)
-                    } else {
-                        client.lastLocation.addOnSuccessListener { lastLoc ->
-                            cont.resume(lastLoc?.let { it.latitude to it.longitude })
-                        }.addOnFailureListener {
-                            cont.resume(null)
+            fun resumeLocation(location: Pair<Double, Double>?) {
+                if (cont.isActive) {
+                    cont.resume(location)
+                }
+            }
+
+            fun fetchLastLocation() {
+                runCatching {
+                    client.lastLocation
+                        .addOnSuccessListener { lastLoc ->
+                            resumeLocation(lastLoc?.let { it.latitude to it.longitude })
+                        }
+                        .addOnFailureListener {
+                            resumeLocation(null)
+                        }
+                }.onFailure {
+                    resumeLocation(null)
+                }
+            }
+
+            runCatching {
+                client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+                    .addOnSuccessListener { location ->
+                        if (location != null) {
+                            resumeLocation(location.latitude to location.longitude)
+                        } else {
+                            fetchLastLocation()
                         }
                     }
-                }
-                .addOnFailureListener { e ->
-                    client.lastLocation.addOnSuccessListener { lastLoc ->
-                        cont.resume(lastLoc?.let { it.latitude to it.longitude })
-                    }.addOnFailureListener {
-                        cont.resumeWithException(e)
+                    .addOnFailureListener {
+                        fetchLastLocation()
                     }
-                }
+            }.onFailure {
+                resumeLocation(null)
+            }
 
             cont.invokeOnCancellation { cts.cancel() }
         }

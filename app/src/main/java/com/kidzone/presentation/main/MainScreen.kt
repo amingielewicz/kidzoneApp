@@ -89,6 +89,13 @@ private val NotificationBannerContent = Color(0xFF4E342E)
 @Suppress("MagicNumber")
 private val NotificationBannerButtonContainer = Color(0xFFF57C00)
 private val NotificationBannerButtonContent = Color.White
+@Suppress("MagicNumber")
+private val LocationBannerContainer = Color(0xFFF3E5F5)
+@Suppress("MagicNumber")
+private val LocationBannerContent = Color(0xFF4A148C)
+@Suppress("MagicNumber")
+private val LocationBannerButtonContainer = Color(0xFF8E24AA)
+private val LocationBannerButtonContent = Color.White
 
 /**
  * Główny shell aplikacji po zalogowaniu – zawiera własny [NavHost]
@@ -159,7 +166,7 @@ fun MainScreen(
     }
 
     val showNotificationRationale = !notificationPermissionGranted && !notificationRationaleDismissed
-    val showLocationRationale = !showNotificationRationale &&
+    val showLocationRationale = currentRoute != Route.Map.path &&
         !locationPermissionGranted &&
         !locationRationaleDismissed
 
@@ -313,7 +320,13 @@ fun MainScreen(
                     rationale = PermissionRationale(
                         title = stringResource(R.string.location_permission_title),
                         message = stringResource(R.string.location_permission_message),
-                        primaryActionLabel = stringResource(R.string.allow)
+                        primaryActionLabel = stringResource(R.string.allow),
+                        colors = PermissionRationaleColors(
+                            container = LocationBannerContainer,
+                            content = LocationBannerContent,
+                            primaryActionContainer = LocationBannerButtonContainer,
+                            primaryActionContent = LocationBannerButtonContent
+                        )
                     ),
                     onPrimaryAction = {
                         locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
