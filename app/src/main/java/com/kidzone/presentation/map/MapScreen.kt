@@ -65,6 +65,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -132,6 +133,13 @@ private const val SPIDERFY_RADIUS_DEGREES = 0.00012
 private const val SPIDERFY_RADIUS_STEP_DEGREES = 0.000015
 private const val SPIDERFY_MAX_EXTRA = 8
 private val MAP_TOP_OVERLAY_SPACING = 8.dp
+@Suppress("MagicNumber")
+private val LocationPermissionBannerContainer = Color(0xFFF3E5F5)
+@Suppress("MagicNumber")
+private val LocationPermissionBannerContent = Color(0xFF4A148C)
+@Suppress("MagicNumber")
+private val LocationPermissionButtonContainer = Color(0xFF8E24AA)
+private val LocationPermissionButtonContent = Color.White
 
 @SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class)
@@ -660,7 +668,7 @@ private fun LocationPermissionBanner(
         modifier = modifier.semantics {
             liveRegion = LiveRegionMode.Polite
         },
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        color = LocationPermissionBannerContainer,
         tonalElevation = 2.dp
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -668,14 +676,14 @@ private fun LocationPermissionBanner(
                 Icon(
                     imageVector = Icons.Filled.MyLocation,
                     contentDescription = "Lokalizacja",
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    tint = LocationPermissionBannerContent,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = stringResource(R.string.map_location_banner_text),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    color = LocationPermissionBannerContent,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -688,14 +696,18 @@ private fun LocationPermissionBanner(
                     onClick = onOpenSettingsClick,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        contentColor = LocationPermissionBannerContent
                     )
                 ) {
                     Text(stringResource(R.string.settings))
                 }
                 Button(
                     onClick = onAllowClick,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = LocationPermissionButtonContainer,
+                        contentColor = LocationPermissionButtonContent
+                    )
                 ) {
                     Text(stringResource(R.string.allow))
                 }
