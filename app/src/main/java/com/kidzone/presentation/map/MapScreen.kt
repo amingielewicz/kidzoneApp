@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,12 +30,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.GpsOff
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -64,6 +65,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -131,6 +133,13 @@ private const val SPIDERFY_RADIUS_DEGREES = 0.00012
 private const val SPIDERFY_RADIUS_STEP_DEGREES = 0.000015
 private const val SPIDERFY_MAX_EXTRA = 8
 private val MAP_TOP_OVERLAY_SPACING = 8.dp
+@Suppress("MagicNumber")
+private val LocationPermissionBannerContainer = Color(0xFFF3E5F5)
+@Suppress("MagicNumber")
+private val LocationPermissionBannerContent = Color(0xFF4A148C)
+@Suppress("MagicNumber")
+private val LocationPermissionButtonContainer = Color(0xFF8E24AA)
+private val LocationPermissionButtonContent = Color.White
 
 @SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class)
@@ -303,8 +312,7 @@ fun MapScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .padding(8.dp),
+                .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(MAP_TOP_OVERLAY_SPACING)
         ) {
             if (!locationPermissionGranted) {
@@ -332,18 +340,69 @@ fun MapScreen(
                 onCategorySelected = viewModel::onCategorySelect,
                 onToggleTopRated = viewModel::toggleTopRated,
                 onToggleAddedByMe = viewModel::toggleAddedByMe,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
             )
-            Button(
-                onClick = { showPlacesList = true },
-                modifier = Modifier.padding(start = 4.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                val countLabel = if (state.isPlaceCountCapped) {
-                    stringResource(R.string.map_place_count_capped, state.places.size)
-                } else {
-                    state.places.size.toString()
+                Button(
+                    onClick = { showPlacesList = true },
+                    modifier = Modifier.padding(start = 4.dp)
+                ) {
+                    val countLabel = if (state.isPlaceCountCapped) {
+                        stringResource(R.string.map_place_count_capped, state.places.size)
+                    } else {
+                        state.places.size.toString()
+                    }
+                    Text(stringResource(R.string.map_list_button, countLabel))
                 }
-                Text(stringResource(R.string.map_list_button, countLabel))
+                Column(
+                    modifier = Modifier.padding(end = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.End
+                ) {
+                    MapMyLocationButton(
+                        isLocationAvailable = locationPermissionGranted && gpsEnabled,
+                        onClick = {
+                            when {
+                                !locationPermissionGranted -> {
+                                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                                }
+                                !gpsEnabled -> {
+                                    context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                                }
+                                else -> {
+                                    userTouchedMap = false
+                                    scope.launch { recenterOnUser(context, cameraPositionState) }
+                                }
+                            }
+                        }
+                    )
+                    MapIconButton(
+                        icon = Icons.Filled.Add,
+                        contentDescription = stringResource(R.string.map_zoom_in),
+                        onClick = {
+                            scope.launch {
+                                cameraPositionState.animate(CameraUpdateFactory.zoomIn())
+                            }
+                        }
+                    )
+                    MapIconButton(
+                        icon = Icons.Filled.Remove,
+                        contentDescription = stringResource(R.string.map_zoom_out),
+                        onClick = {
+                            scope.launch {
+                                cameraPositionState.animate(CameraUpdateFactory.zoomOut())
+                            }
+                        }
+                    )
+                }
             }
         }
 
@@ -372,48 +431,6 @@ fun MapScreen(
                     )
                 }
             }
-        }
-
-        MapMyLocationButton(
-            onClick = {
-                if (locationPermissionGranted) {
-                    userTouchedMap = false
-                    scope.launch { recenterOnUser(context, cameraPositionState) }
-                } else {
-                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                }
-            },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 8.dp, end = 8.dp)
-                .offset(y = 160.dp)
-        )
-
-        // Customowe przyciski zoom +/- na stałej, dobrej wysokości (180dp)
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 12.dp, bottom = 180.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            MapIconButton(
-                icon = Icons.Filled.Add,
-                contentDescription = stringResource(R.string.map_zoom_in),
-                onClick = {
-                    scope.launch {
-                        cameraPositionState.animate(CameraUpdateFactory.zoomIn())
-                    }
-                }
-            )
-            MapIconButton(
-                icon = Icons.Filled.Remove,
-                contentDescription = stringResource(R.string.map_zoom_out),
-                onClick = {
-                    scope.launch {
-                        cameraPositionState.animate(CameraUpdateFactory.zoomOut())
-                    }
-                }
-            )
         }
 
         state.errorMessage?.let { msg ->
@@ -647,24 +664,22 @@ private fun LocationPermissionBanner(
         modifier = modifier.semantics {
             liveRegion = LiveRegionMode.Polite
         },
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        shape = MaterialTheme.shapes.medium,
-        tonalElevation = 4.dp,
-        shadowElevation = 4.dp
+        color = LocationPermissionBannerContainer,
+        tonalElevation = 2.dp
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.MyLocation,
                     contentDescription = "Lokalizacja",
-                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                    tint = LocationPermissionBannerContent,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = stringResource(R.string.map_location_banner_text),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    color = LocationPermissionBannerContent,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -675,13 +690,20 @@ private fun LocationPermissionBanner(
             ) {
                 TextButton(
                     onClick = onOpenSettingsClick,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = LocationPermissionBannerContent
+                    )
                 ) {
                     Text(stringResource(R.string.settings))
                 }
                 Button(
                     onClick = onAllowClick,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = LocationPermissionButtonContainer,
+                        contentColor = LocationPermissionButtonContent
+                    )
                 ) {
                     Text(stringResource(R.string.allow))
                 }
@@ -1071,7 +1093,9 @@ private fun MapIconButton(
 }
 
 @Composable
+@Suppress("FunctionNaming")
 private fun MapMyLocationButton(
+    isLocationAvailable: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1080,14 +1104,22 @@ private fun MapMyLocationButton(
         modifier = modifier.size(48.dp),
         shape = CircleShape,
         containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.primary,
+        contentColor = if (isLocationAvailable) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
         elevation = FloatingActionButtonDefaults.elevation(
             defaultElevation = 4.dp,
             pressedElevation = 8.dp
         )
     ) {
         Icon(
-            imageVector = Icons.Filled.MyLocation,
+            imageVector = if (isLocationAvailable) {
+                Icons.Filled.MyLocation
+            } else {
+                Icons.Filled.GpsOff
+            },
             contentDescription = stringResource(R.string.map_my_location),
             modifier = Modifier.size(22.dp)
         )
