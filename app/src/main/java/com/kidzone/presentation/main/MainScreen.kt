@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.AnimatedVisibility
@@ -124,15 +126,19 @@ fun MainScreen(
     var notificationPromptReason by remember {
         mutableStateOf<NotificationPromptReason?>(null)
     }
+    var locationPermissionGranted by remember {
+        mutableStateOf(hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION))
+    }
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        locationPermissionGranted = granted
+    }
     val showAddPlaceFab = currentRoute in setOf(
         Route.Home.path,
         Route.Map.path,
         Route.PlaceList.path
     )
-
-    val locationPermissionGranted by remember {
-        mutableStateOf(hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION))
-    }
 
     // Lokalny stan przekazywany dalej do MapScreen. Trzymamy go obok sygnału
     // z parent NavGraph, bo `onFocusConsumed()` od razu wyczyści savedStateHandle,
@@ -145,6 +151,15 @@ fun MainScreen(
         if (showHomeIntro) {
             showHomeIntro = false
             prefs.edit().putBoolean(KEY_HOME_INTRO_USED, true).apply()
+        }
+    }
+
+    fun requestLocationFromHome() {
+        markHomeIntroUsed()
+        if (hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
+            locationPermissionGranted = true
+        } else {
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
@@ -289,6 +304,7 @@ fun MainScreen(
                     HomeScreen(
                         onOpenPlaceDetails = onOpenPlaceDetails,
                         onOpenMap = ::openMapFromHome,
+                        onRequestLocation = ::requestLocationFromHome,
                         showIntro = showHomeIntro,
                         locationPermissionGranted = locationPermissionGranted,
                         sharedTransitionScope = sharedTransitionScope,

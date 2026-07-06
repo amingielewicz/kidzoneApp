@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -49,7 +48,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -78,6 +76,7 @@ private val PLACE_ROW_HEIGHT = 164.dp
 private val PLACE_CARD_WIDTH = 176.dp
 private val PLACE_CARD_ICON_SIZE = 30.dp
 private val PLACE_CARD_CONTENT_PADDING = 12.dp
+private const val MANUAL_CITY_HINT = "Nie chcesz używać GPS? Kliknij tutaj, aby wybrać miasto ręcznie"
 
 private data class HomePlaceItem(
     val place: Place,
@@ -99,6 +98,7 @@ private data class PlaceCardAnimation(
 fun HomeScreen(
     onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
     onOpenMap: () -> Unit,
+    onRequestLocation: () -> Unit,
     showIntro: Boolean = true,
     locationPermissionGranted: Boolean = false,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -108,6 +108,7 @@ fun HomeScreen(
     val state by viewModel.uiState.collectAsState()
     val gpsEnabled = rememberLocationServiceEnabled()
     val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
+    val hasLocationContext = locationPermissionGranted || state.locationGranted
 
     var previousNetworkStatus by remember { mutableStateOf(networkStatus) }
     LaunchedEffect(networkStatus) {
@@ -162,22 +163,22 @@ fun HomeScreen(
                     item {
                         WelcomeIntroCard(
                             modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp),
-                            onClick = onOpenMap
+                            onClick = onRequestLocation
                         )
                     }
                 }
 
-                if (!state.locationGranted) {
+                if (!hasLocationContext) {
                     item {
                         HomeLocationEmptyState(
                             modifier = Modifier.padding(horizontal = 16.dp),
-                            onEnableLocationClick = onOpenMap,
+                            onEnableLocationClick = onRequestLocation,
                             onManualCityClick = onOpenMap
                         )
                     }
                 }
 
-                if (state.locationGranted) {
+                if (hasLocationContext) {
                     item {
                         SectionHeader(
                             title = stringResource(R.string.home_nearby_places),
@@ -285,12 +286,20 @@ private fun WelcomeIntroCard(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.LocationOn,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
-                )
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Filled.LocationOn,
+                            contentDescription = null,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -316,7 +325,7 @@ private fun WelcomeIntroCard(
                 )
             ) {
                 Icon(
-                    imageVector = Icons.Filled.MyLocation,
+                    imageVector = Icons.Filled.LocationOn,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
@@ -352,16 +361,25 @@ private fun HomeLocationEmptyState(
         ) {
             Box(
                 modifier = Modifier
-                    .size(96.dp)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)),
+                    .size(104.dp)
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Map,
+                    imageVector = Icons.Filled.LocationOn,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                    modifier = Modifier.size(52.dp)
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(58.dp)
+                )
+                Icon(
+                    imageVector = Icons.Filled.MyLocation,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(14.dp)
+                        .size(22.dp)
                 )
             }
             Text(
@@ -378,7 +396,7 @@ private fun HomeLocationEmptyState(
                 )
             ) {
                 Icon(
-                    imageVector = Icons.Filled.MyLocation,
+                    imageVector = Icons.Filled.LocationOn,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
@@ -387,7 +405,7 @@ private fun HomeLocationEmptyState(
             }
             TextButton(onClick = onManualCityClick) {
                 Text(
-                    text = stringResource(R.string.home_manual_city_hint),
+                    text = MANUAL_CITY_HINT,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
