@@ -255,14 +255,8 @@ fun PlaceListScreen(
 
     // Liczba aktywnych filtrów udogodnień w sheecie.
     val advancedAmenitiesCount = state.selectedAmenities.size
-    val gpsEnabled = rememberLocationServiceEnabled()
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Banner informujący o wyłączonej lokalizacji - na samej górze
-        if (!gpsEnabled && hasLocationPermission(context)) {
-            GpsDisabledBanner()
-        }
-
         // Wyszukiwarka po nazwie miejsca
         SearchBar(
             query = state.searchQuery,
@@ -783,6 +777,7 @@ private fun PlaceCard(
                         text = place.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -832,7 +827,7 @@ private fun PlaceCard(
                     Text(
                         text = place.address,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
                         maxLines = 2,
                         modifier = Modifier.weight(1f)
                     )

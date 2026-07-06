@@ -29,6 +29,8 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,7 +48,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
@@ -98,6 +99,7 @@ private data class PlaceCardAnimation(
 fun HomeScreen(
     onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
     onOpenMap: () -> Unit,
+    showIntro: Boolean = true,
     locationPermissionGranted: Boolean = false,
     viewModel: HomeViewModel = hiltViewModel(),
     sharedTransitionScope: SharedTransitionScope? = null,
@@ -149,13 +151,6 @@ fun HomeScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (state.locationGranted && !gpsEnabled) {
-                GpsDisabledBanner()
-            }
-            if (state.isAcquiringLocation) {
-                GpsAcquiringBanner()
-            }
-
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -164,13 +159,13 @@ fun HomeScreen(
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                item { HeroSection() }
-
-                item {
-                    OpenMapCta(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        onClick = onOpenMap
-                    )
+                if (showIntro) {
+                    item {
+                        WelcomeIntroCard(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            onClick = onOpenMap
+                        )
+                    }
                 }
 
                 item {
@@ -252,51 +247,13 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HeroSection() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 0.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .heightIn(min = 88.dp)
-            .background(
-                brush = Brush.verticalGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.primary,
-                        MaterialTheme.colorScheme.primaryContainer
-                    )
-                )
-            )
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(0.88f)
-        ) {
-            Text(
-                text = stringResource(R.string.home_welcome),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onPrimary,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = stringResource(R.string.app_tagline),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onPrimary
-            )
-        }
-    }
-}
-
-@Composable
-private fun OpenMapCta(
+@Suppress("FunctionNaming", "LongMethod")
+private fun WelcomeIntroCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val desc = stringResource(R.string.home_open_map_description)
-    val label = stringResource(R.string.home_open_map)
+    val desc = stringResource(R.string.home_find_nearby_description)
+    val label = stringResource(R.string.home_find_nearby)
 
     Card(
         modifier = modifier
@@ -310,38 +267,61 @@ private fun OpenMapCta(
                 onClick = onClick
             ),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface
         ),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(
-                imageVector = Icons.Filled.Map,
-                contentDescription = label,
-                modifier = Modifier.size(32.dp)
-            )
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.LocationOn,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.home_intro_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = stringResource(R.string.app_tagline),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Button(
+                onClick = onClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary
+                )
+            ) {
                 Text(
-                    text = stringResource(R.string.home_open_map),
-                    style = MaterialTheme.typography.titleMedium,
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold
                 )
-                Text(
-                    text = stringResource(R.string.home_open_map_subtitle),
-                    style = MaterialTheme.typography.bodySmall
+                Spacer(Modifier.width(8.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = stringResource(R.string.home_go_to_map),
+                    modifier = Modifier.size(18.dp)
                 )
             }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = stringResource(R.string.home_go_to_map)
-            )
         }
     }
 }

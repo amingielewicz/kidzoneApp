@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.GpsOff
@@ -134,12 +135,9 @@ private const val SPIDERFY_RADIUS_STEP_DEGREES = 0.000015
 private const val SPIDERFY_MAX_EXTRA = 8
 private val MAP_TOP_OVERLAY_SPACING = 8.dp
 @Suppress("MagicNumber")
-private val LocationPermissionBannerContainer = Color(0xFFF3E5F5)
+private val MapFilterSelectedContainer = Color(0xFFE0F7FA)
 @Suppress("MagicNumber")
-private val LocationPermissionBannerContent = Color(0xFF4A148C)
-@Suppress("MagicNumber")
-private val LocationPermissionButtonContainer = Color(0xFF8E24AA)
-private val LocationPermissionButtonContent = Color.White
+private val MapFilterSelectedContent = Color(0xFF006064)
 
 @SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class)
@@ -315,31 +313,25 @@ fun MapScreen(
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(MAP_TOP_OVERLAY_SPACING)
         ) {
-            if (!locationPermissionGranted) {
-                LocationPermissionBanner(
-                    onAllowClick = {
-                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                    },
-                    onOpenSettingsClick = {
-                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = Uri.fromParts("package", context.packageName, null)
-                        }
-                        context.startActivity(intent)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            if (locationPermissionGranted && !gpsEnabled) {
-                GpsDisabledBanner(modifier = Modifier.fillMaxWidth())
-            }
             FiltersOverlay(
                 selectedCategory = state.selectedCategory,
                 topRatedOnly = state.topRatedOnly,
                 addedByMeOnly = state.addedByMeOnly,
+                isLocationAvailable = locationPermissionGranted && gpsEnabled,
                 showAddedByMeChip = true, // Simplified check
                 onCategorySelected = viewModel::onCategorySelect,
                 onToggleTopRated = viewModel::toggleTopRated,
                 onToggleAddedByMe = viewModel::toggleAddedByMe,
+                onLocationStatusClick = {
+                    when {
+                        !locationPermissionGranted -> {
+                            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                        }
+                        !gpsEnabled -> {
+                            context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                        }
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp)
@@ -655,79 +647,24 @@ private fun ReportSettledViewport(
 }
 
 @Composable
-private fun LocationPermissionBanner(
-    onAllowClick: () -> Unit,
-    onOpenSettingsClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.semantics {
-            liveRegion = LiveRegionMode.Polite
-        },
-        color = LocationPermissionBannerContainer,
-        tonalElevation = 2.dp
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.MyLocation,
-                    contentDescription = "Lokalizacja",
-                    tint = LocationPermissionBannerContent,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = stringResource(R.string.map_location_banner_text),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = LocationPermissionBannerContent,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TextButton(
-                    onClick = onOpenSettingsClick,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = LocationPermissionBannerContent
-                    )
-                ) {
-                    Text(stringResource(R.string.settings))
-                }
-                Button(
-                    onClick = onAllowClick,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = LocationPermissionButtonContainer,
-                        contentColor = LocationPermissionButtonContent
-                    )
-                ) {
-                    Text(stringResource(R.string.allow))
-                }
-            }
-        }
-    }
-}
-
-@Composable
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList", "MagicNumber")
 private fun FiltersOverlay(
     selectedCategory: PlaceCategory?,
     topRatedOnly: Boolean,
     addedByMeOnly: Boolean,
+    isLocationAvailable: Boolean,
     showAddedByMeChip: Boolean,
     onCategorySelected: (PlaceCategory?) -> Unit,
     onToggleTopRated: () -> Unit,
     onToggleAddedByMe: () -> Unit,
+    onLocationStatusClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val orderedCategories = PlaceCategory.entries
     val selectedChipColors = FilterChipDefaults.filterChipColors(
-        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer
+        selectedContainerColor = MapFilterSelectedContainer,
+        selectedLabelColor = MapFilterSelectedContent,
+        selectedLeadingIconColor = MapFilterSelectedContent
     )
 
     Surface(
@@ -745,10 +682,14 @@ private fun FiltersOverlay(
                     .padding(horizontal = 8.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                if (!isLocationAvailable) {
+                    LocationStatusChip(onClick = onLocationStatusClick)
+                }
                 FilterChip(
                     selected = selectedCategory == null,
                     onClick = { onCategorySelected(null) },
                     colors = selectedChipColors,
+                    shape = RoundedCornerShape(50),
                     label = { Text(stringResource(R.string.category_all)) }
                 )
                 orderedCategories.forEach { category ->
@@ -758,12 +699,13 @@ private fun FiltersOverlay(
                         selected = isSelected,
                         onClick = { onCategorySelected(category) },
                         colors = selectedChipColors,
+                        shape = RoundedCornerShape(50),
                         leadingIcon = {
                             Icon(
                                 imageVector = style.icon,
                                 contentDescription = null,
                                 tint = if (isSelected) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                    MapFilterSelectedContent
                                 } else {
                                     style.color
                                 }
@@ -786,12 +728,13 @@ private fun FiltersOverlay(
                     selected = topRatedOnly,
                     onClick = onToggleTopRated,
                     colors = selectedChipColors,
+                    shape = RoundedCornerShape(50),
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Filled.Star,
                             contentDescription = null,
                             tint = if (topRatedOnly) {
-                                MaterialTheme.colorScheme.onSecondaryContainer
+                                MapFilterSelectedContent
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             }
@@ -804,12 +747,13 @@ private fun FiltersOverlay(
                         selected = addedByMeOnly,
                         onClick = { onToggleAddedByMe() },
                         colors = selectedChipColors,
+                        shape = RoundedCornerShape(50),
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Filled.Person,
                                 contentDescription = null,
                                 tint = if (addedByMeOnly) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                    MapFilterSelectedContent
                                 } else {
                                     MaterialTheme.colorScheme.onSurfaceVariant
                                 }
@@ -819,6 +763,31 @@ private fun FiltersOverlay(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun LocationStatusChip(onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .size(36.dp)
+            .clickable(
+                role = Role.Button,
+                onClick = onClick
+            ),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        tonalElevation = 1.dp
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = Icons.Filled.GpsOff,
+                contentDescription = stringResource(R.string.location_status_unavailable),
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }

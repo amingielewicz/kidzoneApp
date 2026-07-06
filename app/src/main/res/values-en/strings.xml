@@ -86,6 +86,9 @@
 
     <!-- Home -->
     <string name="home_welcome">Hi!</string>
+    <string name="home_intro_title">Welcome to kidZone!</string>
+    <string name="home_find_nearby">Find attractions nearby</string>
+    <string name="home_find_nearby_description">Welcome to kidZone! Find attractions nearby.</string>
     <string name="home_recent_nearby_places">Recently added nearby</string>
     <string name="home_top_places">TOP near you</string>
     <string name="home_nearby_places">Near you</string>
@@ -126,7 +129,7 @@
     <string name="rating">Rating</string>
     <string name="reviews">Reviews</string>
     <string name="clear_filters">Clear filters</string>
-    <string name="search_placeholder">Search place by name\u2026</string>
+    <string name="search_placeholder">Search place\u2026</string>
     <string name="clear_search">Clear search</string>
     <string name="filters">Filters</string>
     <string name="active_filters_count">Active filters: %1$d</string>
@@ -166,7 +169,8 @@
     <string name="error_fetch_more">Could not load more places</string>
     <string name="location_sorting_rationale">Enable location to sort places by distance.</string>
     <string name="no_internet_banner">No internet connection. Waiting for network…</string>
-    <string name="gps_disabled_banner">Location is turned off. Enable GPS in settings.</string>
+    <string name="gps_disabled_banner">We can\'t see where you are. Turn on location to see places in your area.</string>
+    <string name="location_status_unavailable">We can\'t see where you are. Turn on location to see places in your area.</string>
     <string name="gps_acquiring_banner">Acquiring location…</string>
 
     <!-- Profile / settings -->
@@ -294,7 +298,7 @@
     <string name="widget_name">Nearby places</string>
     <string name="place_added_success">New place added</string>
     <string name="notification_permission_title">Enable notifications</string>
-    <string name="notification_permission_message">We\'ll notify you about new badges, replies, and important changes in your places.</string>
+    <string name="notification_permission_message">Stay up to date with what\'s new in kidZone!</string>
     <string name="enable">Enable</string>
     <string name="location_permission_title">Share location</string>
     <string name="location_permission_message">We\'ll show you places near you, distances on Home, and center the map more conveniently.</string>

@@ -3,10 +3,7 @@ package com.kidzone.presentation.main
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.os.Build
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.AnimatedVisibility
@@ -15,7 +12,6 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,8 +28,6 @@ import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -41,9 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,14 +45,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -82,20 +70,8 @@ import com.kidzone.presentation.place.list.PlaceListScreen
 import com.kidzone.presentation.profile.ProfileScreen
 import com.kidzone.presentation.ranking.RankingScreen
 
-@Suppress("MagicNumber")
-private val NotificationBannerContainer = Color(0xFFFFF3E0)
-@Suppress("MagicNumber")
-private val NotificationBannerContent = Color(0xFF4E342E)
-@Suppress("MagicNumber")
-private val NotificationBannerButtonContainer = Color(0xFFF57C00)
-private val NotificationBannerButtonContent = Color.White
-@Suppress("MagicNumber")
-private val LocationBannerContainer = Color(0xFFF3E5F5)
-@Suppress("MagicNumber")
-private val LocationBannerContent = Color(0xFF4A148C)
-@Suppress("MagicNumber")
-private val LocationBannerButtonContainer = Color(0xFF8E24AA)
-private val LocationBannerButtonContent = Color.White
+private const val MAIN_UI_PREFS = "main_ui_prefs"
+private const val KEY_HOME_INTRO_USED = "home_intro_used"
 
 /**
  * Główny shell aplikacji po zalogowaniu – zawiera własny [NavHost]
@@ -135,40 +111,22 @@ fun MainScreen(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val context = LocalContext.current
+    val prefs = remember(context) {
+        context.getSharedPreferences(MAIN_UI_PREFS, Context.MODE_PRIVATE)
+    }
     val networkStatus by rememberNetworkStatus()
+    var showHomeIntro by remember {
+        mutableStateOf(!prefs.getBoolean(KEY_HOME_INTRO_USED, false))
+    }
     val showAddPlaceFab = currentRoute in setOf(
         Route.Home.path,
         Route.Map.path,
         Route.PlaceList.path
     )
 
-    var locationPermissionGranted by remember {
+    val locationPermissionGranted by remember {
         mutableStateOf(hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION))
     }
-    var notificationPermissionGranted by remember {
-        mutableStateOf(hasNotificationPermission(context))
-    }
-    var locationRationaleDismissed by remember { mutableStateOf(false) }
-    var notificationRationaleDismissed by remember { mutableStateOf(false) }
-
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        locationPermissionGranted = granted
-        locationRationaleDismissed = granted
-    }
-
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        notificationPermissionGranted = granted
-        notificationRationaleDismissed = granted
-    }
-
-    val showNotificationRationale = !notificationPermissionGranted && !notificationRationaleDismissed
-    val showLocationRationale = currentRoute != Route.Map.path &&
-        !locationPermissionGranted &&
-        !locationRationaleDismissed
 
     // Lokalny stan przekazywany dalej do MapScreen. Trzymamy go obok sygnału
     // z parent NavGraph, bo `onFocusConsumed()` od razu wyczyści savedStateHandle,
@@ -176,6 +134,24 @@ fun MainScreen(
     // zakończy animację kamery.
     var pendingMapFocus by remember { mutableStateOf<LatLng?>(null) }
     var pendingRankingTab by remember { mutableStateOf(rankingTab) }
+
+    fun markHomeIntroUsed() {
+        if (showHomeIntro) {
+            showHomeIntro = false
+            prefs.edit().putBoolean(KEY_HOME_INTRO_USED, true).apply()
+        }
+    }
+
+    fun openMapFromHome() {
+        markHomeIntroUsed()
+        navController.navigate(Route.Map.path) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     LaunchedEffect(rankingTab) {
         if (rankingTab.isNotBlank()) {
@@ -295,46 +271,6 @@ fun MainScreen(
             ) {
                 NoInternetBanner()
             }
-            if (showNotificationRationale) {
-                PermissionRationaleBanner(
-                    rationale = PermissionRationale(
-                        title = stringResource(R.string.notification_permission_title),
-                        message = stringResource(R.string.notification_permission_message),
-                        primaryActionLabel = stringResource(R.string.enable),
-                        colors = PermissionRationaleColors(
-                            container = NotificationBannerContainer,
-                            content = NotificationBannerContent,
-                            primaryActionContainer = NotificationBannerButtonContainer,
-                            primaryActionContent = NotificationBannerButtonContent
-                        )
-                    ),
-                    onPrimaryAction = {
-                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    },
-                    onDismiss = { notificationRationaleDismissed = true },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            if (showLocationRationale) {
-                PermissionRationaleBanner(
-                    rationale = PermissionRationale(
-                        title = stringResource(R.string.location_permission_title),
-                        message = stringResource(R.string.location_permission_message),
-                        primaryActionLabel = stringResource(R.string.allow),
-                        colors = PermissionRationaleColors(
-                            container = LocationBannerContainer,
-                            content = LocationBannerContent,
-                            primaryActionContainer = LocationBannerButtonContainer,
-                            primaryActionContent = LocationBannerButtonContent
-                        )
-                    ),
-                    onPrimaryAction = {
-                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                    },
-                    onDismiss = { locationRationaleDismissed = true },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
             NavHost(
                 navController = navController,
                 startDestination = Route.Home.path,
@@ -343,15 +279,8 @@ fun MainScreen(
                 composable(Route.Home.path) {
                     HomeScreen(
                         onOpenPlaceDetails = onOpenPlaceDetails,
-                        onOpenMap = {
-                            navController.navigate(Route.Map.path) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
+                        onOpenMap = ::openMapFromHome,
+                        showIntro = showHomeIntro,
                         locationPermissionGranted = locationPermissionGranted,
                         sharedTransitionScope = sharedTransitionScope,
                         animatedContentScope = animatedContentScope
@@ -406,87 +335,5 @@ private enum class BottomTab(
     Profile(Route.Profile, Icons.Filled.Person, R.string.nav_profile);
 }
 
-private data class PermissionRationale(
-    val title: String,
-    val message: String,
-    val primaryActionLabel: String,
-    val colors: PermissionRationaleColors? = null
-)
-
-private data class PermissionRationaleColors(
-    val container: Color,
-    val content: Color,
-    val primaryActionContainer: Color,
-    val primaryActionContent: Color
-)
-
-@Suppress("FunctionNaming")
-@Composable
-private fun PermissionRationaleBanner(
-    rationale: PermissionRationale,
-    onPrimaryAction: () -> Unit,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val colors = rationale.colors ?: PermissionRationaleColors(
-        container = MaterialTheme.colorScheme.secondaryContainer,
-        content = MaterialTheme.colorScheme.onSecondaryContainer,
-        primaryActionContainer = MaterialTheme.colorScheme.primary,
-        primaryActionContent = MaterialTheme.colorScheme.onPrimary
-    )
-    Surface(
-        modifier = modifier.semantics {
-            liveRegion = LiveRegionMode.Polite
-        },
-        color = colors.container,
-        tonalElevation = 2.dp
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = rationale.title,
-                style = MaterialTheme.typography.titleSmall,
-                color = colors.content,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = rationale.message,
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.content
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(
-                    onClick = onDismiss,
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = colors.content
-                    )
-                ) {
-                    Text(stringResource(R.string.later))
-                }
-                Spacer(Modifier.width(8.dp))
-                Button(
-                    onClick = onPrimaryAction,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colors.primaryActionContainer,
-                        contentColor = colors.primaryActionContent
-                    )
-                ) {
-                    Text(rationale.primaryActionLabel)
-                }
-            }
-        }
-    }
-}
-
 private fun hasRuntimePermission(context: Context, permission: String): Boolean =
     ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
-
-private fun hasNotificationPermission(context: Context): Boolean =
-    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-        hasRuntimePermission(context, Manifest.permission.POST_NOTIFICATIONS)
