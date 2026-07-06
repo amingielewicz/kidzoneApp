@@ -2,9 +2,13 @@ package com.kidzone.presentation.main
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
+import android.content.IntentSender
 import android.content.pm.PackageManager
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContentScope
@@ -14,6 +18,7 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,17 +33,22 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,6 +62,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -60,6 +71,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.google.android.gms.common.api.ResolvableApiException
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationSettingsRequest
+import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.model.LatLng
 import com.kidzone.R
 import com.kidzone.navigation.Route
@@ -71,12 +87,15 @@ import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.common.shouldShowNotificationPrompt
 import com.kidzone.presentation.home.HomeScreen
 import com.kidzone.presentation.map.MapScreen
+import com.kidzone.presentation.place.add.isLocationServiceEnabled
 import com.kidzone.presentation.place.list.PlaceListScreen
 import com.kidzone.presentation.profile.ProfileScreen
 import com.kidzone.presentation.ranking.RankingScreen
 
 private const val MAIN_UI_PREFS = "main_ui_prefs"
 private const val KEY_HOME_INTRO_USED = "home_intro_used"
+private const val LOCATION_REQUEST_INTERVAL_MS = 10_000L
+private const val LOCATION_REQUEST_MIN_INTERVAL_MS = 5_000L
 
 /**
  * Główny shell aplikacji po zalogowaniu – zawiera własny [NavHost]
@@ -123,16 +142,28 @@ fun MainScreen(
     var showHomeIntro by remember {
         mutableStateOf(!prefs.getBoolean(KEY_HOME_INTRO_USED, false))
     }
+    var showLocationRationale by remember { mutableStateOf(false) }
     var notificationPromptReason by remember {
         mutableStateOf<NotificationPromptReason?>(null)
     }
     var locationPermissionGranted by remember {
         mutableStateOf(hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION))
     }
+    val locationSettingsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) {
+        locationPermissionGranted = hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+    }
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         locationPermissionGranted = granted
+        if (granted) {
+            context.checkLocationSettings(
+                onResolutionRequired = { request -> locationSettingsLauncher.launch(request) },
+                onFallbackToSettings = { context.openLocationSettings() }
+            )
+        }
     }
     val showAddPlaceFab = currentRoute in setOf(
         Route.Home.path,
@@ -158,8 +189,12 @@ fun MainScreen(
         markHomeIntroUsed()
         if (hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
             locationPermissionGranted = true
+            context.checkLocationSettings(
+                onResolutionRequired = { request -> locationSettingsLauncher.launch(request) },
+                onFallbackToSettings = { context.openLocationSettings() }
+            )
         } else {
-            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            showLocationRationale = true
         }
     }
 
@@ -347,11 +382,76 @@ fun MainScreen(
         }
     }
 
+    if (showLocationRationale) {
+        LocationRationaleBottomSheet(
+            onEnableLocation = {
+                showLocationRationale = false
+                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            },
+            onChooseCityManually = {
+                showLocationRationale = false
+                openMapFromHome()
+            },
+            onDismiss = { showLocationRationale = false }
+        )
+    }
+
     notificationPromptReason?.let { reason ->
         NotificationSoftPromptDialog(
             reason = reason,
             onDismiss = { notificationPromptReason = null }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+@Suppress("FunctionNaming")
+private fun LocationRationaleBottomSheet(
+    onEnableLocation: () -> Unit,
+    onChooseCityManually: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.LocationOn,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(44.dp)
+            )
+            Text(
+                text = "Włącz lokalizację",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "Włącz lokalizację, aby zobaczyć miejsca blisko Ciebie.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Button(
+                onClick = onEnableLocation,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Włącz lokalizację")
+            }
+            TextButton(onClick = onChooseCityManually) {
+                Text("Nie chcesz używać GPS? Wskaż miasto ręcznie")
+            }
+            Spacer(Modifier.height(8.dp))
+        }
     }
 }
 
@@ -369,3 +469,41 @@ private enum class BottomTab(
 
 private fun hasRuntimePermission(context: Context, permission: String): Boolean =
     ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+private fun Context.checkLocationSettings(
+    onResolutionRequired: (IntentSenderRequest) -> Unit,
+    onFallbackToSettings: () -> Unit
+) {
+    if (isLocationServiceEnabled(this)) return
+
+    val locationRequest = LocationRequest.Builder(
+        Priority.PRIORITY_HIGH_ACCURACY,
+        LOCATION_REQUEST_INTERVAL_MS
+    )
+        .setMinUpdateIntervalMillis(LOCATION_REQUEST_MIN_INTERVAL_MS)
+        .build()
+    val settingsRequest = LocationSettingsRequest.Builder()
+        .addLocationRequest(locationRequest)
+        .setAlwaysShow(true)
+        .build()
+
+    LocationServices.getSettingsClient(this)
+        .checkLocationSettings(settingsRequest)
+        .addOnFailureListener { exception ->
+            if (exception is ResolvableApiException) {
+                try {
+                    onResolutionRequired(
+                        IntentSenderRequest.Builder(exception.resolution).build()
+                    )
+                } catch (_: IntentSender.SendIntentException) {
+                    onFallbackToSettings()
+                }
+            } else {
+                onFallbackToSettings()
+            }
+        }
+}
+
+private fun Context.openLocationSettings() {
+    startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+}
