@@ -167,100 +167,115 @@ fun HomeScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .background(MaterialTheme.colorScheme.background),
-                contentPadding = PaddingValues(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                if (showIntro) {
-                    item {
-                        WelcomeIntroCard(
-                            modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp),
-                            onDismiss = onDismissIntro
-                        )
-                    }
+            if (!showIntro && !hasLocationContext) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(horizontal = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    HomeLocationEmptyState(
+                        onEnableLocationClick = onRequestLocation,
+                        onManualCityClick = onOpenMap
+                    )
                 }
-
-                if (!hasLocationContext) {
-                    item {
-                        HomeLocationEmptyState(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            onEnableLocationClick = onRequestLocation,
-                            onManualCityClick = onOpenMap
-                        )
-                    }
-                }
-
-                if (hasLocationContext) {
-                    item {
-                        SectionHeader(
-                            title = stringResource(R.string.home_nearby_places),
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                    }
-                    item {
-                        HorizontalPlacesRow(
-                            items = state.nearbyPlaces.map {
-                                HomePlaceItem(it.place, it.distanceKm)
-                            },
-                            isLoading = state.isNearbyLoading,
-                            emptyMessage = stringResource(R.string.home_no_nearby_places),
-                            onPlaceClick = { onOpenPlaceDetails(it, "nearby") },
-                            animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
-                            keyPrefix = "nearby"
-                        )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .background(MaterialTheme.colorScheme.background),
+                    contentPadding = PaddingValues(bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    if (showIntro) {
+                        item {
+                            WelcomeIntroCard(
+                                modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp),
+                                onDismiss = onDismissIntro
+                            )
+                        }
                     }
 
-                    item {
-                        SectionHeader(
-                            title = stringResource(R.string.home_top_places),
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                    }
-                    item {
-                        HorizontalPlacesRow(
-                            items = state.topPlaces.map {
-                                HomePlaceItem(it.place, it.distanceKm)
-                            },
-                            isLoading = state.isTopLoading,
-                            emptyMessage = stringResource(R.string.home_no_top_places),
-                            onPlaceClick = { onOpenPlaceDetails(it, "top") },
-                            animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
-                            keyPrefix = "top"
-                        )
+                    if (!hasLocationContext) {
+                        item {
+                            HomeLocationEmptyState(
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                                onEnableLocationClick = onRequestLocation,
+                                onManualCityClick = onOpenMap
+                            )
+                        }
                     }
 
-                    item {
-                        SectionHeader(
-                            title = stringResource(R.string.home_recent_nearby_places),
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                    }
-                    item {
-                        HorizontalPlacesRow(
-                            items = state.recentlyAddedPlaces.map {
-                                HomePlaceItem(it.place, it.distanceKm)
-                            },
-                            isLoading = state.isRecentlyAddedLoading,
-                            emptyMessage = stringResource(R.string.home_no_recent_nearby_places),
-                            onPlaceClick = { onOpenPlaceDetails(it, "recent") },
-                            animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
-                            keyPrefix = "recent"
-                        )
-                    }
-                }
+                    if (hasLocationContext) {
+                        item {
+                            SectionHeader(
+                                title = stringResource(R.string.home_nearby_places),
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+                        item {
+                            HorizontalPlacesRow(
+                                items = state.nearbyPlaces.map {
+                                    HomePlaceItem(it.place, it.distanceKm)
+                                },
+                                isLoading = state.isNearbyLoading,
+                                emptyMessage = stringResource(R.string.home_no_nearby_places),
+                                onPlaceClick = { onOpenPlaceDetails(it, "nearby") },
+                                animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
+                                keyPrefix = "nearby"
+                            )
+                        }
 
-                state.errorMessage?.let { msg ->
-                    item {
-                        Text(
-                            text = msg.asString(),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
+                        item {
+                            SectionHeader(
+                                title = stringResource(R.string.home_top_places),
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+                        item {
+                            HorizontalPlacesRow(
+                                items = state.topPlaces.map {
+                                    HomePlaceItem(it.place, it.distanceKm)
+                                },
+                                isLoading = state.isTopLoading,
+                                emptyMessage = stringResource(R.string.home_no_top_places),
+                                onPlaceClick = { onOpenPlaceDetails(it, "top") },
+                                animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
+                                keyPrefix = "top"
+                            )
+                        }
+
+                        item {
+                            SectionHeader(
+                                title = stringResource(R.string.home_recent_nearby_places),
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+                        item {
+                            HorizontalPlacesRow(
+                                items = state.recentlyAddedPlaces.map {
+                                    HomePlaceItem(it.place, it.distanceKm)
+                                },
+                                isLoading = state.isRecentlyAddedLoading,
+                                emptyMessage = stringResource(R.string.home_no_recent_nearby_places),
+                                onPlaceClick = { onOpenPlaceDetails(it, "recent") },
+                                animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
+                                keyPrefix = "recent"
+                            )
+                        }
+                    }
+
+                    state.errorMessage?.let { msg ->
+                        item {
+                            Text(
+                                text = msg.asString(),
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -293,7 +308,7 @@ private fun WelcomeIntroCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, top = 16.dp, end = 52.dp, bottom = 16.dp),
+                    .padding(start = 16.dp, top = 16.dp, end = 54.dp, bottom = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 WavingHand()
@@ -311,18 +326,25 @@ private fun WelcomeIntroCard(
                     )
                 }
             }
-            IconButton(
-                onClick = onDismiss,
+            Surface(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(4.dp)
+                    .padding(top = 6.dp, end = 6.dp)
+                    .size(32.dp),
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "Zamknij powitanie",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
-                )
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Zamknij powitanie",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }
