@@ -1,10 +1,12 @@
 package com.kidzone.presentation.main
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -56,6 +58,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -86,6 +89,7 @@ import com.kidzone.presentation.ranking.RankingScreen
 
 private const val MAIN_UI_PREFS = "main_ui_prefs"
 private const val KEY_HOME_INTRO_USED = "home_intro_used"
+private const val KEY_LOCATION_PERMISSION_REQUESTED = "location_permission_requested"
 private const val LOCATION_REQUEST_INTERVAL_MS = 10_000L
 private const val LOCATION_REQUEST_MIN_INTERVAL_MS = 5_000L
 
@@ -190,7 +194,21 @@ fun MainScreen(
                 onFallbackToSettings = { context.openLocationSettings() }
             )
         } else {
-            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            val activity = context as? Activity
+            val permissionAlreadyRequested = prefs.getBoolean(KEY_LOCATION_PERMISSION_REQUESTED, false)
+            val canShowPermissionDialog = activity == null ||
+                !permissionAlreadyRequested ||
+                ActivityCompat.shouldShowRequestPermissionRationale(
+                    activity,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                )
+
+            if (canShowPermissionDialog) {
+                prefs.edit().putBoolean(KEY_LOCATION_PERMISSION_REQUESTED, true).apply()
+                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            } else {
+                context.openAppPermissionSettings()
+            }
         }
     }
 
@@ -445,4 +463,11 @@ private fun Context.checkLocationSettings(
 
 private fun Context.openLocationSettings() {
     startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+}
+
+private fun Context.openAppPermissionSettings() {
+    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+        data = Uri.fromParts("package", packageName, null)
+    }
+    startActivity(intent)
 }
