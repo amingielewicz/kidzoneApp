@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -35,6 +34,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -86,6 +86,7 @@ import com.kidzone.presentation.ranking.RankingScreen
 
 private const val MAIN_UI_PREFS = "main_ui_prefs"
 private const val KEY_HOME_INTRO_USED = "home_intro_used"
+private const val KEY_ADD_PLACE_FAB_LABEL_USED = "add_place_fab_label_used"
 private const val LOCATION_REQUEST_INTERVAL_MS = 10_000L
 private const val LOCATION_REQUEST_MIN_INTERVAL_MS = 5_000L
 
@@ -137,6 +138,9 @@ fun MainScreen(
                 !hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
         )
     }
+    var showAddPlaceFabLabel by remember {
+        mutableStateOf(!prefs.getBoolean(KEY_ADD_PLACE_FAB_LABEL_USED, false))
+    }
     var notificationPromptReason by remember {
         mutableStateOf<NotificationPromptReason?>(null)
     }
@@ -149,6 +153,14 @@ fun MainScreen(
             showHomeIntro = false
             prefs.edit().putBoolean(KEY_HOME_INTRO_USED, true).apply()
         }
+    }
+
+    fun openAddPlaceFromFab() {
+        if (showAddPlaceFabLabel) {
+            showAddPlaceFabLabel = false
+            prefs.edit().putBoolean(KEY_ADD_PLACE_FAB_LABEL_USED, true).apply()
+        }
+        onOpenAddPlace()
     }
 
     val locationSettingsLauncher = rememberLauncherForActivityResult(
@@ -300,23 +312,31 @@ fun MainScreen(
         },
         floatingActionButton = {
             if (showAddPlaceFab) {
-                ExtendedFloatingActionButton(
-                    onClick = onOpenAddPlace,
-                    modifier = Modifier.height(48.dp),
-                    icon = {
+                if (showAddPlaceFabLabel) {
+                    ExtendedFloatingActionButton(
+                        onClick = ::openAddPlaceFromFab,
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        text = {
+                            Text(
+                                text = stringResource(R.string.add_place),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    )
+                } else {
+                    FloatingActionButton(onClick = ::openAddPlaceFromFab) {
                         Icon(
                             imageVector = Icons.Filled.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = stringResource(R.string.add_place),
-                            style = MaterialTheme.typography.labelLarge
+                            contentDescription = stringResource(R.string.add_place)
                         )
                     }
-                )
+                }
             }
         }
     ) { padding ->
