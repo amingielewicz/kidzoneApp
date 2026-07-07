@@ -1,12 +1,10 @@
 package com.kidzone.presentation.main
 
 import android.Manifest
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -58,7 +56,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -89,7 +86,6 @@ import com.kidzone.presentation.ranking.RankingScreen
 
 private const val MAIN_UI_PREFS = "main_ui_prefs"
 private const val KEY_HOME_INTRO_USED = "home_intro_used"
-private const val KEY_LOCATION_PERMISSION_REQUESTED = "location_permission_requested"
 private const val LOCATION_REQUEST_INTERVAL_MS = 10_000L
 private const val LOCATION_REQUEST_MIN_INTERVAL_MS = 5_000L
 
@@ -136,7 +132,10 @@ fun MainScreen(
     }
     val networkStatus by rememberNetworkStatus()
     var showHomeIntro by remember {
-        mutableStateOf(!prefs.getBoolean(KEY_HOME_INTRO_USED, false))
+        mutableStateOf(
+            !prefs.getBoolean(KEY_HOME_INTRO_USED, false) &&
+                !hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+        )
     }
     var notificationPromptReason by remember {
         mutableStateOf<NotificationPromptReason?>(null)
@@ -144,16 +143,28 @@ fun MainScreen(
     var locationPermissionGranted by remember {
         mutableStateOf(hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION))
     }
+
+    fun markHomeIntroUsed() {
+        if (showHomeIntro) {
+            showHomeIntro = false
+            prefs.edit().putBoolean(KEY_HOME_INTRO_USED, true).apply()
+        }
+    }
+
     val locationSettingsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) {
         locationPermissionGranted = hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+        if (locationPermissionGranted) {
+            markHomeIntroUsed()
+        }
     }
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         locationPermissionGranted = granted
         if (granted) {
+            markHomeIntroUsed()
             context.checkLocationSettings(
                 onResolutionRequired = { request -> locationSettingsLauncher.launch(request) },
                 onFallbackToSettings = { context.openLocationSettings() }
@@ -173,47 +184,20 @@ fun MainScreen(
     var pendingMapFocus by remember { mutableStateOf<LatLng?>(null) }
     var pendingRankingTab by remember { mutableStateOf(rankingTab) }
 
-    fun markHomeIntroUsed() {
-        if (showHomeIntro) {
-            showHomeIntro = false
-            prefs.edit().putBoolean(KEY_HOME_INTRO_USED, true).apply()
-        }
-    }
-
-    fun markHomeIntroUsedWhenLeavingHome() {
-        if (currentRoute == Route.Home.path) {
-            markHomeIntroUsed()
-        }
-    }
-
     fun requestLocationFromHome() {
         if (hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
             locationPermissionGranted = true
+            markHomeIntroUsed()
             context.checkLocationSettings(
                 onResolutionRequired = { request -> locationSettingsLauncher.launch(request) },
                 onFallbackToSettings = { context.openLocationSettings() }
             )
         } else {
-            val activity = context as? Activity
-            val permissionAlreadyRequested = prefs.getBoolean(KEY_LOCATION_PERMISSION_REQUESTED, false)
-            val canShowPermissionDialog = activity == null ||
-                !permissionAlreadyRequested ||
-                ActivityCompat.shouldShowRequestPermissionRationale(
-                    activity,
-                    Manifest.permission.ACCESS_FINE_LOCATION
-                )
-
-            if (canShowPermissionDialog) {
-                prefs.edit().putBoolean(KEY_LOCATION_PERMISSION_REQUESTED, true).apply()
-                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-            } else {
-                context.openAppPermissionSettings()
-            }
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
     fun openMapFromHome() {
-        markHomeIntroUsedWhenLeavingHome()
         navController.navigate(Route.Map.path) {
             popUpTo(navController.graph.findStartDestination().id) {
                 saveState = true
@@ -238,9 +222,6 @@ fun MainScreen(
     // Deep link: przełączenie na konkretną zakładkę (profile, ranking, map)
     LaunchedEffect(focusTab) {
         if (focusTab.isNotBlank()) {
-            if (focusTab != Route.Home.path) {
-                markHomeIntroUsedWhenLeavingHome()
-            }
             navController.navigate(focusTab) {
                 popUpTo(navController.graph.findStartDestination().id) {
                     saveState = true
@@ -255,7 +236,6 @@ fun MainScreen(
     LaunchedEffect(focusLatitude, focusLongitude) {
         if (focusLatitude != null && focusLongitude != null) {
             pendingMapFocus = LatLng(focusLatitude, focusLongitude)
-            markHomeIntroUsedWhenLeavingHome()
             // Przełącz na zakładkę Map z pełną semantyką bottom-nav (saveState /
             // restoreState), żeby zachowanie kart pozostało spójne z klikaniem
             // ich ręcznie.
@@ -300,9 +280,6 @@ fun MainScreen(
                         selected = selected,
                         onClick = {
                             if (!selected) {
-                                if (tab.route != Route.Home) {
-                                    markHomeIntroUsedWhenLeavingHome()
-                                }
                                 navController.navigate(tab.route.path) {
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         saveState = true
@@ -463,11 +440,4 @@ private fun Context.checkLocationSettings(
 
 private fun Context.openLocationSettings() {
     startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-}
-
-private fun Context.openAppPermissionSettings() {
-    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-        data = Uri.fromParts("package", packageName, null)
-    }
-    startActivity(intent)
 }
