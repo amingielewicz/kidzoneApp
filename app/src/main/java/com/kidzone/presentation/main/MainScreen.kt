@@ -185,8 +185,13 @@ fun MainScreen(
         }
     }
 
+    fun markHomeIntroUsedWhenLeavingHome() {
+        if (currentRoute == Route.Home.path) {
+            markHomeIntroUsed()
+        }
+    }
+
     fun requestLocationFromHome() {
-        markHomeIntroUsed()
         if (hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
             locationPermissionGranted = true
             context.checkLocationSettings(
@@ -199,7 +204,7 @@ fun MainScreen(
     }
 
     fun openMapFromHome() {
-        markHomeIntroUsed()
+        markHomeIntroUsedWhenLeavingHome()
         navController.navigate(Route.Map.path) {
             popUpTo(navController.graph.findStartDestination().id) {
                 saveState = true
@@ -224,6 +229,9 @@ fun MainScreen(
     // Deep link: przełączenie na konkretną zakładkę (profile, ranking, map)
     LaunchedEffect(focusTab) {
         if (focusTab.isNotBlank()) {
+            if (focusTab != Route.Home.path) {
+                markHomeIntroUsedWhenLeavingHome()
+            }
             navController.navigate(focusTab) {
                 popUpTo(navController.graph.findStartDestination().id) {
                     saveState = true
@@ -238,6 +246,7 @@ fun MainScreen(
     LaunchedEffect(focusLatitude, focusLongitude) {
         if (focusLatitude != null && focusLongitude != null) {
             pendingMapFocus = LatLng(focusLatitude, focusLongitude)
+            markHomeIntroUsedWhenLeavingHome()
             // Przełącz na zakładkę Map z pełną semantyką bottom-nav (saveState /
             // restoreState), żeby zachowanie kart pozostało spójne z klikaniem
             // ich ręcznie.
@@ -282,6 +291,9 @@ fun MainScreen(
                         selected = selected,
                         onClick = {
                             if (!selected) {
+                                if (tab.route != Route.Home) {
+                                    markHomeIntroUsedWhenLeavingHome()
+                                }
                                 navController.navigate(tab.route.path) {
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         saveState = true
