@@ -8,6 +8,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -71,9 +72,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.kidzone.R
 import com.kidzone.domain.model.Place
-import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
-import com.kidzone.presentation.common.KidZoneCard
 import com.kidzone.presentation.common.KidZoneRadii
 import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.NewPlaceBadge
@@ -81,17 +80,22 @@ import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.shimmerEffect
 
-private val PLACE_ROW_HEIGHT = 164.dp
-private val PLACE_CARD_WIDTH = 176.dp
+private val PLACE_ROW_HEIGHT = 168.dp
+private val PLACE_CARD_WIDTH = 178.dp
 private val PLACE_CARD_ICON_SIZE = 30.dp
-private val PLACE_CARD_CONTENT_PADDING = 12.dp
+private val PLACE_CARD_CONTENT_PADDING = 14.dp
 private val LOCATION_PANEL_MIN_HEIGHT = 360.dp
 private val LOCATION_CTA_HEIGHT = 48.dp
+private val HOME_HORIZONTAL_PADDING = 16.dp
 private const val MANUAL_CITY_HINT = "Nie chcesz używać GPS? Kliknij tutaj, aby wybrać miasto ręcznie"
 private const val WAVE_EMOJI = "👋"
 private const val WAVE_INITIAL_ROTATION = -12f
 private const val WAVE_TARGET_ROTATION = 16f
 private const val WAVE_DURATION_MS = 650
+private const val NEARBY_SECTION_TITLE = "📍 W pobliżu"
+private const val TOP_SECTION_TITLE = "🏆 Najpopularniejsze"
+private const val RECENT_SECTION_TITLE = "🆕 Nowości w okolicy"
+private const val VERY_CLOSE_DISTANCE_LABEL = "Tuż obok"
 
 private data class HomePlaceItem(
     val place: Place,
@@ -172,7 +176,7 @@ fun HomeScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = HOME_HORIZONTAL_PADDING),
                     contentAlignment = Alignment.Center
                 ) {
                     HomeLocationEmptyState(
@@ -186,13 +190,17 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .weight(1f)
                         .background(MaterialTheme.colorScheme.background),
-                    contentPadding = PaddingValues(bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    contentPadding = PaddingValues(bottom = 96.dp),
+                    verticalArrangement = Arrangement.spacedBy(22.dp)
                 ) {
                     if (showIntro) {
                         item {
                             WelcomeIntroCard(
-                                modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp),
+                                modifier = Modifier.padding(
+                                    start = HOME_HORIZONTAL_PADDING,
+                                    top = 18.dp,
+                                    end = HOME_HORIZONTAL_PADDING
+                                ),
                                 onDismiss = onDismissIntro
                             )
                         }
@@ -201,7 +209,7 @@ fun HomeScreen(
                     if (!hasLocationContext) {
                         item {
                             HomeLocationEmptyState(
-                                modifier = Modifier.padding(horizontal = 16.dp),
+                                modifier = Modifier.padding(horizontal = HOME_HORIZONTAL_PADDING),
                                 onEnableLocationClick = onRequestLocation,
                                 onManualCityClick = onOpenMap
                             )
@@ -210,13 +218,8 @@ fun HomeScreen(
 
                     if (hasLocationContext) {
                         item {
-                            SectionHeader(
-                                title = stringResource(R.string.home_nearby_places),
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            )
-                        }
-                        item {
-                            HorizontalPlacesRow(
+                            HomeSection(
+                                title = NEARBY_SECTION_TITLE,
                                 items = state.nearbyPlaces.map {
                                     HomePlaceItem(it.place, it.distanceKm)
                                 },
@@ -229,13 +232,8 @@ fun HomeScreen(
                         }
 
                         item {
-                            SectionHeader(
-                                title = stringResource(R.string.home_top_places),
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            )
-                        }
-                        item {
-                            HorizontalPlacesRow(
+                            HomeSection(
+                                title = TOP_SECTION_TITLE,
                                 items = state.topPlaces.map {
                                     HomePlaceItem(it.place, it.distanceKm)
                                 },
@@ -248,13 +246,8 @@ fun HomeScreen(
                         }
 
                         item {
-                            SectionHeader(
-                                title = stringResource(R.string.home_recent_nearby_places),
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            )
-                        }
-                        item {
-                            HorizontalPlacesRow(
+                            HomeSection(
+                                title = RECENT_SECTION_TITLE,
                                 items = state.recentlyAddedPlaces.map {
                                     HomePlaceItem(it.place, it.distanceKm)
                                 },
@@ -273,7 +266,7 @@ fun HomeScreen(
                                 text = msg.asString(),
                                 color = MaterialTheme.colorScheme.error,
                                 style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(horizontal = 16.dp)
+                                modifier = Modifier.padding(horizontal = HOME_HORIZONTAL_PADDING)
                             )
                         }
                     }
@@ -302,13 +295,14 @@ private fun WelcomeIntroCard(
             contentColor = MaterialTheme.colorScheme.onSurface
         ),
         shape = RoundedCornerShape(18.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, top = 16.dp, end = 54.dp, bottom = 16.dp),
+                    .padding(start = 16.dp, top = 16.dp, end = 48.dp, bottom = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 WavingHand()
@@ -330,8 +324,8 @@ private fun WelcomeIntroCard(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 6.dp, end = 6.dp)
-                    .size(32.dp),
-                shape = RoundedCornerShape(10.dp),
+                    .size(26.dp),
+                shape = RoundedCornerShape(8.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant
             ) {
@@ -342,7 +336,7 @@ private fun WelcomeIntroCard(
                     Icon(
                         imageVector = Icons.Filled.Close,
                         contentDescription = "Zamknij powitanie",
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(14.dp)
                     )
                 }
             }
@@ -455,6 +449,33 @@ private fun HomeLocationEmptyState(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun HomeSection(
+    title: String,
+    items: List<HomePlaceItem>,
+    isLoading: Boolean,
+    emptyMessage: String,
+    onPlaceClick: (placeId: String) -> Unit,
+    animation: PlaceCardAnimation,
+    keyPrefix: String
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SectionHeader(
+            title = title,
+            modifier = Modifier.padding(horizontal = HOME_HORIZONTAL_PADDING)
+        )
+        HorizontalPlacesRow(
+            items = items,
+            isLoading = isLoading,
+            emptyMessage = emptyMessage,
+            onPlaceClick = onPlaceClick,
+            animation = animation,
+            keyPrefix = keyPrefix
+        )
+    }
+}
+
 @Composable
 private fun SectionHeader(
     title: String,
@@ -462,8 +483,9 @@ private fun SectionHeader(
 ) {
     Text(
         text = title,
-        style = MaterialTheme.typography.titleSmall,
+        style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onBackground,
         modifier = modifier
     )
 }
@@ -483,8 +505,8 @@ private fun HorizontalPlacesRow(
         isLoading -> {
             LazyRow(
                 modifier = Modifier.height(rowHeight),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(horizontal = HOME_HORIZONTAL_PADDING),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
                 userScrollEnabled = false
             ) {
                 items(5) {
@@ -497,9 +519,10 @@ private fun HorizontalPlacesRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(rowHeight)
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = HOME_HORIZONTAL_PADDING),
                 shape = RoundedCornerShape(KidZoneRadii.Card),
-                color = MaterialTheme.colorScheme.surfaceContainerLow
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -516,8 +539,8 @@ private fun HorizontalPlacesRow(
         else -> {
             LazyRow(
                 modifier = Modifier.height(rowHeight),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                contentPadding = PaddingValues(horizontal = HOME_HORIZONTAL_PADDING),
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 items(items, key = { "${keyPrefix}_${it.place.id}" }) { item ->
                     PlaceCard(
@@ -548,7 +571,7 @@ private fun PlaceCard(
     val ratingLabel = place.ratingAccessibilityLabel()
     val animationKey = if (keyPrefix.isBlank()) "" else "${keyPrefix}_"
 
-    KidZoneCard(
+    Card(
         modifier = Modifier
             .width(PLACE_CARD_WIDTH)
             .height(PLACE_ROW_HEIGHT)
@@ -559,7 +582,11 @@ private fun PlaceCard(
                 onClickLabel = stringResource(R.string.map_open_place_details_label),
                 role = Role.Button,
                 onClick = onClick
-            )
+            ),
+        shape = RoundedCornerShape(KidZoneRadii.Card),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier
@@ -567,7 +594,7 @@ private fun PlaceCard(
                 .padding(PLACE_CARD_CONTENT_PADDING),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(KidZoneSpacing.GapSmall)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CategoryIcon(
                         category = place.category,
@@ -578,8 +605,8 @@ private fun PlaceCard(
                         iconSize = 18.dp
                     )
                     Spacer(Modifier.width(KidZoneSpacing.GapSmall))
-                    CategoryBadge(
-                        category = place.category,
+                    CategoryOutlinedBadge(
+                        label = categoryLabel,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -588,11 +615,12 @@ private fun PlaceCard(
                         text = place.name,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     item.distanceKm?.let {
-                        Spacer(Modifier.height(KidZoneSpacing.GapTiny))
+                        Spacer(Modifier.height(6.dp))
                         DistanceLabel(distanceKm = it)
                     }
                 }
@@ -615,7 +643,8 @@ private fun PlaceCard(
                             Text(
                                 text = "%.1f (%d)".format(place.averageRating, place.reviewsCount),
                                 style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -629,19 +658,42 @@ private fun PlaceCard(
 }
 
 @Composable
+private fun CategoryOutlinedBadge(
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.primary,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+        )
+    }
+}
+
+@Composable
 private fun DistanceLabel(distanceKm: Double) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
             imageVector = Icons.Filled.LocationOn,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.size(14.dp)
         )
         Spacer(Modifier.width(2.dp))
         Text(
             text = formatDistance(distanceKm),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.secondary,
             maxLines = 1
         )
     }
@@ -649,10 +701,11 @@ private fun DistanceLabel(distanceKm: Double) {
 
 @Composable
 private fun formatDistance(km: Double): String = when {
+    km < 0.05 -> VERY_CLOSE_DISTANCE_LABEL
     km < 1.0 -> {
         val meters = (km * 1000).toInt()
         val rounded = ((meters + 25) / 50) * 50
-        stringResource(R.string.distance_m, rounded)
+        if (rounded == 0) VERY_CLOSE_DISTANCE_LABEL else stringResource(R.string.distance_m, rounded)
     }
     km < 100.0 -> stringResource(R.string.distance_km, km)
     else -> stringResource(R.string.distance_km_integer, km.toInt())
@@ -667,10 +720,14 @@ private fun Place.ratingAccessibilityLabel(): String = when {
 
 @Composable
 private fun PlaceCardSkeleton() {
-    KidZoneCard(
+    Card(
         modifier = Modifier
             .width(PLACE_CARD_WIDTH)
-            .height(PLACE_ROW_HEIGHT)
+            .height(PLACE_ROW_HEIGHT),
+        shape = RoundedCornerShape(KidZoneRadii.Card),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(
