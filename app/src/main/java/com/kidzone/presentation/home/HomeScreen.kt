@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Star
@@ -37,6 +38,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -112,6 +114,7 @@ fun HomeScreen(
     onOpenPlaceDetails: (placeId: String, source: String?) -> Unit,
     onOpenMap: () -> Unit,
     onRequestLocation: () -> Unit,
+    onDismissIntro: () -> Unit,
     showIntro: Boolean = true,
     locationPermissionGranted: Boolean = false,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -175,7 +178,8 @@ fun HomeScreen(
                 if (showIntro) {
                     item {
                         WelcomeIntroCard(
-                            modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp)
+                            modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp),
+                            onDismiss = onDismissIntro
                         )
                     }
                 }
@@ -267,7 +271,8 @@ fun HomeScreen(
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
 private fun WelcomeIntroCard(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDismiss: () -> Unit
 ) {
     val desc = stringResource(R.string.home_find_nearby_description)
 
@@ -284,24 +289,39 @@ private fun WelcomeIntroCard(
         shape = RoundedCornerShape(18.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            WavingHand()
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.home_intro_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = stringResource(R.string.app_tagline),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, top = 16.dp, end = 52.dp, bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                WavingHand()
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.home_intro_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = stringResource(R.string.app_tagline),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "Zamknij powitanie",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
