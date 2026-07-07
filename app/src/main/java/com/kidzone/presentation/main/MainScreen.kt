@@ -343,6 +343,7 @@ fun MainScreen(
                         onOpenPlaceDetails = onOpenPlaceDetails,
                         onOpenMap = ::openMapFromHome,
                         onRequestLocation = ::requestLocationFromHome,
+                        onDismissIntro = ::markHomeIntroUsed,
                         showIntro = showHomeIntro,
                         locationPermissionGranted = locationPermissionGranted,
                         sharedTransitionScope = sharedTransitionScope,
