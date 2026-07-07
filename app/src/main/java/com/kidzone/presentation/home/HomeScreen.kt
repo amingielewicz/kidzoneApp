@@ -3,6 +3,11 @@ package com.kidzone.presentation.home
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -47,6 +53,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -75,7 +83,13 @@ private val PLACE_ROW_HEIGHT = 164.dp
 private val PLACE_CARD_WIDTH = 176.dp
 private val PLACE_CARD_ICON_SIZE = 30.dp
 private val PLACE_CARD_CONTENT_PADDING = 12.dp
+private val LOCATION_PANEL_MIN_HEIGHT = 360.dp
+private val LOCATION_CTA_HEIGHT = 48.dp
 private const val MANUAL_CITY_HINT = "Nie chcesz używać GPS? Kliknij tutaj, aby wybrać miasto ręcznie"
+private const val WAVE_EMOJI = "👋"
+private const val WAVE_INITIAL_ROTATION = -12f
+private const val WAVE_TARGET_ROTATION = 16f
+private const val WAVE_DURATION_MS = 650
 
 private data class HomePlaceItem(
     val place: Place,
@@ -276,20 +290,7 @@ private fun WelcomeIntroCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                color = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.primary,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.size(44.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Filled.LocationOn,
-                        contentDescription = null,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-            }
+            WavingHand()
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -309,22 +310,49 @@ private fun WelcomeIntroCard(
 
 @Composable
 @Suppress("FunctionNaming")
+private fun WavingHand() {
+    val infiniteTransition = rememberInfiniteTransition(label = "home_wave")
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = WAVE_INITIAL_ROTATION,
+        targetValue = WAVE_TARGET_ROTATION,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = WAVE_DURATION_MS),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "home_wave_rotation"
+    )
+
+    Text(
+        text = WAVE_EMOJI,
+        style = MaterialTheme.typography.headlineMedium,
+        modifier = Modifier.graphicsLayer {
+            rotationZ = rotation
+            transformOrigin = TransformOrigin(0.8f, 0.8f)
+        }
+    )
+}
+
+@Composable
+@Suppress("FunctionNaming")
 private fun HomeLocationEmptyState(
     modifier: Modifier = Modifier,
     onEnableLocationClick: () -> Unit,
     onManualCityClick: () -> Unit
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = LOCATION_PANEL_MIN_HEIGHT),
         shape = RoundedCornerShape(KidZoneRadii.Card),
         color = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(min = LOCATION_PANEL_MIN_HEIGHT)
                 .padding(horizontal = 20.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
         ) {
             Box(
                 modifier = Modifier
@@ -357,6 +385,9 @@ private fun HomeLocationEmptyState(
             )
             Button(
                 onClick = onEnableLocationClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(LOCATION_CTA_HEIGHT),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.secondary,
                     contentColor = MaterialTheme.colorScheme.onSecondary
