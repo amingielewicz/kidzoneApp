@@ -255,11 +255,13 @@ fun HomeScreen(
 private fun WelcomeIntroCard(
     modifier: Modifier = Modifier
 ) {
+    val desc = stringResource(R.string.home_find_nearby_description)
+
     Card(
         modifier = modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
-                contentDescription = stringResource(R.string.home_find_nearby_description)
+                contentDescription = desc
             },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
