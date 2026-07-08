@@ -347,8 +347,20 @@ class AddPlaceViewModel @Inject constructor(
      * w promieniu [DUPLICATE_RADIUS_METERS]) — zamiast od razu zapisywać,
      * ustawiamy [UiState.showDuplicateWarning] = true. User musi potwierdzić.
      */
-    fun save() {
+    fun save(isOffline: Boolean = false) {
         val state = _uiState.value
+
+        if (isOffline) {
+            _uiState.update {
+                it.copy(
+                    isSaving = false,
+                    isUploadingPhotos = false,
+                    errorMessage = UiText.StringResource(R.string.add_place_offline_save_hint)
+                )
+            }
+            return
+        }
+
         if (!state.isFormValid) {
             _uiState.update {
                 it.copy(

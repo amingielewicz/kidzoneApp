@@ -47,6 +47,9 @@
     <string name="error_network">Błąd połączenia z serwerem. Spróbuj ponownie.</string>
     <string name="error_unknown">Wystąpił nieoczekiwany błąd. Spróbuj ponownie.</string>
     <string name="error_no_internet">Brak połączenia z internetem. Sprawdź sieć i spróbuj ponownie.</string>
+    <string name="add_place_offline_save_hint">Brak internetu. Dane zostają w formularzu — zapisz po odzyskaniu połączenia.</string>
+    <string name="add_place_offline_save_action">Zapisz po odzyskaniu internetu</string>
+    <string name="add_place_offline_save_snackbar">Brak internetu. Nie wyczyściliśmy formularza — spróbuj ponownie po odzyskaniu połączenia.</string>
     <string name="error_server_temporary">Nie udało się połączyć z serwerem. Spróbuj ponownie za chwilę.</string>
     <string name="error_permission_denied">Nie masz uprawnień do tych danych. Zaloguj się ponownie.</string>
     <string name="error_config_update">Dane wymagają aktualizacji konfiguracji. Spróbuj ponownie później.</string>
@@ -101,6 +104,7 @@
     <string name="home_no_nearby_places">Nie znaleźliśmy miejsc w pobliżu</string>
     <string name="home_enable_location">Włącz lokalizację</string>
     <string name="home_location_rationale">Pokażemy Ci miejsca przyjazne dzieciom w pobliżu, gdy zezwolisz na dostęp do lokalizacji.</string>
+    <string name="home_manual_city_hint">Nie chcesz używać GPS? Kliknij tutaj, aby wybrać miasto ręcznie</string>
 
     <!-- Map -->
     <string name="map_my_location">Moja lokalizacja</string>

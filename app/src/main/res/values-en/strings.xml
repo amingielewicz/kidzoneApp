@@ -53,6 +53,9 @@
     <string name="error_quota_exceeded">Service is temporarily overloaded. Please try again in a moment.</string>
     <string name="error_upload_failed">Failed to upload photo. Please try again.</string>
     <string name="error_storage_permission">You do not have permission for this file. Please sign in again.</string>
+    <string name="add_place_offline_save_hint">No internet connection. Your data stays in the form — save it when the connection is back.</string>
+    <string name="add_place_offline_save_action">Save when online</string>
+    <string name="add_place_offline_save_snackbar">No internet connection. We did not clear the form — try again when the connection is back.</string>
     <string name="error_storage_quota">Failed to upload photo because the service is temporarily overloaded. Please try again later.</string>
     <string name="error_storage_retry_limit">Failed to upload photo due to unstable connection. Please try again.</string>
     <string name="error_already_reported">You have already reported this content.</string>
@@ -101,6 +104,7 @@
     <string name="home_no_nearby_places">No places found nearby</string>
     <string name="home_enable_location">Enable location</string>
     <string name="home_location_rationale">We\'ll show you kid-friendly places nearby when you allow location access.</string>
+    <string name="home_manual_city_hint">Don’t want to use GPS? Tap here to choose a city manually</string>
 
     <!-- Map -->
     <string name="map_my_location">My location</string>
@@ -578,4 +582,5 @@
     <string name="delete_review_confirmation">Your review will be permanently deleted. The average rating of the place will be recalculated.</string>
     <string name="added_date">Added %1$s</string>
     <string name="edited_date">Edited %1$s</string>
+
 </resources>

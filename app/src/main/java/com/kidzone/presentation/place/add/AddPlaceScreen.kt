@@ -96,7 +96,10 @@ import com.kidzone.presentation.common.rememberHapticFeedback
 import com.kidzone.presentation.common.style
 import com.kidzone.utils.UiText
 import com.kidzone.presentation.common.NetworkStatus
+import com.kidzone.presentation.common.createCameraImageUri
+import com.kidzone.presentation.common.rememberHapticFeedback
 import com.kidzone.presentation.common.rememberNetworkStatus
+import com.kidzone.presentation.common.style
 import kotlinx.coroutines.launch
 
 private val FORM_SECTION_GAP = 14.dp
@@ -132,10 +135,13 @@ fun AddPlaceScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val networkStatus by rememberNetworkStatus()
-    val isOffline = networkStatus == NetworkStatus.UNAVAILABLE
+    val isOffline = networkStatus != NetworkStatus.AVAILABLE
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val offlineSaveHint = stringResource(R.string.add_place_offline_save_hint)
+    val offlineSaveAction = stringResource(R.string.add_place_offline_save_action)
+    val offlineSaveSnackbar = stringResource(R.string.add_place_offline_save_snackbar)
     val haptic = rememberHapticFeedback()
     var locationPermissionGranted by remember { mutableStateOf(hasLocationPermission(context)) }
     var locationServiceEnabled by remember { mutableStateOf(isLocationServiceEnabled(context)) }
@@ -289,11 +295,12 @@ fun AddPlaceScreen(
     fun handleSaveClick() {
         if (isOffline) {
             coroutineScope.launch {
-                snackbarHostState.showSnackbar(OFFLINE_SAVE_SNACKBAR)
+                snackbarHostState.showSnackbar(offlineSaveSnackbar)
             }
-        } else {
-            viewModel.save()
+            return
         }
+
+        viewModel.save(isOffline = false)
     }
 
     val saveHint = when {
@@ -302,7 +309,7 @@ fun AddPlaceScreen(
                 (state.latitude == null || state.longitude == null) -> SAVE_HINT_NAME_AND_LOCATION
         !state.isFormValid && state.name.isBlank() -> SAVE_HINT_NAME
         !state.isFormValid && (state.latitude == null || state.longitude == null) -> SAVE_HINT_LOCATION
-        isOffline -> OFFLINE_SAVE_HINT
+        isOffline -> offlineSaveHint
         else -> null
     }
 
@@ -347,7 +354,7 @@ fun AddPlaceScreen(
                         } else {
                             Text(
                                 text = when {
-                                    isOffline -> OFFLINE_SAVE_ACTION
+                                    isOffline -> offlineSaveAction
                                     state.isEditMode -> stringResource(R.string.update_place_action)
                                     else -> stringResource(R.string.save_place_action)
                                 }
@@ -626,12 +633,21 @@ private suspend fun fetchAndSetLocation(
     }
 
     try {
-        val coords = fetchCurrentLocation(context)
+        val coords = kotlinx.coroutines.withTimeoutOrNull(12_000L) {
+            fetchCurrentLocation(context)
+        }
+
         if (coords == null) {
             viewModel.onLocationError(UiText.StringResource(R.string.error_location_timeout))
             return
         }
-        val address = runCatching { reverseGeocode(context, coords.first, coords.second) }.getOrNull()
+
+        val address = kotlinx.coroutines.withTimeoutOrNull(4_000L) {
+            runCatching {
+                reverseGeocode(context, coords.first, coords.second)
+            }.getOrNull()
+        }
+
         viewModel.onLocationFetched(coords.first, coords.second, address)
     } catch (e: Exception) {
         viewModel.onLocationError(UiText.StringResource(R.string.error_location_timeout))
