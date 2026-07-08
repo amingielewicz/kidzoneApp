@@ -23,7 +23,6 @@ import com.kidzone.presentation.place.details.PlaceDetailsScreen
 import com.kidzone.presentation.place.myplaces.MyPlacesScreen
 import com.kidzone.presentation.review.myreviews.MyReviewsScreen
 import com.kidzone.presentation.splash.SplashScreen
-import com.kidzone.data.remote.RemoteConfigService
 
 /**
  * Klucze sygnalizujące "po dodaniu miejsca skacz na Map i wycentruj kamerę".
@@ -329,10 +328,4 @@ fun KidZoneNavGraph(
             }
         }
     }
-}
-
-@dagger.hilt.EntryPoint
-@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
-interface RemoteConfigEntryPoint {
-    fun remoteConfigService(): RemoteConfigService
 }
