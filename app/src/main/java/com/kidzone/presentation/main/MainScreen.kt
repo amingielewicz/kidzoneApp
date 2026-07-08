@@ -53,6 +53,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -143,6 +144,7 @@ fun MainScreen(
     var locationPermissionGranted by remember {
         mutableStateOf(hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION))
     }
+    var locationRefreshSignal by remember { mutableIntStateOf(0) }
 
     fun markHomeIntroUsed() {
         if (showHomeIntro) {
@@ -165,6 +167,7 @@ fun MainScreen(
         locationPermissionGranted = hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
         if (locationPermissionGranted) {
             markHomeIntroUsed()
+            locationRefreshSignal += 1
         }
     }
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -346,6 +349,7 @@ fun MainScreen(
                         onDismissIntro = ::markHomeIntroUsed,
                         showIntro = showHomeIntro,
                         locationPermissionGranted = locationPermissionGranted,
+                        locationRefreshSignal = locationRefreshSignal,
                         sharedTransitionScope = sharedTransitionScope,
                         animatedContentScope = animatedContentScope
                     )
