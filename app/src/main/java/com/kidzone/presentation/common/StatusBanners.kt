@@ -22,6 +22,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -35,10 +36,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.kidzone.R
 import com.kidzone.presentation.place.add.isLocationServiceEnabled
 
@@ -61,10 +62,14 @@ fun rememberNetworkStatus(): State<NetworkStatus> {
 }
 
 @Composable
-fun rememberLocationServiceEnabled(): Boolean {
+fun rememberLocationServiceEnabled(refreshSignal: Int = 0): Boolean {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val enabled = remember { mutableStateOf(isLocationServiceEnabled(context)) }
+
+    LaunchedEffect(refreshSignal) {
+        enabled.value = isLocationServiceEnabled(context)
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
