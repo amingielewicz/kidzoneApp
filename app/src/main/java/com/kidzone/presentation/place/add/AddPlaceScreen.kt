@@ -8,6 +8,7 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateContentSize
 import androidx.core.content.ContextCompat
 import java.security.MessageDigest
 import androidx.compose.foundation.background
@@ -360,15 +361,18 @@ fun AddPlaceScreen(
                     onValueChange = { viewModel.onNameChange(it.take(PLACE_NAME_UI_MAX_LENGTH)) },
                     label = { RequiredFieldLabel(stringResource(R.string.place_name_label)) },
                     singleLine = true,
-                    supportingText = {
-                        CharacterCounterRow(
-                            visible = showNameCounter,
-                            count = nameLength,
-                            max = PLACE_NAME_UI_MAX_LENGTH,
-                            limitReached = nameLimitReached,
-                            showLimitMessage = nameLimitReached,
-                            requiredMessage = stringResource(R.string.field_required).takeIf { nameHasError }
-                        )
+                    supportingText = if (nameHasError || showNameCounter) {
+                        {
+                            CharacterCounterRow(
+                                count = nameLength,
+                                max = PLACE_NAME_UI_MAX_LENGTH,
+                                limitReached = nameLimitReached,
+                                showLimitMessage = nameLimitReached,
+                                requiredMessage = stringResource(R.string.field_required).takeIf { nameHasError }
+                            )
+                        }
+                    } else {
+                        null
                     },
                     isError = nameHasError || nameWarning,
                     enabled = !state.isSaving,
@@ -388,14 +392,17 @@ fun AddPlaceScreen(
                     label = { Text(stringResource(R.string.place_description_label)) },
                     minLines = 2,
                     maxLines = 5,
-                    supportingText = {
-                        CharacterCounterRow(
-                            visible = showDescriptionCounter,
-                            count = descriptionLength,
-                            max = PLACE_DESCRIPTION_UI_MAX_LENGTH,
-                            limitReached = descriptionLimitReached,
-                            showLimitMessage = descriptionLimitReached
-                        )
+                    supportingText = if (showDescriptionCounter) {
+                        {
+                            CharacterCounterRow(
+                                count = descriptionLength,
+                                max = PLACE_DESCRIPTION_UI_MAX_LENGTH,
+                                limitReached = descriptionLimitReached,
+                                showLimitMessage = descriptionLimitReached
+                            )
+                        }
+                    } else {
+                        null
                     },
                     isError = descriptionWarning,
                     enabled = !state.isSaving,
@@ -514,7 +521,6 @@ fun AddPlaceScreen(
 
 @Composable
 private fun CharacterCounterRow(
-    visible: Boolean,
     count: Int,
     max: Int,
     limitReached: Boolean,
@@ -542,7 +548,7 @@ private fun CharacterCounterRow(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            visible -> {
+            else -> {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -586,7 +592,9 @@ private fun FormSection(
         tonalElevation = 1.dp
     ) {
         Column(
-            modifier = Modifier.padding(SECTION_PADDING),
+            modifier = Modifier
+                .padding(SECTION_PADDING)
+                .animateContentSize(),
             verticalArrangement = Arrangement.spacedBy(FORM_FIELD_GAP),
             content = {
                 Text(
