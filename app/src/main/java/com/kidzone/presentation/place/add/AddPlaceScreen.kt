@@ -97,7 +97,13 @@ private val FORM_FIELD_GAP = 10.dp
 private val SECTION_PADDING = 14.dp
 private val PHOTO_THUMBNAIL_SIZE = 76.dp
 private val PHOTO_REMOVE_BUTTON_SIZE = 20.dp
+private const val PLACE_NAME_UI_MAX_LENGTH = 50
+private const val PLACE_NAME_WARNING_LENGTH = 40
+private const val PLACE_DESCRIPTION_UI_MAX_LENGTH = 500
+private const val PLACE_DESCRIPTION_COUNTER_THRESHOLD = 400
+private const val PLACE_DESCRIPTION_WARNING_LENGTH = 480
 private const val LOCATION_ERROR_HINT = "Nie udało się pobrać lokalizacji. Sprawdź GPS i spróbuj ponownie."
+private const val DESCRIPTION_LIMIT_REACHED_HINT = "Osiągnięto maksymalną liczbę znaków"
 
 /**
  * Ekran dodawania nowego miejsca – formularz zapisywany do Firestore.
@@ -264,22 +270,27 @@ fun AddPlaceScreen(
             verticalArrangement = Arrangement.spacedBy(FORM_SECTION_GAP)
         ) {
             val nameHasError = state.hasTriedToSave && state.name.isBlank()
+            val nameLength = state.name.length
+            val showNameCounter = nameLength > 0
+            val nameWarning = nameLength >= PLACE_NAME_WARNING_LENGTH
+            val descriptionLength = state.description.length
+            val showDescriptionCounter = descriptionLength >= PLACE_DESCRIPTION_COUNTER_THRESHOLD
+            val descriptionWarning = descriptionLength >= PLACE_DESCRIPTION_WARNING_LENGTH
+            val descriptionLimitReached = descriptionLength >= PLACE_DESCRIPTION_UI_MAX_LENGTH
 
             FormSection(title = "Podstawy") {
                 OutlinedTextField(
                     value = state.name,
-                    onValueChange = viewModel::onNameChange,
+                    onValueChange = { viewModel.onNameChange(it.take(PLACE_NAME_UI_MAX_LENGTH)) },
                     label = { RequiredFieldLabel(stringResource(R.string.place_name_label)) },
                     singleLine = true,
                     supportingText = {
-                        val requiredText = if (state.name.isBlank()) {
-                            stringResource(R.string.field_required) + ". "
-                        } else {
-                            ""
+                        when {
+                            nameHasError -> Text(stringResource(R.string.field_required))
+                            showNameCounter -> Text("$nameLength/$PLACE_NAME_UI_MAX_LENGTH")
                         }
-                        Text("$requiredText${state.name.length}/$PLACE_NAME_MAX_LENGTH")
                     },
-                    isError = nameHasError,
+                    isError = nameHasError || nameWarning,
                     enabled = !state.isSaving,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     modifier = Modifier
@@ -293,10 +304,21 @@ fun AddPlaceScreen(
 
                 OutlinedTextField(
                     value = state.description,
-                    onValueChange = viewModel::onDescriptionChange,
+                    onValueChange = { viewModel.onDescriptionChange(it.take(PLACE_DESCRIPTION_UI_MAX_LENGTH)) },
                     label = { Text(stringResource(R.string.place_description_label)) },
                     minLines = 2,
                     maxLines = 5,
+                    supportingText = {
+                        if (showDescriptionCounter) {
+                            Column {
+                                Text("$descriptionLength/$PLACE_DESCRIPTION_UI_MAX_LENGTH")
+                                if (descriptionLimitReached) {
+                                    Text(DESCRIPTION_LIMIT_REACHED_HINT)
+                                }
+                            }
+                        }
+                    },
+                    isError = descriptionWarning,
                     enabled = !state.isSaving,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier.fillMaxWidth()
