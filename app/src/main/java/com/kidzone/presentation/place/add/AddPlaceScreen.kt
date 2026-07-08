@@ -108,19 +108,18 @@ private const val PLACE_NAME_WARNING_LENGTH = 40
 private const val PLACE_DESCRIPTION_UI_MAX_LENGTH = 500
 private const val PLACE_DESCRIPTION_COUNTER_THRESHOLD = 400
 private const val PLACE_DESCRIPTION_WARNING_LENGTH = 480
+private const val NEARBY_VISIBLE_LIMIT = 5
 private const val LIMIT_REACHED_HINT = "Osiągnięto maksymalną liczbę znaków"
 private const val LOCATION_PERMISSION_HELPER = "Aby pobrać lokalizację, zezwól na dostęp do GPS."
 private const val LOCATION_GPS_HELPER = "Włącz GPS, aby pobrać lokalizację."
 private const val LOCATION_READY_HELPER = "Kliknij przycisk powyżej, aby pobrać adres."
 
-/**
- * Ekran dodawania nowego miejsca – formularz zapisywany do Firestore.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPlaceScreen(
     onSaved: (newPlaceLat: Double?, newPlaceLng: Double?) -> Unit,
     onBack: () -> Unit,
+    onOpenExistingPlace: (String) -> Unit,
     viewModel: AddPlaceViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -191,9 +190,7 @@ fun AddPlaceScreen(
                 }
                 if (hash != null) hashes.add(hash)
             }
-            if (hashes.isNotEmpty()) {
-                photoHashSet = photoHashSet + hashes
-            }
+            if (hashes.isNotEmpty()) photoHashSet = photoHashSet + hashes
         }
         placeHashesReady = true
     }
@@ -216,9 +213,7 @@ fun AddPlaceScreen(
                 accepted.add(uri)
             }
             photoHashSet = hashes
-            if (accepted.isNotEmpty()) {
-                viewModel.addPhotos(accepted)
-            }
+            if (accepted.isNotEmpty()) viewModel.addPhotos(accepted)
             if (duplicatesFound > 0) {
                 coroutineScope.launch { snackbarHostState.showSnackbar(duplicatePhotoError) }
             }
@@ -250,9 +245,7 @@ fun AddPlaceScreen(
             return
         }
         placeCameraUriString = uri.toString()
-        runCatching {
-            placeCameraLauncher.launch(uri)
-        }.onFailure {
+        runCatching { placeCameraLauncher.launch(uri) }.onFailure {
             placeCameraUriString = null
             coroutineScope.launch { snackbarHostState.showSnackbar(cameraUnavailable) }
         }
@@ -262,10 +255,8 @@ fun AddPlaceScreen(
     val placeCameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) {
-            launchPlaceCamera()
-        } else {
-            coroutineScope.launch { snackbarHostState.showSnackbar(cameraAccessDenied) }
+        if (granted) launchPlaceCamera() else coroutineScope.launch {
+            snackbarHostState.showSnackbar(cameraAccessDenied)
         }
     }
 
@@ -274,9 +265,7 @@ fun AddPlaceScreen(
         locationServiceEnabled = isLocationServiceEnabled(context)
         when {
             !locationPermissionGranted -> locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-            !locationServiceEnabled -> locationSettingsLauncher.launch(
-                Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
-            )
+            !locationServiceEnabled -> locationSettingsLauncher.launch(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
             else -> coroutineScope.launch { fetchAndSetLocation(context, viewModel) }
         }
     }
@@ -299,19 +288,14 @@ fun AddPlaceScreen(
         },
         bottomBar = {
             Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding(),
+                modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
                 tonalElevation = 3.dp,
                 color = MaterialTheme.colorScheme.surface
             ) {
                 Button(
                     onClick = viewModel::save,
                     enabled = !state.isSaving && !state.isLoadingPlace && state.isFormValid,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                        .height(48.dp)
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).height(48.dp)
                 ) {
                     if (state.isSaving) {
                         CircularProgressIndicator(
@@ -331,10 +315,7 @@ fun AddPlaceScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 12.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(FORM_SECTION_GAP)
         ) {
@@ -371,19 +352,13 @@ fun AddPlaceScreen(
                                 requiredMessage = stringResource(R.string.field_required).takeIf { nameHasError }
                             )
                         }
-                    } else {
-                        null
-                    },
+                    } else null,
                     isError = nameHasError || nameWarning,
                     enabled = !state.isSaving,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .semantics {
-                            if (nameHasError) {
-                                error(context.getString(R.string.field_required))
-                            }
-                        }
+                    modifier = Modifier.fillMaxWidth().semantics {
+                        if (nameHasError) error(context.getString(R.string.field_required))
+                    }
                 )
 
                 OutlinedTextField(
@@ -401,9 +376,7 @@ fun AddPlaceScreen(
                                 showLimitMessage = descriptionLimitReached
                             )
                         }
-                    } else {
-                        null
-                    },
+                    } else null,
                     isError = descriptionWarning,
                     enabled = !state.isSaving,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
@@ -429,7 +402,10 @@ fun AddPlaceScreen(
                 )
 
                 if (state.nearbyPlaces.isNotEmpty()) {
-                    NearbyPlacesList(places = state.nearbyPlaces)
+                    NearbyPlacesList(
+                        places = state.nearbyPlaces,
+                        onOpenPlace = onOpenExistingPlace
+                    )
                 }
 
                 AddressReadOnlyCard(address = state.address, helperText = addressHelper)
@@ -464,20 +440,12 @@ fun AddPlaceScreen(
                     isSaving = state.isSaving,
                     placeHashesReady = placeHashesReady,
                     onPickFromGallery = {
-                        photoPickerLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
+                        photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     },
                     onTakePhoto = {
-                        val hasPerm = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.CAMERA
-                        ) == PackageManager.PERMISSION_GRANTED
-                        if (hasPerm) {
-                            launchPlaceCamera()
-                        } else {
-                            placeCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                        }
+                        val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                            PackageManager.PERMISSION_GRANTED
+                        if (hasPerm) launchPlaceCamera() else placeCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                     },
                     onRemoveExisting = { index ->
                         val removedUrl = state.existingPhotoUrls[index]
@@ -533,9 +501,7 @@ private fun CharacterCounterRow(
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(COUNTER_ROW_HEIGHT),
+        modifier = Modifier.fillMaxWidth().height(COUNTER_ROW_HEIGHT),
         contentAlignment = Alignment.CenterStart
     ) {
         when {
@@ -549,10 +515,7 @@ private fun CharacterCounterRow(
                 )
             }
             else -> {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "$count/$max",
                         style = MaterialTheme.typography.labelSmall,
@@ -560,12 +523,7 @@ private fun CharacterCounterRow(
                         maxLines = 1
                     )
                     if (showLimitMessage) {
-                        Text(
-                            text = " | ",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = color,
-                            maxLines = 1
-                        )
+                        Text(text = " | ", style = MaterialTheme.typography.labelSmall, color = color, maxLines = 1)
                         Text(
                             text = LIMIT_REACHED_HINT,
                             style = MaterialTheme.typography.labelSmall,
@@ -592,16 +550,10 @@ private fun FormSection(
         tonalElevation = 1.dp
     ) {
         Column(
-            modifier = Modifier
-                .padding(SECTION_PADDING)
-                .animateContentSize(),
+            modifier = Modifier.padding(SECTION_PADDING).animateContentSize(),
             verticalArrangement = Arrangement.spacedBy(FORM_FIELD_GAP),
             content = {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 content()
             }
         )
@@ -652,31 +604,18 @@ private fun CategoryDropdown(
             readOnly = true,
             label = { Text(stringResource(R.string.category_label)) },
             leadingIcon = {
-                Icon(
-                    imageVector = selectedStyle.icon,
-                    contentDescription = null,
-                    tint = selectedStyle.color
-                )
+                Icon(imageVector = selectedStyle.icon, contentDescription = null, tint = selectedStyle.color)
             },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             enabled = enabled,
             modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable)
         )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             PlaceCategory.entries.forEach { category ->
                 val style = category.style
                 DropdownMenuItem(
                     text = { Text(stringResource(category.labelRes)) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = style.icon,
-                            contentDescription = null,
-                            tint = style.color
-                        )
-                    },
+                    leadingIcon = { Icon(imageVector = style.icon, contentDescription = null, tint = style.color) },
                     onClick = {
                         onSelected(category)
                         expanded = false
@@ -739,11 +678,7 @@ private fun LocationButtonIcon(isReady: Boolean) {
             imageVector = Icons.Filled.MyLocation,
             contentDescription = null,
             modifier = Modifier.size(18.dp),
-            tint = if (isReady) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            }
+            tint = if (isReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
         )
         if (!isReady) {
             Icon(
@@ -788,21 +723,9 @@ private fun AmenityChip(
     enabled: Boolean,
     onClick: () -> Unit
 ) {
-    val containerColor = if (selected) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-    val contentColor = if (selected) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val border = if (selected) {
-        null
-    } else {
-        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    }
+    val containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+    val contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    val border = if (selected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
 
     Surface(
         modifier = Modifier.clickable(enabled = enabled, onClick = onClick),
@@ -815,11 +738,7 @@ private fun AmenityChip(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = amenityIcon(amenity),
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1
-            )
+            Text(text = amenityIcon(amenity), style = MaterialTheme.typography.labelSmall, maxLines = 1)
             Spacer(Modifier.width(6.dp))
             Text(
                 text = stringResource(amenity.labelRes),
@@ -865,12 +784,10 @@ private fun amenityIcon(amenity: Amenity): String = when (amenity) {
 @Composable
 private fun RequiredFieldLabel(text: String) {
     val errorColor = MaterialTheme.colorScheme.error
-    Text(
-        buildAnnotatedString {
-            append(text)
-            withStyle(SpanStyle(color = errorColor)) { append(" *") }
-        }
-    )
+    Text(buildAnnotatedString {
+        append(text)
+        withStyle(SpanStyle(color = errorColor)) { append(" *") }
+    })
 }
 
 @Composable
@@ -933,10 +850,7 @@ private fun PhotosSection(
     )
 
     if (existingPhotoUrls.isNotEmpty() || photoUris.isNotEmpty()) {
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             itemsIndexed(existingPhotoUrls) { index, url ->
                 PhotoThumbnail(model = url, onRemove = { onRemoveExisting(index) }, enabled = !isSaving)
             }
@@ -947,10 +861,7 @@ private fun PhotosSection(
     }
 
     if (canAddMorePhotos) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
                 onClick = onPickFromGallery,
                 enabled = !isSaving && placeHashesReady,
@@ -974,7 +885,13 @@ private fun PhotosSection(
 }
 
 @Composable
-private fun NearbyPlacesList(places: List<AddPlaceViewModel.NearbyPlace>) {
+private fun NearbyPlacesList(
+    places: List<AddPlaceViewModel.NearbyPlace>,
+    onOpenPlace: (String) -> Unit
+) {
+    val visiblePlaces = places.take(NEARBY_VISIBLE_LIMIT)
+    val hiddenCount = places.size - visiblePlaces.size
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -987,10 +904,13 @@ private fun NearbyPlacesList(places: List<AddPlaceViewModel.NearbyPlace>) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(6.dp))
-            places.take(5).forEach { place ->
+            visiblePlaces.forEach { place ->
                 val style = place.category.style
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenPlace(place.id) }
+                        .padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -1014,6 +934,14 @@ private fun NearbyPlacesList(places: List<AddPlaceViewModel.NearbyPlace>) {
                     )
                 }
             }
+            if (hiddenCount > 0) {
+                Text(
+                    text = "+$hiddenCount więcej w pobliżu",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
         }
     }
 }
@@ -1027,9 +955,7 @@ private fun DuplicateWarningDialog(
     val style = candidate.category.style
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        icon = {
-            Icon(imageVector = style.icon, contentDescription = null, tint = style.color)
-        },
+        icon = { Icon(imageVector = style.icon, contentDescription = null, tint = style.color) },
         title = { Text(stringResource(R.string.duplicate_warning_title)) },
         text = {
             Text(
@@ -1041,12 +967,8 @@ private fun DuplicateWarningDialog(
                 )
             )
         },
-        confirmButton = {
-            Button(onClick = onConfirm) { Text(stringResource(R.string.duplicate_warning_confirm)) }
-        },
-        dismissButton = {
-            OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-        }
+        confirmButton = { Button(onClick = onConfirm) { Text(stringResource(R.string.duplicate_warning_confirm)) } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
     )
 }
 
@@ -1061,21 +983,16 @@ private fun PhotoThumbnail(
         AsyncImage(
             model = model,
             contentDescription = stringResource(R.string.photo_thumbnail_description),
-            modifier = Modifier
-                .size(PHOTO_THUMBNAIL_SIZE)
-                .clip(RoundedCornerShape(8.dp)),
+            modifier = Modifier.size(PHOTO_THUMBNAIL_SIZE).clip(RoundedCornerShape(8.dp)),
             contentScale = ContentScale.Crop
         )
         if (enabled) {
             IconButton(
                 onClick = onRemove,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .size(PHOTO_REMOVE_BUTTON_SIZE)
-                    .background(
-                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.82f),
-                        shape = CircleShape
-                    )
+                modifier = Modifier.align(Alignment.TopEnd).size(PHOTO_REMOVE_BUTTON_SIZE).background(
+                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.82f),
+                    shape = CircleShape
+                )
             ) {
                 Icon(
                     imageVector = Icons.Filled.Close,
@@ -1094,9 +1011,7 @@ private fun computePlacePhotoHash(context: android.content.Context, uri: Uri): S
         val md = MessageDigest.getInstance("MD5")
         val buffer = ByteArray(8192)
         var bytesRead: Int
-        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-            md.update(buffer, 0, bytesRead)
-        }
+        while (inputStream.read(buffer).also { bytesRead = it } != -1) md.update(buffer, 0, bytesRead)
         inputStream.close()
         md.digest().joinToString("") { "%02x".format(it) }
     } catch (_: Exception) {
@@ -1113,9 +1028,7 @@ private fun computeRemotePlacePhotoHash(url: String): String? {
         val md = MessageDigest.getInstance("MD5")
         val buffer = ByteArray(8192)
         var bytesRead: Int
-        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-            md.update(buffer, 0, bytesRead)
-        }
+        while (inputStream.read(buffer).also { bytesRead = it } != -1) md.update(buffer, 0, bytesRead)
         inputStream.close()
         md.digest().joinToString("") { "%02x".format(it) }
     } catch (_: Exception) {
