@@ -12,11 +12,8 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContentScope
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -73,9 +70,10 @@ import com.google.android.gms.maps.model.LatLng
 import com.kidzone.R
 import com.kidzone.navigation.Route
 import com.kidzone.presentation.common.NetworkStatus
-import com.kidzone.presentation.common.NoInternetBanner
 import com.kidzone.presentation.common.NotificationPromptReason
 import com.kidzone.presentation.common.NotificationSoftPromptDialog
+import com.kidzone.presentation.common.SystemStatusIcons
+import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.common.shouldShowNotificationPrompt
 import com.kidzone.presentation.home.HomeScreen
@@ -134,6 +132,7 @@ fun MainScreen(
         mutableStateOf(hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION))
     }
     var locationRefreshSignal by remember { mutableIntStateOf(0) }
+    val locationServiceEnabled = rememberLocationServiceEnabled(locationRefreshSignal)
 
     fun markHomeIntroUsed() {
         if (showHomeIntro) {
@@ -248,21 +247,37 @@ fun MainScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painter = painterResource(R.drawable.ic_launcher_foreground),
-                        contentDescription = null,
-                        modifier = Modifier.size(52.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = stringResource(R.string.app_name),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(R.drawable.ic_launcher_foreground),
+                            contentDescription = null,
+                            modifier = Modifier.size(52.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(R.string.app_name),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                },
+                actions = {
+                    SystemStatusIcons(
+                        isNetworkAvailable = networkStatus == NetworkStatus.AVAILABLE,
+                        isLocationAvailable = locationPermissionGranted && locationServiceEnabled,
+                        onNetworkClick = {
+                            Toast.makeText(
+                                context,
+                                "Brak internetu. Sprawdź połączenie sieciowe.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        onLocationClick = { requestLocationFromHome() }
                     )
                 }
-            })
+            )
         },
         bottomBar = {
             NavigationBar {
@@ -320,13 +335,6 @@ fun MainScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            AnimatedVisibility(
-                visible = networkStatus == NetworkStatus.UNAVAILABLE,
-                enter = expandVertically(),
-                exit = shrinkVertically()
-            ) {
-                NoInternetBanner()
-            }
             NavHost(
                 navController = navController,
                 startDestination = Route.Home.path,
