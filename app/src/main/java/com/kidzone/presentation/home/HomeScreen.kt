@@ -37,6 +37,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,6 +65,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -91,6 +93,7 @@ private const val MANUAL_CITY_HINT = "Wybierz miasto ręcznie"
 private const val GPS_STATUS_MESSAGE = "Nie widzimy Twojej lokalizacji. Włącz GPS, aby zobaczyć atrakcje w pobliżu."
 private const val GPS_SECTION_EMPTY_MESSAGE = "Włącz lokalizację, aby zobaczyć, co polecają inni rodzice."
 private const val ENABLE_GPS = "Włącz GPS"
+private const val CHECKING_GPS = "Trwa sprawdzanie..."
 private const val WAVE_EMOJI = "👋"
 private const val WAVE_INITIAL_ROTATION = -12f
 private const val WAVE_TARGET_ROTATION = 16f
@@ -99,6 +102,8 @@ private const val NEARBY_SECTION_TITLE = "📍 W pobliżu"
 private const val TOP_SECTION_TITLE = "🏆 Najpopularniejsze"
 private const val RECENT_SECTION_TITLE = "🆕 Nowości w okolicy"
 private const val VERY_CLOSE_DISTANCE_LABEL = "Tuż obok"
+private const val EMPTY_TOP_ICON = "★"
+private const val EMPTY_RECENT_ICON = "NEW"
 
 private data class HomePlaceItem(
     val place: Place,
@@ -133,6 +138,7 @@ fun HomeScreen(
     val hasLocationContext = hasLocationPermission && gpsEnabled
     val showGpsDisabledSection = hasLocationPermission && !gpsEnabled
     val showLocationAwareContent = hasLocationContext || showGpsDisabledSection
+    var isGpsCheckInProgress by remember { mutableStateOf(false) }
 
     var previousNetworkStatus by remember { mutableStateOf(networkStatus) }
     LaunchedEffect(networkStatus) {
@@ -148,6 +154,15 @@ fun HomeScreen(
         if (locationPermissionGranted) {
             viewModel.onLocationPermissionGranted()
         }
+        if (locationRefreshSignal > 0) {
+            isGpsCheckInProgress = false
+        }
+    }
+
+    LaunchedEffect(gpsEnabled) {
+        if (gpsEnabled) {
+            isGpsCheckInProgress = false
+        }
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -155,6 +170,7 @@ fun HomeScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.refreshLocationGranted()
+                isGpsCheckInProgress = false
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -227,7 +243,11 @@ fun HomeScreen(
                         item {
                             GpsDisabledSection(
                                 title = NEARBY_SECTION_TITLE,
-                                onEnableGpsClick = onRequestLocation,
+                                isChecking = isGpsCheckInProgress,
+                                onEnableGpsClick = {
+                                    isGpsCheckInProgress = true
+                                    onRequestLocation()
+                                },
                                 onManualCityClick = onOpenMap
                             )
                         }
@@ -253,11 +273,14 @@ fun HomeScreen(
                         item {
                             HomeSection(
                                 title = TOP_SECTION_TITLE,
-                                items = state.topPlaces.map {
-                                    HomePlaceItem(it.place, it.distanceKm)
+                                items = if (hasLocationContext) {
+                                    state.topPlaces.map { HomePlaceItem(it.place, it.distanceKm) }
+                                } else {
+                                    emptyList()
                                 },
-                                isLoading = state.isTopLoading,
-                                emptyMessage = stringResource(R.string.home_no_top_places),
+                                isLoading = hasLocationContext && state.isTopLoading,
+                                emptyMessage = GPS_SECTION_EMPTY_MESSAGE,
+                                emptyIcon = EMPTY_TOP_ICON,
                                 onPlaceClick = { onOpenPlaceDetails(it, "top") },
                                 animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
                                 keyPrefix = "top"
@@ -267,25 +290,17 @@ fun HomeScreen(
                         item {
                             HomeSection(
                                 title = RECENT_SECTION_TITLE,
-                                items = state.recentlyAddedPlaces.map {
-                                    HomePlaceItem(it.place, it.distanceKm)
+                                items = if (hasLocationContext) {
+                                    state.recentlyAddedPlaces.map { HomePlaceItem(it.place, it.distanceKm) }
+                                } else {
+                                    emptyList()
                                 },
-                                isLoading = state.isRecentlyAddedLoading,
-                                emptyMessage = stringResource(R.string.home_no_recent_nearby_places),
+                                isLoading = hasLocationContext && state.isRecentlyAddedLoading,
+                                emptyMessage = GPS_SECTION_EMPTY_MESSAGE,
+                                emptyIcon = EMPTY_RECENT_ICON,
                                 onPlaceClick = { onOpenPlaceDetails(it, "recent") },
                                 animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
                                 keyPrefix = "recent"
-                            )
-                        }
-                    }
-
-                    state.errorMessage?.takeIf { hasLocationContext }?.let { msg ->
-                        item {
-                            Text(
-                                text = msg.asString(),
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(horizontal = HOME_HORIZONTAL_PADDING)
                             )
                         }
                     }
@@ -391,6 +406,7 @@ private fun WavingHand() {
 @Suppress("FunctionNaming")
 private fun GpsDisabledSection(
     title: String,
+    isChecking: Boolean,
     onEnableGpsClick: () -> Unit,
     onManualCityClick: () -> Unit
 ) {
@@ -401,6 +417,7 @@ private fun GpsDisabledSection(
         )
         GpsDisabledStatusPanel(
             modifier = Modifier.padding(horizontal = HOME_HORIZONTAL_PADDING),
+            isChecking = isChecking,
             onEnableGpsClick = onEnableGpsClick,
             onManualCityClick = onManualCityClick
         )
@@ -411,6 +428,7 @@ private fun GpsDisabledSection(
 @Suppress("FunctionNaming")
 private fun GpsDisabledStatusPanel(
     modifier: Modifier = Modifier,
+    isChecking: Boolean,
     onEnableGpsClick: () -> Unit,
     onManualCityClick: () -> Unit
 ) {
@@ -444,13 +462,24 @@ private fun GpsDisabledStatusPanel(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Button(
                     onClick = onEnableGpsClick,
+                    enabled = !isChecking,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
-                    Text(ENABLE_GPS)
+                    if (isChecking) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(CHECKING_GPS)
+                    } else {
+                        Text(ENABLE_GPS)
+                    }
                 }
                 TextButton(
                     onClick = onManualCityClick,
@@ -458,7 +487,9 @@ private fun GpsDisabledStatusPanel(
                 ) {
                     Text(
                         text = MANUAL_CITY_HINT,
-                        textAlign = TextAlign.Center
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        textDecoration = TextDecoration.Underline
                     )
                 }
             }
@@ -540,7 +571,8 @@ private fun HomeLocationEmptyState(
                     text = MANUAL_CITY_HINT,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    textDecoration = TextDecoration.Underline
                 )
             }
         }
@@ -556,7 +588,8 @@ private fun HomeSection(
     emptyMessage: String,
     onPlaceClick: (placeId: String) -> Unit,
     animation: PlaceCardAnimation,
-    keyPrefix: String
+    keyPrefix: String,
+    emptyIcon: String? = null
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SectionHeader(
@@ -567,6 +600,7 @@ private fun HomeSection(
             items = items,
             isLoading = isLoading,
             emptyMessage = emptyMessage,
+            emptyIcon = emptyIcon,
             onPlaceClick = onPlaceClick,
             animation = animation,
             keyPrefix = keyPrefix
@@ -596,7 +630,8 @@ private fun HorizontalPlacesRow(
     emptyMessage: String,
     onPlaceClick: (placeId: String) -> Unit,
     animation: PlaceCardAnimation,
-    keyPrefix: String = ""
+    keyPrefix: String = "",
+    emptyIcon: String? = null
 ) {
     val rowHeight = PLACE_ROW_HEIGHT
     when {
@@ -622,16 +657,27 @@ private fun HorizontalPlacesRow(
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
+                    emptyIcon?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.outlineVariant,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
                     Text(
                         text = emptyMessage,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 20.dp)
+                        textAlign = TextAlign.Center
                     )
                 }
             }
