@@ -17,6 +17,8 @@ import com.kidzone.sync.SyncManager
 import com.kidzone.utils.AppConfig
 import com.kidzone.utils.GeoHash
 import com.kidzone.utils.OpResult
+import com.kidzone.data.local.sync.OperationType
+import com.kidzone.sync.OfflinePayload
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.CoroutineScope
@@ -213,13 +215,18 @@ class FirestorePlaceRepository @Inject constructor(
 
     override suspend fun addPlace(place: Place): OpResult<Place> =
         performanceTraces.measureResult(PerformanceTraces.ADD_PLACE) {
+            val doc = placesCollection().document()
+            val p = place.copy(id = doc.id)
+
             try {
-                val doc = placesCollection().document()
-                val p = place.copy(id = doc.id)
                 placesCollection().document(p.id).set(PlaceDto.fromDomain(p)).await()
                 placeDao.upsert(PlaceEntity.fromDomain(p))
                 OpResult.success(p)
-            } catch (e: Exception) { OpResult.failure(e) }
+            } catch (e: Exception) {
+                placeDao.upsert(PlaceEntity.fromDomain(p))
+                syncManager.enqueue(OperationType.ADD_PLACE, OfflinePayload.serializePlace(p))
+                OpResult.success(p)
+            }
         }
 
     override suspend fun updatePlace(place: Place): OpResult<Place> = try {

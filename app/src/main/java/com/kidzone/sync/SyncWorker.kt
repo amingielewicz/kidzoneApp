@@ -11,6 +11,8 @@ import com.kidzone.data.local.sync.PendingOperationDao
 import com.kidzone.data.local.sync.PendingOperationEntity
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.repository.ReviewRepository
+import com.kidzone.data.remote.FirestoreCollections
+import com.kidzone.data.remote.dto.PlaceDto
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.tasks.await
@@ -199,8 +201,23 @@ class SyncWorker @AssistedInject constructor(
             return true
         }
 
-        Timber.w("SyncWorker: ADD_PLACE for ${place.id} is gated until write replay is implemented")
-        return false
+        if (place.id.isBlank()) {
+            Timber.w("SyncWorker: ADD_PLACE payload missing place id")
+            return true
+        }
+
+        return try {
+            firestore.collection(FirestoreCollections.PLACES)
+                .document(place.id)
+                .set(PlaceDto.fromDomain(place))
+                .await()
+
+            Timber.i("SyncWorker: ADD_PLACE synced for ${place.id}")
+            true
+        } catch (e: Exception) {
+            Timber.w(e, "SyncWorker: ADD_PLACE failed for ${place.id}")
+            false
+        }
     }
 
     /**
