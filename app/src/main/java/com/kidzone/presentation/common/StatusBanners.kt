@@ -12,6 +12,7 @@ import android.content.BroadcastReceiver
 import android.content.Intent
 import android.content.IntentFilter
 import android.provider.Settings
+import android.location.LocationManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
@@ -175,19 +176,45 @@ fun rememberLocationServiceEnabled(refreshSignal: Int = 0): Boolean {
     val lifecycleOwner = LocalLifecycleOwner.current
     val enabled = remember { mutableStateOf(isLocationServiceEnabled(context)) }
 
-    LaunchedEffect(refreshSignal) {
+    fun updateLocationServiceState() {
         enabled.value = isLocationServiceEnabled(context)
     }
 
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                enabled.value = isLocationServiceEnabled(context)
+    LaunchedEffect(refreshSignal) {
+        updateLocationServiceState()
+    }
+
+    DisposableEffect(context, lifecycleOwner) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == LocationManager.PROVIDERS_CHANGED_ACTION) {
+                    updateLocationServiceState()
+                }
             }
         }
+
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                updateLocationServiceState()
+            }
+        }
+
+        context.registerReceiver(
+            receiver,
+            IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION)
+        )
+
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+
+        onDispose {
+            runCatching {
+                context.unregisterReceiver(receiver)
+            }
+
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
+
     return enabled.value
 }
 
