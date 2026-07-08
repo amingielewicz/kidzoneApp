@@ -58,7 +58,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -70,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.kidzone.R
 import com.kidzone.domain.model.Place
 import com.kidzone.presentation.common.CategoryIcon
@@ -87,8 +87,9 @@ private val PLACE_CARD_CONTENT_PADDING = 14.dp
 private val LOCATION_PANEL_MIN_HEIGHT = 360.dp
 private val LOCATION_CTA_HEIGHT = 48.dp
 private val HOME_HORIZONTAL_PADDING = 16.dp
-private const val MANUAL_CITY_HINT = "Nie chcesz używać GPS? Kliknij tutaj, aby wybrać miasto ręcznie"
+private const val MANUAL_CITY_HINT = "Wybierz miasto ręcznie"
 private const val GPS_STATUS_MESSAGE = "Nie widzimy Twojej lokalizacji. Włącz GPS, aby zobaczyć atrakcje w pobliżu."
+private const val GPS_SECTION_EMPTY_MESSAGE = "Włącz lokalizację, aby zobaczyć, co polecają inni rodzice."
 private const val ENABLE_GPS = "Włącz GPS"
 private const val WAVE_EMOJI = "👋"
 private const val WAVE_INITIAL_ROTATION = -12f
@@ -110,9 +111,6 @@ private data class PlaceCardAnimation(
     val animatedContentScope: AnimatedContentScope?
 )
 
-/**
- * Ekran "Start" – pierwsza zakładka po zalogowaniu.
- */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
@@ -132,7 +130,8 @@ fun HomeScreen(
     val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
     val hasLocationPermission = locationPermissionGranted || state.locationGranted
     val hasLocationContext = hasLocationPermission && gpsEnabled
-    val showGpsDisabledStatus = hasLocationPermission && !gpsEnabled
+    val showGpsDisabledSection = hasLocationPermission && !gpsEnabled
+    val showLocationAwareContent = hasLocationContext || showGpsDisabledSection
 
     var previousNetworkStatus by remember { mutableStateOf(networkStatus) }
     LaunchedEffect(networkStatus) {
@@ -213,21 +212,21 @@ fun HomeScreen(
                         }
                     }
 
-                    if (showGpsDisabledStatus) {
-                        item {
-                            GpsDisabledStatusPanel(
-                                modifier = Modifier.padding(horizontal = HOME_HORIZONTAL_PADDING),
-                                onEnableGpsClick = onRequestLocation,
-                                onManualCityClick = onOpenMap
-                            )
-                        }
-                    }
-
                     if (!hasLocationPermission) {
                         item {
                             HomeLocationEmptyState(
                                 modifier = Modifier.padding(horizontal = HOME_HORIZONTAL_PADDING),
                                 onEnableLocationClick = onRequestLocation,
+                                onManualCityClick = onOpenMap
+                            )
+                        }
+                    }
+
+                    if (showGpsDisabledSection) {
+                        item {
+                            GpsDisabledSection(
+                                title = NEARBY_SECTION_TITLE,
+                                onEnableGpsClick = onRequestLocation,
                                 onManualCityClick = onOpenMap
                             )
                         }
@@ -241,13 +240,15 @@ fun HomeScreen(
                                     HomePlaceItem(it.place, it.distanceKm)
                                 },
                                 isLoading = state.isNearbyLoading,
-                                emptyMessage = stringResource(R.string.home_no_nearby_places),
+                                emptyMessage = GPS_SECTION_EMPTY_MESSAGE,
                                 onPlaceClick = { onOpenPlaceDetails(it, "nearby") },
                                 animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
                                 keyPrefix = "nearby"
                             )
                         }
+                    }
 
+                    if (showLocationAwareContent) {
                         item {
                             HomeSection(
                                 title = TOP_SECTION_TITLE,
@@ -277,7 +278,7 @@ fun HomeScreen(
                         }
                     }
 
-                    state.errorMessage?.takeIf { !showGpsDisabledStatus }?.let { msg ->
+                    state.errorMessage?.takeIf { hasLocationContext }?.let { msg ->
                         item {
                             Text(
                                 text = msg.asString(),
@@ -387,20 +388,42 @@ private fun WavingHand() {
 
 @Composable
 @Suppress("FunctionNaming")
+private fun GpsDisabledSection(
+    title: String,
+    onEnableGpsClick: () -> Unit,
+    onManualCityClick: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SectionHeader(
+            title = title,
+            modifier = Modifier.padding(horizontal = HOME_HORIZONTAL_PADDING)
+        )
+        GpsDisabledStatusPanel(
+            modifier = Modifier.padding(horizontal = HOME_HORIZONTAL_PADDING),
+            onEnableGpsClick = onEnableGpsClick,
+            onManualCityClick = onManualCityClick
+        )
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
 private fun GpsDisabledStatusPanel(
     modifier: Modifier = Modifier,
     onEnableGpsClick: () -> Unit,
     onManualCityClick: () -> Unit
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(PLACE_ROW_HEIGHT),
         shape = RoundedCornerShape(KidZoneRadii.Card),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.Top) {
                 Icon(
@@ -417,24 +440,26 @@ private fun GpsDisabledStatusPanel(
                     modifier = Modifier.weight(1f)
                 )
             }
-            Button(
-                onClick = onEnableGpsClick,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            ) {
-                Text(ENABLE_GPS)
-            }
-            TextButton(
-                onClick = onManualCityClick,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = MANUAL_CITY_HINT,
-                    textAlign = TextAlign.Center
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Button(
+                    onClick = onEnableGpsClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Text(ENABLE_GPS)
+                }
+                TextButton(
+                    onClick = onManualCityClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = MANUAL_CITY_HINT,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }
@@ -603,7 +628,9 @@ private fun HorizontalPlacesRow(
                     Text(
                         text = emptyMessage,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 20.dp)
                     )
                 }
             }
