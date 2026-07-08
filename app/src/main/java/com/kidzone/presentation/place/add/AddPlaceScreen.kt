@@ -95,6 +95,8 @@ import com.kidzone.presentation.common.createCameraImageUri
 import com.kidzone.presentation.common.rememberHapticFeedback
 import com.kidzone.presentation.common.style
 import com.kidzone.utils.UiText
+import com.kidzone.presentation.common.NetworkStatus
+import com.kidzone.presentation.common.rememberNetworkStatus
 import kotlinx.coroutines.launch
 
 private val FORM_SECTION_GAP = 14.dp
@@ -116,6 +118,9 @@ private const val LOCATION_READY_HELPER = "Kliknij przycisk powyżej, aby pobra�
 private const val SAVE_HINT_NAME_AND_LOCATION = "Wpisz nazwę i pobierz lokalizację, aby zapisać miejsce."
 private const val SAVE_HINT_NAME = "Wpisz nazwę miejsca, aby odblokować zapis."
 private const val SAVE_HINT_LOCATION = "Pobierz lokalizację miejsca, aby odblokować zapis."
+private const val OFFLINE_SAVE_HINT = "Brak internetu. Dane zostają w formularzu — zapisz po odzyskaniu połączenia."
+private const val OFFLINE_SAVE_SNACKBAR = "Brak internetu. Nie wyczyściliśmy formularza — spróbuj ponownie po odzyskaniu połączenia."
+private const val OFFLINE_SAVE_ACTION = "Zapisz po odzyskaniu internetu"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -126,6 +131,8 @@ fun AddPlaceScreen(
     viewModel: AddPlaceViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val networkStatus by rememberNetworkStatus()
+    val isOffline = networkStatus == NetworkStatus.UNAVAILABLE
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -144,6 +151,12 @@ fun AddPlaceScreen(
                 viewModel.consumeReviewRequest()
             }
             onSaved(state.savedNewLatitude, state.savedNewLongitude)
+        }
+    }
+
+    LaunchedEffect(isOffline) {
+        if (isOffline) {
+            snackbarHostState.showSnackbar(OFFLINE_SAVE_HINT)
         }
     }
 
@@ -273,11 +286,23 @@ fun AddPlaceScreen(
         }
     }
 
+    fun handleSaveClick() {
+        if (isOffline) {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(OFFLINE_SAVE_SNACKBAR)
+            }
+        } else {
+            viewModel.save()
+        }
+    }
+
     val saveHint = when {
-        state.isSaving || state.isLoadingPlace || state.isFormValid -> null
-        state.name.isBlank() && (state.latitude == null || state.longitude == null) -> SAVE_HINT_NAME_AND_LOCATION
-        state.name.isBlank() -> SAVE_HINT_NAME
-        state.latitude == null || state.longitude == null -> SAVE_HINT_LOCATION
+        state.isSaving || state.isLoadingPlace -> null
+        !state.isFormValid && state.name.isBlank() &&
+                (state.latitude == null || state.longitude == null) -> SAVE_HINT_NAME_AND_LOCATION
+        !state.isFormValid && state.name.isBlank() -> SAVE_HINT_NAME
+        !state.isFormValid && (state.latitude == null || state.longitude == null) -> SAVE_HINT_LOCATION
+        isOffline -> OFFLINE_SAVE_HINT
         else -> null
     }
 
@@ -309,7 +334,7 @@ fun AddPlaceScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Button(
-                        onClick = viewModel::save,
+                        onClick = ::handleSaveClick,
                         enabled = !state.isSaving && !state.isLoadingPlace && state.isFormValid,
                         modifier = Modifier.fillMaxWidth().height(48.dp)
                     ) {
@@ -321,8 +346,11 @@ fun AddPlaceScreen(
                             )
                         } else {
                             Text(
-                                text = if (state.isEditMode) stringResource(R.string.update_place_action)
-                                else stringResource(R.string.save_place_action)
+                                text = when {
+                                    isOffline -> OFFLINE_SAVE_ACTION
+                                    state.isEditMode -> stringResource(R.string.update_place_action)
+                                    else -> stringResource(R.string.save_place_action)
+                                }
                             )
                         }
                     }
