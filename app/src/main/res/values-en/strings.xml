@@ -53,9 +53,9 @@
     <string name="error_quota_exceeded">Service is temporarily overloaded. Please try again in a moment.</string>
     <string name="error_upload_failed">Failed to upload photo. Please try again.</string>
     <string name="error_storage_permission">You do not have permission for this file. Please sign in again.</string>
-    <string name="add_place_offline_save_hint">No internet connection. Your data stays in the form — save it when the connection is back.</string>
+    <string name="add_place_offline_save_hint">No internet connection. Save it when the connection is back.</string>
     <string name="add_place_offline_save_action">Save when online</string>
-    <string name="add_place_offline_save_snackbar">No internet connection. We did not clear the form — try again when the connection is back.</string>
+    <string name="add_place_offline_hint_short">No internet connection</string>
     <string name="error_storage_quota">Failed to upload photo because the service is temporarily overloaded. Please try again later.</string>
     <string name="error_storage_retry_limit">Failed to upload photo due to unstable connection. Please try again.</string>
     <string name="error_already_reported">You have already reported this content.</string>

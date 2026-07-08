@@ -121,9 +121,6 @@ private const val LOCATION_READY_HELPER = "Kliknij przycisk powyżej, aby pobra�
 private const val SAVE_HINT_NAME_AND_LOCATION = "Wpisz nazwę i pobierz lokalizację, aby zapisać miejsce."
 private const val SAVE_HINT_NAME = "Wpisz nazwę miejsca, aby odblokować zapis."
 private const val SAVE_HINT_LOCATION = "Pobierz lokalizację miejsca, aby odblokować zapis."
-private const val OFFLINE_SAVE_HINT = "Brak internetu. Dane zostają w formularzu — zapisz po odzyskaniu połączenia."
-private const val OFFLINE_SAVE_SNACKBAR = "Brak internetu. Nie wyczyściliśmy formularza — spróbuj ponownie po odzyskaniu połączenia."
-private const val OFFLINE_SAVE_ACTION = "Zapisz po odzyskaniu internetu"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -139,10 +136,10 @@ fun AddPlaceScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val offlineSaveHint = stringResource(R.string.add_place_offline_save_hint)
     val offlineSaveAction = stringResource(R.string.add_place_offline_save_action)
-    val offlineSaveSnackbar = stringResource(R.string.add_place_offline_save_snackbar)
+    val offlineHintShort = stringResource(R.string.add_place_offline_hint_short)
     val haptic = rememberHapticFeedback()
+
     var locationPermissionGranted by remember { mutableStateOf(hasLocationPermission(context)) }
     var locationServiceEnabled by remember { mutableStateOf(isLocationServiceEnabled(context)) }
 
@@ -157,12 +154,6 @@ fun AddPlaceScreen(
                 viewModel.consumeReviewRequest()
             }
             onSaved(state.savedNewLatitude, state.savedNewLongitude)
-        }
-    }
-
-    LaunchedEffect(isOffline) {
-        if (isOffline) {
-            snackbarHostState.showSnackbar(OFFLINE_SAVE_HINT)
         }
     }
 
@@ -293,23 +284,18 @@ fun AddPlaceScreen(
     }
 
     fun handleSaveClick() {
-        if (isOffline) {
-            coroutineScope.launch {
-                snackbarHostState.showSnackbar(offlineSaveSnackbar)
-            }
-            return
-        }
+        if (isOffline) return
 
         viewModel.save(isOffline = false)
     }
 
     val saveHint = when {
+        isOffline -> null
         state.isSaving || state.isLoadingPlace -> null
         !state.isFormValid && state.name.isBlank() &&
                 (state.latitude == null || state.longitude == null) -> SAVE_HINT_NAME_AND_LOCATION
         !state.isFormValid && state.name.isBlank() -> SAVE_HINT_NAME
         !state.isFormValid && (state.latitude == null || state.longitude == null) -> SAVE_HINT_LOCATION
-        isOffline -> offlineSaveHint
         else -> null
     }
 
@@ -342,7 +328,7 @@ fun AddPlaceScreen(
                 ) {
                     Button(
                         onClick = ::handleSaveClick,
-                        enabled = !state.isSaving && !state.isLoadingPlace && state.isFormValid,
+                        enabled = !isOffline && !state.isSaving && !state.isLoadingPlace && state.isFormValid,
                         modifier = Modifier.fillMaxWidth().height(48.dp)
                     ) {
                         if (state.isSaving) {
@@ -361,6 +347,15 @@ fun AddPlaceScreen(
                             )
                         }
                     }
+
+                    if (isOffline) {
+                        Text(
+                            text = offlineHintShort,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
                     saveHint?.let { hint ->
                         Text(
                             text = hint,
