@@ -87,6 +87,8 @@ private val PLACE_CARD_WIDTH = 178.dp
 private val PLACE_CARD_ICON_SIZE = 30.dp
 private val PLACE_CARD_CONTENT_PADDING = 14.dp
 private val PLACE_NAME_BLOCK_HEIGHT = 40.dp
+private val PLACE_CARD_MAIN_GAP = 10.dp
+private val PLACE_CARD_STATUS_GAP = 4.dp
 private val LOCATION_PANEL_MIN_HEIGHT = 360.dp
 private val LOCATION_CTA_HEIGHT = 48.dp
 private val HOME_HORIZONTAL_PADDING = 16.dp
@@ -754,8 +756,7 @@ private fun PlaceCard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(PLACE_CARD_CONTENT_PADDING),
-            verticalArrangement = Arrangement.SpaceBetween
+                .padding(PLACE_CARD_CONTENT_PADDING)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CategoryIcon(
@@ -772,24 +773,25 @@ private fun PlaceCard(
                     modifier = Modifier.weight(1f)
                 )
             }
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = place.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.height(PLACE_NAME_BLOCK_HEIGHT),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+            Spacer(Modifier.height(PLACE_CARD_MAIN_GAP))
+            Text(
+                text = place.name,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.height(PLACE_NAME_BLOCK_HEIGHT),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(PLACE_CARD_MAIN_GAP))
+            item.distanceKm?.let {
+                DistanceLabel(
+                    distanceKm = it,
+                    staleLocationAgeMinutes = item.staleLocationAgeMinutes
                 )
-                item.distanceKm?.let {
-                    DistanceLabel(
-                        distanceKm = it,
-                        staleLocationAgeMinutes = item.staleLocationAgeMinutes
-                    )
-                }
-                PlaceRatingStatus(place = place)
             }
+            Spacer(Modifier.height(PLACE_CARD_STATUS_GAP))
+            PlaceRatingStatus(place = place)
         }
     }
 }
