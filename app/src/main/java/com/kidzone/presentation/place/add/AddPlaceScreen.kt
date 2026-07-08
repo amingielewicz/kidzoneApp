@@ -101,6 +101,7 @@ private val FORM_FIELD_GAP = 10.dp
 private val SECTION_PADDING = 14.dp
 private val PHOTO_THUMBNAIL_SIZE = 76.dp
 private val PHOTO_REMOVE_BUTTON_SIZE = 20.dp
+private val COUNTER_ROW_HEIGHT = 20.dp
 private const val PLACE_NAME_UI_MAX_LENGTH = 50
 private const val PLACE_NAME_WARNING_LENGTH = 40
 private const val PLACE_DESCRIPTION_UI_MAX_LENGTH = 500
@@ -360,17 +361,14 @@ fun AddPlaceScreen(
                     label = { RequiredFieldLabel(stringResource(R.string.place_name_label)) },
                     singleLine = true,
                     supportingText = {
-                        when {
-                            nameHasError -> Text(stringResource(R.string.field_required))
-                            showNameCounter -> {
-                                Column {
-                                    Text("$nameLength/$PLACE_NAME_UI_MAX_LENGTH")
-                                    if (nameLimitReached) {
-                                        Text(LIMIT_REACHED_HINT)
-                                    }
-                                }
-                            }
-                        }
+                        CharacterCounterRow(
+                            visible = showNameCounter,
+                            count = nameLength,
+                            max = PLACE_NAME_UI_MAX_LENGTH,
+                            limitReached = nameLimitReached,
+                            showLimitMessage = nameLimitReached,
+                            requiredMessage = stringResource(R.string.field_required).takeIf { nameHasError }
+                        )
                     },
                     isError = nameHasError || nameWarning,
                     enabled = !state.isSaving,
@@ -391,14 +389,13 @@ fun AddPlaceScreen(
                     minLines = 2,
                     maxLines = 5,
                     supportingText = {
-                        if (showDescriptionCounter) {
-                            Column {
-                                Text("$descriptionLength/$PLACE_DESCRIPTION_UI_MAX_LENGTH")
-                                if (descriptionLimitReached) {
-                                    Text(LIMIT_REACHED_HINT)
-                                }
-                            }
-                        }
+                        CharacterCounterRow(
+                            visible = showDescriptionCounter,
+                            count = descriptionLength,
+                            max = PLACE_DESCRIPTION_UI_MAX_LENGTH,
+                            limitReached = descriptionLimitReached,
+                            showLimitMessage = descriptionLimitReached
+                        )
                     },
                     isError = descriptionWarning,
                     enabled = !state.isSaving,
@@ -512,6 +509,68 @@ fun AddPlaceScreen(
             onConfirm = viewModel::confirmSaveDespiteDuplicate,
             onDismiss = viewModel::dismissDuplicateWarning
         )
+    }
+}
+
+@Composable
+private fun CharacterCounterRow(
+    visible: Boolean,
+    count: Int,
+    max: Int,
+    limitReached: Boolean,
+    showLimitMessage: Boolean,
+    requiredMessage: String? = null
+) {
+    val color = when {
+        requiredMessage != null || limitReached -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(COUNTER_ROW_HEIGHT),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        when {
+            requiredMessage != null -> {
+                Text(
+                    text = requiredMessage,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = color,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            visible -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "$count/$max",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = color,
+                        maxLines = 1
+                    )
+                    if (showLimitMessage) {
+                        Text(
+                            text = " | ",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = color,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = LIMIT_REACHED_HINT,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = color,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
