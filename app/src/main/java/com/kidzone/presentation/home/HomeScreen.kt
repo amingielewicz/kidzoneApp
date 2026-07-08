@@ -82,11 +82,12 @@ import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.shimmerEffect
 
-private val PLACE_ROW_HEIGHT = 184.dp
+private val PLACE_ROW_HEIGHT = 168.dp
 private val PLACE_CARD_WIDTH = 178.dp
 private val PLACE_CARD_ICON_SIZE = 30.dp
 private val PLACE_CARD_CONTENT_PADDING = 14.dp
 private val PLACE_NAME_BLOCK_HEIGHT = 40.dp
+private val PLACE_STATUS_HEIGHT = 24.dp
 private val PLACE_CARD_MAIN_GAP = 10.dp
 private val PLACE_CARD_STATUS_GAP = 6.dp
 private val LOCATION_PANEL_MIN_HEIGHT = 360.dp
@@ -800,7 +801,10 @@ private fun PlaceCard(
 private fun PlaceRatingStatus(place: Place) {
     when {
         place.reviewsCount > 0 -> {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.height(PLACE_STATUS_HEIGHT),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Icon(
                     imageVector = Icons.Filled.Star,
                     contentDescription = stringResource(R.string.rating),
@@ -818,7 +822,10 @@ private fun PlaceRatingStatus(place: Place) {
         }
         place.isNewWithoutReviews() -> NewPlaceBadge()
         else -> {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.height(PLACE_STATUS_HEIGHT),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Icon(
                     imageVector = Icons.Filled.Star,
                     contentDescription = stringResource(R.string.rating),
