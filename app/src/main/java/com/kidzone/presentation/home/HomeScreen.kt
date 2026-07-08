@@ -108,7 +108,8 @@ private const val EMPTY_RECENT_ICON = "NEW"
 
 private data class HomePlaceItem(
     val place: Place,
-    val distanceKm: Double? = null
+    val distanceKm: Double? = null,
+    val staleLocationAgeMinutes: Int? = null
 )
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -139,6 +140,7 @@ fun HomeScreen(
     val hasLocationContext = hasLocationPermission && gpsEnabled
     val showGpsDisabledBanner = hasLocationPermission && !gpsEnabled
     val showLocationAwareContent = hasLocationContext || showGpsDisabledBanner
+    val staleLocationAgeMinutes = state.staleLocationAgeMinutes.takeIf { state.isUsingStaleLocation }
     var isGpsCheckInProgress by remember { mutableStateOf(false) }
 
     var previousNetworkStatus by remember { mutableStateOf(networkStatus) }
@@ -265,7 +267,9 @@ fun HomeScreen(
                             HomeSection(
                                 title = NEARBY_SECTION_TITLE,
                                 items = if (hasLocationContext) {
-                                    state.nearbyPlaces.map { HomePlaceItem(it.place, it.distanceKm) }
+                                    state.nearbyPlaces.map {
+                                        HomePlaceItem(it.place, it.distanceKm, staleLocationAgeMinutes)
+                                    }
                                 } else {
                                     emptyList()
                                 },
@@ -282,7 +286,9 @@ fun HomeScreen(
                             HomeSection(
                                 title = TOP_SECTION_TITLE,
                                 items = if (hasLocationContext) {
-                                    state.topPlaces.map { HomePlaceItem(it.place, it.distanceKm) }
+                                    state.topPlaces.map {
+                                        HomePlaceItem(it.place, it.distanceKm, staleLocationAgeMinutes)
+                                    }
                                 } else {
                                     emptyList()
                                 },
@@ -299,7 +305,9 @@ fun HomeScreen(
                             HomeSection(
                                 title = RECENT_SECTION_TITLE,
                                 items = if (hasLocationContext) {
-                                    state.recentlyAddedPlaces.map { HomePlaceItem(it.place, it.distanceKm) }
+                                    state.recentlyAddedPlaces.map {
+                                        HomePlaceItem(it.place, it.distanceKm, staleLocationAgeMinutes)
+                                    }
                                 } else {
                                     emptyList()
                                 },
@@ -697,7 +705,7 @@ private fun PlaceCard(
     val place = item.place
     val categoryLabel = stringResource(place.category.labelRes)
     val distanceLabel = item.distanceKm?.let {
-        ", ${stringResource(R.string.distance_away, formatDistance(it))}"
+        ", ${stringResource(R.string.distance_away, formatDistance(it, item.staleLocationAgeMinutes))}"
     }.orEmpty()
     val ratingLabel = place.ratingAccessibilityLabel()
     val animationKey = if (keyPrefix.isBlank()) "" else "${keyPrefix}_"
@@ -752,7 +760,7 @@ private fun PlaceCard(
                     )
                     item.distanceKm?.let {
                         Spacer(Modifier.height(6.dp))
-                        DistanceLabel(distanceKm = it)
+                        DistanceLabel(distanceKm = it, staleLocationAgeMinutes = item.staleLocationAgeMinutes)
                     }
                 }
             }
@@ -812,7 +820,10 @@ private fun CategoryOutlinedBadge(
 }
 
 @Composable
-private fun DistanceLabel(distanceKm: Double) {
+private fun DistanceLabel(
+    distanceKm: Double,
+    staleLocationAgeMinutes: Int?
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
             imageVector = Icons.Filled.LocationOn,
@@ -822,7 +833,7 @@ private fun DistanceLabel(distanceKm: Double) {
         )
         Spacer(Modifier.width(2.dp))
         Text(
-            text = formatDistance(distanceKm),
+            text = formatDistance(distanceKm, staleLocationAgeMinutes),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.secondary,
             maxLines = 1
@@ -831,15 +842,24 @@ private fun DistanceLabel(distanceKm: Double) {
 }
 
 @Composable
-private fun formatDistance(km: Double): String = when {
-    km < 0.05 -> VERY_CLOSE_DISTANCE_LABEL
-    km < 1.0 -> {
-        val meters = (km * 1000).toInt()
-        val rounded = ((meters + 25) / 50) * 50
-        if (rounded == 0) VERY_CLOSE_DISTANCE_LABEL else stringResource(R.string.distance_m, rounded)
+private fun formatDistance(km: Double, staleLocationAgeMinutes: Int? = null): String {
+    val distance = when {
+        km < 0.05 -> VERY_CLOSE_DISTANCE_LABEL
+        km < 1.0 -> {
+            val meters = (km * 1000).toInt()
+            val rounded = ((meters + 25) / 50) * 50
+            if (rounded == 0) VERY_CLOSE_DISTANCE_LABEL else stringResource(R.string.distance_m, rounded)
+        }
+        km < 100.0 -> stringResource(R.string.distance_km, km)
+        else -> stringResource(R.string.distance_km_integer, km.toInt())
     }
-    km < 100.0 -> stringResource(R.string.distance_km, km)
-    else -> stringResource(R.string.distance_km_integer, km.toInt())
+    return staleLocationAgeMinutes?.let { "$distance (${staleAgeLabel(it)})" } ?: distance
+}
+
+private fun staleAgeLabel(ageMinutes: Int): String = when {
+    ageMinutes <= 0 -> "przed chwilą"
+    ageMinutes == 1 -> "1 min temu"
+    else -> "$ageMinutes min temu"
 }
 
 @Composable
