@@ -97,9 +97,9 @@ import com.kidzone.presentation.common.style
 import com.kidzone.utils.UiText
 import kotlinx.coroutines.launch
 
-private val FORM_SECTION_GAP = 18.dp
+private val FORM_SECTION_GAP = 14.dp
 private val FORM_VERTICAL_SPACING = 10.dp
-private val SECTION_PADDING = 14.dp
+private val SECTION_PADDING = 12.dp
 private val PHOTO_THUMBNAIL_SIZE = 76.dp
 private val PHOTO_REMOVE_BUTTON_SIZE = 20.dp
 private val COUNTER_ROW_HEIGHT = 20.dp
@@ -113,6 +113,9 @@ private const val LIMIT_REACHED_HINT = "Osiągnięto maksymalną liczbę znaków
 private const val LOCATION_PERMISSION_HELPER = "Aby pobrać lokalizację, zezwól na dostęp do GPS."
 private const val LOCATION_GPS_HELPER = "Włącz GPS, aby pobrać lokalizację."
 private const val LOCATION_READY_HELPER = "Kliknij przycisk powyżej, aby pobrać adres."
+private const val SAVE_HINT_NAME_AND_LOCATION = "Wpisz nazwę i pobierz lokalizację, aby zapisać miejsce."
+private const val SAVE_HINT_NAME = "Wpisz nazwę miejsca, aby odblokować zapis."
+private const val SAVE_HINT_LOCATION = "Pobierz lokalizację miejsca, aby odblokować zapis."
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -270,6 +273,14 @@ fun AddPlaceScreen(
         }
     }
 
+    val saveHint = when {
+        state.isSaving || state.isLoadingPlace || state.isFormValid -> null
+        state.name.isBlank() && (state.latitude == null || state.longitude == null) -> SAVE_HINT_NAME_AND_LOCATION
+        state.name.isBlank() -> SAVE_HINT_NAME
+        state.latitude == null || state.longitude == null -> SAVE_HINT_LOCATION
+        else -> null
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -292,21 +303,36 @@ fun AddPlaceScreen(
                 tonalElevation = 3.dp,
                 color = MaterialTheme.colorScheme.surface
             ) {
-                Button(
-                    onClick = viewModel::save,
-                    enabled = !state.isSaving && !state.isLoadingPlace && state.isFormValid,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).height(48.dp)
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    if (state.isSaving) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    } else {
+                    Button(
+                        onClick = viewModel::save,
+                        enabled = !state.isSaving && !state.isLoadingPlace && state.isFormValid,
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        if (state.isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        } else {
+                            Text(
+                                text = if (state.isEditMode) stringResource(R.string.update_place_action)
+                                else stringResource(R.string.save_place_action)
+                            )
+                        }
+                    }
+                    saveHint?.let { hint ->
                         Text(
-                            text = if (state.isEditMode) stringResource(R.string.update_place_action)
-                            else stringResource(R.string.save_place_action)
+                            text = hint,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -723,9 +749,20 @@ private fun AmenityChip(
     enabled: Boolean,
     onClick: () -> Unit
 ) {
-    val containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-    val contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-    val border = if (selected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    val containerColor = if (selected) {
+        MaterialTheme.colorScheme.secondaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerLow
+    }
+    val contentColor = if (selected) {
+        MaterialTheme.colorScheme.onSecondaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val border = BorderStroke(
+        width = 1.dp,
+        color = if (selected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant
+    )
 
     Surface(
         modifier = Modifier.clickable(enabled = enabled, onClick = onClick),
@@ -800,7 +837,7 @@ private fun AddressReadOnlyCard(address: String, helperText: String? = null) {
         color = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -931,6 +968,12 @@ private fun NearbyPlacesList(
                         text = "${place.distanceMeters}m",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "›",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
