@@ -77,7 +77,6 @@ import com.kidzone.domain.model.Place
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.KidZoneRadii
 import com.kidzone.presentation.common.KidZoneSpacing
-import com.kidzone.presentation.common.NewPlaceBadge
 import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.shimmerEffect
@@ -105,6 +104,7 @@ private const val VERY_CLOSE_DISTANCE_LABEL = "Tuż obok"
 private const val EMPTY_NEARBY_ICON = "📍"
 private const val EMPTY_TOP_ICON = "★"
 private const val EMPTY_RECENT_ICON = "NEW"
+private const val NO_REVIEWS_LABEL = "Brak ocen"
 
 private data class HomePlaceItem(
     val place: Place,
@@ -753,68 +753,72 @@ private fun PlaceCard(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(PLACE_CARD_CONTENT_PADDING),
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CategoryIcon(
-                        category = place.category,
-                        animationKey = "${animationKey}place_icon_${place.id}",
-                        sharedTransitionScope = animation.sharedTransitionScope,
-                        animatedContentScope = animation.animatedContentScope,
-                        size = PLACE_CARD_ICON_SIZE,
-                        iconSize = 18.dp
-                    )
-                    Spacer(Modifier.width(KidZoneSpacing.GapSmall))
-                    CategoryOutlinedBadge(
-                        label = categoryLabel,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                Column {
-                    Text(
-                        text = place.name,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    item.distanceKm?.let {
-                        Spacer(Modifier.height(6.dp))
-                        DistanceLabel(distanceKm = it, staleLocationAgeMinutes = item.staleLocationAgeMinutes)
-                    }
-                }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CategoryIcon(
+                    category = place.category,
+                    animationKey = "${animationKey}place_icon_${place.id}",
+                    sharedTransitionScope = animation.sharedTransitionScope,
+                    animatedContentScope = animation.animatedContentScope,
+                    size = PLACE_CARD_ICON_SIZE,
+                    iconSize = 18.dp
+                )
+                Spacer(Modifier.width(KidZoneSpacing.GapSmall))
+                CategoryOutlinedBadge(
+                    label = categoryLabel,
+                    modifier = Modifier.weight(1f)
+                )
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                when {
-                    place.reviewsCount > 0 -> {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Filled.Star,
-                                contentDescription = stringResource(R.string.rating),
-                                tint = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(Modifier.width(KidZoneSpacing.GapTiny))
-                            Text(
-                                text = "%.1f (%d)".format(place.averageRating, place.reviewsCount),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    place.isNewWithoutReviews() -> {
-                        NewPlaceBadge()
-                    }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = place.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                item.distanceKm?.let {
+                    DistanceLabel(
+                        distanceKm = it,
+                        staleLocationAgeMinutes = item.staleLocationAgeMinutes
+                    )
                 }
+                PlaceRatingStatus(place = place)
             }
         }
+    }
+}
+
+@Composable
+private fun PlaceRatingStatus(place: Place) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = Icons.Filled.Star,
+            contentDescription = stringResource(R.string.rating),
+            tint = if (place.reviewsCount > 0) {
+                MaterialTheme.colorScheme.tertiary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            modifier = Modifier.size(14.dp)
+        )
+        Spacer(Modifier.width(KidZoneSpacing.GapTiny))
+        Text(
+            text = if (place.reviewsCount > 0) {
+                "%.1f (%d)".format(place.averageRating, place.reviewsCount)
+            } else {
+                NO_REVIEWS_LABEL
+            },
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            color = if (place.reviewsCount > 0) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f)
+            }
+        )
     }
 }
 
