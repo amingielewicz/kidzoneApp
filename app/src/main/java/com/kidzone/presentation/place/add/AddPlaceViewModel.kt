@@ -209,8 +209,8 @@ class AddPlaceViewModel @Inject constructor(
                     editingOriginal = result.data
                     _uiState.update {
                         it.copy(
-                            name = result.data.name,
-                            description = result.data.description,
+                            name = result.data.name.take(PLACE_NAME_MAX_LENGTH),
+                            description = result.data.description.take(PLACE_DESCRIPTION_MAX_LENGTH),
                             category = result.data.category,
                             address = result.data.address,
                             latitude = result.data.latitude,
@@ -242,7 +242,9 @@ class AddPlaceViewModel @Inject constructor(
         }
 
     fun onDescriptionChange(value: String) =
-        _uiState.update { it.copy(description = value, errorMessage = null) }
+        _uiState.update {
+            it.copy(description = value.take(PLACE_DESCRIPTION_MAX_LENGTH), errorMessage = null)
+        }
 
     fun onCategoryChange(category: PlaceCategory) {
         _uiState.update { state ->
@@ -561,7 +563,8 @@ class AddPlaceViewModel @Inject constructor(
                     .trim()
                 val updated = original.copy(
                     name = normalizedName,
-                    description = TextNormalization.toSentenceCase(state.description),
+                    description = TextNormalization.toSentenceCase(state.description)
+                        .take(PLACE_DESCRIPTION_MAX_LENGTH),
                     category = state.category,
                     address = TextNormalization.toTitleCase(state.address),
                     latitude = state.latitude!!,
@@ -580,7 +583,8 @@ class AddPlaceViewModel @Inject constructor(
                     id = "",
                     ownerUserId = currentUser.id,
                     name = normalizedName,
-                    description = TextNormalization.toSentenceCase(state.description),
+                    description = TextNormalization.toSentenceCase(state.description)
+                        .take(PLACE_DESCRIPTION_MAX_LENGTH),
                     category = state.category,
                     latitude = state.latitude!!,
                     longitude = state.longitude!!,
@@ -656,7 +660,10 @@ private const val DUPLICATE_RADIUS_METERS = 100
 const val MAX_PLACE_PHOTOS = 5
 
 /** Maksymalna długość nazwy miejsca widoczna w formularzach i zapisie. */
-const val PLACE_NAME_MAX_LENGTH = 100
+const val PLACE_NAME_MAX_LENGTH = 50
+
+/** Maksymalna długość opisu miejsca widoczna w formularzach i zapisie. */
+const val PLACE_DESCRIPTION_MAX_LENGTH = 500
 
 /** Odległość w km między dwoma punktami (formuła haversine). */
 private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
