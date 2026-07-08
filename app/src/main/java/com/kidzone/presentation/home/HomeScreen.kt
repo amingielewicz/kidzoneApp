@@ -102,6 +102,7 @@ private const val NEARBY_SECTION_TITLE = "📍 W pobliżu"
 private const val TOP_SECTION_TITLE = "🏆 Najpopularniejsze"
 private const val RECENT_SECTION_TITLE = "🆕 Nowości w okolicy"
 private const val VERY_CLOSE_DISTANCE_LABEL = "Tuż obok"
+private const val EMPTY_NEARBY_ICON = "📍"
 private const val EMPTY_TOP_ICON = "★"
 private const val EMPTY_RECENT_ICON = "NEW"
 
@@ -136,8 +137,8 @@ fun HomeScreen(
     val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
     val hasLocationPermission = locationPermissionGranted || state.locationGranted
     val hasLocationContext = hasLocationPermission && gpsEnabled
-    val showGpsDisabledSection = hasLocationPermission && !gpsEnabled
-    val showLocationAwareContent = hasLocationContext || showGpsDisabledSection
+    val showGpsDisabledBanner = hasLocationPermission && !gpsEnabled
+    val showLocationAwareContent = hasLocationContext || showGpsDisabledBanner
     var isGpsCheckInProgress by remember { mutableStateOf(false) }
 
     var previousNetworkStatus by remember { mutableStateOf(networkStatus) }
@@ -205,13 +206,33 @@ fun HomeScreen(
                     )
                 }
             } else {
+                if (showGpsDisabledBanner) {
+                    LocationStatusBanner(
+                        modifier = Modifier.padding(
+                            start = HOME_HORIZONTAL_PADDING,
+                            top = 18.dp,
+                            end = HOME_HORIZONTAL_PADDING
+                        ),
+                        isChecking = isGpsCheckInProgress,
+                        onEnableGpsClick = {
+                            isGpsCheckInProgress = true
+                            onRequestLocation()
+                        },
+                        onManualCityClick = onOpenMap
+                    )
+                }
+
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
                         .background(MaterialTheme.colorScheme.background),
                     contentPadding = PaddingValues(
-                        top = if (showIntro) 0.dp else 18.dp,
+                        top = when {
+                            showGpsDisabledBanner -> 22.dp
+                            showIntro -> 0.dp
+                            else -> 18.dp
+                        },
                         bottom = 96.dp
                     ),
                     verticalArrangement = Arrangement.spacedBy(22.dp)
@@ -239,37 +260,24 @@ fun HomeScreen(
                         }
                     }
 
-                    if (showGpsDisabledSection) {
-                        item {
-                            GpsDisabledSection(
-                                title = NEARBY_SECTION_TITLE,
-                                isChecking = isGpsCheckInProgress,
-                                onEnableGpsClick = {
-                                    isGpsCheckInProgress = true
-                                    onRequestLocation()
-                                },
-                                onManualCityClick = onOpenMap
-                            )
-                        }
-                    }
-
-                    if (hasLocationContext) {
+                    if (showLocationAwareContent) {
                         item {
                             HomeSection(
                                 title = NEARBY_SECTION_TITLE,
-                                items = state.nearbyPlaces.map {
-                                    HomePlaceItem(it.place, it.distanceKm)
+                                items = if (hasLocationContext) {
+                                    state.nearbyPlaces.map { HomePlaceItem(it.place, it.distanceKm) }
+                                } else {
+                                    emptyList()
                                 },
-                                isLoading = state.isNearbyLoading,
+                                isLoading = hasLocationContext && state.isNearbyLoading,
                                 emptyMessage = GPS_SECTION_EMPTY_MESSAGE,
+                                emptyIcon = EMPTY_NEARBY_ICON,
                                 onPlaceClick = { onOpenPlaceDetails(it, "nearby") },
                                 animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
                                 keyPrefix = "nearby"
                             )
                         }
-                    }
 
-                    if (showLocationAwareContent) {
                         item {
                             HomeSection(
                                 title = TOP_SECTION_TITLE,
@@ -404,45 +412,22 @@ private fun WavingHand() {
 
 @Composable
 @Suppress("FunctionNaming")
-private fun GpsDisabledSection(
-    title: String,
-    isChecking: Boolean,
-    onEnableGpsClick: () -> Unit,
-    onManualCityClick: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader(
-            title = title,
-            modifier = Modifier.padding(horizontal = HOME_HORIZONTAL_PADDING)
-        )
-        GpsDisabledStatusPanel(
-            modifier = Modifier.padding(horizontal = HOME_HORIZONTAL_PADDING),
-            isChecking = isChecking,
-            onEnableGpsClick = onEnableGpsClick,
-            onManualCityClick = onManualCityClick
-        )
-    }
-}
-
-@Composable
-@Suppress("FunctionNaming")
-private fun GpsDisabledStatusPanel(
+private fun LocationStatusBanner(
     modifier: Modifier = Modifier,
     isChecking: Boolean,
     onEnableGpsClick: () -> Unit,
     onManualCityClick: () -> Unit
 ) {
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(PLACE_ROW_HEIGHT),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(KidZoneRadii.Card),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(verticalAlignment = Alignment.Top) {
                 Icon(
