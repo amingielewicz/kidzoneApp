@@ -66,6 +66,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -74,23 +76,28 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.kidzone.R
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.presentation.common.createCameraImageUri
-import com.kidzone.presentation.common.style
 import com.kidzone.presentation.common.rememberHapticFeedback
+import com.kidzone.presentation.common.style
 import com.kidzone.utils.UiText
 import kotlinx.coroutines.launch
+
+private val FORM_SECTION_GAP = 18.dp
+private val FORM_FIELD_GAP = 10.dp
+private val SECTION_PADDING = 14.dp
+private val PHOTO_THUMBNAIL_SIZE = 76.dp
+private val PHOTO_REMOVE_BUTTON_SIZE = 20.dp
+private const val LOCATION_ERROR_HINT = "Nie udało się pobrać lokalizacji. Sprawdź GPS i spróbuj ponownie."
 
 /**
  * Ekran dodawania nowego miejsca – formularz zapisywany do Firestore.
@@ -143,7 +150,7 @@ fun AddPlaceScreen(
     var photoHashSet by remember { mutableStateOf(setOf<String>()) }
     var placeHashesReady by remember { mutableStateOf(!state.isEditMode) }
 
-    androidx.compose.runtime.LaunchedEffect(state.existingPhotoUrls) {
+    LaunchedEffect(state.existingPhotoUrls) {
         if (state.existingPhotoUrls.isNotEmpty() && photoHashSet.isEmpty()) {
             val hashes = mutableSetOf<String>()
             for (url in state.existingPhotoUrls) {
@@ -181,9 +188,7 @@ fun AddPlaceScreen(
                 viewModel.addPhotos(accepted)
             }
             if (duplicatesFound > 0) {
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar(duplicatePhotoError)
-                }
+                coroutineScope.launch { snackbarHostState.showSnackbar(duplicatePhotoError) }
             }
         }
     }
@@ -199,9 +204,7 @@ fun AddPlaceScreen(
                 if (hash != null) photoHashSet = photoHashSet + hash
                 viewModel.addPhotos(listOf(uri))
             } else {
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar(duplicatePhotoError)
-                }
+                coroutineScope.launch { snackbarHostState.showSnackbar(duplicatePhotoError) }
             }
         }
         placeCameraUriString = null
@@ -211,9 +214,7 @@ fun AddPlaceScreen(
     fun launchPlaceCamera() {
         val uri = createCameraImageUri(context, "place_camera_")
         if (uri == null) {
-            coroutineScope.launch {
-                snackbarHostState.showSnackbar(cameraUnavailable)
-            }
+            coroutineScope.launch { snackbarHostState.showSnackbar(cameraUnavailable) }
             return
         }
         placeCameraUriString = uri.toString()
@@ -221,9 +222,7 @@ fun AddPlaceScreen(
             placeCameraLauncher.launch(uri)
         }.onFailure {
             placeCameraUriString = null
-            coroutineScope.launch {
-                snackbarHostState.showSnackbar(cameraUnavailable)
-            }
+            coroutineScope.launch { snackbarHostState.showSnackbar(cameraUnavailable) }
         }
     }
 
@@ -234,9 +233,7 @@ fun AddPlaceScreen(
         if (granted) {
             launchPlaceCamera()
         } else {
-            coroutineScope.launch {
-                snackbarHostState.showSnackbar(cameraAccessDenied)
-            }
+            coroutineScope.launch { snackbarHostState.showSnackbar(cameraAccessDenied) }
         }
     }
 
@@ -264,241 +261,153 @@ fun AddPlaceScreen(
                 .padding(padding)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.Top
+            verticalArrangement = Arrangement.spacedBy(FORM_SECTION_GAP)
         ) {
             val nameHasError = state.hasTriedToSave && state.name.isBlank()
-            OutlinedTextField(
-                value = state.name,
-                onValueChange = viewModel::onNameChange,
-                label = { RequiredFieldLabel(stringResource(R.string.place_name_label)) },
-                singleLine = true,
-                supportingText = {
-                    val requiredText = if (state.name.isBlank()) {
-                        stringResource(R.string.field_required) + ". "
-                    } else {
-                        ""
-                    }
-                    Text("$requiredText${state.name.length}/$PLACE_NAME_MAX_LENGTH")
-                },
-                isError = nameHasError,
-                enabled = !state.isSaving,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Words
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .semantics {
-                        if (nameHasError) {
-                            error(context.getString(R.string.field_required))
+
+            FormSection(title = "Podstawy") {
+                OutlinedTextField(
+                    value = state.name,
+                    onValueChange = viewModel::onNameChange,
+                    label = { RequiredFieldLabel(stringResource(R.string.place_name_label)) },
+                    singleLine = true,
+                    supportingText = {
+                        val requiredText = if (state.name.isBlank()) {
+                            stringResource(R.string.field_required) + ". "
+                        } else {
+                            ""
                         }
-                    }
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = state.description,
-                onValueChange = viewModel::onDescriptionChange,
-                label = { Text(stringResource(R.string.place_description_label)) },
-                minLines = 2,
-                maxLines = 5,
-                enabled = !state.isSaving,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Sentences
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            CategoryDropdown(
-                selected = state.category,
-                onSelected = viewModel::onCategoryChange,
-                enabled = !state.isSaving
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            Spacer(Modifier.height(12.dp))
-
-            LocationSection(
-                latitude = state.latitude,
-                longitude = state.longitude,
-                isFetching = state.isFetchingLocation,
-                onClickFetch = {
-                    if (hasLocationPermission(context)) {
-                        coroutineScope.launch { fetchAndSetLocation(context, viewModel) }
-                    } else {
-                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                    }
-                },
-                enabled = !state.isSaving
-            )
-
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = if (state.latitude == null || state.longitude == null) {
-                    stringResource(R.string.location_required_hint)
-                } else {
-                    stringResource(R.string.location_fetched_hint)
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = if (state.latitude == null || state.longitude == null) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier
-                    .padding(horizontal = 4.dp)
-                    .semantics {
-                        liveRegion = LiveRegionMode.Polite
-                    }
-            )
-
-            if (state.nearbyPlaces.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                NearbyPlacesList(places = state.nearbyPlaces)
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            AddressReadOnlyCard(address = state.address)
-
-            Spacer(Modifier.height(16.dp))
-
-            Text(
-                text = stringResource(R.string.amenities_label),
-                style = MaterialTheme.typography.titleMedium
-            )
-            Spacer(Modifier.height(8.dp))
-            AmenitiesGrid(
-                selected = state.amenities,
-                category = state.category,
-                amenityFrequency = state.amenityFrequency,
-                onToggle = viewModel::toggleAmenity,
-                enabled = !state.isSaving
-            )
-
-            state.errorMessage?.let { msg ->
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = msg.asString(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.semantics {
-                        liveRegion = LiveRegionMode.Assertive
-                    }
-                )
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            Text(
-                text = stringResource(R.string.photos_with_count, state.photoUris.size + state.existingPhotoUrls.size),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(8.dp))
-
-            if (state.existingPhotoUrls.isNotEmpty() || state.photoUris.isNotEmpty()) {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    itemsIndexed(state.existingPhotoUrls) { index, url ->
-                        PhotoThumbnail(
-                            model = url,
-                            onRemove = {
-                                val removedUrl = state.existingPhotoUrls[index]
-                                viewModel.removeExistingPhoto(index)
-                                coroutineScope.launch {
-                                    val hash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                        computeRemotePlacePhotoHash(removedUrl)
-                                    }
-                                    if (hash != null) {
-                                        photoHashSet = photoHashSet - hash
-                                    }
-                                }
-                            },
-                            enabled = !state.isSaving
-                        )
-                    }
-                    itemsIndexed(state.photoUris) { index, uri ->
-                        PhotoThumbnail(
-                            model = uri,
-                            onRemove = {
-                                val removedUri = state.photoUris[index]
-                                val hash = computePlacePhotoHash(context, removedUri)
-                                viewModel.removeNewPhoto(index)
-                                if (hash != null) {
-                                    photoHashSet = photoHashSet - hash
-                                }
-                            },
-                            enabled = !state.isSaving
-                        )
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-            }
-
-            if (state.canAddMorePhotos) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            photoPickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        },
-                        enabled = !state.isSaving && placeHashesReady,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            Icons.Filled.AddAPhoto,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.gallery))
-                    }
-                    OutlinedButton(
-                        onClick = {
-                            val hasPerm = ContextCompat.checkSelfPermission(
-                                context, Manifest.permission.CAMERA
-                            ) == PackageManager.PERMISSION_GRANTED
-                            if (hasPerm) {
-                                launchPlaceCamera()
-                            } else {
-                                placeCameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                        Text("$requiredText${state.name.length}/$PLACE_NAME_MAX_LENGTH")
+                    },
+                    isError = nameHasError,
+                    enabled = !state.isSaving,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics {
+                            if (nameHasError) {
+                                error(context.getString(R.string.field_required))
                             }
-                        },
-                        enabled = !state.isSaving && placeHashesReady,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            Icons.Filled.CameraAlt,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.camera))
-                    }
-                }
-            }
+                        }
+                )
 
-            if (state.isUploadingPhotos) {
-                Spacer(Modifier.height(8.dp))
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                Text(
-                    text = stringResource(R.string.uploading_photos),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                OutlinedTextField(
+                    value = state.description,
+                    onValueChange = viewModel::onDescriptionChange,
+                    label = { Text(stringResource(R.string.place_description_label)) },
+                    minLines = 2,
+                    maxLines = 5,
+                    enabled = !state.isSaving,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                CategoryDropdown(
+                    selected = state.category,
+                    onSelected = viewModel::onCategoryChange,
+                    enabled = !state.isSaving
                 )
             }
 
-            Spacer(Modifier.height(20.dp))
+            FormSection(title = "Lokalizacja") {
+                LocationSection(
+                    latitude = state.latitude,
+                    longitude = state.longitude,
+                    isFetching = state.isFetchingLocation,
+                    onClickFetch = {
+                        if (hasLocationPermission(context)) {
+                            coroutineScope.launch { fetchAndSetLocation(context, viewModel) }
+                        } else {
+                            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                        }
+                    },
+                    enabled = !state.isSaving
+                )
+
+                LocationHint(
+                    hasLocation = state.latitude != null && state.longitude != null,
+                    showError = state.hasTriedToSave && (state.latitude == null || state.longitude == null)
+                )
+
+                if (state.nearbyPlaces.isNotEmpty()) {
+                    NearbyPlacesList(places = state.nearbyPlaces)
+                }
+
+                AddressReadOnlyCard(address = state.address)
+            }
+
+            FormSection(title = "Szczegóły") {
+                Text(
+                    text = stringResource(R.string.amenities_label),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                AmenitiesGrid(
+                    selected = state.amenities,
+                    category = state.category,
+                    amenityFrequency = state.amenityFrequency,
+                    onToggle = viewModel::toggleAmenity,
+                    enabled = !state.isSaving
+                )
+
+                state.errorMessage?.let { msg ->
+                    Text(
+                        text = msg.asString(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                    )
+                }
+
+                PhotosSection(
+                    existingPhotoUrls = state.existingPhotoUrls,
+                    photoUris = state.photoUris,
+                    canAddMorePhotos = state.canAddMorePhotos,
+                    isSaving = state.isSaving,
+                    placeHashesReady = placeHashesReady,
+                    onPickFromGallery = {
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    onTakePhoto = {
+                        val hasPerm = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.CAMERA
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (hasPerm) {
+                            launchPlaceCamera()
+                        } else {
+                            placeCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                    },
+                    onRemoveExisting = { index ->
+                        val removedUrl = state.existingPhotoUrls[index]
+                        viewModel.removeExistingPhoto(index)
+                        coroutineScope.launch {
+                            val hash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                computeRemotePlacePhotoHash(removedUrl)
+                            }
+                            if (hash != null) photoHashSet = photoHashSet - hash
+                        }
+                    },
+                    onRemoveNew = { index ->
+                        val removedUri = state.photoUris[index]
+                        val hash = computePlacePhotoHash(context, removedUri)
+                        viewModel.removeNewPhoto(index)
+                        if (hash != null) photoHashSet = photoHashSet - hash
+                    }
+                )
+
+                if (state.isUploadingPhotos) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Text(
+                        text = stringResource(R.string.uploading_photos),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
             Button(
                 onClick = viewModel::save,
@@ -533,6 +442,32 @@ fun AddPlaceScreen(
     }
 }
 
+@Composable
+private fun FormSection(
+    title: String,
+    content: @Composable Column.() -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(SECTION_PADDING),
+            verticalArrangement = Arrangement.spacedBy(FORM_FIELD_GAP),
+            content = {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                content()
+            }
+        )
+    }
+}
+
 private suspend fun fetchAndSetLocation(
     context: android.content.Context,
     viewModel: AddPlaceViewModel
@@ -550,8 +485,7 @@ private suspend fun fetchAndSetLocation(
             viewModel.onLocationError(UiText.StringResource(R.string.error_location_timeout))
             return
         }
-        val address = runCatching { reverseGeocode(context, coords.first, coords.second) }
-            .getOrNull()
+        val address = runCatching { reverseGeocode(context, coords.first, coords.second) }.getOrNull()
         viewModel.onLocationFetched(coords.first, coords.second, address)
     } catch (e: Exception) {
         viewModel.onLocationError(UiText.StringResource(R.string.error_location_timeout))
@@ -586,9 +520,7 @@ private fun CategoryDropdown(
             },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             enabled = enabled,
-            modifier = Modifier
-                .fillMaxWidth()
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+            modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable)
         )
         ExposedDropdownMenu(
             expanded = expanded,
@@ -627,19 +559,14 @@ private fun LocationSection(
         OutlinedButton(
             onClick = onClickFetch,
             enabled = enabled && !isFetching,
-            modifier = Modifier.fillMaxWidth().height(48.dp)
+            modifier = Modifier.fillMaxWidth().height(44.dp)
         ) {
             if (isFetching) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp
-                )
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.size(8.dp))
+                Text("Pobieranie lokalizacji...")
             } else {
-                Icon(
-                    Icons.Filled.MyLocation,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
+                Icon(Icons.Filled.MyLocation, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
                 Text(
                     text = if (latitude != null && longitude != null) {
@@ -661,6 +588,27 @@ private fun LocationSection(
     }
 }
 
+@Composable
+private fun LocationHint(
+    hasLocation: Boolean,
+    showError: Boolean
+) {
+    Text(
+        text = when {
+            hasLocation -> stringResource(R.string.location_fetched_hint)
+            showError -> LOCATION_ERROR_HINT
+            else -> stringResource(R.string.location_required_hint)
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = if (showError) {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+    )
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AmenitiesGrid(
@@ -673,24 +621,50 @@ private fun AmenitiesGrid(
     val applicable = remember(category, amenityFrequency) {
         Amenity.forCategory(category)
             .sortedWith(
-                compareByDescending<Amenity> { amenityFrequency[it] ?: 0 }
-                    .thenBy { it.ordinal }
+                compareByDescending<Amenity> { amenityFrequency[it] ?: 0 }.thenBy { it.ordinal }
             )
     }
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         applicable.forEach { amenity ->
             FilterChip(
                 selected = amenity in selected,
                 onClick = { onToggle(amenity) },
                 enabled = enabled,
-                label = { Text(stringResource(amenity.labelRes)) }
+                leadingIcon = {
+                    Text(
+                        text = amenityIcon(amenity),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                },
+                label = {
+                    Text(
+                        text = stringResource(amenity.labelRes),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             )
         }
     }
+}
+
+private fun amenityIcon(amenity: Amenity): String = when (amenity) {
+    Amenity.TOILET -> "🚻"
+    Amenity.CHANGING_TABLE -> "🍼"
+    Amenity.STROLLER_ACCESS, Amenity.STROLLER_RENTAL -> "♿"
+    Amenity.PARKING, Amenity.FAMILY_PARKING -> "🅿"
+    Amenity.FENCING -> "▣"
+    Amenity.SOFT_SURFACE, Amenity.SOFT_PROTECTION -> "🧸"
+    Amenity.SHADED_BENCHES, Amenity.REST_AREAS -> "🌳"
+    Amenity.TODDLER_ZONE, Amenity.AGE_ZONES -> "👶"
+    Amenity.GOOD_LIGHTING -> "💡"
+    Amenity.KIDS_MENU, Amenity.HIGH_CHAIR, Amenity.KIDS_TABLEWARE -> "🍽"
+    Amenity.KIDS_ENTERTAINMENT, Amenity.SENSORY_TOYS -> "🎲"
+    else -> "✓"
 }
 
 @Composable
@@ -699,9 +673,7 @@ private fun RequiredFieldLabel(text: String) {
     Text(
         buildAnnotatedString {
             append(text)
-            withStyle(SpanStyle(color = errorColor)) {
-                append(" *")
-            }
+            withStyle(SpanStyle(color = errorColor)) { append(" *") }
         }
     )
 }
@@ -712,8 +684,8 @@ private fun AddressReadOnlyCard(address: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        tonalElevation = 1.dp,
-        color = MaterialTheme.colorScheme.surfaceVariant
+        tonalElevation = 0.dp,
+        color = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -724,7 +696,7 @@ private fun AddressReadOnlyCard(address: String) {
                 imageVector = Icons.Filled.MyLocation,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(20.dp)
             )
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
@@ -744,10 +716,69 @@ private fun AddressReadOnlyCard(address: String) {
 }
 
 @Composable
+private fun PhotosSection(
+    existingPhotoUrls: List<String>,
+    photoUris: List<Uri>,
+    canAddMorePhotos: Boolean,
+    isSaving: Boolean,
+    placeHashesReady: Boolean,
+    onPickFromGallery: () -> Unit,
+    onTakePhoto: () -> Unit,
+    onRemoveExisting: (Int) -> Unit,
+    onRemoveNew: (Int) -> Unit
+) {
+    Text(
+        text = stringResource(R.string.photos_with_count, photoUris.size + existingPhotoUrls.size),
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold
+    )
+
+    if (existingPhotoUrls.isNotEmpty() || photoUris.isNotEmpty()) {
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            itemsIndexed(existingPhotoUrls) { index, url ->
+                PhotoThumbnail(model = url, onRemove = { onRemoveExisting(index) }, enabled = !isSaving)
+            }
+            itemsIndexed(photoUris) { index, uri ->
+                PhotoThumbnail(model = uri, onRemove = { onRemoveNew(index) }, enabled = !isSaving)
+            }
+        }
+    }
+
+    if (canAddMorePhotos) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = onPickFromGallery,
+                enabled = !isSaving && placeHashesReady,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Filled.AddAPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.gallery))
+            }
+            OutlinedButton(
+                onClick = onTakePhoto,
+                enabled = !isSaving && placeHashesReady,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Filled.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.camera))
+            }
+        }
+    }
+}
+
+@Composable
 private fun NearbyPlacesList(places: List<AddPlaceViewModel.NearbyPlace>) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = MaterialTheme.shapes.medium
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -760,9 +791,7 @@ private fun NearbyPlacesList(places: List<AddPlaceViewModel.NearbyPlace>) {
             places.take(5).forEach { place ->
                 val style = place.category.style
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 3.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -800,11 +829,7 @@ private fun DuplicateWarningDialog(
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
-            Icon(
-                imageVector = style.icon,
-                contentDescription = null,
-                tint = style.color
-            )
+            Icon(imageVector = style.icon, contentDescription = null, tint = style.color)
         },
         title = { Text(stringResource(R.string.duplicate_warning_title)) },
         text = {
@@ -818,14 +843,10 @@ private fun DuplicateWarningDialog(
             )
         },
         confirmButton = {
-            Button(onClick = onConfirm) {
-                Text(stringResource(R.string.duplicate_warning_confirm))
-            }
+            Button(onClick = onConfirm) { Text(stringResource(R.string.duplicate_warning_confirm)) }
         },
         dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
+            OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }
@@ -837,12 +858,12 @@ private fun PhotoThumbnail(
     onRemove: () -> Unit,
     enabled: Boolean = true
 ) {
-    Box(modifier = Modifier.size(80.dp)) {
+    Box(modifier = Modifier.size(PHOTO_THUMBNAIL_SIZE)) {
         AsyncImage(
             model = model,
             contentDescription = stringResource(R.string.photo_thumbnail_description),
             modifier = Modifier
-                .size(80.dp)
+                .size(PHOTO_THUMBNAIL_SIZE)
                 .clip(RoundedCornerShape(8.dp)),
             contentScale = ContentScale.Crop
         )
@@ -851,9 +872,9 @@ private fun PhotoThumbnail(
                 onClick = onRemove,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .size(22.dp)
+                    .size(PHOTO_REMOVE_BUTTON_SIZE)
                     .background(
-                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.82f),
                         shape = CircleShape
                     )
             ) {
@@ -861,7 +882,7 @@ private fun PhotoThumbnail(
                     imageVector = Icons.Filled.Close,
                     contentDescription = stringResource(R.string.remove_photo_description),
                     tint = MaterialTheme.colorScheme.onError,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(12.dp)
                 )
             }
         }
