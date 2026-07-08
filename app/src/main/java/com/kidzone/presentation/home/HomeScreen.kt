@@ -88,6 +88,8 @@ private val LOCATION_PANEL_MIN_HEIGHT = 360.dp
 private val LOCATION_CTA_HEIGHT = 48.dp
 private val HOME_HORIZONTAL_PADDING = 16.dp
 private const val MANUAL_CITY_HINT = "Nie chcesz używać GPS? Kliknij tutaj, aby wybrać miasto ręcznie"
+private const val GPS_STATUS_MESSAGE = "Nie widzimy Twojej lokalizacji. Włącz GPS, aby zobaczyć atrakcje w pobliżu."
+private const val ENABLE_GPS = "Włącz GPS"
 private const val WAVE_EMOJI = "👋"
 private const val WAVE_INITIAL_ROTATION = -12f
 private const val WAVE_TARGET_ROTATION = 16f
@@ -128,7 +130,9 @@ fun HomeScreen(
     val state by viewModel.uiState.collectAsState()
     val gpsEnabled = rememberLocationServiceEnabled()
     val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
-    val hasLocationContext = locationPermissionGranted || state.locationGranted
+    val hasLocationPermission = locationPermissionGranted || state.locationGranted
+    val hasLocationContext = hasLocationPermission && gpsEnabled
+    val showGpsDisabledStatus = hasLocationPermission && !gpsEnabled
 
     var previousNetworkStatus by remember { mutableStateOf(networkStatus) }
     LaunchedEffect(networkStatus) {
@@ -158,8 +162,8 @@ fun HomeScreen(
     }
 
     var previousGpsEnabled by remember { mutableStateOf(gpsEnabled) }
-    LaunchedEffect(gpsEnabled, state.locationGranted) {
-        if (!previousGpsEnabled && gpsEnabled && state.locationGranted) {
+    LaunchedEffect(gpsEnabled, hasLocationPermission) {
+        if (!previousGpsEnabled && gpsEnabled && hasLocationPermission) {
             viewModel.refresh()
         }
         previousGpsEnabled = gpsEnabled
@@ -171,7 +175,7 @@ fun HomeScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (!showIntro && !hasLocationContext) {
+            if (!showIntro && !hasLocationPermission) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -190,7 +194,10 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .weight(1f)
                         .background(MaterialTheme.colorScheme.background),
-                    contentPadding = PaddingValues(bottom = 96.dp),
+                    contentPadding = PaddingValues(
+                        top = if (showIntro) 0.dp else 18.dp,
+                        bottom = 96.dp
+                    ),
                     verticalArrangement = Arrangement.spacedBy(22.dp)
                 ) {
                     if (showIntro) {
@@ -206,7 +213,17 @@ fun HomeScreen(
                         }
                     }
 
-                    if (!hasLocationContext) {
+                    if (showGpsDisabledStatus) {
+                        item {
+                            GpsDisabledStatusPanel(
+                                modifier = Modifier.padding(horizontal = HOME_HORIZONTAL_PADDING),
+                                onEnableGpsClick = onRequestLocation,
+                                onManualCityClick = onOpenMap
+                            )
+                        }
+                    }
+
+                    if (!hasLocationPermission) {
                         item {
                             HomeLocationEmptyState(
                                 modifier = Modifier.padding(horizontal = HOME_HORIZONTAL_PADDING),
@@ -260,7 +277,7 @@ fun HomeScreen(
                         }
                     }
 
-                    state.errorMessage?.let { msg ->
+                    state.errorMessage?.takeIf { !showGpsDisabledStatus }?.let { msg ->
                         item {
                             Text(
                                 text = msg.asString(),
@@ -366,6 +383,61 @@ private fun WavingHand() {
             transformOrigin = TransformOrigin(0.8f, 0.8f)
         }
     )
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun GpsDisabledStatusPanel(
+    modifier: Modifier = Modifier,
+    onEnableGpsClick: () -> Unit,
+    onManualCityClick: () -> Unit
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(KidZoneRadii.Card),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.Top) {
+                Icon(
+                    imageVector = Icons.Filled.MyLocation,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = GPS_STATUS_MESSAGE,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Button(
+                onClick = onEnableGpsClick,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Text(ENABLE_GPS)
+            }
+            TextButton(
+                onClick = onManualCityClick,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = MANUAL_CITY_HINT,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
 }
 
 @Composable
