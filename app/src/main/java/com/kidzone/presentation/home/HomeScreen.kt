@@ -77,11 +77,12 @@ import com.kidzone.domain.model.Place
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.KidZoneRadii
 import com.kidzone.presentation.common.KidZoneSpacing
+import com.kidzone.presentation.common.NewPlaceBadge
 import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.shimmerEffect
 
-private val PLACE_ROW_HEIGHT = 168.dp
+private val PLACE_ROW_HEIGHT = 184.dp
 private val PLACE_CARD_WIDTH = 178.dp
 private val PLACE_CARD_ICON_SIZE = 30.dp
 private val PLACE_CARD_CONTENT_PADDING = 14.dp
@@ -753,7 +754,7 @@ private fun PlaceCard(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(PLACE_CARD_CONTENT_PADDING),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CategoryIcon(
@@ -770,15 +771,15 @@ private fun PlaceCard(
                     modifier = Modifier.weight(1f)
                 )
             }
+            Text(
+                text = place.name,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = place.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
                 item.distanceKm?.let {
                     DistanceLabel(
                         distanceKm = it,
@@ -793,32 +794,42 @@ private fun PlaceCard(
 
 @Composable
 private fun PlaceRatingStatus(place: Place) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = Icons.Filled.Star,
-            contentDescription = stringResource(R.string.rating),
-            tint = if (place.reviewsCount > 0) {
-                MaterialTheme.colorScheme.tertiary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            modifier = Modifier.size(14.dp)
-        )
-        Spacer(Modifier.width(KidZoneSpacing.GapTiny))
-        Text(
-            text = if (place.reviewsCount > 0) {
-                "%.1f (%d)".format(place.averageRating, place.reviewsCount)
-            } else {
-                NO_REVIEWS_LABEL
-            },
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Medium,
-            color = if (place.reviewsCount > 0) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f)
+    when {
+        place.reviewsCount > 0 -> {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = stringResource(R.string.rating),
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(KidZoneSpacing.GapTiny))
+                Text(
+                    text = "%.1f (%d)".format(place.averageRating, place.reviewsCount),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-        )
+        }
+        place.isNewWithoutReviews() -> NewPlaceBadge()
+        else -> {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = stringResource(R.string.rating),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(KidZoneSpacing.GapTiny))
+                Text(
+                    text = NO_REVIEWS_LABEL,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f)
+                )
+            }
+        }
     }
 }
 
@@ -862,7 +873,8 @@ private fun DistanceLabel(
             text = formatDistance(distanceKm, staleLocationAgeMinutes),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.secondary,
-            maxLines = 1
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
