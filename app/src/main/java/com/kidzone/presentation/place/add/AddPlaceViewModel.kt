@@ -355,7 +355,6 @@ class AddPlaceViewModel @Inject constructor(
                 it.copy(
                     isSaving = false,
                     isUploadingPhotos = false,
-                    errorMessage = UiText.StringResource(R.string.add_place_offline_save_hint)
                 )
             }
             return

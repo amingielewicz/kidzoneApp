@@ -47,7 +47,6 @@
     <string name="error_network">Błąd połączenia z serwerem. Spróbuj ponownie.</string>
     <string name="error_unknown">Wystąpił nieoczekiwany błąd. Spróbuj ponownie.</string>
     <string name="error_no_internet">Brak połączenia z internetem. Sprawdź sieć i spróbuj ponownie.</string>
-    <string name="add_place_offline_save_hint">Brak internetu. Zapisz po odzyskaniu połączenia.</string>
     <string name="add_place_offline_save_action">Zapisz po odzyskaniu internetu</string>
     <string name="add_place_offline_hint_short">Brak internetu</string>
     <string name="error_server_temporary">Nie udało się połączyć z serwerem. Spróbuj ponownie za chwilę.</string>
