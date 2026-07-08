@@ -445,7 +445,7 @@ fun AddPlaceScreen(
 @Composable
 private fun FormSection(
     title: String,
-    content: @Composable Column.() -> Unit
+    content: @Composable () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
