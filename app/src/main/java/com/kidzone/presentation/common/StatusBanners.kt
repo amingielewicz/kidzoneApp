@@ -5,6 +5,7 @@ package com.kidzone.presentation.common
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.filled.SignalWifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,6 +52,7 @@ private val GpsDisabledButtonContent = Color(0xFF4527A0)
 
 private val GpsAcquiringContainer = Color(0xFF00796B)
 private val GpsAcquiringContent = Color.White
+private val SystemStatusIconColor = Color(0xFF9E9E9E)
 
 @Composable
 fun rememberNetworkStatus(): State<NetworkStatus> {
@@ -81,6 +84,50 @@ fun rememberLocationServiceEnabled(refreshSignal: Int = 0): Boolean {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     return enabled.value
+}
+
+@Composable
+fun SystemStatusIcons(
+    isNetworkAvailable: Boolean,
+    isLocationAvailable: Boolean,
+    onNetworkClick: () -> Unit,
+    onLocationClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (isNetworkAvailable && isLocationAvailable) return
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (!isNetworkAvailable) {
+            IconButton(
+                onClick = onNetworkClick,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.SignalWifiOff,
+                    contentDescription = "Brak internetu",
+                    tint = SystemStatusIconColor,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+        if (!isLocationAvailable) {
+            IconButton(
+                onClick = onLocationClick,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.GpsOff,
+                    contentDescription = "Brak lokalizacji GPS",
+                    tint = SystemStatusIconColor,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
 }
 
 @Composable
