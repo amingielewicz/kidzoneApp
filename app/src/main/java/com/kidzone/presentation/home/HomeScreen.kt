@@ -432,64 +432,73 @@ private fun LocationStatusBanner(
     onManualCityClick: () -> Unit
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(PLACE_ROW_HEIGHT),
         shape = RoundedCornerShape(KidZoneRadii.Card),
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Center
         ) {
             Row(verticalAlignment = Alignment.Top) {
                 Icon(
                     imageVector = Icons.Filled.MyLocation,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(20.dp)
                 )
                 Spacer(Modifier.width(10.dp))
                 Text(
                     text = GPS_STATUS_MESSAGE,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f)
                 )
             }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Button(
-                    onClick = onEnableGpsClick,
-                    enabled = !isChecking,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+            Spacer(Modifier.height(10.dp))
+            Button(
+                onClick = onEnableGpsClick,
+                enabled = !isChecking,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                if (isChecking) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
                     )
-                ) {
-                    if (isChecking) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(CHECKING_GPS)
-                    } else {
-                        Text(ENABLE_GPS)
-                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(CHECKING_GPS, style = MaterialTheme.typography.labelMedium)
+                } else {
+                    Text(ENABLE_GPS, style = MaterialTheme.typography.labelMedium)
                 }
-                TextButton(
-                    onClick = onManualCityClick,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = MANUAL_CITY_HINT,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        textDecoration = TextDecoration.Underline
-                    )
-                }
+            }
+            Spacer(Modifier.height(6.dp))
+            TextButton(
+                onClick = onManualCityClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(34.dp)
+            ) {
+                Text(
+                    text = MANUAL_CITY_HINT,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium,
+                    textAlign = TextAlign.Center,
+                    textDecoration = TextDecoration.Underline
+                )
             }
         }
     }
