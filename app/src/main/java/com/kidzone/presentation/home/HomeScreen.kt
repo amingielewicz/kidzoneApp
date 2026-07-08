@@ -133,7 +133,7 @@ fun HomeScreen(
     animatedContentScope: AnimatedContentScope? = null
 ) {
     val state by viewModel.uiState.collectAsState()
-    val gpsEnabled = rememberLocationServiceEnabled()
+    val gpsEnabled = rememberLocationServiceEnabled(locationRefreshSignal)
     val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
     val hasLocationPermission = locationPermissionGranted || state.locationGranted
     val hasLocationContext = hasLocationPermission && gpsEnabled
