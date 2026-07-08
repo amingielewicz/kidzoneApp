@@ -121,6 +121,7 @@ fun HomeScreen(
     onDismissIntro: () -> Unit,
     showIntro: Boolean = true,
     locationPermissionGranted: Boolean = false,
+    locationRefreshSignal: Int = 0,
     viewModel: HomeViewModel = hiltViewModel(),
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedContentScope: AnimatedContentScope? = null
@@ -143,7 +144,7 @@ fun HomeScreen(
         previousNetworkStatus = networkStatus
     }
 
-    LaunchedEffect(locationPermissionGranted) {
+    LaunchedEffect(locationPermissionGranted, locationRefreshSignal) {
         if (locationPermissionGranted) {
             viewModel.onLocationPermissionGranted()
         }
