@@ -98,7 +98,7 @@ import com.kidzone.utils.UiText
 import kotlinx.coroutines.launch
 
 private val FORM_SECTION_GAP = 18.dp
-private val FORM_FIELD_GAP = 10.dp
+private val FORM_VERTICAL_SPACING = 10.dp
 private val SECTION_PADDING = 14.dp
 private val PHOTO_THUMBNAIL_SIZE = 76.dp
 private val PHOTO_REMOVE_BUTTON_SIZE = 20.dp
@@ -551,7 +551,7 @@ private fun FormSection(
     ) {
         Column(
             modifier = Modifier.padding(SECTION_PADDING).animateContentSize(),
-            verticalArrangement = Arrangement.spacedBy(FORM_FIELD_GAP),
+            verticalArrangement = Arrangement.spacedBy(FORM_VERTICAL_SPACING),
             content = {
                 Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 content()
@@ -703,7 +703,7 @@ private fun AmenitiesGrid(
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(FORM_VERTICAL_SPACING)
     ) {
         applicable.forEach { amenity ->
             AmenityChip(
