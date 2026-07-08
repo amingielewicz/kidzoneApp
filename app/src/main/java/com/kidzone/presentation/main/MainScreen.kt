@@ -18,10 +18,13 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,18 +33,23 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -55,6 +63,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -89,22 +98,8 @@ private const val KEY_HOME_INTRO_USED = "home_intro_used"
 private const val KEY_ADD_PLACE_FAB_LABEL_USED = "add_place_fab_label_used"
 private const val LOCATION_REQUEST_INTERVAL_MS = 10_000L
 private const val LOCATION_REQUEST_MIN_INTERVAL_MS = 5_000L
+private const val MANUAL_CITY_SHORT = "Wybierz miasto ręcznie"
 
-/**
- * Główny shell aplikacji po zalogowaniu – zawiera własny [NavHost]
- * z kartami (home, map, list, ranking, profile) i [NavigationBar].
- *
- * Otwarcie ekranów stackowych (szczegóły, dodawanie miejsca) lub wylogowanie
- * jest delegowane do rodzica przez callbacki.
- *
- * @param focusLatitude / [focusLongitude] – jeśli niepuste, ekran przełączy
- *   się na zakładkę "Mapa" i wycentruje kamerę na tych współrzędnych.
- *   Wykorzystywane po pomyślnym dodaniu nowego miejsca przez [AddPlaceScreen]
- *   (parent NavGraph wstrzykuje wartości przez `savedStateHandle`).
- * @param onFocusConsumed wywołane raz po skonsumowaniu sygnału (czyści
- *   savedStateHandle, żeby kolejne wejście na ten ekran bez nowego dodawania
- *   nie odpalało powtórnie nawigacji).
- */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
@@ -141,6 +136,7 @@ fun MainScreen(
     var showAddPlaceFabLabel by remember {
         mutableStateOf(!prefs.getBoolean(KEY_ADD_PLACE_FAB_LABEL_USED, false))
     }
+    var showLocationRationale by remember { mutableStateOf(false) }
     var notificationPromptReason by remember {
         mutableStateOf<NotificationPromptReason?>(null)
     }
@@ -189,10 +185,6 @@ fun MainScreen(
         Route.PlaceList.path
     )
 
-    // Lokalny stan przekazywany dalej do MapScreen. Trzymamy go obok sygnału
-    // z parent NavGraph, bo `onFocusConsumed()` od razu wyczyści savedStateHandle,
-    // a my chcemy, by MapScreen otrzymał współrzędne i sam je skonsumował, gdy
-    // zakończy animację kamery.
     var pendingMapFocus by remember { mutableStateOf<LatLng?>(null) }
     var pendingRankingTab by remember { mutableStateOf(rankingTab) }
 
@@ -205,7 +197,7 @@ fun MainScreen(
                 onFallbackToSettings = { context.openLocationSettings() }
             )
         } else {
-            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            showLocationRationale = true
         }
     }
 
@@ -225,13 +217,10 @@ fun MainScreen(
         }
     }
 
-    // Rejestruj FCM token po zalogowaniu – Application.onCreate() może
-    // nie mieć uid (cold start bez sesji). Tu user jest na pewno zalogowany.
     LaunchedEffect(Unit) {
         com.kidzone.messaging.KidZoneMessagingService.registerCurrentToken(context)
     }
 
-    // Deep link: przełączenie na konkretną zakładkę (profile, ranking, map)
     LaunchedEffect(focusTab) {
         if (focusTab.isNotBlank()) {
             navController.navigate(focusTab) {
@@ -248,9 +237,6 @@ fun MainScreen(
     LaunchedEffect(focusLatitude, focusLongitude) {
         if (focusLatitude != null && focusLongitude != null) {
             pendingMapFocus = LatLng(focusLatitude, focusLongitude)
-            // Przełącz na zakładkę Map z pełną semantyką bottom-nav (saveState /
-            // restoreState), żeby zachowanie kart pozostało spójne z klikaniem
-            // ich ręcznie.
             navController.navigate(Route.Map.path) {
                 popUpTo(navController.graph.findStartDestination().id) {
                     saveState = true
@@ -305,7 +291,6 @@ fun MainScreen(
                         label = { Text(stringResource(tab.labelRes)) }
                     )
                 }
-                // wskazówka by wykorzystać `hierarchy` (dla zagnieżdżonych grafów w przyszłości)
                 @Suppress("UNUSED_EXPRESSION")
                 backStackEntry?.destination?.hierarchy
             }
@@ -401,11 +386,76 @@ fun MainScreen(
         }
     }
 
+    if (showLocationRationale) {
+        LocationRationaleBottomSheet(
+            onEnableLocation = {
+                showLocationRationale = false
+                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            },
+            onChooseCityManually = {
+                showLocationRationale = false
+                openMapFromHome()
+            },
+            onDismiss = { showLocationRationale = false }
+        )
+    }
+
     notificationPromptReason?.let { reason ->
         NotificationSoftPromptDialog(
             reason = reason,
             onDismiss = { notificationPromptReason = null }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+@Suppress("FunctionNaming")
+private fun LocationRationaleBottomSheet(
+    onEnableLocation: () -> Unit,
+    onChooseCityManually: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.LocationOn,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(44.dp)
+            )
+            Text(
+                text = "Włącz lokalizację",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "Włącz lokalizację, aby zobaczyć miejsca blisko Ciebie.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Button(
+                onClick = onEnableLocation,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Włącz lokalizację")
+            }
+            TextButton(onClick = onChooseCityManually) {
+                Text(MANUAL_CITY_SHORT)
+            }
+            Spacer(Modifier.height(8.dp))
+        }
     }
 }
 
