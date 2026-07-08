@@ -16,7 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kidzone.domain.model.Place
 
-private const val NEW_PLACE_WINDOW_DAYS = 14L
+private const val NEW_PLACE_WINDOW_DAYS = 30L
 private const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
 private val NewPlaceContainerColor = Color(0xFFE3F2FD)
 private val NewPlaceContentColor = Color(0xFF0D47A1)
