@@ -1,8 +1,10 @@
 package com.kidzone.presentation.place.add
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -102,8 +104,10 @@ private const val PLACE_NAME_WARNING_LENGTH = 40
 private const val PLACE_DESCRIPTION_UI_MAX_LENGTH = 500
 private const val PLACE_DESCRIPTION_COUNTER_THRESHOLD = 400
 private const val PLACE_DESCRIPTION_WARNING_LENGTH = 480
-private const val LOCATION_ERROR_HINT = "Nie udało się pobrać lokalizacji. Sprawdź GPS i spróbuj ponownie."
 private const val DESCRIPTION_LIMIT_REACHED_HINT = "Osiągnięto maksymalną liczbę znaków"
+private const val LOCATION_PERMISSION_HELPER = "Aby pobrać lokalizację, zezwól na dostęp do GPS."
+private const val LOCATION_GPS_HELPER = "Włącz GPS, aby pobrać lokalizację."
+private const val LOCATION_READY_HELPER = "Kliknij przycisk powyżej, aby pobrać adres."
 
 /**
  * Ekran dodawania nowego miejsca – formularz zapisywany do Firestore.
@@ -120,6 +124,8 @@ fun AddPlaceScreen(
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val haptic = rememberHapticFeedback()
+    var locationPermissionGranted by remember { mutableStateOf(hasLocationPermission(context)) }
+    var locationServiceEnabled by remember { mutableStateOf(isLocationServiceEnabled(context)) }
 
     LaunchedEffect(state.isSaved) {
         if (state.isSaved) {
@@ -143,13 +149,29 @@ fun AddPlaceScreen(
         }
     }
 
+    val locationSettingsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        locationPermissionGranted = hasLocationPermission(context)
+        locationServiceEnabled = isLocationServiceEnabled(context)
+        if (locationPermissionGranted && locationServiceEnabled) {
+            coroutineScope.launch { fetchAndSetLocation(context, viewModel) }
+        }
+    }
+
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) {
-            coroutineScope.launch { fetchAndSetLocation(context, viewModel) }
-        } else {
-            viewModel.onLocationError(UiText.StringResource(R.string.location_permission_denied))
+        locationPermissionGranted = granted || hasLocationPermission(context)
+        locationServiceEnabled = isLocationServiceEnabled(context)
+        when {
+            !locationPermissionGranted -> viewModel.onLocationError(
+                UiText.StringResource(R.string.location_permission_denied)
+            )
+            !locationServiceEnabled -> locationSettingsLauncher.launch(
+                Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+            )
+            else -> coroutineScope.launch { fetchAndSetLocation(context, viewModel) }
         }
     }
 
@@ -243,6 +265,18 @@ fun AddPlaceScreen(
         }
     }
 
+    fun handleLocationClick() {
+        locationPermissionGranted = hasLocationPermission(context)
+        locationServiceEnabled = isLocationServiceEnabled(context)
+        when {
+            !locationPermissionGranted -> locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            !locationServiceEnabled -> locationSettingsLauncher.launch(
+                Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+            )
+            else -> coroutineScope.launch { fetchAndSetLocation(context, viewModel) }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -277,6 +311,14 @@ fun AddPlaceScreen(
             val showDescriptionCounter = descriptionLength >= PLACE_DESCRIPTION_COUNTER_THRESHOLD
             val descriptionWarning = descriptionLength >= PLACE_DESCRIPTION_WARNING_LENGTH
             val descriptionLimitReached = descriptionLength >= PLACE_DESCRIPTION_UI_MAX_LENGTH
+            val hasCoordinates = state.latitude != null && state.longitude != null
+            val locationReady = locationPermissionGranted && locationServiceEnabled
+            val addressHelper = when {
+                !locationPermissionGranted -> LOCATION_PERMISSION_HELPER
+                !locationServiceEnabled -> LOCATION_GPS_HELPER
+                !hasCoordinates -> LOCATION_READY_HELPER
+                else -> null
+            }
 
             FormSection(title = "Podstawy") {
                 OutlinedTextField(
@@ -336,26 +378,17 @@ fun AddPlaceScreen(
                     latitude = state.latitude,
                     longitude = state.longitude,
                     isFetching = state.isFetchingLocation,
-                    onClickFetch = {
-                        if (hasLocationPermission(context)) {
-                            coroutineScope.launch { fetchAndSetLocation(context, viewModel) }
-                        } else {
-                            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                        }
-                    },
+                    hasLocationPermission = locationPermissionGranted,
+                    isLocationEnabled = locationServiceEnabled,
+                    onClickFetch = ::handleLocationClick,
                     enabled = !state.isSaving
-                )
-
-                LocationHint(
-                    hasLocation = state.latitude != null && state.longitude != null,
-                    showError = state.hasTriedToSave && (state.latitude == null || state.longitude == null)
                 )
 
                 if (state.nearbyPlaces.isNotEmpty()) {
                     NearbyPlacesList(places = state.nearbyPlaces)
                 }
 
-                AddressReadOnlyCard(address = state.address)
+                AddressReadOnlyCard(address = state.address, helperText = addressHelper)
             }
 
             FormSection(title = "Szczegóły") {
@@ -574,9 +607,12 @@ private fun LocationSection(
     latitude: Double?,
     longitude: Double?,
     isFetching: Boolean,
+    hasLocationPermission: Boolean,
+    isLocationEnabled: Boolean,
     onClickFetch: () -> Unit,
     enabled: Boolean
 ) {
+    val isReady = hasLocationPermission && isLocationEnabled
     Column(modifier = Modifier.fillMaxWidth()) {
         OutlinedButton(
             onClick = onClickFetch,
@@ -588,13 +624,14 @@ private fun LocationSection(
                 Spacer(Modifier.size(8.dp))
                 Text("Pobieranie lokalizacji...")
             } else {
-                Icon(Icons.Filled.MyLocation, contentDescription = null, modifier = Modifier.size(18.dp))
+                LocationButtonIcon(isReady = isReady)
                 Spacer(Modifier.size(8.dp))
                 Text(
-                    text = if (latitude != null && longitude != null) {
-                        stringResource(R.string.update_location_action)
-                    } else {
-                        stringResource(R.string.fetch_location_action)
+                    text = when {
+                        !hasLocationPermission -> "Zezwól na lokalizację"
+                        !isLocationEnabled -> "Włącz GPS"
+                        latitude != null && longitude != null -> stringResource(R.string.update_location_action)
+                        else -> stringResource(R.string.fetch_location_action)
                     }
                 )
             }
@@ -611,24 +648,27 @@ private fun LocationSection(
 }
 
 @Composable
-private fun LocationHint(
-    hasLocation: Boolean,
-    showError: Boolean
-) {
-    Text(
-        text = when {
-            hasLocation -> stringResource(R.string.location_fetched_hint)
-            showError -> LOCATION_ERROR_HINT
-            else -> stringResource(R.string.location_required_hint)
-        },
-        style = MaterialTheme.typography.bodySmall,
-        color = if (showError) {
-            MaterialTheme.colorScheme.error
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
-    )
+private fun LocationButtonIcon(isReady: Boolean) {
+    Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+        Icon(
+            imageVector = Icons.Filled.MyLocation,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = if (isReady) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        )
+        if (!isReady) {
+            Icon(
+                imageVector = Icons.Filled.Close,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(12.dp).align(Alignment.BottomEnd)
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -702,7 +742,7 @@ private fun RequiredFieldLabel(text: String) {
 
 @Composable
 @Suppress("FunctionNaming")
-private fun AddressReadOnlyCard(address: String) {
+private fun AddressReadOnlyCard(address: String, helperText: String? = null) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
@@ -727,7 +767,11 @@ private fun AddressReadOnlyCard(address: String) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = address.ifBlank { stringResource(R.string.address_auto_placeholder) },
+                    text = when {
+                        address.isNotBlank() -> address
+                        helperText != null -> helperText
+                        else -> stringResource(R.string.address_auto_placeholder)
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
