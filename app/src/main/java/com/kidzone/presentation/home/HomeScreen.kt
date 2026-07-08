@@ -658,12 +658,7 @@ private fun HorizontalPlacesRow(
                     verticalArrangement = Arrangement.Center
                 ) {
                     emptyIcon?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.outlineVariant,
-                            fontWeight = FontWeight.Bold
-                        )
+                        EmptyStateIcon(icon = it)
                         Spacer(Modifier.height(8.dp))
                     }
                     Text(
@@ -691,6 +686,33 @@ private fun HorizontalPlacesRow(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun EmptyStateIcon(icon: String) {
+    val contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+    if (icon == EMPTY_TOP_ICON) {
+        Surface(
+            shape = RoundedCornerShape(999.dp),
+            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.25f),
+            contentColor = contentColor
+        ) {
+            Text(
+                text = icon,
+                style = MaterialTheme.typography.titleMedium,
+                color = contentColor,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+            )
+        }
+    } else {
+        Text(
+            text = icon,
+            style = MaterialTheme.typography.titleMedium,
+            color = contentColor,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -755,7 +777,7 @@ private fun PlaceCard(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     item.distanceKm?.let {
