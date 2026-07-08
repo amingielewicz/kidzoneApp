@@ -279,7 +279,12 @@ fun KidZoneNavGraph(
                             navController.popBackStack()
                         }
                     },
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onOpenExistingPlace = { placeId ->
+                        navController.navigate(Route.PlaceDetails.create(placeId)) {
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
 
@@ -319,35 +324,15 @@ fun KidZoneNavGraph(
                     placeId = placeId,
                     sharedTransitionScope = this@SharedTransitionLayout,
                     animatedContentScope = this@composable,
-                    animationSource = source
-                )
-            }
-
-            composable(Route.MyPlaces.path) {
-                MyPlacesScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenPlaceDetails = { placeId, source ->
-                        navController.navigate(Route.PlaceDetails.create(placeId, source)) {
-                            launchSingleTop = true
-                        }
-                    },
-                    sharedTransitionScope = this@SharedTransitionLayout,
-                    animatedContentScope = this@composable
-                )
-            }
-
-            composable(Route.MyReviews.path) {
-                MyReviewsScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenPlaceDetails = { placeId, source ->
-                        navController.navigate(Route.PlaceDetails.create(placeId, source)) {
-                            launchSingleTop = true
-                        }
-                    },
-                    sharedTransitionScope = this@SharedTransitionLayout,
-                    animatedContentScope = this@composable
+                    source = source
                 )
             }
         }
     }
+}
+
+@dagger.hilt.EntryPoint
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+interface RemoteConfigEntryPoint {
+    fun remoteConfigService(): RemoteConfigService
 }
