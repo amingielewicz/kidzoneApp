@@ -906,8 +906,7 @@ private fun formatDistance(km: Double, staleLocationAgeMinutes: Int? = null): St
 }
 
 private fun staleAgeLabel(ageMinutes: Int): String = when {
-    ageMinutes <= 0 -> "przed chwilą"
-    ageMinutes == 1 -> "1 min temu"
+    ageMinutes <= 1 -> "1 min temu"
     else -> "$ageMinutes min temu"
 }
 
