@@ -14,6 +14,7 @@ import com.kidzone.utils.toPlacesErrorMessage
 import com.kidzone.widget.NearbyPlacesWidget
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,6 +28,10 @@ import kotlin.math.sqrt
 
 /** Zakres czasu dla sekcji "Ostatnio dodane w okolicy". */
 private const val RECENTLY_ADDED_WINDOW_MILLIS = 14L * 24L * 60L * 60L * 1000L
+private const val LOCATION_RETRY_DELAY_MS = 3_000L
+private const val LOCATION_RETRY_COUNT = 3
+private const val ONE_MINUTE_MILLIS = 60_000L
+private const val KEY_LAST_LOCATION_TIME = "last_location_time"
 
 /**
  * ViewModel ekranu Home (zakładka "Start" w bottom navigation).
@@ -54,6 +59,12 @@ class HomeViewModel @Inject constructor(
         val distanceKm: Double
     )
 
+    private data class LastKnownLocation(
+        val lat: Double,
+        val lng: Double,
+        val timestampMillis: Long
+    )
+
     /**
      * @property topPlaces lokalny ranking najlepiej ocenianych miejsc w pobliżu
      * @property nearbyPlaces lista najbliższych miejsc bez względu na ocenę
@@ -64,6 +75,9 @@ class HomeViewModel @Inject constructor(
      * @property isRefreshing true podczas pull-to-refresh (kręci spinner)
      * @property locationGranted true gdy user nadał ACCESS_*_LOCATION
      * @property errorMessage błąd ostatniego fetcha (top lub nearby)
+     * @property isUsingStaleLocation true gdy pokazujemy dane z ostatniej poprawnej pozycji
+     * @property staleLocationAgeMinutes wiek ostatniej znanej pozycji w minutach
+     * @property hasWeakGpsSignal true gdy GPS jest włączony, ale nie udało się złapać fixa
      */
     data class UiState(
         val topPlaces: List<PlaceWithDistance> = emptyList(),
@@ -76,11 +90,15 @@ class HomeViewModel @Inject constructor(
         val locationGranted: Boolean = false,
         val errorMessage: UiText? = null,
         /** true gdy GPS jest włączony ale lokalizacja jeszcze nie ustalona (trwa retry). */
-        val isAcquiringLocation: Boolean = false
+        val isAcquiringLocation: Boolean = false,
+        val isUsingStaleLocation: Boolean = false,
+        val staleLocationAgeMinutes: Int? = null,
+        val hasWeakGpsSignal: Boolean = false
     )
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+    private var lastKnownLocation: LastKnownLocation? = null
 
     init {
         refreshLocationGranted()
@@ -100,7 +118,10 @@ class HomeViewModel @Inject constructor(
                 locationGranted = granted,
                 isTopLoading = if (granted) it.isTopLoading else false,
                 isNearbyLoading = if (granted) it.isNearbyLoading else false,
-                isRecentlyAddedLoading = if (granted) it.isRecentlyAddedLoading else false
+                isRecentlyAddedLoading = if (granted) it.isRecentlyAddedLoading else false,
+                hasWeakGpsSignal = if (granted) it.hasWeakGpsSignal else false,
+                isUsingStaleLocation = if (granted) it.isUsingStaleLocation else false,
+                staleLocationAgeMinutes = if (granted) it.staleLocationAgeMinutes else null
             )
         }
         if (shouldLoad) loadLocationBasedPlaces()
@@ -117,7 +138,7 @@ class HomeViewModel @Inject constructor(
         if (!locationProvider.hasPermission()) {
             viewModelScope.launch {
                 _uiState.update { it.copy(isRefreshing = true) }
-                kotlinx.coroutines.delay(300)
+                delay(300)
                 _uiState.update { it.copy(isRefreshing = false) }
             }
             return
@@ -126,54 +147,19 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             val location = runCatching { locationProvider.getCurrentLocation() }.getOrNull()
             if (location == null) {
-                // Minimalny delay żeby PullToRefreshBox zdążył zarejestrować
-                // przejście true→false (bez tego spinner może „zawisnąć" gdy
-                // fetchCurrentLocation zwróci null natychmiast – np. GPS off).
-                kotlinx.coroutines.delay(300)
-                _uiState.update {
-                    it.copy(
-                        isRefreshing = false,
-                        errorMessage = UiText.StringResource(com.kidzone.R.string.error_location_timeout)
-                    )
-                }
+                delay(300)
+                applyWeakGpsFallback(isRefreshing = true)
                 return@launch
             }
 
             val (lat, lng) = location
-            val performanceConfig = performanceConfigProvider.performanceConfig
-            persistLocationForWidget(lat, lng)
-            when (
-                val result = placeRepository.getPlacesNear(
-                    lat,
-                    lng,
-                    performanceConfig.homeFetchRadiusKm
-                )
-            ) {
-                is OpResult.Success -> {
-                    val placesWithDistance = result.data
-                        .map { it to haversineKm(lat, lng, it.latitude, it.longitude) }
-
-                    val homeSections = buildHomeSections(placesWithDistance, performanceConfig)
-
-                    _uiState.update {
-                        it.copy(
-                            topPlaces = homeSections.topPlaces,
-                            nearbyPlaces = homeSections.nearbyPlaces,
-                            recentlyAddedPlaces = homeSections.recentlyAddedPlaces,
-                            isRefreshing = false,
-                            errorMessage = null
-                        )
-                    }
-                }
-                is OpResult.Failure -> _uiState.update {
-                    it.copy(
-                        isRefreshing = false,
-                        errorMessage = result.error.toPlacesErrorMessage(
-                            UiText.StringResource(com.kidzone.R.string.error_fetch_places)
-                        )
-                    )
-                }
-            }
+            saveLastKnownLocation(lat, lng)
+            loadPlacesForLocation(
+                lat = lat,
+                lng = lng,
+                isRefreshing = true,
+                isStale = false
+            )
         }
     }
 
@@ -185,7 +171,10 @@ class HomeViewModel @Inject constructor(
                     isTopLoading = false,
                     isNearbyLoading = false,
                     isRecentlyAddedLoading = false,
-                    isAcquiringLocation = false
+                    isAcquiringLocation = false,
+                    isUsingStaleLocation = false,
+                    staleLocationAgeMinutes = null,
+                    hasWeakGpsSignal = false
                 )
             }
             return
@@ -196,92 +185,158 @@ class HomeViewModel @Inject constructor(
                     isTopLoading = true,
                     isNearbyLoading = true,
                     isRecentlyAddedLoading = true,
-                    errorMessage = null
+                    errorMessage = null,
+                    hasWeakGpsSignal = false
                 )
             }
 
-            // Retry up to 3 times when GPS fix fails (weak signal, cold start).
-            // Between retries, show "Ustalanie lokalizacji…" banner.
             var location: Pair<Double, Double>? = null
-            val maxRetries = 3
-            for (attempt in 1..maxRetries) {
+            repeat(LOCATION_RETRY_COUNT) { attempt ->
                 location = runCatching { locationProvider.getCurrentLocation() }.getOrNull()
-                if (location != null) break
-                if (attempt < maxRetries) {
+                if (location != null) return@repeat
+                if (attempt < LOCATION_RETRY_COUNT - 1) {
                     _uiState.update { it.copy(isAcquiringLocation = true) }
-                    kotlinx.coroutines.delay(3_000L)
+                    delay(LOCATION_RETRY_DELAY_MS)
                 }
             }
             _uiState.update { it.copy(isAcquiringLocation = false) }
 
             if (location == null) {
-                _uiState.update {
-                    it.copy(
-                        isTopLoading = false,
-                        isNearbyLoading = false,
-                        isRecentlyAddedLoading = false,
-                        topPlaces = emptyList(),
-                        nearbyPlaces = emptyList(),
-                        recentlyAddedPlaces = emptyList(),
-                        errorMessage = UiText.StringResource(com.kidzone.R.string.error_location_timeout)
-                    )
-                }
+                applyWeakGpsFallback(isRefreshing = false)
                 return@launch
             }
 
-            val (lat, lng) = location
-            val performanceConfig = performanceConfigProvider.performanceConfig
-            persistLocationForWidget(lat, lng)
-            when (
-                val result = placeRepository.getPlacesNear(
-                    lat,
-                    lng,
-                    performanceConfig.homeFetchRadiusKm
+            val (lat, lng) = location ?: return@launch
+            saveLastKnownLocation(lat, lng)
+            loadPlacesForLocation(
+                lat = lat,
+                lng = lng,
+                isRefreshing = false,
+                isStale = false
+            )
+        }
+    }
+
+    private suspend fun applyWeakGpsFallback(isRefreshing: Boolean) {
+        val fallbackLocation = lastKnownLocation
+        if (fallbackLocation == null) {
+            _uiState.update {
+                it.copy(
+                    isRefreshing = false,
+                    isTopLoading = false,
+                    isNearbyLoading = false,
+                    isRecentlyAddedLoading = false,
+                    isAcquiringLocation = false,
+                    isUsingStaleLocation = false,
+                    staleLocationAgeMinutes = null,
+                    hasWeakGpsSignal = true,
+                    errorMessage = null
                 )
-            ) {
-                is OpResult.Success -> {
-                    // Repo zwraca ograniczony bucket geohash; dokładny dystans
-                    // liczymy na kliencie. "Blisko Ciebie" to 20 najbliższych, bez
-                    // patrzenia na oceny. "Top miejsca" to ranking z miejsc
-                    // znajdujących się blisko usera.
-                    val placesWithDistance = result.data
-                        .map { it to haversineKm(lat, lng, it.latitude, it.longitude) }
+            }
+            return
+        }
 
-                    val homeSections = buildHomeSections(placesWithDistance, performanceConfig)
+        val hasExistingPlaces = _uiState.value.nearbyPlaces.isNotEmpty() ||
+            _uiState.value.topPlaces.isNotEmpty() ||
+            _uiState.value.recentlyAddedPlaces.isNotEmpty()
 
-                    _uiState.update {
-                        it.copy(
-                            topPlaces = homeSections.topPlaces,
-                            nearbyPlaces = homeSections.nearbyPlaces,
-                            recentlyAddedPlaces = homeSections.recentlyAddedPlaces,
-                            isTopLoading = false,
-                            isNearbyLoading = false,
-                            isRecentlyAddedLoading = false
-                        )
-                    }
-                }
-                is OpResult.Failure -> _uiState.update {
+        if (hasExistingPlaces) {
+            _uiState.update {
+                it.copy(
+                    isRefreshing = false,
+                    isTopLoading = false,
+                    isNearbyLoading = false,
+                    isRecentlyAddedLoading = false,
+                    isAcquiringLocation = false,
+                    isUsingStaleLocation = true,
+                    staleLocationAgeMinutes = fallbackLocation.ageMinutes(),
+                    hasWeakGpsSignal = true,
+                    errorMessage = null
+                )
+            }
+            return
+        }
+
+        loadPlacesForLocation(
+            lat = fallbackLocation.lat,
+            lng = fallbackLocation.lng,
+            isRefreshing = isRefreshing,
+            isStale = true
+        )
+    }
+
+    private suspend fun loadPlacesForLocation(
+        lat: Double,
+        lng: Double,
+        isRefreshing: Boolean,
+        isStale: Boolean
+    ) {
+        val performanceConfig = performanceConfigProvider.performanceConfig
+        if (!isStale) {
+            persistLocationForWidget(lat, lng)
+        }
+        when (
+            val result = placeRepository.getPlacesNear(
+                lat,
+                lng,
+                performanceConfig.homeFetchRadiusKm
+            )
+        ) {
+            is OpResult.Success -> {
+                val placesWithDistance = result.data
+                    .map { it to haversineKm(lat, lng, it.latitude, it.longitude) }
+
+                val homeSections = buildHomeSections(placesWithDistance, performanceConfig)
+
+                _uiState.update {
                     it.copy(
+                        topPlaces = homeSections.topPlaces,
+                        nearbyPlaces = homeSections.nearbyPlaces,
+                        recentlyAddedPlaces = homeSections.recentlyAddedPlaces,
                         isTopLoading = false,
                         isNearbyLoading = false,
                         isRecentlyAddedLoading = false,
-                        errorMessage = result.error.toPlacesErrorMessage(
-                            UiText.StringResource(com.kidzone.R.string.error_fetch_places)
-                        )
+                        isRefreshing = false,
+                        isAcquiringLocation = false,
+                        isUsingStaleLocation = isStale,
+                        staleLocationAgeMinutes = lastKnownLocation?.ageMinutes().takeIf { isStale },
+                        hasWeakGpsSignal = isStale,
+                        errorMessage = null
                     )
                 }
+            }
+            is OpResult.Failure -> _uiState.update {
+                it.copy(
+                    isTopLoading = false,
+                    isNearbyLoading = false,
+                    isRecentlyAddedLoading = false,
+                    isRefreshing = false,
+                    errorMessage = result.error.toPlacesErrorMessage(
+                        UiText.StringResource(com.kidzone.R.string.error_fetch_places)
+                    )
+                )
             }
         }
     }
 
+    private fun saveLastKnownLocation(lat: Double, lng: Double) {
+        val now = System.currentTimeMillis()
+        lastKnownLocation = LastKnownLocation(lat, lng, now)
+        persistLocationForWidget(lat, lng, now)
+    }
+
     /** Persists last known location to SharedPreferences for the Glance widget. */
-    private fun persistLocationForWidget(lat: Double, lng: Double) {
+    private fun persistLocationForWidget(lat: Double, lng: Double, timestampMillis: Long = System.currentTimeMillis()) {
         appContext.getSharedPreferences(NearbyPlacesWidget.LOCATION_PREFS, Context.MODE_PRIVATE)
             .edit()
             .putFloat(NearbyPlacesWidget.KEY_LAST_LAT, lat.toFloat())
             .putFloat(NearbyPlacesWidget.KEY_LAST_LNG, lng.toFloat())
+            .putLong(KEY_LAST_LOCATION_TIME, timestampMillis)
             .apply()
     }
+
+    private fun LastKnownLocation.ageMinutes(): Int =
+        ((System.currentTimeMillis() - timestampMillis) / ONE_MINUTE_MILLIS).toInt().coerceAtLeast(0)
 }
 
 internal data class HomeSections(
