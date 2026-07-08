@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -105,7 +106,7 @@ private const val PLACE_NAME_WARNING_LENGTH = 40
 private const val PLACE_DESCRIPTION_UI_MAX_LENGTH = 500
 private const val PLACE_DESCRIPTION_COUNTER_THRESHOLD = 400
 private const val PLACE_DESCRIPTION_WARNING_LENGTH = 480
-private const val DESCRIPTION_LIMIT_REACHED_HINT = "Osiągnięto maksymalną liczbę znaków"
+private const val LIMIT_REACHED_HINT = "Osiągnięto maksymalną liczbę znaków"
 private const val LOCATION_PERMISSION_HELPER = "Aby pobrać lokalizację, zezwól na dostęp do GPS."
 private const val LOCATION_GPS_HELPER = "Włącz GPS, aby pobrać lokalizację."
 private const val LOCATION_READY_HELPER = "Kliknij przycisk powyżej, aby pobrać adres."
@@ -296,7 +297,9 @@ fun AddPlaceScreen(
         },
         bottomBar = {
             Surface(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding(),
                 tonalElevation = 3.dp,
                 color = MaterialTheme.colorScheme.surface
             ) {
@@ -337,12 +340,12 @@ fun AddPlaceScreen(
             val nameLength = state.name.length
             val showNameCounter = nameLength > 0
             val nameWarning = nameLength >= PLACE_NAME_WARNING_LENGTH
+            val nameLimitReached = nameLength >= PLACE_NAME_UI_MAX_LENGTH
             val descriptionLength = state.description.length
             val showDescriptionCounter = descriptionLength >= PLACE_DESCRIPTION_COUNTER_THRESHOLD
             val descriptionWarning = descriptionLength >= PLACE_DESCRIPTION_WARNING_LENGTH
             val descriptionLimitReached = descriptionLength >= PLACE_DESCRIPTION_UI_MAX_LENGTH
             val hasCoordinates = state.latitude != null && state.longitude != null
-            val locationReady = locationPermissionGranted && locationServiceEnabled
             val addressHelper = when {
                 !locationPermissionGranted -> LOCATION_PERMISSION_HELPER
                 !locationServiceEnabled -> LOCATION_GPS_HELPER
@@ -359,7 +362,14 @@ fun AddPlaceScreen(
                     supportingText = {
                         when {
                             nameHasError -> Text(stringResource(R.string.field_required))
-                            showNameCounter -> Text("$nameLength/$PLACE_NAME_UI_MAX_LENGTH")
+                            showNameCounter -> {
+                                Column {
+                                    Text("$nameLength/$PLACE_NAME_UI_MAX_LENGTH")
+                                    if (nameLimitReached) {
+                                        Text(LIMIT_REACHED_HINT)
+                                    }
+                                }
+                            }
                         }
                     },
                     isError = nameHasError || nameWarning,
@@ -385,7 +395,7 @@ fun AddPlaceScreen(
                             Column {
                                 Text("$descriptionLength/$PLACE_DESCRIPTION_UI_MAX_LENGTH")
                                 if (descriptionLimitReached) {
-                                    Text(DESCRIPTION_LIMIT_REACHED_HINT)
+                                    Text(LIMIT_REACHED_HINT)
                                 }
                             }
                         }
@@ -702,9 +712,9 @@ private fun AmenitiesGrid(
                     containerColor = MaterialTheme.colorScheme.surface,
                     labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                     selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    selectedLeadingIconColor = MaterialTheme.colorScheme.primary
+                    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ),
                 leadingIcon = {
                     Text(
