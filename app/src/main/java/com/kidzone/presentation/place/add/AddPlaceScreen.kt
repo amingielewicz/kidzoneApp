@@ -45,6 +45,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -293,6 +294,35 @@ fun AddPlaceScreen(
                 }
             )
         },
+        bottomBar = {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                tonalElevation = 3.dp,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Button(
+                    onClick = viewModel::save,
+                    enabled = !state.isSaving && !state.isLoadingPlace && state.isFormValid,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .height(48.dp)
+                ) {
+                    if (state.isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Text(
+                            text = if (state.isEditMode) stringResource(R.string.update_place_action)
+                            else stringResource(R.string.save_place_action)
+                        )
+                    }
+                }
+            }
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
@@ -393,14 +423,13 @@ fun AddPlaceScreen(
 
             FormSection(title = "Szczegóły") {
                 Text(
-                    text = stringResource(R.string.amenities_label),
+                    text = "Udogodnienia (${state.amenities.size})",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
                 AmenitiesGrid(
                     selected = state.amenities,
                     category = state.category,
-                    amenityFrequency = state.amenityFrequency,
                     onToggle = viewModel::toggleAmenity,
                     enabled = !state.isSaving
                 )
@@ -463,27 +492,6 @@ fun AddPlaceScreen(
                     )
                 }
             }
-
-            Button(
-                onClick = viewModel::save,
-                enabled = !state.isSaving && !state.isLoadingPlace && state.isFormValid,
-                modifier = Modifier.fillMaxWidth().height(48.dp)
-            ) {
-                if (state.isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Text(
-                        text = if (state.isEditMode) stringResource(R.string.update_place_action)
-                        else stringResource(R.string.save_place_action)
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
         }
     }
 
@@ -676,16 +684,10 @@ private fun LocationButtonIcon(isReady: Boolean) {
 private fun AmenitiesGrid(
     selected: Set<Amenity>,
     category: PlaceCategory,
-    amenityFrequency: Map<Amenity, Int>,
     onToggle: (Amenity) -> Unit,
     enabled: Boolean
 ) {
-    val applicable = remember(category, amenityFrequency) {
-        Amenity.forCategory(category)
-            .sortedWith(
-                compareByDescending<Amenity> { amenityFrequency[it] ?: 0 }.thenBy { it.ordinal }
-            )
-    }
+    val applicable = remember(category) { Amenity.forCategory(category) }
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -696,6 +698,14 @@ private fun AmenitiesGrid(
                 selected = amenity in selected,
                 onClick = { onToggle(amenity) },
                 enabled = enabled,
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    selectedLeadingIconColor = MaterialTheme.colorScheme.primary
+                ),
                 leadingIcon = {
                     Text(
                         text = amenityIcon(amenity),
@@ -715,18 +725,34 @@ private fun AmenitiesGrid(
 }
 
 private fun amenityIcon(amenity: Amenity): String = when (amenity) {
+    Amenity.FENCING -> "🛡"
+    Amenity.SOFT_SURFACE, Amenity.SOFT_PROTECTION -> "🧸"
+    Amenity.TODDLER_ZONE, Amenity.AGE_ZONES -> "👶"
+    Amenity.CAR_FREE_AREA, Amenity.SAFE_PATHS -> "🚸"
     Amenity.TOILET -> "🚻"
     Amenity.CHANGING_TABLE -> "🍼"
     Amenity.STROLLER_ACCESS, Amenity.STROLLER_RENTAL -> "♿"
-    Amenity.PARKING, Amenity.FAMILY_PARKING -> "🅿"
-    Amenity.FENCING -> "▣"
-    Amenity.SOFT_SURFACE, Amenity.SOFT_PROTECTION -> "🧸"
     Amenity.SHADED_BENCHES, Amenity.REST_AREAS -> "🌳"
-    Amenity.TODDLER_ZONE, Amenity.AGE_ZONES -> "👶"
     Amenity.GOOD_LIGHTING -> "💡"
+    Amenity.PARKING, Amenity.FAMILY_PARKING -> "🅿"
     Amenity.KIDS_MENU, Amenity.HIGH_CHAIR, Amenity.KIDS_TABLEWARE -> "🍽"
     Amenity.KIDS_ENTERTAINMENT, Amenity.SENSORY_TOYS -> "🎲"
-    else -> "✓"
+    Amenity.KIDS_CORNER_VISIBLE -> "👀"
+    Amenity.FAST_SERVICE, Amenity.FAMILY_FAST_TRACK -> "⚡"
+    Amenity.QUIET_FEEDING, Amenity.BREASTFEEDING_AREA -> "🤱"
+    Amenity.MICROWAVE -> "♨"
+    Amenity.NO_LOUD_MUSIC, Amenity.QUIET_AREAS -> "🔇"
+    Amenity.ANIMATOR -> "🎈"
+    Amenity.MONITORING -> "📹"
+    Amenity.TOY_SANITIZATION -> "🧼"
+    Amenity.PARENT_ZONE, Amenity.PARENT_CHILD_ROOM -> "👨‍👩‍👧"
+    Amenity.LOCKERS -> "🔒"
+    Amenity.PICNIC_AREA -> "🧺"
+    Amenity.DRINKING_WATER -> "💧"
+    Amenity.LOST_CHILD_POINT -> "📍"
+    Amenity.WIDE_DOORS -> "↔"
+    Amenity.KID_FRIENDLY_SIGNS -> "ℹ"
+    Amenity.WIFI -> "📶"
 }
 
 @Composable
