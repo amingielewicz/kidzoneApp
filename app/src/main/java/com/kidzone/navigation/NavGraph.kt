@@ -323,7 +323,7 @@ fun KidZoneNavGraph(
                     placeId = placeId,
                     sharedTransitionScope = this@SharedTransitionLayout,
                     animatedContentScope = this@composable,
-                    source = source
+                    animationSource = source
                 )
             }
         }
