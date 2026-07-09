@@ -39,6 +39,7 @@ private val LIST_MORE_ERROR_FALLBACK = UiText.StringResource(R.string.error_fetc
 private const val FLOW_SUBSCRIPTION_TIMEOUT_MS = 5000L
 private const val EARTH_RADIUS_KM = 6371.0
 private const val SEARCH_CONTAINS_RANK_OFFSET = 100
+private const val ONE_MINUTE_MILLIS = 60_000L
 
 /**
  * ViewModel listy miejsc.
@@ -73,7 +74,15 @@ class PlaceListViewModel @Inject constructor(
         val hasMore: Boolean = false,
         val isLoadingMore: Boolean = false,
         val totalCount: Int = 0,
-        val searchQuery: String = ""
+        val searchQuery: String = "",
+        val isUsingStaleLocation: Boolean = false,
+        val staleLocationAgeMinutes: Int? = null
+    )
+
+    private data class LastKnownLocation(
+        val lat: Double,
+        val lng: Double,
+        val timestampMillis: Long
     )
 
     private val selectedCategory = MutableStateFlow<PlaceCategory?>(null)
@@ -86,10 +95,13 @@ class PlaceListViewModel @Inject constructor(
     private val _lastResult = MutableStateFlow<PagedResult<Place>?>(null)
     private val _errorMessage = MutableStateFlow<UiText?>(null)
     private val _userLocation = MutableStateFlow<Pair<Double, Double>?>(null)
+    private val _isUsingStaleLocation = MutableStateFlow(false)
+    private val _staleLocationAgeMinutes = MutableStateFlow<Int?>(null)
 
     // Flag helping to restore scroll position when returning from details
     private var isReturningFromDetails = false
     private var isPrefetchingSearchPool = false
+    private var lastKnownLocation: LastKnownLocation? = null
     var savedScrollIndex = 0
         private set
     var savedScrollOffset = 0
@@ -105,7 +117,9 @@ class PlaceListViewModel @Inject constructor(
         _isRefreshing,
         _isLoadingMore,
         _lastResult,
-        _errorMessage
+        _errorMessage,
+        _isUsingStaleLocation,
+        _staleLocationAgeMinutes
     ) { args ->
         @Suppress("MagicNumber")
         val category = args[0] as PlaceCategory?
@@ -127,6 +141,10 @@ class PlaceListViewModel @Inject constructor(
         val paged = args[8] as PagedResult<Place>?
         @Suppress("MagicNumber")
         val error = args[9] as UiText?
+        @Suppress("MagicNumber")
+        val isUsingStaleLocation = args[10] as Boolean
+        @Suppress("MagicNumber")
+        val staleLocationAgeMinutes = args[11] as Int?
 
         val places = paged?.items.orEmpty()
         val filtered = filterAndSort(
@@ -148,7 +166,9 @@ class PlaceListViewModel @Inject constructor(
             hasMore = query.isBlank() && (paged?.hasMore ?: false),
             isLoadingMore = loadingMore,
             totalCount = paged?.items?.size ?: 0,
-            searchQuery = query
+            searchQuery = query,
+            isUsingStaleLocation = isUsingStaleLocation,
+            staleLocationAgeMinutes = staleLocationAgeMinutes
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SUBSCRIPTION_TIMEOUT_MS), UiState())
 
@@ -168,7 +188,29 @@ class PlaceListViewModel @Inject constructor(
 
     fun refreshLocation() {
         viewModelScope.launch {
-            _userLocation.value = locationProvider.getCurrentLocation()
+            applyCurrentOrStaleLocation(locationProvider.getCurrentLocation())
+        }
+    }
+
+    private fun applyCurrentOrStaleLocation(location: Pair<Double, Double>?) {
+        if (location != null) {
+            val (lat, lng) = location
+            lastKnownLocation = LastKnownLocation(lat, lng, System.currentTimeMillis())
+            _userLocation.value = location
+            _isUsingStaleLocation.value = false
+            _staleLocationAgeMinutes.value = null
+            return
+        }
+
+        val fallbackLocation = lastKnownLocation
+        if (fallbackLocation != null) {
+            _userLocation.value = fallbackLocation.lat to fallbackLocation.lng
+            _isUsingStaleLocation.value = true
+            _staleLocationAgeMinutes.value = fallbackLocation.ageMinutes()
+        } else {
+            _userLocation.value = null
+            _isUsingStaleLocation.value = false
+            _staleLocationAgeMinutes.value = null
         }
     }
 
@@ -356,6 +398,9 @@ class PlaceListViewModel @Inject constructor(
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
         return EARTH_RADIUS_KM * c
     }
+
+    private fun LastKnownLocation.ageMinutes(): Int =
+        ((System.currentTimeMillis() - timestampMillis) / ONE_MINUTE_MILLIS).toInt().coerceAtLeast(0)
 
     private fun String.normalizedForSearch(): String =
         Normalizer.normalize(this, Normalizer.Form.NFD)
