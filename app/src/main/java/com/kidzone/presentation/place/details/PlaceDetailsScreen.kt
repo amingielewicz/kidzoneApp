@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -1520,8 +1521,11 @@ private fun ReviewSortDropdown(
     onChange: (PlaceDetailsViewModel.ReviewSortOrder) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+
     Box {
-        TextButton(onClick = { expanded = true }) {
+        OutlinedButton(
+            onClick = { expanded = true }
+        ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.Sort,
                 contentDescription = null,
@@ -1529,18 +1533,54 @@ private fun ReviewSortDropdown(
             )
             Spacer(Modifier.width(6.dp))
             Text(text = current.getLabel())
+            Spacer(Modifier.width(4.dp))
             Icon(
                 imageVector = Icons.Filled.ArrowDropDown,
-                contentDescription = null
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
             )
         }
+
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false }
         ) {
             PlaceDetailsViewModel.ReviewSortOrder.entries.forEach { order ->
+                val selected = order == current
+
                 DropdownMenuItem(
-                    text = { Text(order.getLabel()) },
+                    text = {
+                        Text(
+                            text = order.getLabel(),
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            }
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Sort,
+                            contentDescription = null,
+                            tint = if (selected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
+                    trailingIcon = if (selected) {
+                        {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    } else null,
                     onClick = {
                         onChange(order)
                         expanded = false
