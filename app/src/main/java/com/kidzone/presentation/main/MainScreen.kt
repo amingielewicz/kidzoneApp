@@ -309,7 +309,6 @@ fun MainScreen(
                 if (showAddPlaceFabLabel) {
                     ExtendedFloatingActionButton(
                         onClick = ::openAddPlaceFromFab,
-                        modifier = Modifier.padding(bottom = 16.dp),
                         icon = {
                             Icon(
                                 imageVector = Icons.Filled.Add,
@@ -326,8 +325,7 @@ fun MainScreen(
                     )
                 } else {
                     FloatingActionButton(
-                        onClick = ::openAddPlaceFromFab,
-                        modifier = Modifier.padding(bottom = 16.dp)
+                        onClick = ::openAddPlaceFromFab
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Add,
