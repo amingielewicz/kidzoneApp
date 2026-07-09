@@ -854,14 +854,14 @@ private fun PlaceMainCard(
             PlaceDetailsRatingStatus(place = place)
 
             if (place.description.isNotBlank()) {
-                SoftDivider()
+                MainCardDivider()
                 Text(
                     text = place.description,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
 
-            SoftDivider()
+            MainCardDivider()
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.LocationOn,
@@ -940,7 +940,7 @@ private fun PlaceMainCard(
                 Text(stringResource(R.string.view_on_google_maps))
             }
 
-            SoftDivider()
+            MainCardDivider()
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.Person,
@@ -1076,6 +1076,16 @@ private fun SoftDivider() {
         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     )
     Spacer(Modifier.height(12.dp))
+}
+
+@Composable
+private fun MainCardDivider() {
+    Spacer(Modifier.height(8.dp))
+    androidx.compose.material3.HorizontalDivider(
+        thickness = 1.dp,
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    )
+    Spacer(Modifier.height(8.dp))
 }
 
 private fun formatDate(millis: Long): String {
