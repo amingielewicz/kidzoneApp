@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -723,9 +724,23 @@ private fun PlaceDetailsContent(
                             .filter { it in place.amenities }
                             .forEach { amenity ->
                                 AssistChip(
-                                    onClick = { /* read-only */ },
+                                    onClick = { },
                                     enabled = false,
-                                    label = { Text(stringResource(amenity.labelRes)) }
+                                    label = {
+                                        Text(
+                                            text = stringResource(amenity.labelRes),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    colors = AssistChipDefaults.assistChipColors(
+                                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    border = AssistChipDefaults.assistChipBorder(
+                                        enabled = false,
+                                        borderColor = MaterialTheme.colorScheme.outlineVariant,
+                                        disabledBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+                                    )
                                 )
                             }
                     }
