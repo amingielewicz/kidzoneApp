@@ -68,9 +68,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -82,32 +80,22 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.kidzone.R
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
-import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.EmptyState
 import com.kidzone.presentation.common.EmptyStateAction
-import com.kidzone.presentation.common.GpsDisabledBanner
 import com.kidzone.presentation.common.KidZoneCard
 import com.kidzone.presentation.common.KidZoneSpacing
-import com.kidzone.presentation.common.NewPlaceBadge
 import com.kidzone.presentation.common.isNewWithoutReviews
-import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.hasLocationPermission
-import com.kidzone.R
 import kotlinx.coroutines.launch
 
-/**
- * Dawne 4 "quick" udogodnienia. Usunięte z UI listy – teraz wszystkie
- * udogodnienia są dostępne wyłącznie z bottom sheeta filtrów.
- * Stała zachowana, bo [PlaceListViewModel] nadal ich używa do logiki
- * (zachowanie kompatybilności wstecznej – brak wpływu na UX).
- */
-@Suppress("unused")
 private val QUICK_AMENITIES = setOf(
     Amenity.CHANGING_TABLE,
     Amenity.TOILET,
@@ -115,24 +103,13 @@ private val QUICK_AMENITIES = setOf(
     Amenity.PARKING
 )
 
-/**
- * Lista miejsc - LazyColumn kart z filtrami + sortowaniem + twardym
- * cap-em [PlaceListViewModel] do 100 najistotniejszych pozycji.
- *
- * Subskrybuje Firestore przez [PlaceListViewModel] - snapshot listener
- * w repo automatycznie aktualizuje listę po dodaniu nowego miejsca z
- * [com.kidzone.presentation.place.add.AddPlaceScreen], bez potrzeby
- * pull-to-refresh.
- *
- * Filtry:
- *  - kategoria (single-select chipy w pierwszym rzędzie)
- *  - 4 uniwersalne udogodnienia (multi-select chipy w drugim rzędzie)
- *  - pełna lista udogodnień (multi-select w bottom sheecie pod "Filtry · N")
- *
- * Sortowanie - 5 trybów (zob. [PlaceListViewModel.SortOrder]) wybierane
- * przez "chip" z dropdownem na pasku filtrów. Domyślny: "Najbliższe"
- * (wymaga lokalizacji - jeżeli brak, banner zachęca do włączenia).
- */
+private val ListContentPadding = PaddingValues(
+    start = 16.dp,
+    top = 12.dp,
+    end = 16.dp,
+    bottom = 104.dp
+)
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun PlaceListScreen(
@@ -142,13 +119,12 @@ fun PlaceListScreen(
     animatedContentScope: AnimatedContentScope? = null
 ) {
     val state by viewModel.uiState.collectAsState()
-
-    // Auto-refresh po przywróceniu internetu
     val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
     var previousNetworkStatus by remember { mutableStateOf(networkStatus) }
+
     LaunchedEffect(networkStatus) {
-        if (previousNetworkStatus == com.kidzone.presentation.common.NetworkStatus.UNAVAILABLE
-            && networkStatus == com.kidzone.presentation.common.NetworkStatus.AVAILABLE
+        if (previousNetworkStatus == com.kidzone.presentation.common.NetworkStatus.UNAVAILABLE &&
+            networkStatus == com.kidzone.presentation.common.NetworkStatus.AVAILABLE
         ) {
             viewModel.refresh()
         }
@@ -158,50 +134,25 @@ fun PlaceListScreen(
     var showFilterSheet by rememberSaveable { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
-
     val context = LocalContext.current
-
-    // Stan przewijania listy — inicjalizowany z pozycji zapisanej w ViewModel
-    // TYLKO gdy user wraca z PlaceDetails. Przy powrocie z innej zakładki
-    // (lub pierwszym wejściu) zaczynamy od góry.
     val returningFromDetails = remember { viewModel.consumeReturnFromDetails() }
     val lazyListState = rememberLazyListState()
 
-    // Przy wejściu na zakładkę Lista z innej zakładki (NIE z PlaceDetails)
-    // odświeżamy lokalizację i scrollujemy na górę. Dane i tak są real-time
-    // przez snapshot listener, ale lokalizacja mogła się zmienić.
-    // Przy powrocie z PlaceDetails — przywracamy zapisaną pozycję scrollu.
     LaunchedEffect(returningFromDetails) {
         if (returningFromDetails) {
-            // Przywróć scroll do miejsca, gdzie user kliknął na item
-            lazyListState.scrollToItem(
-                viewModel.savedScrollIndex,
-                viewModel.savedScrollOffset
-            )
+            lazyListState.scrollToItem(viewModel.savedScrollIndex, viewModel.savedScrollOffset)
         } else {
-            // Powrót z innej zakładki lub pierwsze wejście — scroll na górze
             lazyListState.scrollToItem(0)
             viewModel.refreshLocation()
         }
     }
 
-    // Po zmianie kategorii/sortowania automatycznie przewijamy listę na górę.
-    // Bez tego user widziałby "tę samą pozycję pod palcem", ale w nowym
-    // porządku - co jest mylące (nie wiadomo, czy to jeszcze ten sam wynik
-    // czy nowy item w środku rankingu).
-    //
-    // Używamy rememberSaveable, żeby uniknąć scrollowania na górę po
-    // nawigacji powrotnej z PlaceDetails (LaunchedEffect odpalałby się
-    // ponownie z tym samym kluczem przy re-compose).
-    //
-    // Uwaga: nie używamy animateScrollToItem(). Na Compose 2024.09.x potrafi
-    // zderzyć się z LazyColumn + shared transition/lookahead przy nagłej
-    // zmianie listy i skończyć crashem "Placement happened before lookahead".
     var lastAppliedCategory by rememberSaveable {
         mutableStateOf(state.selectedCategory?.name.orEmpty())
     }
     var lastAppliedSortOrder by rememberSaveable { mutableStateOf(state.sortOrder.name) }
     var lastAppliedSearchQuery by rememberSaveable { mutableStateOf(state.searchQuery) }
+
     LaunchedEffect(state.selectedCategory) {
         val categoryName = state.selectedCategory?.name.orEmpty()
         if (categoryName != lastAppliedCategory) {
@@ -222,8 +173,6 @@ fun PlaceListScreen(
         }
     }
 
-    // Launcher requestu uprawnienia. Po nadaniu odświeżamy lokalizację -
-    // sortowanie "Najbliższe" zaczyna działać bez restartu ekranu.
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
@@ -232,17 +181,12 @@ fun PlaceListScreen(
         }
     }
 
-    // Po wejściu na ekran - jeśli user już ma permission, ale fixu jeszcze
-    // nie pobraliśmy (np. ekran się zrekonstruował po deep-linku), próbujemy
-    // ponownie. To no-op gdy lokalizacja już jest w state.
     LaunchedEffect(Unit) {
         if (hasLocationPermission(context) && state.userLocation == null) {
             viewModel.refreshLocation()
         }
     }
 
-    // Gdy user wraca z ustawień Androida (gdzie ręcznie dał lokalizację),
-    // odświeżamy fix - banner sam zniknie.
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -253,11 +197,7 @@ fun PlaceListScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
     }
 
-    // Liczba aktywnych filtrów udogodnień w sheecie.
-    val advancedAmenitiesCount = state.selectedAmenities.size
-
     Column(modifier = Modifier.fillMaxSize()) {
-        // Wyszukiwarka po nazwie miejsca
         SearchBar(
             query = state.searchQuery,
             onQueryChange = viewModel::onSearchQueryChange,
@@ -282,7 +222,7 @@ fun PlaceListScreen(
                 )
 
                 FilterAndSortBar(
-                    advancedFiltersCount = advancedAmenitiesCount,
+                    advancedFiltersCount = state.selectedAmenities.size,
                     sortOrder = state.sortOrder,
                     currentUserSignedIn = state.currentUserId != null,
                     onOpenFilterSheet = { showFilterSheet = true },
@@ -291,132 +231,90 @@ fun PlaceListScreen(
             }
         }
 
+        if (state.nearestUnavailable) {
+            EnableLocationForSortingBanner(
+                onAllowClick = {
+                    locationPermissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        )
+                    )
+                }
+            )
+        }
+
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
             onRefresh = { viewModel.refresh() },
             modifier = Modifier.fillMaxSize()
         ) {
-        when {
-            state.isLoading && state.places.isEmpty() -> {
-                // Smart Loading: don't show skeleton immediately to avoid flickering on fast cache hits
-                var showSkeleton by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) {
-                    kotlinx.coroutines.delay(150)
-                    showSkeleton = true
-                }
-                if (showSkeleton) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        userScrollEnabled = false
-                    ) {
-                        items(10) {
-                            PlaceRowSkeleton()
-                        }
-                    }
-                }
-            }
-
-            state.errorMessage != null && state.places.isEmpty() -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = state.errorMessage!!.asString(),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-
-            state.places.isEmpty() -> {
-                val canClearFilters = state.searchQuery.isNotBlank() ||
-                    state.selectedCategory != null ||
-                    state.selectedAmenities.isNotEmpty()
-                EmptyState(
-                    icon = Icons.Filled.Search,
-                    title = emptyTitleFor(state),
-                    message = emptyMessageFor(state),
-                    action = if (canClearFilters) {
-                        EmptyStateAction(
-                            label = stringResource(R.string.clear_filters),
-                            onClick = {
-                                viewModel.onSearchQueryChange("")
-                                viewModel.onCategorySelect(null)
-                                viewModel.onAmenitiesCleared()
-                            }
-                        )
-                    } else {
-                        null
+            when {
+                state.isLoading && state.places.isEmpty() -> LoadingList()
+                state.errorMessage != null && state.places.isEmpty() -> ListError(state.errorMessage!!.asString())
+                state.places.isEmpty() -> EmptyListState(
+                    state = state,
+                    onClear = {
+                        viewModel.onSearchQueryChange("")
+                        viewModel.onCategorySelect(null)
+                        viewModel.onAmenitiesCleared()
                     }
                 )
-            }
-
-            else -> {
-                LazyColumn(
-                    state = lazyListState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(items = state.places, key = { "list_${it.id}" }) { place ->
-                        PlaceCard(
-                            place = place,
-                            distanceKm = state.userLocation?.let { (lat, lng) ->
-                                haversineKm(lat, lng, place.latitude, place.longitude)
-                            },
-                            showDistance = state.sortOrder ==
-                                PlaceListViewModel.SortOrder.NEAREST &&
-                                state.userLocation != null,
-                            onClick = {
-                                // Zapisz pozycję scrollu i ustaw flagę przed nawigacją
-                                // do szczegółów — po powrocie lista wróci w to samo miejsce.
-                                viewModel.saveScrollPosition(
-                                    firstVisibleItemIndex = lazyListState.firstVisibleItemIndex,
-                                    firstVisibleItemScrollOffset = lazyListState.firstVisibleItemScrollOffset
-                                )
-                                viewModel.markNavigatingToDetails()
-                                onOpenPlaceDetails(place.id, "list")
-                            },
-                            sharedTransitionScope = sharedTransitionScope,
-                            animatedContentScope = animatedContentScope,
-                            animationSource = "list"
-                        )
-                    }
-                    if (state.isLoadingMore) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                else -> {
+                    LazyColumn(
+                        state = lazyListState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = ListContentPadding,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(items = state.places, key = { "list_${it.id}" }) { place ->
+                            PlaceCard(
+                                place = place,
+                                distanceKm = state.userLocation?.let { (lat, lng) ->
+                                    haversineKm(lat, lng, place.latitude, place.longitude)
+                                },
+                                showDistance = state.sortOrder == PlaceListViewModel.SortOrder.NEAREST &&
+                                    state.userLocation != null,
+                                onClick = {
+                                    viewModel.saveScrollPosition(
+                                        firstVisibleItemIndex = lazyListState.firstVisibleItemIndex,
+                                        firstVisibleItemScrollOffset = lazyListState.firstVisibleItemScrollOffset
+                                    )
+                                    viewModel.markNavigatingToDetails()
+                                    onOpenPlaceDetails(place.id, "list")
+                                },
+                                sharedTransitionScope = sharedTransitionScope,
+                                animatedContentScope = animatedContentScope
+                            )
+                        }
+                        if (state.isLoadingMore) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                }
                             }
                         }
                     }
-                }
 
-                // Infinite scroll: doładuj następną stronę gdy user dojdzie
-                // blisko końca listy (ostatnie 3 elementy).
-                val shouldLoadMore = remember {
-                    derivedStateOf {
-                        val lastVisible = lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                        val totalItems = lazyListState.layoutInfo.totalItemsCount
-                        lastVisible >= totalItems - 3 && state.hasMore && !state.isLoadingMore
+                    val shouldLoadMore = remember {
+                        derivedStateOf {
+                            val lastVisible = lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                            val totalItems = lazyListState.layoutInfo.totalItemsCount
+                            lastVisible >= totalItems - 3 && state.hasMore && !state.isLoadingMore
+                        }
                     }
-                }
-                LaunchedEffect(shouldLoadMore.value) {
-                    if (shouldLoadMore.value) {
-                        viewModel.loadMore()
+                    LaunchedEffect(shouldLoadMore.value) {
+                        if (shouldLoadMore.value) {
+                            viewModel.loadMore()
+                        }
                     }
                 }
             }
-        }
         }
     }
 
@@ -440,9 +338,65 @@ fun PlaceListScreen(
 }
 
 @Composable
-private fun emptyMessageFor(
-    state: PlaceListViewModel.UiState
-): String = when {
+private fun LoadingList() {
+    var showSkeleton by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(150)
+        showSkeleton = true
+    }
+    if (showSkeleton) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = ListContentPadding,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            userScrollEnabled = false
+        ) {
+            items(10) { PlaceRowSkeleton() }
+        }
+    }
+}
+
+@Composable
+private fun ListError(message: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = message,
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun EmptyListState(
+    state: PlaceListViewModel.UiState,
+    onClear: () -> Unit
+) {
+    val canClearFilters = state.searchQuery.isNotBlank() ||
+        state.selectedCategory != null ||
+        state.selectedAmenities.isNotEmpty()
+    EmptyState(
+        icon = Icons.Filled.Search,
+        title = emptyTitleFor(state),
+        message = emptyMessageFor(state),
+        action = if (canClearFilters) {
+            EmptyStateAction(
+                label = stringResource(R.string.clear_filters),
+                onClick = onClear
+            )
+        } else {
+            null
+        }
+    )
+}
+
+@Composable
+private fun emptyMessageFor(state: PlaceListViewModel.UiState): String = when {
     state.sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME && state.currentUserId == null ->
         stringResource(R.string.empty_added_by_me_logged_out)
     state.sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME ->
@@ -466,11 +420,6 @@ private fun emptyTitleFor(state: PlaceListViewModel.UiState): String = when {
     else -> stringResource(R.string.empty_title_default)
 }
 
-/**
- * Pole wyszukiwania po nazwie miejsca. Debouncing jest naturalny
- * (MutableStateFlow w VM pomija duplikaty), więc nie potrzebujemy
- * dodatkowego delay — lista filtruje się natychmiast.
- */
 @Composable
 private fun SearchBar(
     query: String,
@@ -516,7 +465,7 @@ private fun SearchBar(
             }
         },
         singleLine = true,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(12.dp),
         modifier = modifier.height(52.dp)
     )
 }
@@ -527,9 +476,6 @@ private fun CategoryFilterBar(
     selectedCategory: PlaceCategory?,
     onCategorySelected: (PlaceCategory?) -> Unit
 ) {
-    // Kolejność jak w enum PlaceCategory (świadomie nie alfabetycznie -
-    // logiczne grupowanie: place zabaw -> sale -> kawiarnia/restauracja ->
-    // park -> atrakcje -> inne). "Wszystkie" zostaje pierwsze jako reset.
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -560,13 +506,6 @@ private fun CategoryFilterBar(
     }
 }
 
-/**
- * Rząd z przyciskiem filtrów (ikona Tune) + chipem sortowania.
- *
- * Quick-amenity chipy usunięte – wszystkie udogodnienia dostępne wyłącznie
- * z bottom sheeta (po kliknięciu ikony Tune). Dzięki temu ekran listy jest
- * czystszy i mniej przytłaczający na mniejszych ekranach.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FilterAndSortBar(
@@ -585,7 +524,6 @@ private fun FilterAndSortBar(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 1. Button "Filtry" (ikona Tune z badge liczbą aktywnych filtrów)
         BadgedBox(
             modifier = Modifier.semantics {
                 contentDescription = context.getString(R.string.filters)
@@ -619,7 +557,6 @@ private fun FilterAndSortBar(
             }
         }
 
-        // 2. Sortowanie
         SortChip(
             current = sortOrder,
             currentUserSignedIn = currentUserSignedIn,
@@ -628,16 +565,6 @@ private fun FilterAndSortBar(
     }
 }
 
-/**
- * Chip "Sortuj: <label>" z dropdownem 5 trybów. Implementacja przez
- * `AssistChip` (a nie FilterChip), bo wartość nie jest binarna - wybór
- * jednego z wielu, a kontrolka i tak otwiera natywny menu.
- *
- * `currentUserSignedIn` reguluje, czy "Dodane przez Ciebie" jest enabled
- * w menu - dla wylogowanego usera ten wybór nie ma sensu (zwróciłby
- * pustą listę), ale zostawiamy go widocznego, żeby user widział co go
- * czeka po zalogowaniu.
- */
 @Composable
 private fun SortChip(
     current: PlaceListViewModel.SortOrder,
@@ -672,8 +599,7 @@ private fun SortChip(
             onDismissRequest = { expanded = false }
         ) {
             PlaceListViewModel.SortOrder.entries.forEach { option ->
-                val enabled = !(option == PlaceListViewModel.SortOrder.ADDED_BY_ME &&
-                    !currentUserSignedIn)
+                val enabled = !(option == PlaceListViewModel.SortOrder.ADDED_BY_ME && !currentUserSignedIn)
                 DropdownMenuItem(
                     text = { Text(stringResource(option.labelRes)) },
                     enabled = enabled,
@@ -687,11 +613,6 @@ private fun SortChip(
     }
 }
 
-/**
- * Banner pokazywany pod paskiem filtrów, gdy user wybrał "Najbliższe", a
- * lokalizacji nie mamy. Tłumaczy dlaczego sortowanie nie działa i daje
- * przycisk requesta uprawnienia.
- */
 @Composable
 private fun EnableLocationForSortingBanner(onAllowClick: () -> Unit) {
     Surface(
@@ -735,8 +656,7 @@ private fun PlaceCard(
     showDistance: Boolean,
     onClick: () -> Unit,
     sharedTransitionScope: SharedTransitionScope? = null,
-    animatedContentScope: AnimatedContentScope? = null,
-    animationSource: String? = "list"
+    animatedContentScope: AnimatedContentScope? = null
 ) {
     val categoryLabel = stringResource(place.category.labelRes)
     val distanceLabel = if (showDistance && distanceKm != null) {
@@ -775,85 +695,128 @@ private fun PlaceCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = place.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(KidZoneSpacing.GapTiny))
-                    CategoryBadge(category = place.category)
-                }
-                when {
-                    place.reviewsCount > 0 -> {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Star,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(15.dp)
-                                )
-                                Spacer(Modifier.width(3.dp))
-                                Text(
-                                    text = "%.1f".format(place.averageRating),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SoftCategoryTag(category = place.category)
+                        if (place.isNewWithoutReviews()) {
+                            SoftNewTag()
                         }
                     }
-                    place.isNewWithoutReviews() -> {
-                        NewPlaceBadge()
-                    }
+                }
+                if (place.reviewsCount > 0) {
+                    RatingBadge(place = place)
                 }
             }
+
             if (place.address.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Filled.LocationOn,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                        modifier = Modifier.size(15.dp)
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
                         text = place.address,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                        fontWeight = FontWeight.Normal,
                         maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
-                    // Odległość pokazujemy tylko gdy aktywne sortowanie po
-                    // odległości - inaczej byłoby "głośno" przy sortach
-                    // niezwiązanych z lokalizacją.
                     if (showDistance && distanceKm != null) {
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = formatDistance(distanceKm),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
                             fontWeight = FontWeight.Medium
                         )
                     }
                 }
             }
+
             if (place.description.isNotBlank()) {
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text = place.description,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SoftCategoryTag(category: PlaceCategory) {
+    val style = category.style
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = style.color.copy(alpha = 0.10f),
+        contentColor = style.color
+    ) {
+        Text(
+            text = stringResource(category.labelRes),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        )
+    }
+}
+
+@Composable
+private fun SoftNewTag() {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.50f),
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+    ) {
+        Text(
+            text = stringResource(R.string.new_place_no_reviews),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        )
+    }
+}
+
+@Composable
+private fun RatingBadge(place: Place) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Star,
+                contentDescription = null,
+                modifier = Modifier.size(15.dp)
+            )
+            Spacer(Modifier.width(3.dp))
+            Text(
+                text = "%.1f".format(place.averageRating),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }
@@ -876,7 +839,6 @@ private fun Place.ratingAccessibilityLabel(): String = when {
     else -> stringResource(R.string.map_no_reviews)
 }
 
-/** Odległość w km między dwoma punktami (formuła haversine). */
 private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
     val r = 6371.0
     val dLat = Math.toRadians(lat2 - lat1)
