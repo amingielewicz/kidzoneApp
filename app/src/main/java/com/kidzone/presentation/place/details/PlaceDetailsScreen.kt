@@ -832,7 +832,8 @@ private fun PlaceMainCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically) {
                 CategoryIcon(
                     category = place.category,
                     animationKey = "${keyPrefix}place_icon_${place.id}",
@@ -878,14 +879,16 @@ private fun PlaceMainCard(
             }
 
             MainCardDivider()
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.LocationOn,
                     contentDescription = stringResource(R.string.map_location_banner_text),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
                 )
-                Spacer(Modifier.width(6.6.dp))
+                Spacer(Modifier.width(6.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = place.address.ifBlank { stringResource(R.string.address_unavailable) },
@@ -920,8 +923,8 @@ private fun PlaceMainCard(
                         )
                     }
 
-                    if (distanceKm != null) {
-                        Spacer(Modifier.height(4.dp))
+                    distanceKm?.let {
+                        Spacer(Modifier.height(2.dp))
                         Text(
                             text = formatDistance(distanceKm, staleLocationAgeMinutes),
                             style = MaterialTheme.typography.labelSmall,
@@ -933,7 +936,7 @@ private fun PlaceMainCard(
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
             OutlinedButton(
                 onClick = {
                     val uri = Uri.parse(
@@ -952,11 +955,26 @@ private fun PlaceMainCard(
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
-                Spacer(Modifier.width(6.6.dp))
+                Spacer(Modifier.width(6.dp))
                 Text(stringResource(R.string.view_on_google_maps))
             }
 
-            MainCardDivider()
+            Spacer(Modifier.height(6.dp))
+            androidx.compose.material3.HorizontalDivider(
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+            Spacer(Modifier.height(6.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Person,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.Person,
@@ -1096,12 +1114,12 @@ private fun SoftDivider() {
 
 @Composable
 private fun MainCardDivider() {
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(6.dp))
     androidx.compose.material3.HorizontalDivider(
         thickness = 1.dp,
         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     )
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(6.dp))
 }
 
 private fun formatDate(millis: Long): String {
@@ -1272,7 +1290,7 @@ private fun ReviewCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isMine) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.16f)
             } else {
                 MaterialTheme.colorScheme.surface
             }
@@ -1320,7 +1338,7 @@ private fun ReviewCard(
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                             },
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                     }
                 }
