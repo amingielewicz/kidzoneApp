@@ -2,23 +2,17 @@
 
 package com.kidzone.presentation.common
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.os.Handler
 import android.os.Looper
-import android.content.BroadcastReceiver
-import android.content.Intent
-import android.content.IntentFilter
 import android.provider.Settings
-import android.location.LocationManager
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.State
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,10 +30,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -63,6 +63,7 @@ private val SystemStatusIconColor = Color(0xFF9E9E9E)
 @Composable
 fun rememberNetworkStatus(): State<NetworkStatus> {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val connectivityManager = remember(context) {
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     }
@@ -71,13 +72,34 @@ fun rememberNetworkStatus(): State<NetworkStatus> {
         mutableStateOf(connectivityManager.currentNetworkStatus(context))
     }
 
-    DisposableEffect(connectivityManager) {
+    DisposableEffect(context, lifecycleOwner, connectivityManager) {
         val mainHandler = Handler(Looper.getMainLooper())
 
         fun updateStatus() {
             mainHandler.post {
                 networkStatus.value = connectivityManager.currentNetworkStatus(context)
             }
+
+            mainHandler.postDelayed(
+                {
+                    networkStatus.value = connectivityManager.currentNetworkStatus(context)
+                },
+                500L
+            )
+
+            mainHandler.postDelayed(
+                {
+                    networkStatus.value = connectivityManager.currentNetworkStatus(context)
+                },
+                1_500L
+            )
+
+            mainHandler.postDelayed(
+                {
+                    networkStatus.value = connectivityManager.currentNetworkStatus(context)
+                },
+                3_000L
+            )
         }
 
         val callback = object : ConnectivityManager.NetworkCallback() {
@@ -110,16 +132,23 @@ fun rememberNetworkStatus(): State<NetworkStatus> {
                 }
             }
         }
-        updateStatus()
 
-        connectivityManager.registerDefaultNetworkCallback(callback)
+        val lifecycleObserver = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                updateStatus()
+            }
+        }
 
         val intentFilter = IntentFilter().apply {
             addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)
             addAction(ConnectivityManager.CONNECTIVITY_ACTION)
         }
 
+        updateStatus()
+
+        connectivityManager.registerDefaultNetworkCallback(callback)
         context.registerReceiver(networkReceiver, intentFilter)
+        lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
 
         onDispose {
             runCatching {
@@ -129,6 +158,8 @@ fun rememberNetworkStatus(): State<NetworkStatus> {
             runCatching {
                 context.unregisterReceiver(networkReceiver)
             }
+
+            lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
         }
     }
 
