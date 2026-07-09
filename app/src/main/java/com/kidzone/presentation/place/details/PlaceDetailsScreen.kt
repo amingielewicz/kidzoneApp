@@ -1254,25 +1254,42 @@ private fun ReviewCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        border = if (isMine) {
-            androidx.compose.foundation.BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-            )
-        } else null
+        colors = CardDefaults.cardColors(
+            containerColor = if (isMine) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = review.authorName.ifBlank { stringResource(R.string.anonymous) },
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium
-                )
-                if (isMine) {
-                    Spacer(Modifier.width(6.dp))
-                    MyReviewBadge()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = review.authorName.ifBlank { stringResource(R.string.anonymous) },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    if (isMine) {
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            imageVector = Icons.Filled.Person,
+                            contentDescription = stringResource(R.string.your_review),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
-                Spacer(Modifier.weight(1f))
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     repeat(5) { index ->
                         Icon(
@@ -1291,66 +1308,79 @@ private fun ReviewCard(
                         )
                     }
                 }
-                if (onEdit != null) {
-                    Spacer(Modifier.width(4.dp))
-                    IconButton(
-                        onClick = onEdit,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Edit,
-                            contentDescription = stringResource(R.string.edit_your_review),
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
+            }
+
+            ReviewTimestampRow(
+                createdAtMillis = review.createdAtMillis,
+                updatedAtMillis = review.updatedAtMillis
+            )
+
+            if (review.comment.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = review.comment,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            if (review.photoUrls.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                ReviewPhotoRow(
+                    photoUrls = review.photoUrls,
+                    onPhotoClick = { index -> onPhotoClick?.invoke(index) }
+                )
+            }
+
+            if (onEdit != null || onDelete != null || onReport != null) {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (onEdit != null) {
+                        IconButton(
+                            onClick = onEdit,
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Edit,
+                                contentDescription = stringResource(R.string.edit_your_review),
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
-                }
-                if (onDelete != null) {
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Delete,
-                            contentDescription = stringResource(R.string.delete_your_review),
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(18.dp)
-                        )
+
+                    if (onDelete != null) {
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Delete,
+                                contentDescription = stringResource(R.string.delete_your_review),
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.65f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
-                }
-                if (onReport != null) {
-                    Spacer(Modifier.width(4.dp))
-                    IconButton(
-                        onClick = onReport,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Flag,
-                            contentDescription = stringResource(R.string.report_review),
-                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                            modifier = Modifier.size(18.dp)
-                        )
+
+                    if (onReport != null) {
+                        IconButton(
+                            onClick = onReport,
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Flag,
+                                contentDescription = stringResource(R.string.report_review),
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.55f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
             }
-        }
-        ReviewTimestampRow(
-            createdAtMillis = review.createdAtMillis,
-            updatedAtMillis = review.updatedAtMillis
-        )
-        if (review.comment.isNotBlank()) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = review.comment,
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
-        if (review.photoUrls.isNotEmpty()) {
-            Spacer(Modifier.height(8.dp))
-            ReviewPhotoRow(
-                photoUrls = review.photoUrls,
-                onPhotoClick = { index -> onPhotoClick?.invoke(index) }
-            )
         }
     }
 }
@@ -1786,8 +1816,8 @@ private fun ReviewPhotoRow(
                 model = photoUrls[index],
                 contentDescription = contentDesc,
                 modifier = Modifier
-                    .size(72.dp)
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                    .size(64.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
                     .clickable { onPhotoClick(index) },
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop
             )
