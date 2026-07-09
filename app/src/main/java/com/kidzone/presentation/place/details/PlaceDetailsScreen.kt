@@ -97,6 +97,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+private const val VERY_CLOSE_DISTANCE_LABEL = "Tuż obok"
+
 /**
  * Szczegóły miejsca.
  */
@@ -398,54 +400,58 @@ fun PlaceDetailsScreen(
                         isRefreshing = state.isLoading,
                         onRefresh = viewModel::refresh
                     ) {
-                    PlaceDetailsContent(
-                        place = state.place!!,
-                        author = state.author,
-                        reviews = state.reviews,
-                        currentUserId = currentUser?.id,
-                        topRank = state.topRank,
-                        sortOrder = state.sortOrder,
-                        reportedReviewIds = state.reportedReviewIds,
-                        onSortOrderChange = viewModel::setSortOrder,
-                        onAddReview = viewModel::openAddReviewSheet,
-                        onEditReview = viewModel::openEditReviewSheet,
-                        onDeleteReview = { review -> viewModel.deleteReview(review.id) },
-                        onReportReview = { review ->
-                            reviewToReport = review
-                            showReportReviewDialog = true
-                        },
-                        onOpenPhotoViewer = { photos, index, areMine ->
-                            fullscreenPhotos = photos
-                            fullscreenPhotoIndex = index
-                            fullscreenPhotosAreMine = areMine
-                            fullscreenPhotoUploadedBy = state.place?.photoUploadedBy.orEmpty()
-                        },
-                        onAddPlacePhoto = if (currentUser != null) {
-                            {
-                                placePhotoPickerLauncher.launch(
-                                    androidx.activity.result.PickVisualMediaRequest(
-                                        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+                        PlaceDetailsContent(
+                            place = state.place!!,
+                            author = state.author,
+                            reviews = state.reviews,
+                            currentUserId = currentUser?.id,
+                            topRank = state.topRank,
+                            userLocation = state.userLocation,
+                            staleLocationAgeMinutes = state.staleLocationAgeMinutes.takeIf {
+                                state.isUsingStaleLocation
+                            },
+                            sortOrder = state.sortOrder,
+                            reportedReviewIds = state.reportedReviewIds,
+                            onSortOrderChange = viewModel::setSortOrder,
+                            onAddReview = viewModel::openAddReviewSheet,
+                            onEditReview = viewModel::openEditReviewSheet,
+                            onDeleteReview = { review -> viewModel.deleteReview(review.id) },
+                            onReportReview = { review ->
+                                reviewToReport = review
+                                showReportReviewDialog = true
+                            },
+                            onOpenPhotoViewer = { photos, index, areMine ->
+                                fullscreenPhotos = photos
+                                fullscreenPhotoIndex = index
+                                fullscreenPhotosAreMine = areMine
+                                fullscreenPhotoUploadedBy = state.place?.photoUploadedBy.orEmpty()
+                            },
+                            onAddPlacePhoto = if (currentUser != null) {
+                                {
+                                    placePhotoPickerLauncher.launch(
+                                        androidx.activity.result.PickVisualMediaRequest(
+                                            androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+                                        )
                                     )
-                                )
-                            }
-                        } else null,
-                        onAddPlaceCamera = if (currentUser != null) {
-                            {
-                                val hasPerm = androidx.core.content.ContextCompat.checkSelfPermission(
-                                    context, android.Manifest.permission.CAMERA
-                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                                if (hasPerm) {
-                                    launchPlaceCamera()
-                                } else {
-                                    placeCameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
                                 }
-                            }
-                        } else null,
-                        isUploadingPlacePhoto = state.isUploadingPlacePhoto,
-                        sharedTransitionScope = sharedTransitionScope,
-                        animatedContentScope = animatedContentScope,
-                        animationSource = animationSource
-                    )
+                            } else null,
+                            onAddPlaceCamera = if (currentUser != null) {
+                                {
+                                    val hasPerm = androidx.core.content.ContextCompat.checkSelfPermission(
+                                        context, android.Manifest.permission.CAMERA
+                                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                    if (hasPerm) {
+                                        launchPlaceCamera()
+                                    } else {
+                                        placeCameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                                    }
+                                }
+                            } else null,
+                            isUploadingPlacePhoto = state.isUploadingPlacePhoto,
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedContentScope = animatedContentScope,
+                            animationSource = animationSource
+                        )
                     }
                 }
             }
@@ -598,6 +604,8 @@ private fun PlaceDetailsContent(
     reviews: List<Review>,
     currentUserId: String?,
     topRank: Int?,
+    userLocation: Pair<Double, Double>?,
+    staleLocationAgeMinutes: Int?,
     sortOrder: PlaceDetailsViewModel.ReviewSortOrder,
     reportedReviewIds: Set<String> = emptySet(),
     onSortOrderChange: (PlaceDetailsViewModel.ReviewSortOrder) -> Unit,
@@ -632,6 +640,10 @@ private fun PlaceDetailsContent(
                 author = author,
                 currentUserId = currentUserId,
                 topRank = topRank,
+                distanceKm = userLocation?.let { (lat, lng) ->
+                    haversineKm(lat, lng, place.latitude, place.longitude)
+                },
+                staleLocationAgeMinutes = staleLocationAgeMinutes,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedContentScope = animatedContentScope,
                 animationSource = animationSource
@@ -789,6 +801,8 @@ private fun PlaceMainCard(
     author: User?,
     currentUserId: String?,
     topRank: Int?,
+    distanceKm: Double?,
+    staleLocationAgeMinutes: Int?,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedContentScope: AnimatedContentScope? = null,
     animationSource: String? = null
@@ -836,48 +850,8 @@ private fun PlaceMainCard(
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.Star,
-                        contentDescription = stringResource(R.string.rating),
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    if (place.reviewsCount > 0) {
-                        Text(
-                            text = "%.1f".format(place.averageRating),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        val reviewsCountText = pluralStringResource(
-                            R.plurals.reviews_count,
-                            place.reviewsCount,
-                            place.reviewsCount
-                        )
-                        Text(
-                            text = stringResource(R.string.reviews_count_short, reviewsCountText),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
-                        Text(
-                            text = stringResource(R.string.no_ratings),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                if (place.isNewWithoutReviews()) {
-                    Spacer(Modifier.weight(1f))
-                    NewPlaceBadge()
-                }
-            }
+
+            PlaceDetailsRatingStatus(place = place)
 
             if (place.description.isNotBlank()) {
                 SoftDivider()
@@ -899,7 +873,8 @@ private fun PlaceMainCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = place.address.ifBlank { stringResource(R.string.address_unavailable) },
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = "%.5f, %.5f".format(place.latitude, place.longitude),
@@ -908,23 +883,37 @@ private fun PlaceMainCard(
                     )
                 }
                 Spacer(Modifier.width(8.dp))
-                FilledTonalIconButton(
-                    onClick = {
-                        val uri = Uri.parse(
-                            "https://www.google.com/maps/dir/?api=1" +
-                                "&destination=${place.latitude},${place.longitude}" +
-                                "&travelmode=driving"
-                        )
-                        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    FilledTonalIconButton(
+                        onClick = {
+                            val uri = Uri.parse(
+                                "https://www.google.com/maps/dir/?api=1" +
+                                        "&destination=${place.latitude},${place.longitude}" +
+                                        "&travelmode=driving"
+                            )
+                            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            runCatching { context.startActivity(intent) }
                         }
-                        runCatching { context.startActivity(intent) }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Navigation,
+                            contentDescription = stringResource(R.string.navigate)
+                        )
                     }
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Navigation,
-                        contentDescription = stringResource(R.string.navigate)
-                    )
+
+                    if (distanceKm != null) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = formatDistance(distanceKm, staleLocationAgeMinutes),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
 
@@ -933,7 +922,7 @@ private fun PlaceMainCard(
                 onClick = {
                     val uri = Uri.parse(
                         "https://www.google.com/maps/search/?api=1" +
-                            "&query=${place.latitude},${place.longitude}"
+                                "&query=${place.latitude},${place.longitude}"
                     )
                     val intent = Intent(Intent.ACTION_VIEW, uri).apply {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -987,6 +976,96 @@ private fun PlaceMainCard(
             }
         }
     }
+}
+
+@Composable
+private fun PlaceDetailsRatingStatus(place: Place) {
+    when {
+        place.reviewsCount > 0 -> {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = stringResource(R.string.rating),
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "%.1f".format(place.averageRating),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.width(8.dp))
+                val reviewsCountText = pluralStringResource(
+                    R.plurals.reviews_count,
+                    place.reviewsCount,
+                    place.reviewsCount
+                )
+                Text(
+                    text = stringResource(R.string.reviews_count_short, reviewsCountText),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        place.isNewWithoutReviews() -> {
+            NewPlaceBadge()
+        }
+
+        else -> {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = stringResource(R.string.rating),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = stringResource(R.string.map_no_reviews),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun formatDistance(
+    km: Double,
+    staleLocationAgeMinutes: Int? = null
+): String {
+    val distance = when {
+        km < 0.05 -> VERY_CLOSE_DISTANCE_LABEL
+        km < 1.0 -> {
+            val meters = (km * 1000).toInt()
+            val rounded = ((meters + 25) / 50) * 50
+            if (rounded == 0) VERY_CLOSE_DISTANCE_LABEL else stringResource(R.string.distance_m, rounded)
+        }
+        km < 100.0 -> stringResource(R.string.distance_km, km)
+        else -> stringResource(R.string.distance_km_integer, km.toInt())
+    }
+
+    return staleLocationAgeMinutes?.let { "$distance (${staleAgeLabel(it)})" } ?: distance
+}
+
+private fun staleAgeLabel(ageMinutes: Int): String = when {
+    ageMinutes <= 1 -> "1 min temu"
+    else -> "$ageMinutes min temu"
+}
+
+private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val r = 6371.0
+    val dLat = Math.toRadians(lat2 - lat1)
+    val dLon = Math.toRadians(lon2 - lon1)
+    val a = kotlin.math.sin(dLat / 2).let { it * it } +
+            kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
+            kotlin.math.sin(dLon / 2).let { it * it }
+    val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+    return r * c
 }
 
 @Composable
@@ -1194,74 +1273,74 @@ private fun ReviewCard(
                                 stringResource(R.string.star_not_selected, index + 1)
                             },
                             tint = if (index < review.rating) {
-                                MaterialTheme.colorScheme.secondary
+                                MaterialTheme.colorScheme.tertiary
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                             },
                             modifier = Modifier.size(16.dp)
                         )
                     }
-                    if (onEdit != null) {
-                        Spacer(Modifier.width(4.dp))
-                        IconButton(
-                            onClick = onEdit,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Edit,
-                                contentDescription = stringResource(R.string.edit_your_review),
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                }
+                if (onEdit != null) {
+                    Spacer(Modifier.width(4.dp))
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Edit,
+                            contentDescription = stringResource(R.string.edit_your_review),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
-                    if (onDelete != null) {
-                        IconButton(
-                            onClick = onDelete,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Delete,
-                                contentDescription = stringResource(R.string.delete_your_review),
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                }
+                if (onDelete != null) {
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = stringResource(R.string.delete_your_review),
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
-                    if (onReport != null) {
-                        Spacer(Modifier.width(4.dp))
-                        IconButton(
-                            onClick = onReport,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Flag,
-                                contentDescription = stringResource(R.string.report_review),
-                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                }
+                if (onReport != null) {
+                    Spacer(Modifier.width(4.dp))
+                    IconButton(
+                        onClick = onReport,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Flag,
+                            contentDescription = stringResource(R.string.report_review),
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             }
-            ReviewTimestampRow(
-                createdAtMillis = review.createdAtMillis,
-                updatedAtMillis = review.updatedAtMillis
+        }
+        ReviewTimestampRow(
+            createdAtMillis = review.createdAtMillis,
+            updatedAtMillis = review.updatedAtMillis
+        )
+        if (review.comment.isNotBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = review.comment,
+                style = MaterialTheme.typography.bodyMedium
             )
-            if (review.comment.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = review.comment,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-            if (review.photoUrls.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                ReviewPhotoRow(
-                    photoUrls = review.photoUrls,
-                    onPhotoClick = { index -> onPhotoClick?.invoke(index) }
-                )
-            }
+        }
+        if (review.photoUrls.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            ReviewPhotoRow(
+                photoUrls = review.photoUrls,
+                onPhotoClick = { index -> onPhotoClick?.invoke(index) }
+            )
         }
     }
 }
@@ -1311,7 +1390,7 @@ private fun ReviewDistributionChart(reviews: List<Review>) {
             Icon(
                 imageVector = Icons.Filled.Star,
                 contentDescription = stringResource(R.string.average_rating),
-                tint = MaterialTheme.colorScheme.secondary,
+                tint = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.size(20.dp)
             )
             Spacer(Modifier.weight(1f))
@@ -1356,7 +1435,7 @@ private fun DistributionRow(
         Icon(
             imageVector = Icons.Filled.Star,
             contentDescription = stringResource(R.string.star_count_label, star),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            tint = MaterialTheme.colorScheme.tertiary,
             modifier = Modifier.size(12.dp)
         )
         Spacer(Modifier.width(8.dp))
@@ -1366,7 +1445,7 @@ private fun DistributionRow(
                 .weight(1f)
                 .height(6.dp)
                 .clip(RoundedCornerShape(3.dp)),
-            color = MaterialTheme.colorScheme.secondary,
+            color = MaterialTheme.colorScheme.tertiary,
             trackColor = MaterialTheme.colorScheme.surfaceVariant
         )
         Spacer(Modifier.width(8.dp))
