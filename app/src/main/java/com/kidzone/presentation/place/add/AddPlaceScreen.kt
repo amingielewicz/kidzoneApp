@@ -1053,7 +1053,7 @@ private fun PhotoThumbnail(
                     imageVector = Icons.Filled.Close,
                     contentDescription = stringResource(R.string.remove_photo_description),
                     tint = MaterialTheme.colorScheme.onError,
-                    modifier = Modifier.size(12.dp)
+                    modifier = Modifier.size(8.dp)
                 )
             }
         }

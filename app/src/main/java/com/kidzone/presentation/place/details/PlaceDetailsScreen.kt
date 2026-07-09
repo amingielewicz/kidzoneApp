@@ -117,22 +117,22 @@ private val PLACE_DETAILS_AVERAGE_RATING_ICON_SIZE = 20.dp
 private val PLACE_DETAILS_CATEGORY_ICON_SIZE = 36.dp
 private val PLACE_DETAILS_CATEGORY_INNER_ICON_SIZE = 22.dp
 private val PLACE_DETAILS_BADGE_HORIZONTAL_PADDING = 4.dp
-
 private val PLACE_DETAILS_CHIP_HORIZONTAL_PADDING = 8.dp
 private val PLACE_DETAILS_CHIP_VERTICAL_PADDING = 4.dp
 private val PLACE_DETAILS_CHIP_CONTENT_SPACING = 4.dp
 private val PLACE_DETAILS_CHIP_BORDER_WIDTH = 1.dp
 private const val PLACE_DETAILS_CHIP_SHAPE_PERCENT = 50
 private const val PLACE_DETAILS_CHIP_BORDER_ALPHA = 0.75f
-
 private val PLACE_DETAILS_REVIEW_ACTION_BUTTON_SIZE = 30.dp
 private val PLACE_DETAILS_REVIEW_ACTION_ICON_SIZE = 16.dp
 private val PLACE_DETAILS_REVIEW_STAR_SIZE = 15.dp
 private val PLACE_DETAILS_REVIEW_OWN_ICON_SIZE = 14.dp
 private const val PLACE_DETAILS_REVIEW_OWN_ALPHA = 0.7f
 private const val PLACE_DETAILS_REVIEW_ACTION_ALPHA = 0.55f
-private const val PLACE_DETAILS_DISABLED_STAR_ALPHA = 0.3f
+private val PLACE_DETAILS_REVIEW_CARD_ELEVATION = 0.dp
 
+private const val PLACE_DETAILS_MY_REVIEW_BACKGROUND_ALPHA = 0.06f
+private const val PLACE_DETAILS_DISABLED_STAR_ALPHA = 0.3f
 private val PLACE_DETAILS_DISTRIBUTION_STAR_COLUMN_WIDTH = 12.dp
 private val PLACE_DETAILS_DISTRIBUTION_COUNT_COLUMN_WIDTH = 28.dp
 private val PLACE_DETAILS_DISTRIBUTION_BAR_HEIGHT = 6.dp
@@ -927,7 +927,7 @@ private fun PlaceMainCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = PLACE_DETAILS_MAIN_CARD_ELEVATION)
+        elevation = CardDefaults.cardElevation(defaultElevation = PLACE_DETAILS_REVIEW_CARD_ELEVATION)
     ) {
         Column(modifier = Modifier.padding(PLACE_DETAILS_CARD_PADDING)) {
             Row(
@@ -1385,10 +1385,16 @@ private fun ReviewCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = PLACE_DETAILS_CARD_ELEVATION
+            defaultElevation = PLACE_DETAILS_REVIEW_CARD_ELEVATION
         ),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = if (isMine) {
+                MaterialTheme.colorScheme.primary.copy(
+                    alpha = PLACE_DETAILS_MY_REVIEW_BACKGROUND_ALPHA
+                )
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
         )
     ) {
         Column(
