@@ -14,6 +14,7 @@ import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.repository.ReviewRepository
 import com.kidzone.domain.service.ImageCompressorPort
+import com.kidzone.domain.service.LocationProvider
 import com.kidzone.navigation.Route
 import com.kidzone.presentation.place.add.PLACE_NAME_MAX_LENGTH
 import com.kidzone.review.InAppReviewManager
@@ -46,6 +47,7 @@ class PlaceDetailsViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
     private val authRepository: AuthRepository,
     private val reviewRepository: ReviewRepository,
+    private val locationProvider: LocationProvider,
     private val photoUploader: PhotoUploader,
     private val imageCompressor: ImageCompressorPort,
     private val inAppReviewManager: InAppReviewManager
@@ -67,6 +69,9 @@ class PlaceDetailsViewModel @Inject constructor(
         val sortOrder: ReviewSortOrder = ReviewSortOrder.NEWEST,
         val reviewActionEvent: ReviewActionEvent? = null,
         val topRank: Int? = null,
+        val userLocation: Pair<Double, Double>? = null,
+        val isUsingStaleLocation: Boolean = false,
+        val staleLocationAgeMinutes: Int? = null,
         val isUploadingPlacePhoto: Boolean = false,
         val placePhotoDuplicateEvent: Boolean = false,
         val reviewPhotoDuplicateEvent: Boolean = false,
@@ -113,7 +118,7 @@ class PlaceDetailsViewModel @Inject constructor(
 
     init {
         loadPlace()
-
+        refreshLocation()
         viewModelScope.launch {
             reviewRepository.observeReviewsForPlace(placeId)
                 .catch { e ->
@@ -164,6 +169,7 @@ class PlaceDetailsViewModel @Inject constructor(
                     seedPlacePhotoHashes(result.data.photoUrls)
                     loadUserReports()
                 }
+
                 is OpResult.Failure -> _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -185,7 +191,8 @@ class PlaceDetailsViewModel @Inject constructor(
                     } else null
                     _uiState.update { it.copy(topRank = rankOrNull) }
                 }
-                is OpResult.Failure -> { }
+
+                is OpResult.Failure -> {}
             }
         }
     }
@@ -195,7 +202,7 @@ class PlaceDetailsViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = authRepository.getUserById(ownerUserId)) {
                 is OpResult.Success -> _uiState.update { it.copy(author = result.data) }
-                is OpResult.Failure -> { }
+                is OpResult.Failure -> {}
             }
         }
     }
@@ -220,6 +227,7 @@ class PlaceDetailsViewModel @Inject constructor(
                 is OpResult.Success -> _uiState.update {
                     it.copy(isDeleting = false, isDeleted = true)
                 }
+
                 is OpResult.Failure -> _uiState.update {
                     it.copy(
                         isDeleting = false,
@@ -236,6 +244,56 @@ class PlaceDetailsViewModel @Inject constructor(
 
     fun refresh() {
         loadPlace()
+        refreshLocation()
+    }
+
+    private fun refreshLocation() {
+        if (!locationProvider.hasPermission()) {
+            useStaleLocationOrClear()
+            return
+        }
+
+        viewModelScope.launch {
+            applyCurrentOrStaleLocation(locationProvider.getCurrentLocation())
+        }
+    }
+
+    private fun useStaleLocationOrClear() {
+        val stale = locationProvider.getLastKnownLocation()
+
+        if (stale == null) {
+            _uiState.update {
+                it.copy(
+                    userLocation = null,
+                    isUsingStaleLocation = false,
+                    staleLocationAgeMinutes = null
+                )
+            }
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                userLocation = stale,
+                isUsingStaleLocation = true,
+                staleLocationAgeMinutes = locationProvider.getLastKnownLocationAgeMinutes()
+            )
+        }
+    }
+
+    private fun applyCurrentOrStaleLocation(location: Pair<Double, Double>?) {
+        if (location != null) {
+            _uiState.update {
+                it.copy(
+                    userLocation = location,
+                    isUsingStaleLocation = false,
+                    staleLocationAgeMinutes = null
+                )
+            }
+            return
+        }
+
+        useStaleLocationOrClear()
     }
 
     fun deleteReview(reviewId: String) {
@@ -258,7 +316,8 @@ class PlaceDetailsViewModel @Inject constructor(
                         }
                     }
                 }
-                is OpResult.Failure -> { }
+
+                is OpResult.Failure -> {}
             }
         }
     }
@@ -294,7 +353,12 @@ class PlaceDetailsViewModel @Inject constructor(
         }
     }
 
-    fun submitReview(rating: Int, comment: String, photoUris: List<android.net.Uri> = emptyList(), retainedPhotoUrls: List<String> = emptyList()) {
+    fun submitReview(
+        rating: Int,
+        comment: String,
+        photoUris: List<android.net.Uri> = emptyList(),
+        retainedPhotoUrls: List<String> = emptyList()
+    ) {
         val place = _uiState.value.place ?: return
         val user = currentUser.value
         if (user == null) {
@@ -352,7 +416,8 @@ class PlaceDetailsViewModel @Inject constructor(
                         imageBytes = bytes
                     )
                     uploadedPhotoUrls.add(url)
-                } catch (_: Exception) { }
+                } catch (_: Exception) {
+                }
             }
         }
 
@@ -389,6 +454,7 @@ class PlaceDetailsViewModel @Inject constructor(
                     )
                 }
             }
+
             is OpResult.Failure -> _uiState.update {
                 it.copy(
                     isAddingReview = false,
@@ -419,7 +485,8 @@ class PlaceDetailsViewModel @Inject constructor(
                     .digest(bytes)
                     .joinToString("") { "%02x".format(it) }
                 existingHashes.add(hash)
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
         }
 
         val newUploadedUrls = mutableListOf<String>()
@@ -442,12 +509,14 @@ class PlaceDetailsViewModel @Inject constructor(
                         imageBytes = bytes
                     )
                     newUploadedUrls.add(url)
-                } catch (_: Exception) { }
+                } catch (_: Exception) {
+                }
             }
         }
 
         if (reviewDuplicatesSkipped > 0 && newUploadedUrls.isEmpty() && photoUris.isNotEmpty()
-            && rating == existing.rating && comment.trim() == existing.comment) {
+            && rating == existing.rating && comment.trim() == existing.comment
+        ) {
             _uiState.update {
                 it.copy(
                     isAddingReview = false,
@@ -463,7 +532,10 @@ class PlaceDetailsViewModel @Inject constructor(
 
         val removedUrls = existing.photoUrls.filter { it !in retainedPhotoUrls }
         for (url in removedUrls) {
-            try { photoUploader.deletePhoto(url) } catch (_: Exception) { }
+            try {
+                photoUploader.deletePhoto(url)
+            } catch (_: Exception) {
+            }
         }
 
         val updated = existing.copy(
@@ -493,6 +565,7 @@ class PlaceDetailsViewModel @Inject constructor(
                     )
                 }
             }
+
             is OpResult.Failure -> _uiState.update {
                 it.copy(
                     isAddingReview = false,
@@ -595,7 +668,12 @@ class PlaceDetailsViewModel @Inject constructor(
                 .joinToString("") { "%02x".format(it) }
 
             if (newHash in placePhotoHashes) {
-                _uiState.update { it.copy(isUploadingPlacePhoto = false, placePhotoDuplicateEvent = true) }
+                _uiState.update {
+                    it.copy(
+                        isUploadingPlacePhoto = false,
+                        placePhotoDuplicateEvent = true
+                    )
+                }
                 return@launch
             }
 
@@ -618,6 +696,7 @@ class PlaceDetailsViewModel @Inject constructor(
                             )
                         }
                     }
+
                     is OpResult.Failure -> {
                         _uiState.update { it.copy(isUploadingPlacePhoto = false) }
                     }
@@ -640,7 +719,10 @@ class PlaceDetailsViewModel @Inject constructor(
 
             when (placeRepository.removePhotoUrl(place.id, photoUrl)) {
                 is OpResult.Success -> {
-                    try { photoUploader.deletePhoto(photoUrl) } catch (_: Exception) {}
+                    try {
+                        photoUploader.deletePhoto(photoUrl)
+                    } catch (_: Exception) {
+                    }
 
                     _uiState.update {
                         it.copy(
@@ -653,6 +735,7 @@ class PlaceDetailsViewModel @Inject constructor(
                     }
                     seedPlacePhotoHashes((_uiState.value.place?.photoUrls).orEmpty())
                 }
+
                 is OpResult.Failure -> {
                     _uiState.update { it.copy(isUploadingPlacePhoto = false) }
                 }
@@ -676,7 +759,8 @@ class PlaceDetailsViewModel @Inject constructor(
                         .digest(bytes)
                         .joinToString("") { "%02x".format(it) }
                     placePhotoHashes.add(hash)
-                } catch (_: Exception) { }
+                } catch (_: Exception) {
+                }
             }
         }
     }
@@ -729,10 +813,14 @@ class PlaceDetailsViewModel @Inject constructor(
     private fun mapReviewError(e: Throwable): UiText = when (e) {
         is FirestoreReviewRepository.OfflineReviewSyncDisabledException ->
             UiText.StringResource(R.string.error_offline_sync)
+
         is FirestoreReviewRepository.AlreadyReportedException ->
             UiText.StringResource(R.string.error_already_reported)
+
         is TimeoutException ->
             UiText.StringResource(R.string.error_timeout)
+
         else -> UiText.StringResource(R.string.error_unknown)
     }
+
 }

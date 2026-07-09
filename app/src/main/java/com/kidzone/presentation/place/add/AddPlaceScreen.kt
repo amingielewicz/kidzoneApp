@@ -100,13 +100,14 @@ import com.kidzone.presentation.common.createCameraImageUri
 import com.kidzone.presentation.common.rememberHapticFeedback
 import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.common.style
+import com.kidzone.presentation.common.amenityIcon
 import kotlinx.coroutines.launch
 
 private val FORM_SECTION_GAP = 14.dp
 private val FORM_VERTICAL_SPACING = 10.dp
 private val SECTION_PADDING = 12.dp
 private val PHOTO_THUMBNAIL_SIZE = 76.dp
-private val PHOTO_REMOVE_BUTTON_SIZE = 20.dp
+private val PHOTO_REMOVE_BUTTON_SIZE = 15.dp
 private val COUNTER_ROW_HEIGHT = 20.dp
 private const val PLACE_NAME_UI_MAX_LENGTH = 50
 private const val PLACE_NAME_WARNING_LENGTH = 40
@@ -826,37 +827,6 @@ private fun AmenityChip(
     }
 }
 
-private fun amenityIcon(amenity: Amenity): String = when (amenity) {
-    Amenity.FENCING -> "🛡"
-    Amenity.SOFT_SURFACE, Amenity.SOFT_PROTECTION -> "🧸"
-    Amenity.TODDLER_ZONE, Amenity.AGE_ZONES -> "👶"
-    Amenity.CAR_FREE_AREA, Amenity.SAFE_PATHS -> "🚸"
-    Amenity.TOILET -> "🚻"
-    Amenity.CHANGING_TABLE -> "🍼"
-    Amenity.STROLLER_ACCESS, Amenity.STROLLER_RENTAL -> "♿"
-    Amenity.SHADED_BENCHES, Amenity.REST_AREAS -> "🌳"
-    Amenity.GOOD_LIGHTING -> "💡"
-    Amenity.PARKING, Amenity.FAMILY_PARKING -> "🅿"
-    Amenity.KIDS_MENU, Amenity.HIGH_CHAIR, Amenity.KIDS_TABLEWARE -> "🍽"
-    Amenity.KIDS_ENTERTAINMENT, Amenity.SENSORY_TOYS -> "🎲"
-    Amenity.KIDS_CORNER_VISIBLE -> "👀"
-    Amenity.FAST_SERVICE, Amenity.FAMILY_FAST_TRACK -> "⚡"
-    Amenity.QUIET_FEEDING, Amenity.BREASTFEEDING_AREA -> "🤱"
-    Amenity.MICROWAVE -> "♨"
-    Amenity.NO_LOUD_MUSIC, Amenity.QUIET_AREAS -> "🔇"
-    Amenity.ANIMATOR -> "🎈"
-    Amenity.MONITORING -> "📹"
-    Amenity.TOY_SANITIZATION -> "🧼"
-    Amenity.PARENT_ZONE, Amenity.PARENT_CHILD_ROOM -> "👨‍👩‍👧"
-    Amenity.LOCKERS -> "🔒"
-    Amenity.PICNIC_AREA -> "🧺"
-    Amenity.DRINKING_WATER -> "💧"
-    Amenity.LOST_CHILD_POINT -> "📍"
-    Amenity.WIDE_DOORS -> "↔"
-    Amenity.KID_FRIENDLY_SIGNS -> "ℹ"
-    Amenity.WIFI -> "📶"
-}
-
 @Composable
 private fun RequiredFieldLabel(text: String) {
     val errorColor = MaterialTheme.colorScheme.error
@@ -1071,7 +1041,10 @@ private fun PhotoThumbnail(
         if (enabled) {
             IconButton(
                 onClick = onRemove,
-                modifier = Modifier.align(Alignment.TopEnd).size(PHOTO_REMOVE_BUTTON_SIZE).background(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(PHOTO_REMOVE_BUTTON_SIZE)
+                    .background(
                     color = MaterialTheme.colorScheme.error.copy(alpha = 0.82f),
                     shape = CircleShape
                 )

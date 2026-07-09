@@ -69,7 +69,7 @@ private val SHEET_SECTIONS: List<AmenitySection> = listOf(
         amenities = listOf(
             Amenity.CHANGING_TABLE,
             Amenity.TOILET,
-            Amenity.STROLLER_ACCESS,
+            Amenity.WHEELCHAIR_ACCESSIBLE,
             Amenity.PARKING,
             Amenity.WIDE_DOORS,
             Amenity.FAMILY_PARKING,
@@ -82,13 +82,13 @@ private val SHEET_SECTIONS: List<AmenitySection> = listOf(
     AmenitySection(
         titleRes = R.string.amenity_section_playground,
         amenities = listOf(
-            Amenity.FENCING,
+            Amenity.FENCED,
             Amenity.SOFT_SURFACE,
-            Amenity.SHADED_BENCHES,
+            Amenity.SHADE,
             Amenity.TODDLER_ZONE,
-            Amenity.CAR_FREE_AREA,
-            Amenity.SOFT_PROTECTION,
-            Amenity.GOOD_LIGHTING
+            Amenity.LOW_TRAFFIC,
+            Amenity.SOFT_SAFETY,
+            Amenity.EVENING_LIGHTING
         ),
         matchingCategories = setOf(PlaceCategory.PLAYGROUND)
     ),
@@ -101,7 +101,7 @@ private val SHEET_SECTIONS: List<AmenitySection> = listOf(
             Amenity.TOY_SANITIZATION,
             Amenity.PARENT_ZONE,
             Amenity.LOCKERS,
-            Amenity.SOFT_PROTECTION
+            Amenity.SOFT_SAFETY
         ),
         matchingCategories = setOf(PlaceCategory.PLAY_ROOM)
     ),
@@ -128,7 +128,7 @@ private val SHEET_SECTIONS: List<AmenitySection> = listOf(
             Amenity.SAFE_PATHS,
             Amenity.DRINKING_WATER,
             Amenity.BREASTFEEDING_AREA,
-            Amenity.GOOD_LIGHTING
+            Amenity.EVENING_LIGHTING
         ),
         matchingCategories = setOf(PlaceCategory.PARK)
     ),

@@ -1,0 +1,36 @@
+package com.kidzone.presentation.common
+
+import com.kidzone.domain.model.Amenity
+
+fun amenityIcon(amenity: Amenity): String = when (amenity) {
+    Amenity.FENCED -> "🛡"
+    Amenity.SOFT_SURFACE -> "🧸"
+    Amenity.TODDLER_ZONE -> "👶"
+    Amenity.LOW_TRAFFIC, Amenity.SAFE_PATHS -> "🚸"
+    Amenity.TOILET -> "🚻"
+    Amenity.CHANGING_TABLE -> "🍼"
+    Amenity.WHEELCHAIR_ACCESSIBLE, Amenity.STROLLER_RENTAL -> "♿"
+    Amenity.SHADE, Amenity.REST_AREAS -> "🌳"
+    Amenity.EVENING_LIGHTING -> "💡"
+    Amenity.PARKING, Amenity.FAMILY_PARKING -> "🅿"
+    Amenity.KIDS_MENU, Amenity.HIGH_CHAIR, Amenity.KIDS_TABLEWARE -> "🍽"
+    Amenity.KIDS_ENTERTAINMENT, Amenity.SENSORY_TOYS -> "🎲"
+    Amenity.KIDS_CORNER_VISIBLE -> "👀"
+    Amenity.FAST_SERVICE, Amenity.FAMILY_FAST_TRACK -> "⚡"
+    Amenity.QUIET_FEEDING, Amenity.BREASTFEEDING_AREA -> "🤱"
+    Amenity.MICROWAVE -> "♨"
+    Amenity.NO_LOUD_MUSIC, Amenity.QUIET_AREAS -> "🔇"
+    Amenity.ANIMATOR -> "🎈"
+    Amenity.MONITORING -> "📹"
+    Amenity.TOY_SANITIZATION -> "🧼"
+    Amenity.PARENT_ZONE, Amenity.PARENT_CHILD_ROOM -> "👨‍👩‍👧"
+    Amenity.LOCKERS -> "🔒"
+    Amenity.PICNIC_AREA -> "🧺"
+    Amenity.DRINKING_WATER -> "💧"
+    Amenity.LOST_CHILD_POINT -> "📍"
+    Amenity.WIDE_DOORS -> "↔"
+    Amenity.KID_FRIENDLY_SIGNS -> "ℹ"
+    Amenity.WIFI -> "📶"
+    Amenity.SOFT_SAFETY -> "🛟"
+    else -> "•"
+}

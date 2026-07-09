@@ -32,7 +32,7 @@ enum class Amenity(
         R.string.amenity_toilet,
         setOf(PLAYGROUND, RESTAURANT, PLAY_ROOM, CAFE, PARK, ATTRACTION, OTHER)
     ),
-    STROLLER_ACCESS(
+    WHEELCHAIR_ACCESSIBLE(
         R.string.amenity_stroller_access,
         setOf(PLAYGROUND, RESTAURANT, PLAY_ROOM, CAFE, PARK, ATTRACTION, OTHER)
     ),
@@ -42,11 +42,11 @@ enum class Amenity(
     ),
 
     // === Plac zabaw ===
-    FENCING(R.string.amenity_fencing, setOf(PLAYGROUND)),
+    FENCED(R.string.amenity_fencing, setOf(PLAYGROUND)),
     SOFT_SURFACE(R.string.amenity_soft_surface, setOf(PLAYGROUND)),
-    SHADED_BENCHES(R.string.amenity_shaded_benches, setOf(PLAYGROUND, PARK)),
+    SHADE(R.string.amenity_shaded_benches, setOf(PLAYGROUND, PARK)),
     TODDLER_ZONE(R.string.amenity_toddler_zone, setOf(PLAYGROUND, PLAY_ROOM)),
-    CAR_FREE_AREA(R.string.amenity_car_free_area, setOf(PLAYGROUND, PARK)),
+    LOW_TRAFFIC(R.string.amenity_car_free_area, setOf(PLAYGROUND, PARK)),
 
     // === Restauracja / Kawiarnia (food places) ===
     KIDS_MENU(R.string.amenity_kids_menu, setOf(RESTAURANT, CAFE, ATTRACTION)),
@@ -63,7 +63,7 @@ enum class Amenity(
     TOY_SANITIZATION(R.string.amenity_toy_sanitization, setOf(PLAY_ROOM)),
     PARENT_ZONE(R.string.amenity_parent_zone, setOf(PLAY_ROOM, ATTRACTION)),
     LOCKERS(R.string.amenity_lockers, setOf(PLAY_ROOM, ATTRACTION)),
-    SOFT_PROTECTION(R.string.amenity_soft_protection, setOf(PLAY_ROOM, PLAYGROUND)),
+    SOFT_SAFETY(R.string.amenity_soft_protection, setOf(PLAY_ROOM, PLAYGROUND)),
 
     // === Kawiarnia (specyficzne) ===
     QUIET_FEEDING(R.string.amenity_quiet_feeding, setOf(CAFE, RESTAURANT)),
@@ -76,7 +76,7 @@ enum class Amenity(
     SAFE_PATHS(R.string.amenity_safe_paths, setOf(PARK)),
     DRINKING_WATER(R.string.amenity_drinking_water, setOf(PARK, ATTRACTION)),
     BREASTFEEDING_AREA(R.string.amenity_breastfeeding_area, setOf(PARK, ATTRACTION, CAFE)),
-    GOOD_LIGHTING(R.string.amenity_good_lighting, setOf(PARK, PLAYGROUND)),
+    EVENING_LIGHTING(R.string.amenity_good_lighting, setOf(PARK, PLAYGROUND)),
 
     // === Atrakcja ===
     STROLLER_RENTAL(R.string.amenity_stroller_rental, setOf(ATTRACTION)),
@@ -115,16 +115,16 @@ enum class Amenity(
          */
         val categoryPriorityMap: Map<PlaceCategory, List<Amenity>> = mapOf(
             PLAYGROUND to listOf(
-                FENCING,
+                FENCED,
                 SOFT_SURFACE,
                 TODDLER_ZONE,
-                CAR_FREE_AREA,
+                LOW_TRAFFIC,
                 TOILET,
                 CHANGING_TABLE,
-                STROLLER_ACCESS,
-                SHADED_BENCHES,
-                GOOD_LIGHTING,
-                SOFT_PROTECTION
+                WHEELCHAIR_ACCESSIBLE,
+                SHADE,
+                EVENING_LIGHTING,
+                SOFT_SAFETY
             ),
             RESTAURANT to listOf(
                 CHANGING_TABLE,
@@ -133,7 +133,7 @@ enum class Amenity(
                 KIDS_TABLEWARE,
                 KIDS_CORNER_VISIBLE,
                 TOILET,
-                STROLLER_ACCESS,
+                WHEELCHAIR_ACCESSIBLE,
                 FAST_SERVICE,
                 QUIET_FEEDING,
                 MICROWAVE,
@@ -150,7 +150,7 @@ enum class Amenity(
                 HIGH_CHAIR,
                 QUIET_FEEDING,
                 TOILET,
-                STROLLER_ACCESS,
+                WHEELCHAIR_ACCESSIBLE,
                 KIDS_MENU,
                 KIDS_TABLEWARE,
                 MICROWAVE,
@@ -168,12 +168,12 @@ enum class Amenity(
             ),
             PLAY_ROOM to listOf(
                 AGE_ZONES,
-                SOFT_PROTECTION,
+                SOFT_SAFETY,
                 MONITORING,
                 TOY_SANITIZATION,
                 TOILET,
                 CHANGING_TABLE,
-                STROLLER_ACCESS,
+                WHEELCHAIR_ACCESSIBLE,
                 TODDLER_ZONE,
                 ANIMATOR,
                 PARENT_ZONE,
@@ -186,12 +186,12 @@ enum class Amenity(
             ),
             PARK to listOf(
                 SAFE_PATHS,
-                CAR_FREE_AREA,
+                LOW_TRAFFIC,
                 TOILET,
-                STROLLER_ACCESS,
+                WHEELCHAIR_ACCESSIBLE,
                 CHANGING_TABLE,
-                GOOD_LIGHTING,
-                SHADED_BENCHES,
+                EVENING_LIGHTING,
+                SHADE,
                 PICNIC_AREA,
                 DRINKING_WATER,
                 BREASTFEEDING_AREA,
@@ -201,7 +201,7 @@ enum class Amenity(
             ATTRACTION to listOf(
                 TOILET,
                 CHANGING_TABLE,
-                STROLLER_ACCESS,
+                WHEELCHAIR_ACCESSIBLE,
                 PARENT_CHILD_ROOM,
                 LOST_CHILD_POINT,
                 REST_AREAS,
@@ -222,7 +222,7 @@ enum class Amenity(
             OTHER to listOf(
                 TOILET,
                 CHANGING_TABLE,
-                STROLLER_ACCESS,
+                WHEELCHAIR_ACCESSIBLE,
                 MICROWAVE,
                 PARKING,
                 FAMILY_PARKING,

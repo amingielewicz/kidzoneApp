@@ -1,5 +1,6 @@
 package com.kidzone.presentation.place.list
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.R
@@ -76,7 +77,9 @@ class PlaceListViewModel @Inject constructor(
         val totalCount: Int = 0,
         val searchQuery: String = "",
         val isUsingStaleLocation: Boolean = false,
-        val staleLocationAgeMinutes: Int? = null
+        val staleLocationAgeMinutes: Int? = null,
+        val hasLocationPermission: Boolean = false,
+        val isLocationServiceEnabled: Boolean = false,
     )
 
     private data class LastKnownLocation(
@@ -97,6 +100,8 @@ class PlaceListViewModel @Inject constructor(
     private val _userLocation = MutableStateFlow<Pair<Double, Double>?>(null)
     private val _isUsingStaleLocation = MutableStateFlow(false)
     private val _staleLocationAgeMinutes = MutableStateFlow<Int?>(null)
+    private val _hasLocationPermission = MutableStateFlow(false)
+    private val _isLocationServiceEnabled = MutableStateFlow(false)
 
     // Flag helping to restore scroll position when returning from details
     private var isReturningFromDetails = false
@@ -119,7 +124,9 @@ class PlaceListViewModel @Inject constructor(
         _lastResult,
         _errorMessage,
         _isUsingStaleLocation,
-        _staleLocationAgeMinutes
+        _staleLocationAgeMinutes,
+        _hasLocationPermission,
+        _isLocationServiceEnabled
     ) { args ->
         @Suppress("MagicNumber")
         val category = args[0] as PlaceCategory?
@@ -145,6 +152,10 @@ class PlaceListViewModel @Inject constructor(
         val isUsingStaleLocation = args[10] as Boolean
         @Suppress("MagicNumber")
         val staleLocationAgeMinutes = args[11] as Int?
+        @Suppress("MagicNumber")
+        val hasLocationPermission = args[12] as Boolean
+        @Suppress("MagicNumber")
+        val isLocationServiceEnabled = args[13] as Boolean
 
         val places = paged?.items.orEmpty()
         val filtered = filterAndSort(
@@ -152,14 +163,18 @@ class PlaceListViewModel @Inject constructor(
             FilterParams(location, user?.id, order, query, category, amenities)
         )
 
+
         UiState(
             places = filtered,
             selectedCategory = category,
             selectedAmenities = amenities,
             sortOrder = order,
             userLocation = location,
+            hasLocationPermission = hasLocationPermission,
+            isLocationServiceEnabled = isLocationServiceEnabled,
             currentUserId = user?.id,
-            nearestUnavailable = order == SortOrder.NEAREST && location == null,
+            nearestUnavailable = order == SortOrder.NEAREST &&
+                    (!hasLocationPermission || !isLocationServiceEnabled),
             isLoading = paged == null && error == null,
             isRefreshing = refreshing,
             errorMessage = error,
@@ -187,8 +202,64 @@ class PlaceListViewModel @Inject constructor(
     }
 
     fun refreshLocation() {
+        val hasPermission = locationProvider.hasPermission()
+        val isServiceEnabled = locationProvider.isServiceEnabled()
+
+        Log.d(
+            "PlaceListLocation",
+            "refreshLocation: hasPermission=$hasPermission, isServiceEnabled=$isServiceEnabled"
+        )
+
+        _hasLocationPermission.value = hasPermission
+        _isLocationServiceEnabled.value = isServiceEnabled
+
+        if (!hasPermission || !isServiceEnabled) {
+            val staleLocation: Pair<Double, Double>? = locationProvider.getLastKnownLocation()
+
+            Log.d(
+                "PlaceListLocation",
+                "using stale: staleLocation=$staleLocation, age=${locationProvider.getLastKnownLocationAgeMinutes()}"
+            )
+
+            _userLocation.value = staleLocation
+            _isUsingStaleLocation.value = staleLocation != null
+            _staleLocationAgeMinutes.value = if (staleLocation != null) {
+                locationProvider.getLastKnownLocationAgeMinutes()
+            } else {
+                null
+            }
+
+            return
+        }
+
         viewModelScope.launch {
-            applyCurrentOrStaleLocation(locationProvider.getCurrentLocation())
+            val location: Pair<Double, Double>? = locationProvider.getCurrentLocation()
+
+            Log.d(
+                "PlaceListLocation",
+                "current location result=$location"
+            )
+
+            if (location != null) {
+                _userLocation.value = location
+                _isUsingStaleLocation.value = false
+                _staleLocationAgeMinutes.value = null
+            } else {
+                val staleLocation: Pair<Double, Double>? = locationProvider.getLastKnownLocation()
+
+                Log.d(
+                    "PlaceListLocation",
+                    "current null, fallback stale=$staleLocation, age=${locationProvider.getLastKnownLocationAgeMinutes()}"
+                )
+
+                _userLocation.value = staleLocation
+                _isUsingStaleLocation.value = staleLocation != null
+                _staleLocationAgeMinutes.value = if (staleLocation != null) {
+                    locationProvider.getLastKnownLocationAgeMinutes()
+                } else {
+                    null
+                }
+            }
         }
     }
 

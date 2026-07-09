@@ -76,6 +76,8 @@ private const val COMMENT_MAX_LENGTH = 1000
 
 /** Maksymalna liczba zdjęć na opinię. */
 private const val MAX_REVIEW_PHOTOS = 3
+private val REVIEW_PHOTO_REMOVE_BUTTON_SIZE = 22.dp
+private val REVIEW_PHOTO_REMOVE_ICON_SIZE = 14.dp
 
 /**
  * Oblicza MD5 hash zawartości URI.
@@ -470,7 +472,7 @@ private fun PhotoThumbnail(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .zIndex(1f)
-                .size(14.dp)
+                .size(15.dp)
                 .clip(CircleShape)
                 .background(
                     color = MaterialTheme.colorScheme.error.copy(alpha = 0.95f)

@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
+import com.kidzone.domain.model.Amenity
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -40,8 +42,6 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -61,6 +61,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -82,7 +83,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
-import com.kidzone.domain.model.Amenity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.kidzone.domain.model.Place
@@ -94,12 +94,85 @@ import com.kidzone.presentation.common.RankBadge
 import com.kidzone.presentation.common.createCameraImageUri
 import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.shimmerEffect
-import com.kidzone.presentation.common.style
+import com.kidzone.presentation.common.amenityIcon
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 private const val VERY_CLOSE_DISTANCE_LABEL = "Tuż obok"
+
+private val PLACE_DETAILS_SECTION_SPACING = 12.dp
+private val PLACE_DETAILS_CONTENT_PADDING = 16.dp
+private val PLACE_DETAILS_CARD_PADDING = 14.dp
+private val PLACE_DETAILS_SMALL_SPACING = 6.dp
+private val PLACE_DETAILS_TINY_SPACING = 2.dp
+
+private val PLACE_DETAILS_CARD_ELEVATION = 1.dp
+private val PLACE_DETAILS_MAIN_CARD_ELEVATION = 2.dp
+private val PLACE_DETAILS_EMPTY_STATE_PADDING = 24.dp
+private val PLACE_DETAILS_PROGRESS_SIZE = 24.dp
+
+private val PLACE_DETAILS_ICON_SIZE = 18.dp
+private val PLACE_DETAILS_AVERAGE_RATING_ICON_SIZE = 20.dp
+private val PLACE_DETAILS_CATEGORY_ICON_SIZE = 36.dp
+private val PLACE_DETAILS_CATEGORY_INNER_ICON_SIZE = 22.dp
+private val PLACE_DETAILS_BADGE_HORIZONTAL_PADDING = 4.dp
+
+private val PLACE_DETAILS_CHIP_HORIZONTAL_PADDING = 8.dp
+private val PLACE_DETAILS_CHIP_VERTICAL_PADDING = 4.dp
+private val PLACE_DETAILS_CHIP_CONTENT_SPACING = 4.dp
+private val PLACE_DETAILS_CHIP_BORDER_WIDTH = 1.dp
+private const val PLACE_DETAILS_CHIP_SHAPE_PERCENT = 50
+private const val PLACE_DETAILS_CHIP_BORDER_ALPHA = 0.75f
+
+private val PLACE_DETAILS_REVIEW_ACTION_BUTTON_SIZE = 30.dp
+private val PLACE_DETAILS_REVIEW_ACTION_ICON_SIZE = 16.dp
+private val PLACE_DETAILS_REVIEW_STAR_SIZE = 15.dp
+private val PLACE_DETAILS_REVIEW_OWN_ICON_SIZE = 14.dp
+private const val PLACE_DETAILS_REVIEW_OWN_ALPHA = 0.7f
+private const val PLACE_DETAILS_REVIEW_ACTION_ALPHA = 0.55f
+private const val PLACE_DETAILS_DISABLED_STAR_ALPHA = 0.3f
+
+private val PLACE_DETAILS_DISTRIBUTION_STAR_COLUMN_WIDTH = 12.dp
+private val PLACE_DETAILS_DISTRIBUTION_COUNT_COLUMN_WIDTH = 28.dp
+private val PLACE_DETAILS_DISTRIBUTION_BAR_HEIGHT = 6.dp
+private val PLACE_DETAILS_DISTRIBUTION_BAR_RADIUS = 3.dp
+private val PLACE_DETAILS_DISTRIBUTION_ICON_SIZE = 12.dp
+
+private val PLACE_DETAILS_DIALOG_PROGRESS_STROKE_WIDTH = 2.dp
+private val PLACE_DETAILS_DIALOG_OPTION_VERTICAL_PADDING = 6.dp
+
+private val PLACE_DETAILS_PLACE_PHOTO_SIZE = 120.dp
+private val PLACE_DETAILS_REVIEW_PHOTO_SIZE = 64.dp
+private val PLACE_DETAILS_PHOTO_CORNER_RADIUS = 8.dp
+
+private val PLACE_DETAILS_SKELETON_LARGE_WIDTH = 200.dp
+private val PLACE_DETAILS_SKELETON_MEDIUM_WIDTH = 120.dp
+private val PLACE_DETAILS_SKELETON_SMALL_WIDTH = 100.dp
+private val PLACE_DETAILS_SKELETON_TINY_WIDTH = 80.dp
+private val PLACE_DETAILS_SKELETON_CHIP_WIDTH = 70.dp
+private val PLACE_DETAILS_SKELETON_TITLE_HEIGHT = 24.dp
+private val PLACE_DETAILS_SKELETON_TEXT_HEIGHT = 16.dp
+private val PLACE_DETAILS_SKELETON_RATING_HEIGHT = 20.dp
+private val PLACE_DETAILS_SKELETON_DESCRIPTION_HEIGHT = 80.dp
+private val PLACE_DETAILS_SKELETON_CHIP_HEIGHT = 32.dp
+private val PLACE_DETAILS_SKELETON_PHOTO_SIZE = 100.dp
+private val PLACE_DETAILS_SKELETON_CHIP_RADIUS = 16.dp
+
+private val PLACE_DETAILS_DIVIDER_THICKNESS = 1.dp
+private const val PLACE_DETAILS_DIVIDER_ALPHA = 0.5f
+
+private const val COORDINATE_FORMAT = "%.5f, %.5f"
+private const val AVERAGE_RATING_FORMAT = "%.1f"
+private const val DATE_FORMAT = "dd.MM.yyyy"
+
+private const val VERY_CLOSE_DISTANCE_KM = 0.05
+private const val METER_DISTANCE_THRESHOLD_KM = 1.0
+private const val INTEGER_DISTANCE_THRESHOLD_KM = 100.0
+private const val METERS_PER_KILOMETER = 1000
+private const val DISTANCE_ROUNDING_OFFSET_METERS = 25
+private const val DISTANCE_ROUNDING_STEP_METERS = 50
+private const val EARTH_RADIUS_KM = 6371.0
 
 /**
  * Szczegóły miejsca.
@@ -382,7 +455,7 @@ fun PlaceDetailsScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(24.dp),
+                            .padding(PLACE_DETAILS_EMPTY_STATE_PADDING),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -391,7 +464,7 @@ fun PlaceDetailsScreen(
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodyMedium
                         )
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
                         TextButton(onClick = viewModel::retry) {
                             Text(stringResource(R.string.retry))
                         }
@@ -633,8 +706,11 @@ private fun PlaceDetailsContent(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(
+            horizontal = PLACE_DETAILS_CONTENT_PADDING,
+            vertical = PLACE_DETAILS_SECTION_SPACING
+        ),
+        verticalArrangement = Arrangement.spacedBy(PLACE_DETAILS_SECTION_SPACING)
     ) {
         item {
             PlaceMainCard(
@@ -670,8 +746,8 @@ private fun PlaceDetailsContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        Spacer(Modifier.width(8.dp))
+                        CircularProgressIndicator(modifier = Modifier.size(PLACE_DETAILS_PROGRESS_SIZE))
+                        Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                         Text(
                             text = stringResource(R.string.uploading_photo),
                             style = MaterialTheme.typography.bodySmall
@@ -680,7 +756,7 @@ private fun PlaceDetailsContent(
                 } else {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING)
                     ) {
                         OutlinedButton(
                             onClick = onAddPlacePhoto,
@@ -689,9 +765,9 @@ private fun PlaceDetailsContent(
                             Icon(
                                 imageVector = Icons.Filled.AddAPhoto,
                                 contentDescription = null,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
                             )
-                            Spacer(Modifier.width(6.6.dp))
+                            Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
                             Text(stringResource(R.string.gallery_with_count, place.photoUrls.size))
                         }
                         if (onAddPlaceCamera != null) {
@@ -702,9 +778,9 @@ private fun PlaceDetailsContent(
                                 Icon(
                                     imageVector = Icons.Filled.CameraAlt,
                                     contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
                                 )
-                                Spacer(Modifier.width(6.6.dp))
+                                Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
                                 Text(stringResource(R.string.camera))
                             }
                         }
@@ -718,31 +794,13 @@ private fun PlaceDetailsContent(
                 SectionCard(title = stringResource(R.string.amenities_with_count, place.amenities.size)) {
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(PLACE_DETAILS_SMALL_SPACING),
+                        verticalArrangement = Arrangement.spacedBy(PLACE_DETAILS_SMALL_SPACING)
                     ) {
                         Amenity.entries
                             .filter { it in place.amenities }
                             .forEach { amenity ->
-                                AssistChip(
-                                    onClick = { },
-                                    enabled = false,
-                                    label = {
-                                        Text(
-                                            text = stringResource(amenity.labelRes),
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    },
-                                    colors = AssistChipDefaults.assistChipColors(
-                                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    border = AssistChipDefaults.assistChipBorder(
-                                        enabled = false,
-                                        borderColor = MaterialTheme.colorScheme.outlineVariant,
-                                        disabledBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-                                    )
-                                )
+                                ReadonlyAmenityChip(amenity = amenity)
                             }
                     }
                 }
@@ -773,7 +831,7 @@ private fun PlaceDetailsContent(
                 } else {
                     if (reviews.size >= 3) {
                         ReviewDistributionChart(reviews = reviews)
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
                     }
                     if (reviews.size >= 2) {
                         ReviewSortDropdown(
@@ -810,6 +868,46 @@ private fun PlaceDetailsContent(
     }
 }
 
+@Composable
+private fun ReadonlyAmenityChip(
+    amenity: Amenity,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(PLACE_DETAILS_CHIP_SHAPE_PERCENT),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        border = BorderStroke(
+            width = PLACE_DETAILS_CHIP_BORDER_WIDTH,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = PLACE_DETAILS_CHIP_BORDER_ALPHA)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                horizontal = PLACE_DETAILS_CHIP_HORIZONTAL_PADDING,
+                vertical = PLACE_DETAILS_CHIP_VERTICAL_PADDING
+            ),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = amenityIcon(amenity),
+                style = MaterialTheme.typography.labelSmall
+            )
+
+            Spacer(Modifier.width(PLACE_DETAILS_CHIP_CONTENT_SPACING))
+
+            Text(
+                text = stringResource(amenity.labelRes),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun PlaceMainCard(
@@ -829,20 +927,21 @@ private fun PlaceMainCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = PLACE_DETAILS_MAIN_CARD_ELEVATION)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(PLACE_DETAILS_CARD_PADDING)) {
             Row(
-                verticalAlignment = Alignment.CenterVertically) {
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 CategoryIcon(
                     category = place.category,
                     animationKey = "${keyPrefix}place_icon_${place.id}",
                     sharedTransitionScope = sharedTransitionScope,
                     animatedContentScope = animatedContentScope,
-                    size = 36.dp,
-                    iconSize = 22.dp
+                    size = PLACE_DETAILS_CATEGORY_ICON_SIZE,
+                    iconSize = PLACE_DETAILS_CATEGORY_INNER_ICON_SIZE
                 )
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(PLACE_DETAILS_SECTION_SPACING))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = place.name,
@@ -858,15 +957,15 @@ private fun PlaceMainCard(
                     )
                 }
                 if (topRank != null) {
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                     RankBadge(
                         rank = topRank,
                         label = stringResource(R.string.top_100_label),
-                        modifier = Modifier.padding(horizontal = 4.dp)
+                        modifier = Modifier.padding(horizontal = PLACE_DETAILS_BADGE_HORIZONTAL_PADDING)
                     )
                 }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
 
             PlaceDetailsRatingStatus(place = place)
 
@@ -881,14 +980,15 @@ private fun PlaceMainCard(
             MainCardDivider()
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically) {
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Icon(
                     imageVector = Icons.Filled.LocationOn,
                     contentDescription = stringResource(R.string.map_location_banner_text),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
                 )
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = place.address.ifBlank { stringResource(R.string.address_unavailable) },
@@ -896,14 +996,14 @@ private fun PlaceMainCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "%.5f, %.5f".format(place.latitude, place.longitude),
+                        text = COORDINATE_FORMAT.format(place.latitude, place.longitude),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(horizontalAlignment = Alignment.End) {
                     FilledTonalIconButton(
                         onClick = {
                             val uri = Uri.parse(
@@ -923,20 +1023,20 @@ private fun PlaceMainCard(
                         )
                     }
 
-                    distanceKm?.let {
-                        Spacer(Modifier.height(2.dp))
+                    distanceKm?.let { distance ->
+                        Spacer(Modifier.height(PLACE_DETAILS_TINY_SPACING))
                         Text(
-                            text = formatDistance(distanceKm, staleLocationAgeMinutes),
+                            text = formatDistance(distance, staleLocationAgeMinutes),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.secondary,
-                            textAlign = TextAlign.Center,
+                            textAlign = TextAlign.End,
                             maxLines = 1
                         )
                     }
                 }
             }
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(PLACE_DETAILS_SMALL_SPACING))
             OutlinedButton(
                 onClick = {
                     val uri = Uri.parse(
@@ -953,36 +1053,27 @@ private fun PlaceMainCard(
                 Icon(
                     imageVector = Icons.Filled.LocationOn,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
                 )
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
                 Text(stringResource(R.string.view_on_google_maps))
             }
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(PLACE_DETAILS_SMALL_SPACING))
             androidx.compose.material3.HorizontalDivider(
-                thickness = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                thickness = PLACE_DETAILS_DIVIDER_THICKNESS,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = PLACE_DETAILS_DIVIDER_ALPHA)
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(PLACE_DETAILS_SMALL_SPACING))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.Person,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
                 )
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.Person,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(Modifier.width(6.6.dp))
+                Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
                 val datePart = place.createdAtMillis
                     .takeIf { it > 0L }
                     ?.let { formatDate(it) }
@@ -1021,16 +1112,16 @@ private fun PlaceDetailsRatingStatus(place: Place) {
                     imageVector = Icons.Filled.Star,
                     contentDescription = stringResource(R.string.rating),
                     tint = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
                 )
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(PLACE_DETAILS_CHIP_CONTENT_SPACING))
                 Text(
-                    text = "%.1f".format(place.averageRating),
+                    text = AVERAGE_RATING_FORMAT.format(place.averageRating),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                 val reviewsCountText = pluralStringResource(
                     R.plurals.reviews_count,
                     place.reviewsCount,
@@ -1054,9 +1145,9 @@ private fun PlaceDetailsRatingStatus(place: Place) {
                     imageVector = Icons.Filled.Star,
                     contentDescription = stringResource(R.string.rating),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
                 )
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(PLACE_DETAILS_CHIP_CONTENT_SPACING))
                 Text(
                     text = stringResource(R.string.map_no_reviews),
                     style = MaterialTheme.typography.bodyMedium,
@@ -1073,13 +1164,13 @@ private fun formatDistance(
     staleLocationAgeMinutes: Int? = null
 ): String {
     val distance = when {
-        km < 0.05 -> VERY_CLOSE_DISTANCE_LABEL
-        km < 1.0 -> {
-            val meters = (km * 1000).toInt()
-            val rounded = ((meters + 25) / 50) * 50
+        km < VERY_CLOSE_DISTANCE_KM -> VERY_CLOSE_DISTANCE_LABEL
+        km < METER_DISTANCE_THRESHOLD_KM -> {
+            val meters = (km * METERS_PER_KILOMETER).toInt()
+            val rounded = ((meters + DISTANCE_ROUNDING_OFFSET_METERS) / DISTANCE_ROUNDING_STEP_METERS) * DISTANCE_ROUNDING_STEP_METERS
             if (rounded == 0) VERY_CLOSE_DISTANCE_LABEL else stringResource(R.string.distance_m, rounded)
         }
-        km < 100.0 -> stringResource(R.string.distance_km, km)
+        km < INTEGER_DISTANCE_THRESHOLD_KM -> stringResource(R.string.distance_km, km)
         else -> stringResource(R.string.distance_km_integer, km.toInt())
     }
 
@@ -1091,41 +1182,47 @@ private fun staleAgeLabel(ageMinutes: Int): String = when {
     else -> "$ageMinutes min temu"
 }
 
-private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-    val r = 6371.0
-    val dLat = Math.toRadians(lat2 - lat1)
-    val dLon = Math.toRadians(lon2 - lon1)
-    val a = kotlin.math.sin(dLat / 2).let { it * it } +
-            kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
-            kotlin.math.sin(dLon / 2).let { it * it }
-    val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
-    return r * c
+private fun haversineKm(
+    fromLat: Double,
+    fromLng: Double,
+    toLat: Double,
+    toLng: Double
+): Double {
+    val radiusKm = EARTH_RADIUS_KM
+    val dLat = Math.toRadians(toLat - fromLat)
+    val dLng = Math.toRadians(toLng - fromLng)
+
+    val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
+            kotlin.math.cos(Math.toRadians(fromLat)) *
+            kotlin.math.cos(Math.toRadians(toLat)) *
+            kotlin.math.sin(dLng / 2) *
+            kotlin.math.sin(dLng / 2)
+
+    val c = 2 * kotlin.math.atan2(
+        kotlin.math.sqrt(a),
+        kotlin.math.sqrt(1 - a)
+    )
+
+    return radiusKm * c
 }
 
-@Composable
-private fun SoftDivider() {
-    Spacer(Modifier.height(12.dp))
-    androidx.compose.material3.HorizontalDivider(
-        thickness = 1.dp,
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-    )
-    Spacer(Modifier.height(12.dp))
-}
 
 @Composable
 private fun MainCardDivider() {
-    Spacer(Modifier.height(6.dp))
+    Spacer(Modifier.height(PLACE_DETAILS_SMALL_SPACING))
     androidx.compose.material3.HorizontalDivider(
-        thickness = 1.dp,
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        thickness = PLACE_DETAILS_DIVIDER_THICKNESS,
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = PLACE_DETAILS_DIVIDER_ALPHA)
     )
-    Spacer(Modifier.height(6.dp))
+    Spacer(Modifier.height(PLACE_DETAILS_SMALL_SPACING))
 }
 
 private fun formatDate(millis: Long): String {
-    val formatter = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+    val formatter = SimpleDateFormat(DATE_FORMAT, Locale.getDefault())
     return formatter.format(Date(millis))
 }
+
+
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -1140,55 +1237,55 @@ private fun PlaceDetailsSkeleton(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(PLACE_DETAILS_CONTENT_PADDING),
+        verticalArrangement = Arrangement.spacedBy(PLACE_DETAILS_CONTENT_PADDING)
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = PLACE_DETAILS_MAIN_CARD_ELEVATION)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(PLACE_DETAILS_CARD_PADDING)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CategoryIcon(
                         category = com.kidzone.domain.model.PlaceCategory.OTHER,
                         animationKey = if (placeId.isNotBlank()) "${keyPrefix}place_icon_$placeId" else null,
                         sharedTransitionScope = sharedTransitionScope,
                         animatedContentScope = animatedContentScope,
-                        size = 36.dp,
-                        iconSize = 22.dp
+                        size = PLACE_DETAILS_CATEGORY_ICON_SIZE,
+                        iconSize = PLACE_DETAILS_CATEGORY_INNER_ICON_SIZE
                     )
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(PLACE_DETAILS_SECTION_SPACING))
                     Column(modifier = Modifier.weight(1f)) {
                         Box(
                             modifier = Modifier
-                                .width(200.dp)
-                                .height(24.dp)
+                                .width(PLACE_DETAILS_SKELETON_LARGE_WIDTH)
+                                .height(PLACE_DETAILS_SKELETON_TITLE_HEIGHT)
                                 .clip(MaterialTheme.shapes.small)
                                 .shimmerEffect()
                         )
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                         Box(
                             modifier = Modifier
-                                .width(120.dp)
-                                .height(16.dp)
+                                .width(PLACE_DETAILS_SKELETON_MEDIUM_WIDTH)
+                                .height(PLACE_DETAILS_SKELETON_TEXT_HEIGHT)
                                 .clip(MaterialTheme.shapes.small)
                                 .shimmerEffect()
                         )
                     }
                 }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_SKELETON_TEXT_HEIGHT))
                 Box(
                     modifier = Modifier
-                        .width(100.dp)
-                        .height(20.dp)
+                        .width(PLACE_DETAILS_SKELETON_SMALL_WIDTH)
+                        .height(PLACE_DETAILS_SKELETON_RATING_HEIGHT)
                         .clip(MaterialTheme.shapes.small)
                         .shimmerEffect()
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_SKELETON_TEXT_HEIGHT))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(80.dp)
+                        .height(PLACE_DETAILS_SKELETON_DESCRIPTION_HEIGHT)
                         .clip(MaterialTheme.shapes.small)
                         .shimmerEffect()
                 )
@@ -1197,23 +1294,23 @@ private fun PlaceDetailsSkeleton(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = PLACE_DETAILS_CARD_ELEVATION)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(PLACE_DETAILS_CARD_PADDING)) {
                 Box(
                     modifier = Modifier
-                        .width(80.dp)
-                        .height(16.dp)
+                        .width(PLACE_DETAILS_SKELETON_TINY_WIDTH)
+                        .height(PLACE_DETAILS_SKELETON_TEXT_HEIGHT)
                         .clip(MaterialTheme.shapes.small)
                         .shimmerEffect()
                 )
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
+                Row(horizontalArrangement = Arrangement.spacedBy(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING)) {
                     repeat(3) {
                         Box(
                             modifier = Modifier
-                                .size(100.dp)
-                                .clip(RoundedCornerShape(8.dp))
+                                .size(PLACE_DETAILS_SKELETON_PHOTO_SIZE)
+                                .clip(RoundedCornerShape(PLACE_DETAILS_PHOTO_CORNER_RADIUS))
                                 .shimmerEffect()
                         )
                     }
@@ -1223,24 +1320,24 @@ private fun PlaceDetailsSkeleton(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = PLACE_DETAILS_CARD_ELEVATION)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(PLACE_DETAILS_CARD_PADDING)) {
                 Box(
                     modifier = Modifier
-                        .width(120.dp)
-                        .height(16.dp)
+                        .width(PLACE_DETAILS_SKELETON_MEDIUM_WIDTH)
+                        .height(PLACE_DETAILS_SKELETON_TEXT_HEIGHT)
                         .clip(MaterialTheme.shapes.small)
                         .shimmerEffect()
                 )
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
+                Row(horizontalArrangement = Arrangement.spacedBy(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING)) {
                     repeat(3) {
                         Box(
                             modifier = Modifier
-                                .width(70.dp)
-                                .height(32.dp)
-                                .clip(RoundedCornerShape(16.dp))
+                                .width(PLACE_DETAILS_SKELETON_CHIP_WIDTH)
+                                .height(PLACE_DETAILS_SKELETON_CHIP_HEIGHT)
+                                .clip(RoundedCornerShape(PLACE_DETAILS_SKELETON_CHIP_RADIUS))
                                 .shimmerEffect()
                         )
                     }
@@ -1258,9 +1355,9 @@ private fun SectionCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = PLACE_DETAILS_CARD_ELEVATION)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(PLACE_DETAILS_CARD_PADDING)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = title,
@@ -1270,7 +1367,7 @@ private fun SectionCard(
                 )
                 trailing?.invoke()
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
             content()
         }
     }
@@ -1287,16 +1384,16 @@ private fun ReviewCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = PLACE_DETAILS_CARD_ELEVATION
+        ),
         colors = CardDefaults.cardColors(
-            containerColor = if (isMine) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.16f)
-            } else {
-                MaterialTheme.colorScheme.surface
-            }
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier.padding(PLACE_DETAILS_CARD_PADDING)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -1306,7 +1403,9 @@ private fun ReviewCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = review.authorName.ifBlank { stringResource(R.string.anonymous) },
+                        text = review.authorName.ifBlank {
+                            stringResource(R.string.anonymous)
+                        },
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
@@ -1314,12 +1413,23 @@ private fun ReviewCard(
                     )
 
                     if (isMine) {
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
+
                         Icon(
                             imageVector = Icons.Filled.Person,
                             contentDescription = stringResource(R.string.your_review),
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
+                            tint = MaterialTheme.colorScheme.primary.copy(
+                                alpha = PLACE_DETAILS_REVIEW_OWN_ALPHA
+                            ),
+                            modifier = Modifier.size(PLACE_DETAILS_REVIEW_OWN_ICON_SIZE)
+                        )
+
+                        Spacer(Modifier.width(PLACE_DETAILS_CHIP_CONTENT_SPACING))
+
+                        Text(
+                            text = stringResource(R.string.your_review),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -1336,9 +1446,11 @@ private fun ReviewCard(
                             tint = if (index < review.rating) {
                                 MaterialTheme.colorScheme.tertiary
                             } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                    alpha = PLACE_DETAILS_DISABLED_STAR_ALPHA
+                                )
                             },
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(PLACE_DETAILS_REVIEW_STAR_SIZE)
                         )
                     }
                 }
@@ -1350,7 +1462,8 @@ private fun ReviewCard(
             )
 
             if (review.comment.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
+
                 Text(
                     text = review.comment,
                     style = MaterialTheme.typography.bodyMedium
@@ -1358,7 +1471,8 @@ private fun ReviewCard(
             }
 
             if (review.photoUrls.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
+
                 ReviewPhotoRow(
                     photoUrls = review.photoUrls,
                     onPhotoClick = { index -> onPhotoClick?.invoke(index) }
@@ -1366,36 +1480,54 @@ private fun ReviewCard(
             }
 
             if (onEdit != null || onDelete != null || onReport != null) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_SMALL_SPACING))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (onEdit != null) {
                         IconButton(
                             onClick = onEdit,
-                            modifier = Modifier.size(30.dp)
+                            modifier = Modifier.size(
+                                PLACE_DETAILS_REVIEW_ACTION_BUTTON_SIZE
+                            )
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Edit,
-                                contentDescription = stringResource(R.string.edit_your_review),
-                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
-                                modifier = Modifier.size(16.dp)
+                                contentDescription = stringResource(
+                                    R.string.edit_your_review
+                                ),
+                                tint = MaterialTheme.colorScheme.primary.copy(
+                                    alpha = PLACE_DETAILS_REVIEW_ACTION_ALPHA
+                                ),
+                                modifier = Modifier.size(
+                                    PLACE_DETAILS_REVIEW_ACTION_ICON_SIZE
+                                )
                             )
                         }
                     }
 
+                    Spacer(Modifier.weight(1f))
+
                     if (onDelete != null) {
                         IconButton(
                             onClick = onDelete,
-                            modifier = Modifier.size(30.dp)
+                            modifier = Modifier.size(
+                                PLACE_DETAILS_REVIEW_ACTION_BUTTON_SIZE
+                            )
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Delete,
-                                contentDescription = stringResource(R.string.delete_your_review),
-                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.65f),
-                                modifier = Modifier.size(16.dp)
+                                contentDescription = stringResource(
+                                    R.string.delete_your_review
+                                ),
+                                tint = MaterialTheme.colorScheme.error.copy(
+                                    alpha = PLACE_DETAILS_REVIEW_ACTION_ALPHA
+                                ),
+                                modifier = Modifier.size(
+                                    PLACE_DETAILS_REVIEW_ACTION_ICON_SIZE
+                                )
                             )
                         }
                     }
@@ -1403,13 +1535,21 @@ private fun ReviewCard(
                     if (onReport != null) {
                         IconButton(
                             onClick = onReport,
-                            modifier = Modifier.size(30.dp)
+                            modifier = Modifier.size(
+                                PLACE_DETAILS_REVIEW_ACTION_BUTTON_SIZE
+                            )
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Flag,
-                                contentDescription = stringResource(R.string.report_review),
-                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.55f),
-                                modifier = Modifier.size(16.dp)
+                                contentDescription = stringResource(
+                                    R.string.report_review
+                                ),
+                                tint = MaterialTheme.colorScheme.error.copy(
+                                    alpha = PLACE_DETAILS_REVIEW_ACTION_ALPHA
+                                ),
+                                modifier = Modifier.size(
+                                    PLACE_DETAILS_REVIEW_ACTION_ICON_SIZE
+                                )
                             )
                         }
                     }
@@ -1434,7 +1574,7 @@ private fun ReviewTimestampRow(
             )
         }
         if (updatedAtMillis > createdAtMillis && updatedAtMillis > 0L) {
-            Spacer(Modifier.width(6.6.dp))
+            Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
             Text(
                 text = stringResource(R.string.edited_with_date, formatDate(updatedAtMillis)),
                 style = MaterialTheme.typography.labelSmall,
@@ -1456,16 +1596,16 @@ private fun ReviewDistributionChart(reviews: List<Review>) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "%.1f".format(avg),
+                text = AVERAGE_RATING_FORMAT.format(avg),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
             Icon(
                 imageVector = Icons.Filled.Star,
                 contentDescription = stringResource(R.string.average_rating),
                 tint = MaterialTheme.colorScheme.tertiary,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(PLACE_DETAILS_AVERAGE_RATING_ICON_SIZE)
             )
             Spacer(Modifier.weight(1f))
             val reviewsCountText = pluralStringResource(R.plurals.reviews_count, total, total)
@@ -1475,7 +1615,7 @@ private fun ReviewDistributionChart(reviews: List<Review>) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
         (5 downTo 1).forEach { star ->
             val count = counts.getValue(star)
             DistributionRow(
@@ -1496,38 +1636,38 @@ private fun DistributionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp),
+            .padding(vertical = PLACE_DETAILS_TINY_SPACING),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = "$star",
             style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.width(12.dp),
+            modifier = Modifier.width(PLACE_DETAILS_DISTRIBUTION_STAR_COLUMN_WIDTH),
             textAlign = TextAlign.End
         )
-        Spacer(Modifier.width(2.dp))
+        Spacer(Modifier.width(PLACE_DETAILS_TINY_SPACING))
         Icon(
             imageVector = Icons.Filled.Star,
             contentDescription = stringResource(R.string.star_count_label, star),
             tint = MaterialTheme.colorScheme.tertiary,
-            modifier = Modifier.size(12.dp)
+            modifier = Modifier.size(PLACE_DETAILS_DISTRIBUTION_ICON_SIZE)
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
         LinearProgressIndicator(
             progress = { fraction },
             modifier = Modifier
                 .weight(1f)
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp)),
+                .height(PLACE_DETAILS_DISTRIBUTION_BAR_HEIGHT)
+                .clip(RoundedCornerShape(PLACE_DETAILS_DISTRIBUTION_BAR_RADIUS)),
             color = MaterialTheme.colorScheme.tertiary,
             trackColor = MaterialTheme.colorScheme.surfaceVariant
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
         Text(
             text = count.toString(),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(28.dp),
+            modifier = Modifier.width(PLACE_DETAILS_DISTRIBUTION_COUNT_COLUMN_WIDTH),
             textAlign = TextAlign.End
         )
     }
@@ -1547,15 +1687,15 @@ private fun ReviewSortDropdown(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.Sort,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
             Text(text = current.getLabel())
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(PLACE_DETAILS_CHIP_CONTENT_SPACING))
             Icon(
                 imageVector = Icons.Filled.ArrowDropDown,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
             )
         }
 
@@ -1586,7 +1726,7 @@ private fun ReviewSortDropdown(
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             },
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
                         )
                     },
                     trailingIcon = if (selected) {
@@ -1595,7 +1735,7 @@ private fun ReviewSortDropdown(
                                 imageVector = Icons.Filled.Check,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
                             )
                         }
                     } else null,
@@ -1606,22 +1746,6 @@ private fun ReviewSortDropdown(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun MyReviewBadge() {
-    androidx.compose.material3.Surface(
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-    ) {
-        Text(
-            text = stringResource(R.string.your_review),
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Medium
-        )
     }
 }
 
@@ -1658,8 +1782,8 @@ private fun DeleteConfirmationDialog(
             ) {
                 if (isDeleting) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(PLACE_DETAILS_REVIEW_ACTION_ICON_SIZE),
+                        strokeWidth = PLACE_DETAILS_DIALOG_PROGRESS_STROKE_WIDTH,
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
@@ -1710,27 +1834,27 @@ private fun ReportPlaceDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
                 reasons.forEach { (code, label) ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { selectedReason = code }
-                            .padding(vertical = 6.dp),
+                            .padding(vertical = PLACE_DETAILS_DIALOG_OPTION_VERTICAL_PADDING),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         androidx.compose.material3.RadioButton(
                             selected = selectedReason == code,
                             onClick = { selectedReason = code }
                         )
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                         Text(
                             text = label,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                 androidx.compose.material3.OutlinedTextField(
                     value = comment,
                     onValueChange = { comment = it },
@@ -1790,33 +1914,33 @@ private fun ReportReviewDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
                 Text(
                     text = stringResource(R.string.report_choose_reason),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                 reasons.forEach { (code, label) ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { selectedReason = code }
-                            .padding(vertical = 6.dp),
+                            .padding(vertical = PLACE_DETAILS_DIALOG_OPTION_VERTICAL_PADDING),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         androidx.compose.material3.RadioButton(
                             selected = selectedReason == code,
                             onClick = { selectedReason = code }
                         )
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                         Text(
                             text = label,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                 androidx.compose.material3.OutlinedTextField(
                     value = comment,
                     onValueChange = { comment = it },
@@ -1846,17 +1970,17 @@ private fun PlacePhotoGallery(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = PLACE_DETAILS_CARD_ELEVATION)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(PLACE_DETAILS_CARD_PADDING)) {
             Text(
                 text = stringResource(R.string.photos_with_count, photoUrls.size),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
             androidx.compose.foundation.lazy.LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING)
             ) {
                 items(photoUrls.size) { index ->
                     val contentDesc = stringResource(R.string.photo_index, index + 1)
@@ -1864,8 +1988,8 @@ private fun PlacePhotoGallery(
                         model = photoUrls[index],
                         contentDescription = contentDesc,
                         modifier = Modifier
-                            .size(120.dp)
-                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                            .size(PLACE_DETAILS_PLACE_PHOTO_SIZE)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(PLACE_DETAILS_PHOTO_CORNER_RADIUS))
                             .clickable { onPhotoClick(index) },
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop
                     )
@@ -1881,7 +2005,7 @@ private fun ReviewPhotoRow(
     onPhotoClick: (index: Int) -> Unit = {}
 ) {
     androidx.compose.foundation.lazy.LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(PLACE_DETAILS_SMALL_SPACING)
     ) {
         items(photoUrls.size) { index ->
             val contentDesc = stringResource(R.string.review_photo_index, index + 1)
@@ -1889,8 +2013,8 @@ private fun ReviewPhotoRow(
                 model = photoUrls[index],
                 contentDescription = contentDesc,
                 modifier = Modifier
-                    .size(64.dp)
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .size(PLACE_DETAILS_REVIEW_PHOTO_SIZE)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(PLACE_DETAILS_PHOTO_CORNER_RADIUS))
                     .clickable { onPhotoClick(index) },
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop
             )
@@ -1930,27 +2054,27 @@ private fun ReportPhotoDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
                 reasons.forEach { (code, label) ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { selectedReason = code }
-                            .padding(vertical = 6.dp),
+                            .padding(vertical = PLACE_DETAILS_DIALOG_OPTION_VERTICAL_PADDING),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         androidx.compose.material3.RadioButton(
                             selected = selectedReason == code,
                             onClick = { selectedReason = code }
                         )
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                         Text(
                             text = label,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                 androidx.compose.material3.OutlinedTextField(
                     value = comment,
                     onValueChange = { comment = it },
