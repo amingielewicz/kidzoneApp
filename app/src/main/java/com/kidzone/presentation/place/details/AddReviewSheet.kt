@@ -31,7 +31,7 @@ import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarOutline
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -505,7 +505,7 @@ private fun StarRatingInput(
         (1..5).forEach { star ->
             val isFilled = star <= rating
             Icon(
-                imageVector = if (isFilled) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                imageVector = if (isFilled) Icons.Filled.Star else Icons.Filled.StarBorder,
                 contentDescription = stringResource(R.string.rate_star_label, star),
                 tint = if (isFilled) {
                     MaterialTheme.colorScheme.secondary

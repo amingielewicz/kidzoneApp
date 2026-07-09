@@ -74,6 +74,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.kidzone.R
 import com.kidzone.domain.model.Place
+import com.kidzone.presentation.common.style
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.KidZoneRadii
 import com.kidzone.presentation.common.KidZoneSpacing
@@ -778,7 +779,8 @@ private fun PlaceCard(
                     iconSize = 18.dp
                 )
                 Spacer(Modifier.width(KidZoneSpacing.GapSmall))
-                CategoryOutlinedBadge(
+                CategoryFilledBadge(
+                    category = place.category,
                     label = categoryLabel,
                     modifier = Modifier.weight(1f)
                 )
@@ -854,16 +856,18 @@ private fun PlaceRatingStatus(place: Place) {
 }
 
 @Composable
-private fun CategoryOutlinedBadge(
+private fun CategoryFilledBadge(
+    category: com.kidzone.domain.model.PlaceCategory,
     label: String,
     modifier: Modifier = Modifier
 ) {
+    val style = category.style
+
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(999.dp),
-        color = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.primary,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+        color = style.color.copy(alpha = 0.10f),
+        contentColor = style.color
     ) {
         Text(
             text = label,

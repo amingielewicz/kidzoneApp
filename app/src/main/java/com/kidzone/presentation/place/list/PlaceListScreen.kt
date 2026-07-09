@@ -35,6 +35,10 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Badge
@@ -96,6 +100,18 @@ import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.hasLocationPermission
 import kotlinx.coroutines.launch
 
+<<<<<<< HEAD
+=======
+/**
+ * Dawne 4 "quick" udogodnienia. Usunięte z UI listy – teraz wszystkie
+ * udogodnienia są dostępne wyłącznie z bottom sheeta filtrów.
+ * Stała zachowana, bo [PlaceListViewModel] nadal ich używa do logiki
+ * (zachowanie kompatybilności wstecznej – brak wpływu na UX).
+ */
+private const val VERY_CLOSE_DISTANCE_LABEL = "Tuż obok"
+
+@Suppress("unused")
+>>>>>>> 4bdbfd5 (Polish place list visual details)
 private val QUICK_AMENITIES = setOf(
     Amenity.CHANGING_TABLE,
     Amenity.TOILET,
@@ -206,21 +222,17 @@ fun PlaceListScreen(
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         )
 
-        Surface(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-            color = MaterialTheme.colorScheme.surface,
-            shape = MaterialTheme.shapes.medium,
-            tonalElevation = 4.dp,
-            shadowElevation = 4.dp
+                .padding(horizontal = 12.dp, vertical = 4.dp)
         ) {
-            Column(modifier = Modifier.padding(vertical = 6.dp)) {
-                CategoryFilterBar(
-                    selectedCategory = state.selectedCategory,
-                    onCategorySelected = viewModel::onCategorySelect
-                )
+            CategoryFilterBar(
+                selectedCategory = state.selectedCategory,
+                onCategorySelected = viewModel::onCategorySelect
+            )
 
+<<<<<<< HEAD
                 FilterAndSortBar(
                     advancedFiltersCount = state.selectedAmenities.size,
                     sortOrder = state.sortOrder,
@@ -229,6 +241,15 @@ fun PlaceListScreen(
                     onSortOrderChange = viewModel::onSortOrderChange
                 )
             }
+=======
+            FilterAndSortBar(
+                advancedFiltersCount = state.selectedAmenities.size,
+                sortOrder = state.sortOrder,
+                currentUserSignedIn = state.currentUserId != null,
+                onOpenFilterSheet = { showFilterSheet = true },
+                onSortOrderChange = viewModel::onSortOrderChange
+            )
+>>>>>>> 4bdbfd5 (Polish place list visual details)
         }
 
         if (state.nearestUnavailable) {
@@ -260,6 +281,7 @@ fun PlaceListScreen(
                         viewModel.onAmenitiesCleared()
                     }
                 )
+<<<<<<< HEAD
                 else -> {
                     LazyColumn(
                         state = lazyListState,
@@ -297,6 +319,54 @@ fun PlaceListScreen(
                                 ) {
                                     CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                                 }
+=======
+            }
+
+            else -> {
+                LazyColumn(
+                    state = lazyListState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        top = 12.dp,
+                        end = 16.dp,
+                        bottom = 144.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(items = state.places, key = { "list_${it.id}" }) { place ->
+                        PlaceCard(
+                            place = place,
+                            distanceKm = state.userLocation?.let { (lat, lng) ->
+                                haversineKm(lat, lng, place.latitude, place.longitude)
+                            },
+                            showDistance = state.sortOrder ==
+                                PlaceListViewModel.SortOrder.NEAREST &&
+                                state.userLocation != null,
+                            onClick = {
+                                // Zapisz pozycję scrollu i ustaw flagę przed nawigacją
+                                // do szczegółów — po powrocie lista wróci w to samo miejsce.
+                                viewModel.saveScrollPosition(
+                                    firstVisibleItemIndex = lazyListState.firstVisibleItemIndex,
+                                    firstVisibleItemScrollOffset = lazyListState.firstVisibleItemScrollOffset
+                                )
+                                viewModel.markNavigatingToDetails()
+                                onOpenPlaceDetails(place.id, "list")
+                            },
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedContentScope = animatedContentScope,
+                            animationSource = "list"
+                        )
+                    }
+                    if (state.isLoadingMore) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+>>>>>>> 4bdbfd5 (Polish place list visual details)
                             }
                         }
                     }
@@ -572,10 +642,13 @@ private fun SortChip(
     onChange: (PlaceListViewModel.SortOrder) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+
     Box {
         AssistChip(
             onClick = { expanded = true },
-            label = { Text(stringResource(R.string.sort_prefix, stringResource(current.labelRes))) },
+            label = {
+                Text(stringResource(R.string.sort_prefix, stringResource(current.labelRes)))
+            },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Sort,
@@ -591,17 +664,37 @@ private fun SortChip(
             },
             shape = RoundedCornerShape(50),
             colors = AssistChipDefaults.assistChipColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                containerColor = MaterialTheme.colorScheme.surface
             )
         )
+
         DropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onDismissRequest = { expanded = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            shadowElevation = 4.dp
         ) {
             PlaceListViewModel.SortOrder.entries.forEach { option ->
+<<<<<<< HEAD
                 val enabled = !(option == PlaceListViewModel.SortOrder.ADDED_BY_ME && !currentUserSignedIn)
+=======
+                val enabled = !(option == PlaceListViewModel.SortOrder.ADDED_BY_ME &&
+                        !currentUserSignedIn)
+
+>>>>>>> 4bdbfd5 (Polish place list visual details)
                 DropdownMenuItem(
-                    text = { Text(stringResource(option.labelRes)) },
+                    text = {
+                        Text(stringResource(option.labelRes))
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = option.icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
                     enabled = enabled,
                     onClick = {
                         onChange(option)
@@ -613,6 +706,23 @@ private fun SortChip(
     }
 }
 
+<<<<<<< HEAD
+=======
+private val PlaceListViewModel.SortOrder.icon: ImageVector
+    get() = when (this) {
+        PlaceListViewModel.SortOrder.NEAREST -> Icons.Filled.MyLocation
+        PlaceListViewModel.SortOrder.RECENTLY_ADDED -> Icons.Filled.AccessTime
+        PlaceListViewModel.SortOrder.ADDED_BY_ME -> Icons.Filled.Person
+        PlaceListViewModel.SortOrder.BEST_RATED -> Icons.Filled.Star
+        PlaceListViewModel.SortOrder.WORST_RATED -> Icons.Filled.StarBorder
+    }
+
+/**
+ * Banner pokazywany pod paskiem filtrów, gdy user wybrał "Najbliższe", a
+ * lokalizacji nie mamy. Tłumaczy dlaczego sortowanie nie działa i daje
+ * przycisk requesta uprawnienia.
+ */
+>>>>>>> 4bdbfd5 (Polish place list visual details)
 @Composable
 private fun EnableLocationForSortingBanner(onAllowClick: () -> Unit) {
     Surface(
@@ -701,6 +811,7 @@ private fun PlaceCard(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
+<<<<<<< HEAD
                     Spacer(Modifier.height(6.dp))
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -709,6 +820,27 @@ private fun PlaceCard(
                         SoftCategoryTag(category = place.category)
                         if (place.isNewWithoutReviews()) {
                             SoftNewTag()
+=======
+                    Spacer(Modifier.height(KidZoneSpacing.GapTiny))
+                    CategoryBadge(category = place.category)
+                }
+                when {
+                    place.reviewsCount > 0 -> {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = stringResource(R.string.rating),
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(Modifier.width(3.dp))
+                            Text(
+                                text = "%.1f".format(place.averageRating),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.SemiBold
+                            )
+>>>>>>> 4bdbfd5 (Polish place list visual details)
                         }
                     }
                 }
@@ -716,6 +848,7 @@ private fun PlaceCard(
                     RatingBadge(place = place)
                 }
             }
+<<<<<<< HEAD
 
             if (place.address.isNotBlank()) {
                 Spacer(Modifier.height(10.dp))
@@ -743,7 +876,30 @@ private fun PlaceCard(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
                             fontWeight = FontWeight.Medium
+=======
+            val showDistanceLabel = showDistance && distanceKm != null
+
+            if (place.address.isNotBlank() || showDistanceLabel) {
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (place.address.isNotBlank()) {
+                        Text(
+                            text = place.address,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                            fontWeight = FontWeight.Normal,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+>>>>>>> 4bdbfd5 (Polish place list visual details)
                         )
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
+
+                    if (showDistanceLabel && distanceKm != null) {
+                        Spacer(Modifier.width(8.dp))
+                        ListDistanceLabel(distanceKm = distanceKm)
                     }
                 }
             }
@@ -823,13 +979,35 @@ private fun RatingBadge(place: Place) {
 
 @Composable
 private fun formatDistance(km: Double): String = when {
+    km < 0.05 -> VERY_CLOSE_DISTANCE_LABEL
     km < 1.0 -> {
         val meters = (km * 1000).toInt()
         val rounded = ((meters + 25) / 50) * 50
-        stringResource(R.string.distance_m, rounded)
+        if (rounded == 0) VERY_CLOSE_DISTANCE_LABEL else stringResource(R.string.distance_m, rounded)
     }
     km < 100.0 -> stringResource(R.string.distance_km, km)
     else -> stringResource(R.string.distance_km_integer, km.toInt())
+}
+
+@Composable
+private fun ListDistanceLabel(distanceKm: Double) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = Icons.Filled.LocationOn,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.secondary,
+            modifier = Modifier.size(14.dp)
+        )
+        Spacer(Modifier.width(2.dp))
+        Text(
+            text = formatDistance(distanceKm),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.secondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            fontWeight = FontWeight.Medium
+        )
+    }
 }
 
 @Composable
