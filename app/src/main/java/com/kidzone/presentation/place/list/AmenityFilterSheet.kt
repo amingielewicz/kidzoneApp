@@ -38,6 +38,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.ExperimentalFoundationApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.annotation.StringRes
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.PlaceCategory
@@ -197,10 +203,7 @@ fun AmenityFilterSheet(
                 val expandedMap = remember(selectedCategory) {
                     mutableStateMapOf<Int, Boolean>().apply {
                         SHEET_SECTIONS.forEach { section ->
-                            put(
-                                section.titleRes,
-                                section.shouldAutoExpand(selectedCategory)
-                            )
+                            put(section.titleRes, false)
                         }
                     }
                 }
@@ -235,13 +238,14 @@ fun AmenityFilterSheet(
     }
 }
 
-private fun AmenitySection.shouldAutoExpand(selectedCategory: PlaceCategory?): Boolean {
-    if (selectedCategory == null) return false
-    if (matchingCategories.isEmpty()) return false
-    return selectedCategory in matchingCategories
-}
+private const val SECTION_EXPAND_SCROLL_DELAY = 250L
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Suppress("LongMethod", "FunctionNaming")
+@OptIn(
+    ExperimentalLayoutApi::class,
+    ExperimentalMaterial3Api::class,
+    ExperimentalFoundationApi::class
+)
 @Composable
 private fun SectionItem(
     section: AmenitySection,
@@ -253,69 +257,88 @@ private fun SectionItem(
     val selectedInSection = section.amenities.count { it in selectedAmenities }
     val rotation by animateFloatAsState(if (expanded) 180f else 0f, label = "chevronRotation")
     val title = stringResource(section.titleRes)
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 48.dp)
-                .clickable(
-                    onClickLabel = if (expanded) {
-                        stringResource(R.string.collapse_section, title)
-                    } else {
-                        stringResource(R.string.expand_section, title)
-                    },
-                    role = Role.Button,
-                    onClick = onToggleExpand
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .bringIntoViewRequester(bringIntoViewRequester)
+    ) {
+
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clickable(
+                        onClickLabel = if (expanded) {
+                            stringResource(R.string.collapse_section, title)
+                        } else {
+                            stringResource(R.string.expand_section, title)
+                        },
+                        role = Role.Button,
+                        onClick = {
+                            val willExpand = !expanded
+                            onToggleExpand()
+
+                            if (willExpand) {
+                                scope.launch {
+                                    delay(SECTION_EXPAND_SCROLL_DELAY)
+                                    bringIntoViewRequester.bringIntoView()
+                                }
+                            }
+                        }
+                    )
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
                 )
-                .padding(vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f)
-            )
-            if (selectedInSection > 0) {
-                Box(
-                    modifier = Modifier.padding(end = 8.dp)
-                ) {
+                if (selectedInSection > 0) {
+                    Box(
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = "$selectedInSection / ${section.amenities.size}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                } else {
                     Text(
-                        text = "$selectedInSection / ${section.amenities.size}",
+                        text = "${section.amenities.size}",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(end = 8.dp)
                     )
                 }
-            } else {
-                Text(
-                    text = "${section.amenities.size}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(end = 8.dp)
+                Icon(
+                    imageVector = Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    modifier = Modifier.rotate(rotation)
                 )
             }
-            Icon(
-                imageVector = Icons.Filled.ExpandMore,
-                contentDescription = null,
-                modifier = Modifier.rotate(rotation)
-            )
-        }
 
-        AnimatedVisibility(visible = expanded) {
-            val context = androidx.compose.ui.platform.LocalContext.current
-            val sortedAmenities = remember(section, context) {
-                section.amenities.sortedBy { context.getString(it.labelRes).lowercase() }
+            AnimatedVisibility(visible = expanded) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val sortedAmenities = remember(section, context) {
+                    section.amenities.sortedBy { context.getString(it.labelRes).lowercase() }
+                }
+                com.kidzone.presentation.common.AmenitiesFlowGrid(
+                    amenities = sortedAmenities,
+                    selectedAmenities = selectedAmenities,
+                    onToggle = onAmenityToggled,
+                    modifier = Modifier.padding(bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                )
             }
-            com.kidzone.presentation.common.AmenitiesFlowGrid(
-                amenities = sortedAmenities,
-                selectedAmenities = selectedAmenities,
-                onToggle = onAmenityToggled,
-                modifier = Modifier.padding(bottom = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            )
-        }
 
-        HorizontalDivider()
+            HorizontalDivider()
+        }
     }
 }
