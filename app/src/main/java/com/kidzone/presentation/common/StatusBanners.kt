@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber")
+@file:Suppress("FunctionNaming", "MagicNumber")
 
 package com.kidzone.presentation.common
 
@@ -167,26 +167,18 @@ fun rememberNetworkStatus(): State<NetworkStatus> {
 }
 
 private fun ConnectivityManager.currentNetworkStatus(context: Context): NetworkStatus {
-    if (context.isAirplaneModeEnabled()) {
-        return NetworkStatus.UNAVAILABLE
-    }
+    val capabilities = activeNetwork
+        ?.takeUnless { context.isAirplaneModeEnabled() }
+        ?.let(::getNetworkCapabilities)
 
-    val network = activeNetwork
+    val isAvailable = capabilities
+        ?.let {
+            it.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                it.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        }
+        ?: false
 
-    if (network == null) {
-        return NetworkStatus.UNAVAILABLE
-    }
-
-    val capabilities = getNetworkCapabilities(network)
-
-    if (capabilities == null) {
-        return NetworkStatus.UNAVAILABLE
-    }
-
-    val hasInternet = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-    val isValidated = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-
-    return if (hasInternet && isValidated) {
+    return if (isAvailable) {
         NetworkStatus.AVAILABLE
     } else {
         NetworkStatus.UNAVAILABLE

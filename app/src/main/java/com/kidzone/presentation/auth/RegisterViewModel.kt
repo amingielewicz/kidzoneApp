@@ -16,8 +16,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private const val REGISTER_CONNECTION_ERROR = "Błąd połączenia. Sprawdź internet i spróbuj ponownie."
-
 /**
  * ViewModel ekranu rejestracji.
  */
@@ -68,7 +66,7 @@ class RegisterViewModel @Inject constructor(
     }
 
     fun showConnectionError() {
-        _uiState.update { it.copy(errorMessage = UiText.DynamicString(REGISTER_CONNECTION_ERROR)) }
+        _uiState.update { it.copy(errorMessage = UiText.StringResource(R.string.error_network)) }
     }
 
     fun consumeErrorMessage() {
@@ -123,7 +121,7 @@ class RegisterViewModel @Inject constructor(
     }
 
     private fun mapError(throwable: Throwable): UiText = when (throwable) {
-        is AuthException.Network -> UiText.DynamicString(REGISTER_CONNECTION_ERROR)
+        is AuthException.Network -> UiText.StringResource(R.string.error_network)
         is AuthException -> UiText.StringResource(throwable.messageRes)
         else -> UiText.StringResource(R.string.error_unknown)
     }

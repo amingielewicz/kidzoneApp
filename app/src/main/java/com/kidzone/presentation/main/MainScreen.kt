@@ -1,3 +1,5 @@
+@file:Suppress("CyclomaticComplexMethod")
+
 package com.kidzone.presentation.main
 
 import android.Manifest

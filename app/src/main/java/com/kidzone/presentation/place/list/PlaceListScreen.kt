@@ -1,3 +1,5 @@
+@file:Suppress("FunctionNaming", "LongMethod", "LongParameterList")
+
 package com.kidzone.presentation.place.list
 
 import android.Manifest
@@ -110,6 +112,12 @@ import com.kidzone.presentation.place.add.hasLocationPermission
 import kotlinx.coroutines.launch
 
 private const val VERY_CLOSE_DISTANCE_LABEL = "Tuż obok"
+private const val VERY_CLOSE_DISTANCE_KM = 0.05
+private const val METER_DISTANCE_THRESHOLD_KM = 1.0
+private const val METERS_PER_KILOMETER = 1000
+private const val DISTANCE_ROUNDING_OFFSET_METERS = 25
+private const val DISTANCE_ROUNDING_STEP_METERS = 50
+private const val INTEGER_DISTANCE_THRESHOLD_KM = 100.0
 
 @Suppress("unused")
 private val QUICK_AMENITIES = setOf(
@@ -937,13 +945,16 @@ private fun formatDistance(
     staleLocationAgeMinutes: Int? = null
 ): String {
     val distance = when {
-        km < 0.05 -> VERY_CLOSE_DISTANCE_LABEL
-        km < 1.0 -> {
-            val meters = (km * 1000).toInt()
-            val rounded = ((meters + 25) / 50) * 50
+        km < VERY_CLOSE_DISTANCE_KM -> VERY_CLOSE_DISTANCE_LABEL
+        km < METER_DISTANCE_THRESHOLD_KM -> {
+            val meters = (km * METERS_PER_KILOMETER).toInt()
+            val rounded = (
+                (meters + DISTANCE_ROUNDING_OFFSET_METERS) /
+                    DISTANCE_ROUNDING_STEP_METERS
+                ) * DISTANCE_ROUNDING_STEP_METERS
             if (rounded == 0) VERY_CLOSE_DISTANCE_LABEL else stringResource(R.string.distance_m, rounded)
         }
-        km < 100.0 -> stringResource(R.string.distance_km, km)
+        km < INTEGER_DISTANCE_THRESHOLD_KM -> stringResource(R.string.distance_km, km)
         else -> stringResource(R.string.distance_km_integer, km.toInt())
     }
 

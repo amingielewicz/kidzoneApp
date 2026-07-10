@@ -148,7 +148,7 @@ class HomeViewModel @Inject constructor(
             val location = runCatching { locationProvider.getCurrentLocation() }.getOrNull()
             if (location == null) {
                 delay(300)
-                applyWeakGpsFallback(isRefreshing = true)
+                applyWeakGpsFallback()
                 return@launch
             }
 
@@ -157,7 +157,6 @@ class HomeViewModel @Inject constructor(
             loadPlacesForLocation(
                 lat = lat,
                 lng = lng,
-                isRefreshing = true,
                 isStale = false
             )
         }
@@ -202,7 +201,7 @@ class HomeViewModel @Inject constructor(
             _uiState.update { it.copy(isAcquiringLocation = false) }
 
             if (location == null) {
-                applyWeakGpsFallback(isRefreshing = false)
+                applyWeakGpsFallback()
                 return@launch
             }
 
@@ -211,13 +210,12 @@ class HomeViewModel @Inject constructor(
             loadPlacesForLocation(
                 lat = lat,
                 lng = lng,
-                isRefreshing = false,
                 isStale = false
             )
         }
     }
 
-    private suspend fun applyWeakGpsFallback(isRefreshing: Boolean) {
+    private suspend fun applyWeakGpsFallback() {
         val fallbackLocation = lastKnownLocation
         if (fallbackLocation == null) {
             _uiState.update {
@@ -260,7 +258,6 @@ class HomeViewModel @Inject constructor(
         loadPlacesForLocation(
             lat = fallbackLocation.lat,
             lng = fallbackLocation.lng,
-            isRefreshing = isRefreshing,
             isStale = true
         )
     }
@@ -268,7 +265,6 @@ class HomeViewModel @Inject constructor(
     private suspend fun loadPlacesForLocation(
         lat: Double,
         lng: Double,
-        isRefreshing: Boolean,
         isStale: Boolean
     ) {
         val performanceConfig = performanceConfigProvider.performanceConfig

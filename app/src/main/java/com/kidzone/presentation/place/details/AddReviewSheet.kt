@@ -472,7 +472,7 @@ private fun PhotoThumbnail(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .zIndex(1f)
-                .size(15.dp)
+                .size(REVIEW_PHOTO_REMOVE_BUTTON_SIZE)
                 .clip(CircleShape)
                 .background(
                     color = MaterialTheme.colorScheme.error.copy(alpha = 0.95f)
@@ -487,7 +487,7 @@ private fun PhotoThumbnail(
                 Icons.Filled.Close,
                 contentDescription = stringResource(R.string.delete),
                 tint = MaterialTheme.colorScheme.onError,
-                modifier = Modifier.size(8.dp)
+                modifier = Modifier.size(REVIEW_PHOTO_REMOVE_ICON_SIZE)
             )
         }
     }

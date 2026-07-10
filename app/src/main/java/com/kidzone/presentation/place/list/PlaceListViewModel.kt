@@ -40,7 +40,8 @@ private val LIST_MORE_ERROR_FALLBACK = UiText.StringResource(R.string.error_fetc
 private const val FLOW_SUBSCRIPTION_TIMEOUT_MS = 5000L
 private const val EARTH_RADIUS_KM = 6371.0
 private const val SEARCH_CONTAINS_RANK_OFFSET = 100
-private const val ONE_MINUTE_MILLIS = 60_000L
+private const val HAS_REVIEWS_SORT_WEIGHT = 0
+private const val NO_REVIEWS_SORT_WEIGHT = 1
 
 /**
  * ViewModel listy miejsc.
@@ -82,12 +83,6 @@ class PlaceListViewModel @Inject constructor(
         val isLocationServiceEnabled: Boolean = false,
     )
 
-    private data class LastKnownLocation(
-        val lat: Double,
-        val lng: Double,
-        val timestampMillis: Long
-    )
-
     private val selectedCategory = MutableStateFlow<PlaceCategory?>(null)
     private val selectedAmenities = MutableStateFlow<Set<Amenity>>(emptySet())
     private val sortOrder = MutableStateFlow(SortOrder.NEAREST)
@@ -106,7 +101,6 @@ class PlaceListViewModel @Inject constructor(
     // Flag helping to restore scroll position when returning from details
     private var isReturningFromDetails = false
     private var isPrefetchingSearchPool = false
-    private var lastKnownLocation: LastKnownLocation? = null
     var savedScrollIndex = 0
         private set
     var savedScrollOffset = 0
@@ -249,7 +243,8 @@ class PlaceListViewModel @Inject constructor(
 
                 Log.d(
                     "PlaceListLocation",
-                    "current null, fallback stale=$staleLocation, age=${locationProvider.getLastKnownLocationAgeMinutes()}"
+                    "current null, fallback stale=$staleLocation, " +
+                        "age=${locationProvider.getLastKnownLocationAgeMinutes()}"
                 )
 
                 _userLocation.value = staleLocation
@@ -260,28 +255,6 @@ class PlaceListViewModel @Inject constructor(
                     null
                 }
             }
-        }
-    }
-
-    private fun applyCurrentOrStaleLocation(location: Pair<Double, Double>?) {
-        if (location != null) {
-            val (lat, lng) = location
-            lastKnownLocation = LastKnownLocation(lat, lng, System.currentTimeMillis())
-            _userLocation.value = location
-            _isUsingStaleLocation.value = false
-            _staleLocationAgeMinutes.value = null
-            return
-        }
-
-        val fallbackLocation = lastKnownLocation
-        if (fallbackLocation != null) {
-            _userLocation.value = fallbackLocation.lat to fallbackLocation.lng
-            _isUsingStaleLocation.value = true
-            _staleLocationAgeMinutes.value = fallbackLocation.ageMinutes()
-        } else {
-            _userLocation.value = null
-            _isUsingStaleLocation.value = false
-            _staleLocationAgeMinutes.value = null
         }
     }
 
@@ -407,7 +380,9 @@ class PlaceListViewModel @Inject constructor(
             SortOrder.ADDED_BY_ME -> compareByDescending<Place> { it.createdAtMillis }
             SortOrder.BEST_RATED -> compareByDescending<Place> { it.averageRating }
                 .thenByDescending { it.reviewsCount }
-            SortOrder.WORST_RATED -> compareBy<Place> { it.reviewsCount == 0 }
+            SortOrder.WORST_RATED -> compareBy<Place> {
+                if (it.reviewsCount == 0) NO_REVIEWS_SORT_WEIGHT else HAS_REVIEWS_SORT_WEIGHT
+            }
                 .thenBy { it.averageRating }
                 .thenByDescending { it.reviewsCount }
             SortOrder.NEAREST -> if (params.location != null) {
@@ -469,9 +444,6 @@ class PlaceListViewModel @Inject constructor(
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
         return EARTH_RADIUS_KM * c
     }
-
-    private fun LastKnownLocation.ageMinutes(): Int =
-        ((System.currentTimeMillis() - timestampMillis) / ONE_MINUTE_MILLIS).toInt().coerceAtLeast(0)
 
     private fun String.normalizedForSearch(): String =
         Normalizer.normalize(this, Normalizer.Form.NFD)

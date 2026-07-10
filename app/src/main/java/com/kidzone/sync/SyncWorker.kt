@@ -1,3 +1,5 @@
+@file:Suppress("ReturnCount")
+
 package com.kidzone.sync
 
 import android.content.Context

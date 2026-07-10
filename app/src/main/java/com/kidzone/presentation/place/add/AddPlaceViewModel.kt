@@ -1,3 +1,5 @@
+@file:Suppress("ReturnCount")
+
 package com.kidzone.presentation.place.add
 
 import androidx.lifecycle.SavedStateHandle

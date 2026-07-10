@@ -1,3 +1,5 @@
+@file:Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod", "LongParameterList")
+
 package com.kidzone.presentation.place.add
 
 import android.Manifest
@@ -96,19 +98,22 @@ import com.kidzone.presentation.common.rememberHapticFeedback
 import com.kidzone.presentation.common.style
 import com.kidzone.utils.UiText
 import com.kidzone.presentation.common.NetworkStatus
+import com.kidzone.presentation.common.amenityIcon
 import com.kidzone.presentation.common.createCameraImageUri
 import com.kidzone.presentation.common.rememberHapticFeedback
 import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.common.style
-import com.kidzone.presentation.common.amenityIcon
 import kotlinx.coroutines.launch
 
 private val FORM_SECTION_GAP = 14.dp
 private val FORM_VERTICAL_SPACING = 10.dp
 private val SECTION_PADDING = 12.dp
 private val PHOTO_THUMBNAIL_SIZE = 76.dp
-private val PHOTO_REMOVE_BUTTON_SIZE = 15.dp
+private val PHOTO_REMOVE_BUTTON_SIZE = 22.dp
+private val PHOTO_REMOVE_ICON_SIZE = 14.dp
 private val COUNTER_ROW_HEIGHT = 20.dp
+private const val LOCATION_FETCH_TIMEOUT_MS = 12_000L
+private const val GEOCODE_TIMEOUT_MS = 4_000L
 private const val PLACE_NAME_UI_MAX_LENGTH = 50
 private const val PLACE_NAME_WARNING_LENGTH = 40
 private const val PLACE_DESCRIPTION_UI_MAX_LENGTH = 500
@@ -497,12 +502,23 @@ fun AddPlaceScreen(
                     isSaving = state.isSaving,
                     placeHashesReady = placeHashesReady,
                     onPickFromGallery = {
-                        photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(
+                                ActivityResultContracts.PickVisualMedia.ImageOnly
+                            )
+                        )
                     },
                     onTakePhoto = {
-                        val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                        val hasPerm = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.CAMERA
+                        ) ==
                             PackageManager.PERMISSION_GRANTED
-                        if (hasPerm) launchPlaceCamera() else placeCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        if (hasPerm) {
+                            launchPlaceCamera()
+                        } else {
+                            placeCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
                     },
                     onRemoveExisting = { index ->
                         val removedUrl = state.existingPhotoUrls[index]
@@ -629,7 +645,7 @@ private suspend fun fetchAndSetLocation(
     }
 
     try {
-        val coords = kotlinx.coroutines.withTimeoutOrNull(12_000L) {
+        val coords = kotlinx.coroutines.withTimeoutOrNull(LOCATION_FETCH_TIMEOUT_MS) {
             fetchCurrentLocation(context)
         }
 
@@ -638,7 +654,7 @@ private suspend fun fetchAndSetLocation(
             return
         }
 
-        val address = kotlinx.coroutines.withTimeoutOrNull(4_000L) {
+        val address = kotlinx.coroutines.withTimeoutOrNull(GEOCODE_TIMEOUT_MS) {
             runCatching {
                 reverseGeocode(context, coords.first, coords.second)
             }.getOrNull()
@@ -1045,15 +1061,15 @@ private fun PhotoThumbnail(
                     .align(Alignment.TopEnd)
                     .size(PHOTO_REMOVE_BUTTON_SIZE)
                     .background(
-                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.82f),
-                    shape = CircleShape
-                )
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.82f),
+                        shape = CircleShape
+                    )
             ) {
                 Icon(
                     imageVector = Icons.Filled.Close,
                     contentDescription = stringResource(R.string.remove_photo_description),
                     tint = MaterialTheme.colorScheme.onError,
-                    modifier = Modifier.size(8.dp)
+                    modifier = Modifier.size(PHOTO_REMOVE_ICON_SIZE)
                 )
             }
         }

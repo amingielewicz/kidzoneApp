@@ -49,7 +49,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,7 +76,6 @@ import com.kidzone.presentation.common.SystemStatusIcons
 import com.kidzone.presentation.common.passwordRequirementText
 import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.utils.PasswordPolicy
-import kotlinx.coroutines.launch
 
 /**
  * Ekran rejestracji - nazwa, e-mail, hasło zgodne z [PasswordPolicy].
@@ -102,7 +100,6 @@ fun RegisterScreen(
 
     var isPasswordVisible by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val networkStatus by rememberNetworkStatus()
     val isNetworkAvailable = networkStatus == NetworkStatus.AVAILABLE
@@ -480,24 +477,4 @@ private fun RequiredFieldLabel(text: String) {
             }
         }
     )
-}
-
-@Composable
-private fun ErrorMessageBanner(text: String) {
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.errorContainer,
-        modifier = Modifier
-            .fillMaxWidth()
-            .semantics {
-                liveRegion = LiveRegionMode.Assertive
-            }
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-        )
-    }
 }

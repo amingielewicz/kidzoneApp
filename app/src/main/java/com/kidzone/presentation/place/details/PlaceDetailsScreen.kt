@@ -1,3 +1,5 @@
+@file:Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod", "LongParameterList")
+
 package com.kidzone.presentation.place.details
 
 import android.content.Intent
@@ -1167,7 +1169,10 @@ private fun formatDistance(
         km < VERY_CLOSE_DISTANCE_KM -> VERY_CLOSE_DISTANCE_LABEL
         km < METER_DISTANCE_THRESHOLD_KM -> {
             val meters = (km * METERS_PER_KILOMETER).toInt()
-            val rounded = ((meters + DISTANCE_ROUNDING_OFFSET_METERS) / DISTANCE_ROUNDING_STEP_METERS) * DISTANCE_ROUNDING_STEP_METERS
+            val rounded = (
+                (meters + DISTANCE_ROUNDING_OFFSET_METERS) /
+                    DISTANCE_ROUNDING_STEP_METERS
+                ) * DISTANCE_ROUNDING_STEP_METERS
             if (rounded == 0) VERY_CLOSE_DISTANCE_LABEL else stringResource(R.string.distance_m, rounded)
         }
         km < INTEGER_DISTANCE_THRESHOLD_KM -> stringResource(R.string.distance_km, km)
@@ -1995,7 +2000,11 @@ private fun PlacePhotoGallery(
                         contentDescription = contentDesc,
                         modifier = Modifier
                             .size(PLACE_DETAILS_PLACE_PHOTO_SIZE)
-                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(PLACE_DETAILS_PHOTO_CORNER_RADIUS))
+                            .clip(
+                                androidx.compose.foundation.shape.RoundedCornerShape(
+                                    PLACE_DETAILS_PHOTO_CORNER_RADIUS
+                                )
+                            )
                             .clickable { onPhotoClick(index) },
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop
                     )

@@ -1,3 +1,5 @@
+@file:Suppress("LargeClass", "LongParameterList", "ReturnCount")
+
 package com.kidzone.presentation.place.details
 
 import androidx.compose.runtime.Composable

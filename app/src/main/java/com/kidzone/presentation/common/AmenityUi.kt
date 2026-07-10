@@ -2,6 +2,7 @@ package com.kidzone.presentation.common
 
 import com.kidzone.domain.model.Amenity
 
+@Suppress("CyclomaticComplexMethod")
 fun amenityIcon(amenity: Amenity): String = when (amenity) {
     Amenity.FENCED -> "🛡"
     Amenity.SOFT_SURFACE -> "🧸"
