@@ -266,8 +266,8 @@ fun MapScreen(
                 mapToolbarEnabled = false,
                 compassEnabled = true
             ),
-            // Logo Google nisko na krawędzi (6dp)
-            contentPadding = PaddingValues(bottom = 6.dp),
+            // Logo Google
+            contentPadding = PaddingValues(start = 16.dp, bottom = 16.dp),
             onMapLoaded = { mapLoaded = true },
             onMapClick = {
                 userTouchedMap = true
@@ -306,7 +306,6 @@ fun MapScreen(
                 }
             }
         }
-
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -327,6 +326,7 @@ fun MapScreen(
                         !locationPermissionGranted -> {
                             locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                         }
+
                         !gpsEnabled -> {
                             context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
                         }
@@ -336,46 +336,60 @@ fun MapScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp)
             )
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
+                    .padding(start = 12.dp, end = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Button(
-                    onClick = { showPlacesList = true },
-                    modifier = Modifier.padding(start = 4.dp)
+                    onClick = { showPlacesList = true }
                 ) {
                     val countLabel = if (state.isPlaceCountCapped) {
                         stringResource(R.string.map_place_count_capped, state.places.size)
                     } else {
                         state.places.size.toString()
                     }
+
                     Text(stringResource(R.string.map_list_button, countLabel))
                 }
+
+                MapMyLocationButton(
+                    isLocationAvailable = locationPermissionGranted && gpsEnabled,
+                    onClick = {
+                        when {
+                            !locationPermissionGranted -> {
+                                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                            }
+
+                            !gpsEnabled -> {
+                                context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                            }
+
+                            else -> {
+                                userTouchedMap = false
+                                scope.launch { recenterOnUser(context, cameraPositionState) }
+                            }
+                        }
+                    }
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(end = 16.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Column(
-                    modifier = Modifier.padding(end = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     horizontalAlignment = Alignment.End
                 ) {
-                    MapMyLocationButton(
-                        isLocationAvailable = locationPermissionGranted && gpsEnabled,
-                        onClick = {
-                            when {
-                                !locationPermissionGranted -> {
-                                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                                }
-                                !gpsEnabled -> {
-                                    context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-                                }
-                                else -> {
-                                    userTouchedMap = false
-                                    scope.launch { recenterOnUser(context, cameraPositionState) }
-                                }
-                            }
-                        }
-                    )
+                    Spacer(Modifier.height(90.dp))
+
                     MapIconButton(
                         icon = Icons.Filled.Add,
                         contentDescription = stringResource(R.string.map_zoom_in),
@@ -385,6 +399,7 @@ fun MapScreen(
                             }
                         }
                     )
+
                     MapIconButton(
                         icon = Icons.Filled.Remove,
                         contentDescription = stringResource(R.string.map_zoom_out),
