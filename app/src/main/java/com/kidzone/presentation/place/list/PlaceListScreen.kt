@@ -36,27 +36,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -80,7 +70,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -103,9 +92,12 @@ import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.EmptyState
 import com.kidzone.presentation.common.EmptyStateAction
 import com.kidzone.presentation.common.KidZoneCard
+import com.kidzone.presentation.common.KidZoneFilterChip
 import com.kidzone.presentation.common.KidZoneSpacing
+import com.kidzone.presentation.common.KidZoneSortMenu
 import com.kidzone.presentation.common.NewPlaceBadge
 import com.kidzone.presentation.common.RatingIcon
+import com.kidzone.presentation.common.SortMenuOption
 import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.style
@@ -555,33 +547,19 @@ private fun CategoryFilterBar(
             .padding(horizontal = 8.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        FilterChip(
+        KidZoneFilterChip(
             selected = selectedCategory == null,
             onClick = { onCategorySelected(null) },
-            label = { Text(stringResource(R.string.category_all)) }
+            label = stringResource(R.string.category_all)
         )
         PlaceCategory.entries.forEach { category ->
             val style = category.style
-            FilterChip(
+            KidZoneFilterChip(
                 selected = selectedCategory == category,
                 onClick = { onCategorySelected(category) },
-                leadingIcon = {
-                    Icon(
-                        imageVector = style.icon,
-                        contentDescription = null,
-                        tint = if (selectedCategory == category) {
-                            MaterialTheme.colorScheme.onPrimary
-                        } else {
-                            style.color
-                        }
-                    )
-                },
-                label = {
-                    Text(
-                        text = stringResource(category.labelRes),
-                        
-                    )
-                }
+                label = stringResource(category.labelRes),
+                icon = style.icon,
+                inactiveContentColor = style.color
             )
         }
     }
@@ -652,75 +630,22 @@ private fun SortChip(
     currentUserSignedIn: Boolean,
     onChange: (PlaceListViewModel.SortOrder) -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box {
-        AssistChip(
-            onClick = { expanded = true },
-            label = {
-                Text(stringResource(R.string.sort_prefix, stringResource(current.labelRes)))
-            },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Sort,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-            },
-            trailingIcon = {
-                Icon(
-                    imageVector = Icons.Filled.ArrowDropDown,
-                    contentDescription = null
-                )
-            },
-            shape = RoundedCornerShape(50),
-            colors = AssistChipDefaults.assistChipColors(
-                containerColor = MaterialTheme.colorScheme.surface
+    val options = PlaceListViewModel.SortOrder.entries
+        .filter { it != PlaceListViewModel.SortOrder.ADDED_BY_ME || currentUserSignedIn }
+        .map { order ->
+            SortMenuOption(
+                value = order,
+                label = stringResource(order.labelRes)
             )
-        )
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = 0.dp,
-            shadowElevation = 4.dp
-        ) {
-            PlaceListViewModel.SortOrder.entries
-                .filter { it != PlaceListViewModel.SortOrder.ADDED_BY_ME || currentUserSignedIn }
-                .forEach { order ->
-                    DropdownMenuItem(
-                        text = { Text(stringResource(order.labelRes)) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = order.icon,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        },
-                        trailingIcon = {
-                            if (order == current) {
-                                Text("✓")
-                            }
-                        },
-                        onClick = {
-                            expanded = false
-                            onChange(order)
-                        }
-                    )
-                }
         }
-    }
-}
 
-private val PlaceListViewModel.SortOrder.icon: ImageVector
-    get() = when (this) {
-        PlaceListViewModel.SortOrder.NEAREST -> Icons.Filled.MyLocation
-        PlaceListViewModel.SortOrder.RECENTLY_ADDED -> Icons.Filled.AccessTime
-        PlaceListViewModel.SortOrder.ADDED_BY_ME -> Icons.Filled.Person
-        PlaceListViewModel.SortOrder.BEST_RATED -> Icons.Filled.Star
-        PlaceListViewModel.SortOrder.WORST_RATED -> Icons.Filled.StarBorder
-    }
+    KidZoneSortMenu(
+        current = current,
+        currentLabel = stringResource(current.labelRes),
+        options = options,
+        onChange = onChange
+    )
+}
 
 @Composable
 private fun EnableLocationForSortingBanner(onAllowClick: () -> Unit) {

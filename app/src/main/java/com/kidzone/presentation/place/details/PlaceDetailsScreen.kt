@@ -26,8 +26,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
@@ -39,7 +37,6 @@ import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -87,8 +84,10 @@ import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.model.User
 import com.kidzone.presentation.common.CategoryIcon
+import com.kidzone.presentation.common.KidZoneSortMenu
 import com.kidzone.presentation.common.NewPlaceBadge
 import com.kidzone.presentation.common.RankBadge
+import com.kidzone.presentation.common.SortMenuOption
 import com.kidzone.presentation.common.createCameraImageUri
 import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.shimmerEffect
@@ -1627,75 +1626,17 @@ private fun ReviewSortDropdown(
     current: PlaceDetailsViewModel.ReviewSortOrder,
     onChange: (PlaceDetailsViewModel.ReviewSortOrder) -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box {
-        OutlinedButton(
-            onClick = { expanded = true }
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.Sort,
-                contentDescription = null,
-                modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
+    KidZoneSortMenu(
+        current = current,
+        currentLabel = current.getLabel(),
+        options = PlaceDetailsViewModel.ReviewSortOrder.entries.map { order ->
+            SortMenuOption(
+                value = order,
+                label = order.getLabel()
             )
-            Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
-            Text(text = current.getLabel())
-            Spacer(Modifier.width(PLACE_DETAILS_CHIP_CONTENT_SPACING))
-            Icon(
-                imageVector = Icons.Filled.ArrowDropDown,
-                contentDescription = null,
-                modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
-            )
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            PlaceDetailsViewModel.ReviewSortOrder.entries.forEach { order ->
-                val selected = order == current
-
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = order.getLabel(),
-                            color = if (selected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            }
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Sort,
-                            contentDescription = null,
-                            tint = if (selected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
-                        )
-                    },
-                    trailingIcon = if (selected) {
-                        {
-                            Icon(
-                                imageVector = Icons.Filled.Check,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
-                            )
-                        }
-                    } else null,
-                    onClick = {
-                        onChange(order)
-                        expanded = false
-                    }
-                )
-            }
-        }
-    }
+        },
+        onChange = onChange
+    )
 }
 
 @Composable

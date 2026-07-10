@@ -75,6 +75,8 @@ private const val COMMENT_MAX_LENGTH = 1000
 
 /** Maksymalna liczba zdjęć na opinię. */
 private const val MAX_REVIEW_PHOTOS = 3
+private val REVIEW_PHOTO_REMOVE_BUTTON_SIZE = 15.dp
+private val REVIEW_PHOTO_REMOVE_ICON_SIZE = 8.dp
 
 /**
  * Oblicza MD5 hash zawartości URI.

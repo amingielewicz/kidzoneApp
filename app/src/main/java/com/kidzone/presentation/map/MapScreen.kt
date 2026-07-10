@@ -40,8 +40,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
@@ -113,6 +111,7 @@ import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.model.GeoBounds
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.RatingIcon
+import com.kidzone.presentation.common.KidZoneFilterChip
 import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.rememberNetworkStatus
@@ -132,10 +131,6 @@ private const val SPIDERFY_RADIUS_DEGREES = 0.00012
 private const val SPIDERFY_RADIUS_STEP_DEGREES = 0.000015
 private const val SPIDERFY_MAX_EXTRA = 8
 private val MAP_TOP_OVERLAY_SPACING = 8.dp
-@Suppress("MagicNumber")
-private val MapFilterSelectedContainer = Color(0xFFE0F7FA)
-@Suppress("MagicNumber")
-private val MapFilterSelectedContent = Color(0xFF006064)
 
 @SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class)
@@ -674,11 +669,6 @@ private fun FiltersOverlay(
     modifier: Modifier = Modifier
 ) {
     val orderedCategories = PlaceCategory.entries
-    val selectedChipColors = FilterChipDefaults.filterChipColors(
-        selectedContainerColor = MapFilterSelectedContainer,
-        selectedLabelColor = MapFilterSelectedContent,
-        selectedLeadingIconColor = MapFilterSelectedContent
-    )
 
     Surface(
         modifier = modifier,
@@ -698,33 +688,19 @@ private fun FiltersOverlay(
                 if (!isLocationAvailable) {
                     LocationStatusChip(onClick = onLocationStatusClick)
                 }
-                FilterChip(
+                KidZoneFilterChip(
                     selected = selectedCategory == null,
                     onClick = { onCategorySelected(null) },
-                    colors = selectedChipColors,
-                    shape = RoundedCornerShape(50),
-                    label = { Text(stringResource(R.string.category_all)) }
+                    label = stringResource(R.string.category_all)
                 )
                 orderedCategories.forEach { category ->
                     val style = category.style
-                    val isSelected = selectedCategory == category
-                    FilterChip(
-                        selected = isSelected,
+                    KidZoneFilterChip(
+                        selected = selectedCategory == category,
                         onClick = { onCategorySelected(category) },
-                        colors = selectedChipColors,
-                        shape = RoundedCornerShape(50),
-                        leadingIcon = {
-                            Icon(
-                                imageVector = style.icon,
-                                contentDescription = null,
-                                tint = if (isSelected) {
-                                    MapFilterSelectedContent
-                                } else {
-                                    style.color
-                                }
-                            )
-                        },
-                        label = { Text(stringResource(category.labelRes)) }
+                        label = stringResource(category.labelRes),
+                        icon = style.icon,
+                        inactiveContentColor = style.color
                     )
                 }
             }
@@ -737,42 +713,18 @@ private fun FiltersOverlay(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                FilterChip(
+                KidZoneFilterChip(
                     selected = topRatedOnly,
                     onClick = onToggleTopRated,
-                    colors = selectedChipColors,
-                    shape = RoundedCornerShape(50),
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = null,
-                            tint = if (topRatedOnly) {
-                                MapFilterSelectedContent
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
-                    },
-                    label = { Text(stringResource(R.string.filter_top_rated)) }
+                    label = stringResource(R.string.filter_top_rated),
+                    icon = Icons.Filled.Star
                 )
                 if (showAddedByMeChip) {
-                    FilterChip(
+                    KidZoneFilterChip(
                         selected = addedByMeOnly,
                         onClick = { onToggleAddedByMe() },
-                        colors = selectedChipColors,
-                        shape = RoundedCornerShape(50),
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Filled.Person,
-                                contentDescription = null,
-                                tint = if (addedByMeOnly) {
-                                    MapFilterSelectedContent
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                            )
-                        },
-                        label = { Text(stringResource(R.string.filter_added_by_me)) }
+                        label = stringResource(R.string.filter_added_by_me),
+                        icon = Icons.Filled.Person
                     )
                 }
             }
