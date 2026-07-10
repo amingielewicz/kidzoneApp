@@ -105,6 +105,7 @@ import com.kidzone.presentation.common.EmptyStateAction
 import com.kidzone.presentation.common.KidZoneCard
 import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.NewPlaceBadge
+import com.kidzone.presentation.common.RatingIcon
 import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.style
@@ -907,13 +908,12 @@ private fun PlaceListStatus(place: Place) {
 @Composable
 private fun RatingBadge(place: Place) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = Icons.Filled.Star,
-            contentDescription = stringResource(R.string.rating),
-            tint = MaterialTheme.colorScheme.tertiary,
-            modifier = Modifier.size(15.dp)
+        RatingIcon(
+            size = 15.dp
         )
+
         Spacer(Modifier.width(3.dp))
+
         Text(
             text = "%.1f".format(place.averageRating),
             style = MaterialTheme.typography.labelMedium,

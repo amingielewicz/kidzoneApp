@@ -82,6 +82,7 @@ import com.kidzone.presentation.common.KidZoneRadii
 import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.NewPlaceBadge
 import com.kidzone.presentation.common.isNewWithoutReviews
+import com.kidzone.presentation.common.RatingIcon
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.shimmerEffect
 
@@ -829,12 +830,7 @@ private fun PlaceRatingStatus(place: Place) {
                 modifier = Modifier.height(PLACE_STATUS_HEIGHT),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Star,
-                    contentDescription = stringResource(R.string.rating),
-                    tint = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.size(14.dp)
-                )
+                RatingIcon(size = 14.dp)
                 Spacer(Modifier.width(KidZoneSpacing.GapTiny))
                 Text(
                     text = "%.1f (%d)".format(place.averageRating, place.reviewsCount),

@@ -24,8 +24,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.BorderStroke
-import com.kidzone.domain.model.Amenity
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -62,7 +60,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -95,7 +92,7 @@ import com.kidzone.presentation.common.RankBadge
 import com.kidzone.presentation.common.createCameraImageUri
 import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.shimmerEffect
-import com.kidzone.presentation.common.amenityIcon
+import com.kidzone.presentation.common.RatingIcon
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -1056,12 +1053,7 @@ private fun PlaceDetailsRatingStatus(place: Place) {
     when {
         place.reviewsCount > 0 -> {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.Star,
-                    contentDescription = stringResource(R.string.rating),
-                    tint = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
-                )
+                RatingIcon(size = PLACE_DETAILS_ICON_SIZE)
                 Spacer(Modifier.width(PLACE_DETAILS_CHIP_CONTENT_SPACING))
                 Text(
                     text = AVERAGE_RATING_FORMAT.format(place.averageRating),

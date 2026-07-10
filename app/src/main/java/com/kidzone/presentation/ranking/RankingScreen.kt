@@ -5,7 +5,6 @@ package com.kidzone.presentation.ranking
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,13 +24,9 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -48,9 +43,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -68,20 +63,17 @@ import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.EmptyState
 import com.kidzone.presentation.common.KidZoneCard
-import com.kidzone.presentation.common.KidZoneRadii
+import com.kidzone.presentation.common.RatingIcon
 import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.chronologicalOrder
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.R
+import com.kidzone.presentation.common.KidZoneRankingColors
 
 private const val RANKING_SWIPE_THRESHOLD_PX = 80f
-private const val MEDAL_GOLD = 0xFFE6B84A
-private const val MEDAL_GOLD_CONTENT = 0xFF3B2A00
-private const val MEDAL_SILVER = 0xFFC7CCD1
-private const val MEDAL_SILVER_CONTENT = 0xFF263238
-private const val MEDAL_BRONZE = 0xFFC58A52
-private const val MEDAL_BRONZE_CONTENT = 0xFF3A2414
+private const val PLACEHOLDER_AVATAR_BLUE = 0xFF42A5F5
+private const val PLACEHOLDER_AVATAR_ICON_BLUE = 0xFFE3F2FD
 
 /**
  * Ranking miejsc i użytkowników.
@@ -258,8 +250,8 @@ private fun TopUsersList(
         item {
             Text(
                 text = stringResource(R.string.ranking_badges_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
                 modifier = Modifier.padding(bottom = 4.dp)
             )
         }
@@ -363,12 +355,7 @@ private fun TopPlaceCardContent(
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.Star,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    RatingIcon(contentDescription = null, size = 18.dp)
                     Spacer(Modifier.width(2.dp))
                     Text(
                         text = "%.1f".format(place.averageRating),
@@ -439,6 +426,7 @@ private fun TopUserCardContent(
                     Text(
                         text = stringResource(R.string.user_activity_summary, user.placesAddedCount, user.reviewsCount),
                         style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -455,18 +443,20 @@ private fun TopUserCardContent(
 @Composable
 private fun UserAvatar(user: User) {
     val avatarSize = 44.dp
+
     if (user.avatarUrl.isNullOrBlank()) {
         Box(
             modifier = Modifier
                 .size(avatarSize)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
+                .background(Color(PLACEHOLDER_AVATAR_BLUE)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Filled.Person,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                tint = Color(PLACEHOLDER_AVATAR_ICON_BLUE),
+                modifier = Modifier.size(26.dp)
             )
         }
     } else {
@@ -484,9 +474,9 @@ private fun UserAvatar(user: User) {
 @Composable
 private fun PositionMedal(position: Int) {
     val (background, contentColor) = when (position) {
-        1 -> Color(MEDAL_GOLD) to Color(MEDAL_GOLD_CONTENT)
-        2 -> Color(MEDAL_SILVER) to Color(MEDAL_SILVER_CONTENT)
-        3 -> Color(MEDAL_BRONZE) to Color(MEDAL_BRONZE_CONTENT)
+        1 -> KidZoneRankingColors.Gold to KidZoneRankingColors.GoldContent
+        2 -> KidZoneRankingColors.Silver to KidZoneRankingColors.SilverContent
+        3 -> KidZoneRankingColors.Bronze to KidZoneRankingColors.BronzeContent
         else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
     }
     Box(

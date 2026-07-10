@@ -273,8 +273,8 @@ fun BadgesIconRow(
     if (badges.isEmpty()) return
     FlowRow(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         badges.forEach { badge ->
             BadgeIconTile(badge = badge, iconSize = iconSize)
