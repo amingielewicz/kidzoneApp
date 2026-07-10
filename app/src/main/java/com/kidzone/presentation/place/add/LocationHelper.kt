@@ -179,38 +179,5 @@ suspend fun reverseGeocode(
         }.getOrNull()
     }
 
-    address?.toFormattedString()
-}
-
-/**
- * Składa [Address] do czytelnego formatu adresu.
- *
- * Strategia:
- *  1. Próbujemy `getAddressLine(0)` – Android sam składa to najlepiej,
- *     z lokalizacją po polsku (np. "Aleje Ujazdowskie 4, 00-478 Warszawa, Polska").
- *  2. Jeśli `addressLine(0)` jest puste lub zawiera tylko kod pocztowy
- *     (np. "00-478") – odrzucamy je i składamy ręcznie z części.
- *  3. Ręczne składanie też nie wstawia samego kodu pocztowego bez miasta –
- *     bo "00-478" w polu adresu to bezużyteczne UX.
- *  4. Jak nic sensownego nie da się złożyć – zwracamy `null` i ekran
- *     zachowuje to, co user wpisał ręcznie.
- */
-private fun Address.toFormattedString(): String? {
-    val fromLine = getAddressLine(0)?.takeIf { line ->
-        line.isNotBlank() && !line.trim().matches(Regex("^\\d{2}-\\d{3}$"))
-    }
-    if (fromLine != null) return fromLine
-
-    val street = listOfNotNull(thoroughfare, subThoroughfare)
-        .joinToString(" ")
-        .ifBlank { null }
-    val city = locality ?: subAdminArea
-    val cityPart = when {
-        city != null && postalCode != null -> "$postalCode $city"
-        city != null -> city
-        else -> null // sam kod pocztowy bez miasta – pomijamy
-    }
-    return listOfNotNull(street, cityPart)
-        .joinToString(", ")
-        .ifBlank { null }
+    address?.let { com.kidzone.utils.AddressUtils.fromAndroidAddress(it) }
 }

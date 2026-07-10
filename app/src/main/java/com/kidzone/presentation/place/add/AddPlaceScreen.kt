@@ -74,6 +74,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -109,8 +110,6 @@ private val FORM_SECTION_GAP = 14.dp
 private val FORM_VERTICAL_SPACING = 10.dp
 private val SECTION_PADDING = 12.dp
 private val PHOTO_THUMBNAIL_SIZE = 76.dp
-private val PHOTO_REMOVE_BUTTON_SIZE = 22.dp
-private val PHOTO_REMOVE_ICON_SIZE = 14.dp
 private val COUNTER_ROW_HEIGHT = 20.dp
 private const val LOCATION_FETCH_TIMEOUT_MS = 12_000L
 private const val GEOCODE_TIMEOUT_MS = 4_000L
@@ -479,9 +478,9 @@ fun AddPlaceScreen(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
-                AmenitiesGrid(
-                    selected = state.amenities,
-                    category = state.category,
+                com.kidzone.presentation.common.AmenitiesFlowGrid(
+                    amenities = remember(state.category) { Amenity.forCategory(state.category) },
+                    selectedAmenities = state.amenities,
                     onToggle = viewModel::toggleAmenity,
                     enabled = !state.isSaving
                 )
@@ -773,76 +772,6 @@ private fun LocationButtonIcon(isReady: Boolean) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun AmenitiesGrid(
-    selected: Set<Amenity>,
-    category: PlaceCategory,
-    onToggle: (Amenity) -> Unit,
-    enabled: Boolean
-) {
-    val applicable = remember(category) { Amenity.forCategory(category) }
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(FORM_VERTICAL_SPACING)
-    ) {
-        applicable.forEach { amenity ->
-            AmenityChip(
-                amenity = amenity,
-                selected = amenity in selected,
-                enabled = enabled,
-                onClick = { onToggle(amenity) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun AmenityChip(
-    amenity: Amenity,
-    selected: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit
-) {
-    val containerColor = if (selected) {
-        MaterialTheme.colorScheme.secondaryContainer
-    } else {
-        MaterialTheme.colorScheme.surfaceContainerLow
-    }
-    val contentColor = if (selected) {
-        MaterialTheme.colorScheme.onSecondaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val border = BorderStroke(
-        width = 1.dp,
-        color = if (selected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant
-    )
-
-    Surface(
-        modifier = Modifier.clickable(enabled = enabled, onClick = onClick),
-        shape = RoundedCornerShape(999.dp),
-        color = containerColor,
-        contentColor = contentColor,
-        border = border
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(text = amenityIcon(amenity), style = MaterialTheme.typography.labelSmall, maxLines = 1)
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = stringResource(amenity.labelRes),
-                style = MaterialTheme.typography.labelMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
 @Composable
 private fun RequiredFieldLabel(text: String) {
     val errorColor = MaterialTheme.colorScheme.error
@@ -880,7 +809,7 @@ private fun AddressReadOnlyCard(address: String, helperText: String? = null) {
                 )
                 Text(
                     text = when {
-                        address.isNotBlank() -> address
+                        address.isNotBlank() -> com.kidzone.utils.AddressUtils.formatDisplayAddress(address)
                         helperText != null -> helperText
                         else -> stringResource(R.string.address_auto_placeholder)
                     },
@@ -914,10 +843,20 @@ private fun PhotosSection(
     if (existingPhotoUrls.isNotEmpty() || photoUris.isNotEmpty()) {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             itemsIndexed(existingPhotoUrls) { index, url ->
-                PhotoThumbnail(model = url, onRemove = { onRemoveExisting(index) }, enabled = !isSaving)
+                com.kidzone.presentation.common.KidZonePhotoThumbnail(
+                    model = url,
+                    onRemove = { onRemoveExisting(index) },
+                    enabled = !isSaving,
+                    size = PHOTO_THUMBNAIL_SIZE
+                )
             }
             itemsIndexed(photoUris) { index, uri ->
-                PhotoThumbnail(model = uri, onRemove = { onRemoveNew(index) }, enabled = !isSaving)
+                com.kidzone.presentation.common.KidZonePhotoThumbnail(
+                    model = uri,
+                    onRemove = { onRemoveNew(index) },
+                    enabled = !isSaving,
+                    size = PHOTO_THUMBNAIL_SIZE
+                )
             }
         }
     }
@@ -1038,42 +977,6 @@ private fun DuplicateWarningDialog(
         confirmButton = { Button(onClick = onConfirm) { Text(stringResource(R.string.duplicate_warning_confirm)) } },
         dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
     )
-}
-
-@Suppress("FunctionNaming")
-@Composable
-private fun PhotoThumbnail(
-    model: Any,
-    onRemove: () -> Unit,
-    enabled: Boolean = true
-) {
-    Box(modifier = Modifier.size(PHOTO_THUMBNAIL_SIZE)) {
-        AsyncImage(
-            model = model,
-            contentDescription = stringResource(R.string.photo_thumbnail_description),
-            modifier = Modifier.size(PHOTO_THUMBNAIL_SIZE).clip(RoundedCornerShape(8.dp)),
-            contentScale = ContentScale.Crop
-        )
-        if (enabled) {
-            IconButton(
-                onClick = onRemove,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .size(PHOTO_REMOVE_BUTTON_SIZE)
-                    .background(
-                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.82f),
-                        shape = CircleShape
-                    )
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = stringResource(R.string.remove_photo_description),
-                    tint = MaterialTheme.colorScheme.onError,
-                    modifier = Modifier.size(PHOTO_REMOVE_ICON_SIZE)
-                )
-            }
-        }
-    }
 }
 
 private fun computePlacePhotoHash(context: android.content.Context, uri: Uri): String? {

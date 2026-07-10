@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -196,34 +195,9 @@ fun AmenityFilterSheet(
                     .weight(1f, fill = false)
                     .verticalScroll(rememberScrollState())
             ) {
-                val visibleSections = remember(selectedCategory) {
-                    if (selectedCategory == null) {
-                        SHEET_SECTIONS
-                    } else {
-                        SHEET_SECTIONS.filter { section ->
-                            section.matchingCategories.isEmpty() ||
-                                selectedCategory in section.matchingCategories
-                        }
-                    }
-                }
-
-                val sectionsWithFilteredAmenities = remember(selectedCategory, visibleSections) {
-                    if (selectedCategory == null) {
-                        visibleSections
-                    } else {
-                        visibleSections.map { section ->
-                            section.copy(
-                                amenities = section.amenities.filter { amenity ->
-                                    selectedCategory in amenity.applicableCategories
-                                }
-                            )
-                        }.filter { it.amenities.isNotEmpty() }
-                    }
-                }
-
                 val expandedMap = remember(selectedCategory) {
                     mutableStateMapOf<Int, Boolean>().apply {
-                        sectionsWithFilteredAmenities.forEach { section ->
+                        SHEET_SECTIONS.forEach { section ->
                             put(
                                 section.titleRes,
                                 section.shouldAutoExpand(selectedCategory)
@@ -232,7 +206,7 @@ fun AmenityFilterSheet(
                     }
                 }
 
-                sectionsWithFilteredAmenities.forEach { section ->
+                SHEET_SECTIONS.forEach { section ->
                     SectionItem(
                         section = section,
                         expanded = expandedMap[section.titleRes] ?: false,
@@ -334,21 +308,13 @@ private fun SectionItem(
             val sortedAmenities = remember(section, context) {
                 section.amenities.sortedBy { context.getString(it.labelRes).lowercase() }
             }
-            FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            com.kidzone.presentation.common.AmenitiesFlowGrid(
+                amenities = sortedAmenities,
+                selectedAmenities = selectedAmenities,
+                onToggle = onAmenityToggled,
+                modifier = Modifier.padding(bottom = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                sortedAmenities.forEach { amenity ->
-                    FilterChip(
-                        selected = amenity in selectedAmenities,
-                        onClick = { onAmenityToggled(amenity) },
-                        label = { Text(stringResource(amenity.labelRes)) }
-                    )
-                }
-            }
+            )
         }
 
         HorizontalDivider()

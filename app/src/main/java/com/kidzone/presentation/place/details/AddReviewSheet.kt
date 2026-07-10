@@ -7,7 +7,6 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -76,8 +75,6 @@ private const val COMMENT_MAX_LENGTH = 1000
 
 /** Maksymalna liczba zdjęć na opinię. */
 private const val MAX_REVIEW_PHOTOS = 3
-private val REVIEW_PHOTO_REMOVE_BUTTON_SIZE = 22.dp
-private val REVIEW_PHOTO_REMOVE_ICON_SIZE = 14.dp
 
 /**
  * Oblicza MD5 hash zawartości URI.
@@ -344,7 +341,7 @@ fun AddReviewSheet(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     itemsIndexed(existingPhotoUrls) { index, url ->
-                        PhotoThumbnail(
+                        com.kidzone.presentation.common.KidZonePhotoThumbnail(
                             model = url,
                             onRemove = {
                                 val removedUrl = existingPhotoUrls[index]
@@ -361,7 +358,7 @@ fun AddReviewSheet(
                         )
                     }
                     itemsIndexed(photoUris) { index, uri ->
-                        PhotoThumbnail(
+                        com.kidzone.presentation.common.KidZonePhotoThumbnail(
                             model = uri,
                             onRemove = {
                                 val removedUri = photoUris[index]
@@ -448,46 +445,6 @@ fun AddReviewSheet(
             SnackbarHost(
                 hostState = snackbarHostState,
                 modifier = Modifier.align(Alignment.BottomCenter)
-            )
-        }
-    }
-}
-
-@Composable
-private fun PhotoThumbnail(
-    model: Any,
-    onRemove: () -> Unit
-) {
-    Box(modifier = Modifier.size(width = 68.dp, height = 72.dp)) {
-        AsyncImage(
-            model = model,
-            contentDescription = stringResource(R.string.photo_thumbnail_description),
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .size(64.dp)
-                .clip(RoundedCornerShape(6.dp)),
-            contentScale = ContentScale.Crop
-        )
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .zIndex(1f)
-                .size(REVIEW_PHOTO_REMOVE_BUTTON_SIZE)
-                .clip(CircleShape)
-                .background(
-                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.95f)
-                )
-                .clickable(
-                    role = Role.Button,
-                    onClick = onRemove
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Filled.Close,
-                contentDescription = stringResource(R.string.delete),
-                tint = MaterialTheme.colorScheme.onError,
-                modifier = Modifier.size(REVIEW_PHOTO_REMOVE_ICON_SIZE)
             )
         }
     }

@@ -297,8 +297,8 @@
     <string name="amenity_quiet_areas">Strefy ciszy</string>
 
     <!-- Widget -->
-    <string name="widget_description" translatable="false">Pokazuje 3 najbliższe miejsca przyjazne dzieciom</string>
-    <string name="widget_name" translatable="false">Miejsca w pobliżu</string>
+    <string name="widget_description">Pokazuje 3 najbliższe miejsca przyjazne dzieciom</string>
+    <string name="widget_name">Miejsca w pobliżu</string>
     <string name="place_added_success">Dodano nowe miejsce</string>
     <string name="notification_permission_title">Włącz powiadomienia</string>
     <string name="notification_permission_message">Bądź na bieżąco z nowościami w kidZone!</string>

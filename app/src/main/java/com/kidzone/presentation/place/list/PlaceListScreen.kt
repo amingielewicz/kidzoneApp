@@ -568,10 +568,19 @@ private fun CategoryFilterBar(
                     Icon(
                         imageVector = style.icon,
                         contentDescription = null,
-                        tint = style.color
+                        tint = if (selectedCategory == category) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            style.color
+                        }
                     )
                 },
-                label = { Text(stringResource(category.labelRes)) }
+                label = {
+                    Text(
+                        text = stringResource(category.labelRes),
+                        
+                    )
+                }
             )
         }
     }
@@ -933,11 +942,8 @@ private fun NoReviewsLabel() {
     }
 }
 
-private fun formatDisplayAddress(address: String): String = address
-    .split(",")
-    .map { it.trim() }
-    .filter { it.isNotBlank() }
-    .joinToString(", ")
+private fun formatDisplayAddress(address: String): String = 
+    com.kidzone.utils.AddressUtils.formatDisplayAddress(address)
 
 @Composable
 private fun formatDistance(

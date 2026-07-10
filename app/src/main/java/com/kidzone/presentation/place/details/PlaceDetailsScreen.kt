@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -120,11 +119,7 @@ private val PLACE_DETAILS_CATEGORY_ICON_SIZE = 36.dp
 private val PLACE_DETAILS_CATEGORY_INNER_ICON_SIZE = 22.dp
 private val PLACE_DETAILS_BADGE_HORIZONTAL_PADDING = 4.dp
 private val PLACE_DETAILS_CHIP_HORIZONTAL_PADDING = 8.dp
-private val PLACE_DETAILS_CHIP_VERTICAL_PADDING = 4.dp
 private val PLACE_DETAILS_CHIP_CONTENT_SPACING = 4.dp
-private val PLACE_DETAILS_CHIP_BORDER_WIDTH = 1.dp
-private const val PLACE_DETAILS_CHIP_SHAPE_PERCENT = 50
-private const val PLACE_DETAILS_CHIP_BORDER_ALPHA = 0.75f
 private val PLACE_DETAILS_REVIEW_ACTION_BUTTON_SIZE = 30.dp
 private val PLACE_DETAILS_REVIEW_ACTION_ICON_SIZE = 16.dp
 private val PLACE_DETAILS_REVIEW_STAR_SIZE = 15.dp
@@ -794,17 +789,9 @@ private fun PlaceDetailsContent(
         if (place.amenities.isNotEmpty()) {
             item {
                 SectionCard(title = stringResource(R.string.amenities_with_count, place.amenities.size)) {
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(PLACE_DETAILS_SMALL_SPACING),
-                        verticalArrangement = Arrangement.spacedBy(PLACE_DETAILS_SMALL_SPACING)
-                    ) {
-                        Amenity.entries
-                            .filter { it in place.amenities }
-                            .forEach { amenity ->
-                                ReadonlyAmenityChip(amenity = amenity)
-                            }
-                    }
+                    com.kidzone.presentation.common.AmenitiesFlowGrid(
+                        amenities = place.amenities.toList()
+                    )
                 }
             }
         }
@@ -869,47 +856,6 @@ private fun PlaceDetailsContent(
         }
     }
 }
-
-@Composable
-private fun ReadonlyAmenityChip(
-    amenity: Amenity,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(PLACE_DETAILS_CHIP_SHAPE_PERCENT),
-        color = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        border = BorderStroke(
-            width = PLACE_DETAILS_CHIP_BORDER_WIDTH,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = PLACE_DETAILS_CHIP_BORDER_ALPHA)
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(
-                horizontal = PLACE_DETAILS_CHIP_HORIZONTAL_PADDING,
-                vertical = PLACE_DETAILS_CHIP_VERTICAL_PADDING
-            ),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = amenityIcon(amenity),
-                style = MaterialTheme.typography.labelSmall
-            )
-
-            Spacer(Modifier.width(PLACE_DETAILS_CHIP_CONTENT_SPACING))
-
-            Text(
-                text = stringResource(amenity.labelRes),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun PlaceMainCard(
