@@ -23,8 +23,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.CameraAlt
@@ -54,15 +52,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
-import coil.compose.AsyncImage
 import com.kidzone.R
 import com.kidzone.presentation.common.createCameraImageUri
 import kotlinx.coroutines.launch
@@ -74,9 +69,7 @@ import java.security.MessageDigest
 private const val COMMENT_MAX_LENGTH = 1000
 
 /** Maksymalna liczba zdjęć na opinię. */
-private const val MAX_REVIEW_PHOTOS = 3
-private val REVIEW_PHOTO_REMOVE_BUTTON_SIZE = 15.dp
-private val REVIEW_PHOTO_REMOVE_ICON_SIZE = 8.dp
+private const val MAX_REVIEW_PHOTOS = 5
 
 /**
  * Oblicza MD5 hash zawartości URI.

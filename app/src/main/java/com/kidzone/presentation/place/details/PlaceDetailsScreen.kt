@@ -86,10 +86,12 @@ import com.kidzone.domain.model.User
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.KidZoneSortMenu
 import com.kidzone.presentation.common.NewPlaceBadge
+import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.RankBadge
 import com.kidzone.presentation.common.SortMenuOption
 import com.kidzone.presentation.common.createCameraImageUri
 import com.kidzone.presentation.common.isNewWithoutReviews
+import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.RatingIcon
 import java.text.SimpleDateFormat
@@ -158,6 +160,7 @@ private const val PLACE_DETAILS_DIVIDER_ALPHA = 0.5f
 private const val COORDINATE_FORMAT = "%.5f, %.5f"
 private const val AVERAGE_RATING_FORMAT = "%.1f"
 private const val DATE_FORMAT = "dd.MM.yyyy"
+private const val PLACE_DETAILS_MAX_PHOTOS = 5
 
 private const val VERY_CLOSE_DISTANCE_KM = 0.05
 private const val METER_DISTANCE_THRESHOLD_KM = 1.0
@@ -209,11 +212,16 @@ fun PlaceDetailsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val networkStatus by rememberNetworkStatus()
+    val offlineMessage = stringResource(R.string.error_no_internet)
 
     val placePhotoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(
+            PLACE_DETAILS_MAX_PHOTOS
+        )
+    ) { uris ->
+        val availableSlots = PLACE_DETAILS_MAX_PHOTOS - (state.place?.photoUrls?.size ?: 0)
+        uris.take(availableSlots.coerceAtLeast(0)).forEach { uri ->
             viewModel.addPhotoToPlace(uri)
         }
     }
@@ -542,10 +550,14 @@ fun PlaceDetailsScreen(
     if (showReportDialog) {
         ReportPlaceDialog(
             onSubmit = { reason, comment ->
-                viewModel.reportPlace(reason, comment)
-                showReportDialog = false
-                scope.launch {
-                    snackbarHostState.showSnackbar(thankYouReport)
+                if (networkStatus == NetworkStatus.UNAVAILABLE) {
+                    scope.launch { snackbarHostState.showSnackbar(offlineMessage) }
+                } else {
+                    viewModel.reportPlace(reason, comment)
+                    showReportDialog = false
+                    scope.launch {
+                        snackbarHostState.showSnackbar(thankYouReport)
+                    }
                 }
             },
             onDismiss = { showReportDialog = false }
@@ -557,10 +569,14 @@ fun PlaceDetailsScreen(
         SuggestEditSheet(
             place = state.place!!,
             onSubmit = { name, description, category, amenities ->
-                viewModel.submitSuggestedEdit(name, description, category, amenities)
-                showSuggestEditSheet = false
-                scope.launch {
-                    snackbarHostState.showSnackbar(thankYouSuggestEdit)
+                if (networkStatus == NetworkStatus.UNAVAILABLE) {
+                    scope.launch { snackbarHostState.showSnackbar(offlineMessage) }
+                } else {
+                    viewModel.submitSuggestedEdit(name, description, category, amenities)
+                    showSuggestEditSheet = false
+                    scope.launch {
+                        snackbarHostState.showSnackbar(thankYouSuggestEdit)
+                    }
                 }
             },
             onDismiss = { showSuggestEditSheet = false }
@@ -571,10 +587,14 @@ fun PlaceDetailsScreen(
         val thankYouLocationCorrection = stringResource(R.string.thank_you_location_correction)
         LocationCorrectionDialog(
             onSubmit = { lat, lng, address ->
-                viewModel.submitLocationCorrection(lat, lng, address)
-                showLocationCorrectionDialog = false
-                scope.launch {
-                    snackbarHostState.showSnackbar(thankYouLocationCorrection)
+                if (networkStatus == NetworkStatus.UNAVAILABLE) {
+                    scope.launch { snackbarHostState.showSnackbar(offlineMessage) }
+                } else {
+                    viewModel.submitLocationCorrection(lat, lng, address)
+                    showLocationCorrectionDialog = false
+                    scope.launch {
+                        snackbarHostState.showSnackbar(thankYouLocationCorrection)
+                    }
                 }
             },
             onDismiss = { showLocationCorrectionDialog = false }
@@ -603,11 +623,15 @@ fun PlaceDetailsScreen(
         ReportReviewDialog(
             authorName = reviewToReport!!.authorName,
             onSubmit = { reason, comment ->
-                viewModel.reportReview(reviewToReport!!.id, reason, comment)
-                showReportReviewDialog = false
-                reviewToReport = null
-                scope.launch {
-                    snackbarHostState.showSnackbar(thankYouReportReview)
+                if (networkStatus == NetworkStatus.UNAVAILABLE) {
+                    scope.launch { snackbarHostState.showSnackbar(offlineMessage) }
+                } else {
+                    viewModel.reportReview(reviewToReport!!.id, reason, comment)
+                    showReportReviewDialog = false
+                    reviewToReport = null
+                    scope.launch {
+                        snackbarHostState.showSnackbar(thankYouReportReview)
+                    }
                 }
             },
             onDismiss = {
@@ -649,11 +673,15 @@ fun PlaceDetailsScreen(
         val thankYouReportPhoto = stringResource(R.string.thank_you_report_photo)
         ReportPhotoDialog(
             onSubmit = { reason, comment ->
-                viewModel.reportPhoto(photoUrlToReport!!, reason, comment)
-                showReportPhotoDialog = false
-                photoUrlToReport = null
-                scope.launch {
-                    snackbarHostState.showSnackbar(thankYouReportPhoto)
+                if (networkStatus == NetworkStatus.UNAVAILABLE) {
+                    scope.launch { snackbarHostState.showSnackbar(offlineMessage) }
+                } else {
+                    viewModel.reportPhoto(photoUrlToReport!!, reason, comment)
+                    showReportPhotoDialog = false
+                    photoUrlToReport = null
+                    scope.launch {
+                        snackbarHostState.showSnackbar(thankYouReportPhoto)
+                    }
                 }
             },
             onDismiss = {

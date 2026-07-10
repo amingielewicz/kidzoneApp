@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -75,11 +74,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -90,9 +87,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.kidzone.R
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.PlaceCategory
@@ -109,8 +104,6 @@ private val FORM_SECTION_GAP = 14.dp
 private val FORM_VERTICAL_SPACING = 10.dp
 private val SECTION_PADDING = 12.dp
 private val PHOTO_THUMBNAIL_SIZE = 76.dp
-private val PHOTO_REMOVE_BUTTON_SIZE = 15.dp
-private val PHOTO_REMOVE_ICON_SIZE = 8.dp
 private val COUNTER_ROW_HEIGHT = 20.dp
 private const val LOCATION_FETCH_TIMEOUT_MS = 12_000L
 private const val GEOCODE_TIMEOUT_MS = 4_000L
@@ -983,47 +976,6 @@ private fun DuplicateWarningDialog(
         confirmButton = { Button(onClick = onConfirm) { Text(stringResource(R.string.duplicate_warning_confirm)) } },
         dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
     )
-}
-
-@Suppress("FunctionNaming")
-@Composable
-private fun PhotoThumbnail(
-    model: Any,
-    onRemove: () -> Unit,
-    enabled: Boolean = true
-) {
-    Box(modifier = Modifier.size(PHOTO_THUMBNAIL_SIZE)) {
-        AsyncImage(
-            model = model,
-            contentDescription = stringResource(R.string.photo_thumbnail_description),
-            modifier = Modifier.size(PHOTO_THUMBNAIL_SIZE).clip(RoundedCornerShape(8.dp)),
-            contentScale = ContentScale.Crop
-        )
-        if (enabled) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .zIndex(1f)
-                    .size(PHOTO_REMOVE_BUTTON_SIZE)
-                    .clip(CircleShape)
-                    .background(
-                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.95f)
-                    )
-                    .clickable(
-                        role = Role.Button,
-                        onClick = onRemove
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = stringResource(R.string.remove_photo_description),
-                    tint = MaterialTheme.colorScheme.onError,
-                    modifier = Modifier.size(PHOTO_REMOVE_ICON_SIZE)
-                )
-            }
-        }
-    }
 }
 
 private fun computePlacePhotoHash(context: android.content.Context, uri: Uri): String? {

@@ -2,8 +2,6 @@ package com.kidzone.presentation.place.details
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,7 +16,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -39,10 +36,12 @@ import com.kidzone.R
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.presentation.common.AmenitiesFlowGrid
 import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.PLACE_NAME_MAX_LENGTH
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 fun SuggestEditSheet(
     place: Place,
@@ -54,7 +53,7 @@ fun SuggestEditSheet(
     var name by remember { mutableStateOf(place.name) }
     var description by remember { mutableStateOf(place.description) }
     var selectedCategory by remember { mutableStateOf(place.category) }
-    var selectedAmenities by remember { mutableStateOf(place.amenities.map { it.name }.toSet()) }
+    var selectedAmenities by remember { mutableStateOf(place.amenities.toSet()) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -123,31 +122,24 @@ fun SuggestEditSheet(
             val applicable = remember(selectedCategory) {
                 Amenity.forCategory(selectedCategory)
             }
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                applicable.forEach { amenity ->
-                    FilterChip(
-                        selected = amenity.name in selectedAmenities,
-                        onClick = {
-                            selectedAmenities = if (amenity.name in selectedAmenities) {
-                                selectedAmenities - amenity.name
-                            } else {
-                                selectedAmenities + amenity.name
-                            }
-                        },
-                        label = { Text(stringResource(amenity.labelRes)) }
-                    )
+            AmenitiesFlowGrid(
+                amenities = applicable,
+                selectedAmenities = selectedAmenities,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                onToggle = { amenity ->
+                    selectedAmenities = if (amenity in selectedAmenities) {
+                        selectedAmenities - amenity
+                    } else {
+                        selectedAmenities + amenity
+                    }
                 }
-            }
+            )
 
             Spacer(Modifier.height(16.dp))
 
             Button(
                 onClick = {
-                    onSubmit(name, description, selectedCategory.name, selectedAmenities)
+                    onSubmit(name, description, selectedCategory.name, selectedAmenities.map { it.name }.toSet())
                 },
                 enabled = name.trim().isNotBlank(),
                 modifier = Modifier

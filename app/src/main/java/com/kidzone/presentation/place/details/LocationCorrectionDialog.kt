@@ -1,6 +1,8 @@
 package com.kidzone.presentation.place.details
 
 import android.Manifest
+import android.content.Intent
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
@@ -50,6 +52,7 @@ fun LocationCorrectionDialog(
     var address by remember { mutableStateOf<String?>(null) }
     var isFetching by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showGpsDialog by remember { mutableStateOf(false) }
 
     val locationPermissionDenied = stringResource(R.string.location_permission_denied)
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -88,9 +91,12 @@ fun LocationCorrectionDialog(
 
                 OutlinedButton(
                     onClick = {
-                        isFetching = true
                         errorMessage = null
-                        if (hasLocationPermission(context)) {
+                        if (!isLocationServiceEnabled(context)) {
+                            isFetching = false
+                            showGpsDialog = true
+                        } else if (hasLocationPermission(context)) {
+                            isFetching = true
                             scope.launch {
                                 fetchLocationInternal(context) { lat, lng, addr, err ->
                                     latitude = lat; longitude = lng; address = addr; errorMessage = err; isFetching = false
@@ -144,6 +150,36 @@ fun LocationCorrectionDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
+
+    if (showGpsDialog) {
+        AlertDialog(
+            onDismissRequest = { showGpsDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Filled.MyLocation,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = { Text(stringResource(R.string.gps_disabled_title)) },
+            text = { Text(stringResource(R.string.error_location_service_disabled)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showGpsDialog = false
+                        context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                    }
+                ) {
+                    Text(stringResource(R.string.home_enable_location))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showGpsDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
 }
 
 private suspend fun fetchLocationInternal(

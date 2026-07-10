@@ -9,15 +9,15 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Flag
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +38,10 @@ import com.kidzone.R
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+
+private val VIEWER_ACTION_BUTTON_SIZE = 30.dp
+private val VIEWER_ACTION_ICON_SIZE = 16.dp
+private const val VIEWER_ACTION_ICON_ALPHA = 0.75f
 
 /**
  * Fullscreen photo viewer z nawigacją swipe + pinch-to-zoom.
@@ -100,19 +104,18 @@ fun FullscreenPhotoViewer(
             }
 
             // Close button (top-left)
-            FilledTonalIconButton(
+            IconButton(
                 onClick = onDismiss,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(16.dp),
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = Color.Black.copy(alpha = 0.6f),
-                    contentColor = Color.White
-                )
+                    .padding(16.dp)
+                    .size(VIEWER_ACTION_BUTTON_SIZE)
             ) {
                 Icon(
                     imageVector = Icons.Filled.Close,
-                    contentDescription = "Zamknij"
+                    contentDescription = "Zamknij",
+                    tint = Color.White,
+                    modifier = Modifier.size(VIEWER_ACTION_ICON_SIZE)
                 )
             }
 
@@ -123,29 +126,28 @@ fun FullscreenPhotoViewer(
 
             // Report button (top-right) - only if callback provided AND photo is reportable
             if (onReportPhoto != null && canReportPhoto(photoUrls[safeCurrentPage])) {
-                FilledTonalIconButton(
+                IconButton(
                     onClick = {
                         val currentUrl = photoUrls[safeCurrentPage]
                         onReportPhoto(currentUrl)
                     },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(16.dp),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = Color.Black.copy(alpha = 0.6f),
-                        contentColor = Color.White
-                    )
+                        .padding(16.dp)
+                        .size(VIEWER_ACTION_BUTTON_SIZE)
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Flag,
-                        contentDescription = stringResource(R.string.report_photo)
+                        contentDescription = stringResource(R.string.report_photo),
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = VIEWER_ACTION_ICON_ALPHA),
+                        modifier = Modifier.size(VIEWER_ACTION_ICON_SIZE)
                     )
                 }
             }
 
             // Delete button (top-right, below report) - only for user's own photos
             if (onDeletePhoto != null && canDeletePhoto(photoUrls[safeCurrentPage])) {
-                FilledTonalIconButton(
+                IconButton(
                     onClick = {
                         val currentUrl = photoUrls[safeCurrentPage]
                         onDeletePhoto(currentUrl)
@@ -153,15 +155,14 @@ fun FullscreenPhotoViewer(
                     },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 72.dp, end = 16.dp),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = Color.Red.copy(alpha = 0.7f),
-                        contentColor = Color.White
-                    )
+                        .padding(top = 52.dp, end = 16.dp)
+                        .size(VIEWER_ACTION_BUTTON_SIZE)
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Delete,
-                        contentDescription = stringResource(R.string.delete_photo)
+                        contentDescription = stringResource(R.string.delete_photo),
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = VIEWER_ACTION_ICON_ALPHA),
+                        modifier = Modifier.size(VIEWER_ACTION_ICON_SIZE)
                     )
                 }
             }
