@@ -560,10 +560,13 @@
     <string name="delete_account_gdpr_info">The content created by you provides value to the community and will remain available in anonymized form (in accordance with GDPR).</string>
     <string name="delete_account_confirm_google">Sign in again with Google to confirm account deletion:</string>
     <string name="delete_account_confirm_password">Enter your current password to confirm:</string>
+    <string name="delete_account_reviews_prefix">Your reviews</string>
+    <string name="delete_account_places_prefix">Your places</string>
     <string name="confirm_google_button">Confirm via Google</string>
     <string name="change_email_title">Change email address</string>
     <string name="current_email_label">Current address: %1$s</string>
     <string name="new_email_label">New email address</string>
+    <string name="email_same_as_current">The new email address must be different from the current one</string>
     <string name="email_already_set">This is your current address</string>
     <string name="email_verification_hint">We will send a verification link to the new address</string>
     <string name="send_link">Send link</string>
@@ -581,5 +584,4 @@
     <string name="delete_review_confirmation">Your review will be permanently deleted. The average rating of the place will be recalculated.</string>
     <string name="added_date">Added %1$s</string>
     <string name="edited_date">Edited %1$s</string>
-
 </resources>

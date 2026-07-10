@@ -41,6 +41,7 @@
     <string name="error_user_not_found">Konto z podanym e-mailem nie istnieje</string>
     <string name="error_invalid_credentials">Nieprawidłowy e-mail lub hasło</string>
     <string name="error_email_already_in_use">Konto z tym adresem e-mail już istnieje</string>
+    <string name="email_same_as_current">Nowy adres e-mail musi być inny niż aktualny</string>
     <string name="error_username_taken">Ta nazwa użytkownika jest już zajęta. Wybierz inną.</string>
     <string name="error_weak_password">Hasło nie spełnia wymagań bezpieczeństwa</string>
     <string name="error_email_not_verified">Potwierdź swój adres e-mail. Sprawdź skrzynkę pocztową.</string>
@@ -562,6 +563,8 @@
     <string name="delete_account_gdpr_info">Treści tworzone przez Ciebie stanowią wartość dla społeczności i pozostaną dostępne w formie zanonimizowanej (zgodnie z RODO).</string>
     <string name="delete_account_confirm_google">Zaloguj się ponownie przez Google, aby potwierdzić usunięcie konta:</string>
     <string name="delete_account_confirm_password">Wpisz aktualne hasło, aby potwierdzić:</string>
+    <string name="delete_account_reviews_prefix">Twoje opinie</string>
+    <string name="delete_account_places_prefix">Twoje miejsca</string>
     <string name="confirm_google_button">Potwierdź przez Google</string>
     <string name="change_email_title">Zmiana adresu e-mail</string>
     <string name="current_email_label">Aktualny adres: %1$s</string>

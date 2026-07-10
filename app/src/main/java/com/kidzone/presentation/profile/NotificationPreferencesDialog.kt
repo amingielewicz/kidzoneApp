@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,105 +22,228 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kidzone.R
+import com.kidzone.presentation.common.ModalActionColor
+import com.kidzone.presentation.common.ModalDialogShape
+import com.kidzone.presentation.common.ModalPrimaryButton
+import com.kidzone.presentation.common.ModalTextButton
 
 data class NotificationPrefs(
     val newReviewOnMyPlace: Boolean = true,
     val newBadgeEarned: Boolean = true,
     val newPhotoOnMyPlace: Boolean = true,
     val rankings: Boolean = true,
-    val emailNotificationsEnabled: Boolean = true
+    val emailNotificationsEnabled: Boolean = true,
 )
 
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 fun NotificationPreferencesDialog(
     currentPrefs: NotificationPrefs,
     onSave: (NotificationPrefs) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
-    var prefs by remember(currentPrefs) { mutableStateOf(currentPrefs) }
+    var prefs by remember(currentPrefs) {
+        mutableStateOf(currentPrefs)
+    }
+
+    val hasChanges = prefs != currentPrefs
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.notifications_title)) },
+        shape = ModalDialogShape,
+        title = {
+            Text(
+                text = stringResource(
+                    R.string.notifications_title,
+                ),
+            )
+        },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Text(
-                    text = stringResource(R.string.push_notifications_section),
+                    text = stringResource(
+                        R.string.push_notifications_section,
+                    ),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
-                Spacer(Modifier.height(8.dp))
+
+                Spacer(
+                    modifier = Modifier.height(8.dp),
+                )
+
                 Text(
-                    text = stringResource(R.string.notification_preferences_subtitle),
+                    text = stringResource(
+                        R.string.notification_preferences_subtitle,
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(16.dp))
+
+                Spacer(
+                    modifier = Modifier.height(12.dp),
+                )
+
                 NotificationToggle(
-                    title = stringResource(R.string.pref_new_review_title),
-                    description = stringResource(R.string.pref_new_review_desc),
+                    title = stringResource(
+                        R.string.pref_new_review_title,
+                    ),
+                    description = stringResource(
+                        R.string.pref_new_review_desc,
+                    ),
                     checked = prefs.newReviewOnMyPlace,
-                    onCheckedChange = { prefs = prefs.copy(newReviewOnMyPlace = it) }
+                    onCheckedChange = {
+                        prefs = prefs.copy(
+                            newReviewOnMyPlace = it,
+                        )
+                    },
                 )
+
                 NotificationToggle(
-                    title = stringResource(R.string.pref_new_badge_title),
-                    description = stringResource(R.string.pref_new_badge_desc),
+                    title = stringResource(
+                        R.string.pref_new_badge_title,
+                    ),
+                    description = stringResource(
+                        R.string.pref_new_badge_desc,
+                    ),
                     checked = prefs.newBadgeEarned,
-                    onCheckedChange = { prefs = prefs.copy(newBadgeEarned = it) }
+                    onCheckedChange = {
+                        prefs = prefs.copy(
+                            newBadgeEarned = it,
+                        )
+                    },
                 )
+
                 NotificationToggle(
-                    title = stringResource(R.string.pref_new_photo_title),
-                    description = stringResource(R.string.pref_new_photo_desc),
+                    title = stringResource(
+                        R.string.pref_new_photo_title,
+                    ),
+                    description = stringResource(
+                        R.string.pref_new_photo_desc,
+                    ),
                     checked = prefs.newPhotoOnMyPlace,
-                    onCheckedChange = { prefs = prefs.copy(newPhotoOnMyPlace = it) }
+                    onCheckedChange = {
+                        prefs = prefs.copy(
+                            newPhotoOnMyPlace = it,
+                        )
+                    },
                 )
+
                 NotificationToggle(
-                    title = stringResource(R.string.pref_rankings_title),
-                    description = stringResource(R.string.pref_rankings_desc),
+                    title = stringResource(
+                        R.string.pref_rankings_title,
+                    ),
+                    description = stringResource(
+                        R.string.pref_rankings_desc,
+                    ),
                     checked = prefs.rankings,
-                    onCheckedChange = { prefs = prefs.copy(rankings = it) }
+                    onCheckedChange = {
+                        prefs = prefs.copy(
+                            rankings = it,
+                        )
+                    },
                 )
-                Spacer(Modifier.height(16.dp))
+
+                Spacer(
+                    modifier = Modifier.height(16.dp),
+                )
+
                 Text(
-                    text = stringResource(R.string.email_notifications_section),
+                    text = stringResource(
+                        R.string.email_notifications_section,
+                    ),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
-                Spacer(Modifier.height(8.dp))
+
+                Spacer(
+                    modifier = Modifier.height(8.dp),
+                )
+
                 NotificationToggle(
-                    title = stringResource(R.string.email_notifications_section),
-                    description = stringResource(R.string.pref_email_notifs_desc),
+                    title = stringResource(
+                        R.string.email_notifications_section,
+                    ),
+                    description = stringResource(
+                        R.string.pref_email_notifs_desc,
+                    ),
                     checked = prefs.emailNotificationsEnabled,
-                    onCheckedChange = { prefs = prefs.copy(emailNotificationsEnabled = it) }
+                    onCheckedChange = {
+                        prefs = prefs.copy(
+                            emailNotificationsEnabled = it,
+                        )
+                    },
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(prefs) }) { Text(stringResource(R.string.save_changes)) }
+            ModalPrimaryButton(
+                text = stringResource(
+                    R.string.save_changes,
+                ),
+                onClick = {
+                    onSave(prefs)
+                },
+                enabled = hasChanges,
+            )
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-        }
+            ModalTextButton(
+                text = stringResource(
+                    R.string.cancel,
+                ),
+                onClick = onDismiss,
+            )
+        },
     )
 }
 
+@Suppress("FunctionNaming")
 @Composable
 private fun NotificationToggle(
     title: String,
     description: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-            Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(
+            modifier = Modifier.weight(1f),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+            )
+
+            Spacer(
+                modifier = Modifier.height(2.dp),
+            )
+
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                checkedTrackColor = ModalActionColor,
+                checkedBorderColor = ModalActionColor,
+            ),
+        )
     }
 }

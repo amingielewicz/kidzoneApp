@@ -40,7 +40,6 @@ import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -54,7 +53,6 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -80,15 +78,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
 import coil.compose.AsyncImage
+import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.SignInProvider
 import com.kidzone.i18n.AppLanguage
 import com.kidzone.presentation.common.BadgeRowItem
-import com.kidzone.presentation.common.BadgesRow
 import com.kidzone.presentation.common.KidZoneCard
+import com.kidzone.presentation.common.ModalDialogShape
+import com.kidzone.presentation.common.ModalPrimaryButton
+import com.kidzone.presentation.common.ModalTextButton
 import com.kidzone.presentation.common.NotificationPromptReason
 import com.kidzone.presentation.common.NotificationSoftPromptDialog
 import com.kidzone.presentation.common.RankBadge
@@ -97,6 +100,7 @@ import com.kidzone.presentation.common.rememberHapticFeedback
 import com.kidzone.presentation.common.rememberReducedMotionEnabled
 import com.kidzone.presentation.common.shouldShowNotificationPrompt
 import com.kidzone.presentation.common.shimmerEffect
+import com.kidzone.presentation.common.RequiredFieldLabel
 import com.kidzone.utils.UiText
 import nl.dionsegijn.konfetti.compose.KonfettiView
 import nl.dionsegijn.konfetti.core.Party
@@ -370,7 +374,7 @@ private fun ProfileContent(
         state = lazyListState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(KidZoneSpacing.GapSmall),
     ) {
         item { ProfileHeaderCard(user = user, userRank = userRank, onEdit = onEdit) }
 
@@ -431,7 +435,10 @@ private fun ProfileHeaderCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(
+                    horizontal = KidZoneSpacing.Card,
+                    vertical = KidZoneSpacing.CardCompact,
+                )
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -592,14 +599,26 @@ private fun StatsCard(
             )
         }
         if (user.createdAtMillis > 0L) {
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+            Spacer(
+                modifier = Modifier.height(16.dp),
             )
-            Spacer(Modifier.height(8.dp))
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(
+                    alpha = 0.6f,
+                ),
+            )
+
+            Spacer(
+                modifier = Modifier.height(10.dp),
+            )
+
             Text(
-                text = stringResource(R.string.member_since, formatDate(user.createdAtMillis)),
-                style = MaterialTheme.typography.labelMedium,
+                text = stringResource(
+                    R.string.member_since,
+                    formatDate(user.createdAtMillis),
+                ),
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
@@ -619,26 +638,34 @@ private fun StatItem(
 ) {
     Column(
         modifier = modifier
+            .heightIn(min = 72.dp)
             .clickable(
                 onClickLabel = label,
                 role = Role.Button,
                 onClick = onClick,
             )
-            .padding(vertical = 8.dp),
+            .padding(
+                horizontal = KidZoneSpacing.GapSmall,
+                vertical = KidZoneSpacing.GapTiny,
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(28.dp),
+            modifier = Modifier.size(24.dp),
         )
-        Spacer(Modifier.height(4.dp))
+
+        Spacer(Modifier.height(2.dp))
+
         Text(
             text = value,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
         )
+
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
@@ -656,13 +683,14 @@ private fun MyContentCard(
     onOpenMyReviews: () -> Unit,
 ) {
     SectionCard(title = stringResource(R.string.my_content_title)) {
+
         ProfileNavRow(
             icon = Icons.Filled.Place,
             label = stringResource(R.string.my_places),
             trailingText = placesCount.toString(),
             onClick = onOpenMyPlaces,
         )
-        Spacer(Modifier.height(4.dp))
+
         ProfileNavRow(
             icon = Icons.Filled.RateReview,
             label = stringResource(R.string.my_reviews),
@@ -702,8 +730,76 @@ private fun BadgesCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            BadgesRow(badges = obtainedBadges)
+            ProfileBadgesGrid(badges = obtainedBadges)
         }
+    }
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun ProfileBadgesGrid(
+    badges: List<UserBadge>,
+) {
+    val rows = badges.chunked(2)
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(KidZoneSpacing.GapSmall)
+    ) {
+        rows.forEach { rowBadges ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(KidZoneSpacing.GapTiny)
+            ) {
+                rowBadges.forEach { badge ->
+                    ProfileBadgeItem(
+                        badge = badge,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+
+                if (rowBadges.size == 1) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun ProfileBadgeItem(
+    badge: UserBadge,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .heightIn(min = 36.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(badge.color.copy(alpha = 0.10f))
+            .padding(
+                horizontal = 10.dp,
+                vertical = 4.dp,
+            ),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = badge.icon,
+            contentDescription = null,
+            tint = badge.color,
+            modifier = Modifier.size(16.dp),
+        )
+
+        Spacer(Modifier.width(6.dp))
+
+        Text(
+            text = badge.label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+        )
     }
 }
 
@@ -715,6 +811,7 @@ private fun BadgesInfoDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = ModalDialogShape,
         icon = {
             Icon(
                 imageVector = Icons.Filled.EmojiEvents,
@@ -722,10 +819,16 @@ private fun BadgesInfoDialog(
                 tint = MaterialTheme.colorScheme.primary,
             )
         },
-        title = { Text(stringResource(R.string.badges_info_title)) },
+        title = {
+            Text(
+                text = stringResource(R.string.badges_info_title),
+            )
+        },
         text = {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
@@ -733,6 +836,7 @@ private fun BadgesInfoDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+
                 UserBadge.entries.forEach { badge ->
                     BadgeRowItem(
                         badge = badge,
@@ -742,9 +846,10 @@ private fun BadgesInfoDialog(
             }
         },
         confirmButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.i_understand))
-            }
+            ModalTextButton(
+                text = stringResource(R.string.i_understand),
+                onClick = onDismiss,
+            )
         },
     )
 }
@@ -768,7 +873,7 @@ private fun BadgeEarnedDialog(
                 modifier = Modifier
                     .fillMaxWidth(0.9f)
                     .padding(24.dp),
-                shape = MaterialTheme.shapes.extraLarge,
+                shape = ModalDialogShape,
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
             ) {
@@ -865,16 +970,11 @@ private fun BadgeEarnedDialog(
 
                     Spacer(Modifier.height(24.dp))
 
-                    androidx.compose.material3.TextButton(
+                    ModalTextButton(
+                        text = stringResource(R.string.great),
                         onClick = onDismiss,
                         modifier = Modifier.align(Alignment.End),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.great),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
+                    )
                 }
             }
 
@@ -944,19 +1044,18 @@ private fun AccountSecurityCard(
                 label = stringResource(R.string.change_password_title),
                 onClick = onChangePassword,
             )
-            Spacer(Modifier.height(4.dp))
+
             ProfileNavRow(
                 icon = Icons.Filled.AlternateEmail,
                 label = stringResource(R.string.change_email),
                 onClick = onChangeEmail,
             )
-            Spacer(Modifier.height(4.dp))
         }
         ProfileNavRow(
             icon = Icons.Filled.DeleteForever,
             label = stringResource(R.string.delete_account),
-            iconTint = MaterialTheme.colorScheme.error,
-            labelColor = MaterialTheme.colorScheme.error,
+            iconTint = MaterialTheme.colorScheme.primary,
+            labelColor = MaterialTheme.colorScheme.onSurface,
             onClick = onDeleteAccount,
         )
     }
@@ -980,48 +1079,57 @@ private fun SettingsCard(
             trailingText = stringResource(selectedLanguage.labelRes),
             onClick = onLanguageSettings,
         )
-        Spacer(Modifier.height(4.dp))
+
         ProfileNavRow(
             icon = Icons.Filled.Notifications,
             label = stringResource(R.string.notification_settings),
             onClick = onNotificationPrefs,
         )
-        Spacer(Modifier.height(4.dp))
+
         ProfileNavRow(
             icon = Icons.Filled.Gavel,
             label = stringResource(R.string.terms_of_service),
             onClick = onTermsOfService,
         )
-        Spacer(Modifier.height(4.dp))
+
         ProfileNavRow(
             icon = Icons.Filled.PrivacyTip,
             label = stringResource(R.string.privacy_policy),
             onClick = onPrivacyPolicy,
         )
-        Spacer(Modifier.height(4.dp))
+
         ProfileNavRow(
             icon = Icons.Filled.Email,
             label = stringResource(R.string.contact_support),
             onClick = onContact,
         )
-        Spacer(Modifier.height(8.dp))
+
+        Spacer(Modifier.height(KidZoneSpacing.GapSmall))
+
         OutlinedButton(
             onClick = onSignOut,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp),
+                .heightIn(min = 44.dp),
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.Logout,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
             )
-            Spacer(Modifier.width(8.dp))
+
+            Spacer(Modifier.width(KidZoneSpacing.GapSmall))
+
             Text(stringResource(R.string.sign_out))
         }
-        Spacer(Modifier.height(12.dp))
+
+        Spacer(Modifier.height(KidZoneSpacing.GapSmall))
+
         Text(
-            text = stringResource(R.string.app_version, com.kidzone.BuildConfig.VERSION_NAME),
+            text = stringResource(
+                R.string.app_version,
+                com.kidzone.BuildConfig.VERSION_NAME,
+            ),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             modifier = Modifier.fillMaxWidth(),
@@ -1036,16 +1144,34 @@ private fun ContactSupportDialog(
     isSubmitting: Boolean,
     errorMessage: UiText?,
     onDismiss: () -> Unit,
-    onSubmit: (subject: String, message: String) -> Unit,
+    onSubmit: (
+        subject: String,
+        message: String,
+    ) -> Unit,
 ) {
     val context = LocalContext.current
-    var subject by remember { mutableStateOf("") }
-    var message by remember { mutableStateOf("") }
-    val subjectValid = subject.trim().length >= CONTACT_SUBJECT_MIN_LENGTH
-    val messageValid = message.trim().length >= CONTACT_MESSAGE_MIN_LENGTH
+
+    var subject by remember {
+        mutableStateOf("")
+    }
+
+    var message by remember {
+        mutableStateOf("")
+    }
+
+    val subjectValid =
+        subject.trim().length >= CONTACT_SUBJECT_MIN_LENGTH
+
+    val messageValid =
+        message.trim().length >= CONTACT_MESSAGE_MIN_LENGTH
 
     AlertDialog(
-        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        onDismissRequest = {
+            if (!isSubmitting) {
+                onDismiss()
+            }
+        },
+        shape = ModalDialogShape,
         icon = {
             Icon(
                 imageVector = Icons.Filled.Email,
@@ -1053,62 +1179,115 @@ private fun ContactSupportDialog(
                 tint = MaterialTheme.colorScheme.primary,
             )
         },
-        title = { Text(stringResource(R.string.contact_support_title)) },
+        title = {
+            Text(
+                text = stringResource(
+                    R.string.contact_support_title,
+                ),
+            )
+        },
         text = {
-            Column {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Text(
-                    text = stringResource(R.string.contact_support_body),
+                    text = stringResource(
+                        R.string.contact_support_body,
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(8.dp))
+
+                Spacer(
+                    modifier = Modifier.height(12.dp),
+                )
+
                 OutlinedTextField(
                     value = subject,
-                    onValueChange = { subject = it.take(CONTACT_SUBJECT_MAX_LENGTH) },
-                    label = { Text(stringResource(R.string.contact_support_subject_label)) },
-                    singleLine = true,
-                    isError = subject.isNotBlank() && !subjectValid,
+                    onValueChange = {
+                        subject = it.take(
+                            CONTACT_SUBJECT_MAX_LENGTH,
+                        )
+                    },
                     enabled = !isSubmitting,
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
+                    label = {
+                        RequiredFieldLabel(
+                            label = stringResource(
+                                R.string.contact_support_subject_label,
+                            ),
+                        )
+                    },
+                    isError =
+                        subject.isNotBlank() &&
+                                !subjectValid,
                     supportingText = {
                         Text(
-                            stringResource(
+                            text = stringResource(
                                 R.string.contact_support_subject_counter,
                                 subject.length,
-                                CONTACT_SUBJECT_MAX_LENGTH
-                            )
+                                CONTACT_SUBJECT_MAX_LENGTH,
+                            ),
                         )
-                    }
+                    },
                 )
-                Spacer(Modifier.height(8.dp))
+
+                Spacer(
+                    modifier = Modifier.height(8.dp),
+                )
+
                 OutlinedTextField(
                     value = message,
-                    onValueChange = { message = it.take(CONTACT_MESSAGE_MAX_LENGTH) },
-                    label = { Text(stringResource(R.string.contact_support_message_label)) },
+                    onValueChange = {
+                        message = it.take(
+                            CONTACT_MESSAGE_MAX_LENGTH,
+                        )
+                    },
+                    enabled = !isSubmitting,
                     minLines = 4,
                     maxLines = 7,
-                    isError = message.isNotBlank() && !messageValid,
-                    enabled = !isSubmitting,
                     modifier = Modifier.fillMaxWidth(),
+                    label = {
+                        RequiredFieldLabel(
+                            label = stringResource(
+                                R.string.contact_support_message_label,
+                            ),
+                        )
+                    },
+                    isError =
+                        message.isNotBlank() &&
+                                !messageValid,
                     supportingText = {
                         Text(
-                            stringResource(
+                            text = stringResource(
                                 R.string.contact_support_message_counter,
                                 message.length,
-                                CONTACT_MESSAGE_MAX_LENGTH
-                            )
+                                CONTACT_MESSAGE_MAX_LENGTH,
+                            ),
                         )
-                    }
+                    },
                 )
-                Spacer(Modifier.height(8.dp))
+
+                Spacer(
+                    modifier = Modifier.height(8.dp),
+                )
+
                 Text(
-                    text = stringResource(R.string.contact_support_hint),
+                    text = stringResource(
+                        R.string.contact_support_hint,
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                errorMessage?.let {
-                    Spacer(Modifier.height(8.dp))
+
+                errorMessage?.let { error ->
+                    Spacer(
+                        modifier = Modifier.height(8.dp),
+                    )
+
                     Text(
-                        text = it.asString(context),
+                        text = error.asString(context),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -1116,67 +1295,127 @@ private fun ContactSupportDialog(
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = { onSubmit(subject, message) },
-                enabled = subjectValid && messageValid && !isSubmitting
-            ) {
-                if (isSubmitting) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Text(stringResource(R.string.contact_support_send))
-                }
-            }
+            ModalPrimaryButton(
+                text = stringResource(
+                    R.string.contact_support_send,
+                ),
+                onClick = {
+                    onSubmit(
+                        subject.trim(),
+                        message.trim(),
+                    )
+                },
+                enabled = subjectValid && messageValid,
+                isLoading = isSubmitting,
+            )
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isSubmitting) {
-                Text(stringResource(R.string.cancel))
-            }
+            ModalTextButton(
+                text = stringResource(
+                    R.string.cancel,
+                ),
+                onClick = onDismiss,
+                enabled = !isSubmitting,
+            )
         },
     )
 }
 
+@Suppress(
+    "FunctionNaming",
+    "LongMethod",
+    "MagicNumber",
+)
 @Composable
-@Suppress("FunctionNaming")
 private fun LanguageSettingsDialog(
     selectedLanguage: AppLanguage,
     onSelectLanguage: (AppLanguage) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    @Suppress("MagicNumber")
+    val selectedColor = Color(0xFF2E7D32)
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.language_settings_title)) },
+        shape = ModalDialogShape,
+        title = {
+            Text(
+                text = stringResource(R.string.language_settings_title),
+                style = MaterialTheme.typography.titleLarge,
+            )
+        },
         text = {
-            Column {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 AppLanguage.entries.forEach { language ->
+                    val isSelected = language == selectedLanguage
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .heightIn(min = 48.dp)
                             .clickable(
                                 role = Role.RadioButton,
-                                onClick = { onSelectLanguage(language) },
+                                onClick = {
+                                    onSelectLanguage(language)
+                                },
                             )
-                            .padding(vertical = 8.dp),
+                            .padding(
+                                horizontal = 4.dp,
+                                vertical = 4.dp,
+                            ),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        RadioButton(
-                            selected = language == selectedLanguage,
-                            onClick = { onSelectLanguage(language) },
+                        Box(
+                            modifier = Modifier.size(24.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = languageFlag(language),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
+
+                        Spacer(
+                            modifier = Modifier.width(12.dp),
                         )
-                        Spacer(Modifier.width(8.dp))
+
                         Text(
                             text = stringResource(language.labelRes),
                             style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f),
+                        )
+
+                        RadioButton(
+                            selected = isSelected,
+                            onClick = null,
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = selectedColor,
+                                unselectedColor =
+                                    MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
                         )
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.close))
-            }
+            ModalTextButton(
+                text = stringResource(R.string.close),
+                onClick = onDismiss,
+            )
         },
     )
+}
+
+private fun languageFlag(
+    language: AppLanguage,
+): String = when (language) {
+    AppLanguage.SYSTEM -> "🌐"
+    AppLanguage.POLISH -> "🇵🇱"
+    AppLanguage.ENGLISH -> "🇬🇧"
 }
 
 @Suppress("FunctionNaming", "LongParameterList")
@@ -1192,37 +1431,49 @@ internal fun ProfileNavRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 48.dp)
+            .heightIn(min = 44.dp)
             .clickable(
                 onClickLabel = label,
                 role = Role.Button,
                 onClick = onClick,
             )
             .semantics(mergeDescendants = true) {}
-            .padding(vertical = 10.dp),
+            .padding(
+                horizontal = KidZoneSpacing.GapTiny,
+                vertical = 4.dp,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = iconTint,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(24.dp),
         )
-        Spacer(Modifier.width(12.dp))
+
+        Spacer(
+            modifier = Modifier.width(12.dp),
+        )
+
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             color = labelColor,
             modifier = Modifier.weight(1f),
         )
+
         if (trailingText != null) {
             Text(
                 text = trailingText,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.width(4.dp))
+
+            Spacer(
+                modifier = Modifier.width(4.dp),
+            )
         }
+
         Icon(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
@@ -1241,8 +1492,15 @@ private fun SectionCard(
     content: @Composable () -> Unit,
 ) {
     KidZoneCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(
+            modifier = Modifier.padding(
+                horizontal = KidZoneSpacing.Card,
+                vertical = KidZoneSpacing.CardCompact,
+            ),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 if (leadingIcon != null) {
                     Icon(
                         imageVector = leadingIcon,
@@ -1250,17 +1508,22 @@ private fun SectionCard(
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp),
                     )
-                    Spacer(Modifier.width(8.dp))
+
+                    Spacer(Modifier.width(KidZoneSpacing.GapSmall))
                 }
+
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
+
                 trailing?.invoke()
             }
-            Spacer(Modifier.height(12.dp))
+
+            Spacer(Modifier.height(KidZoneSpacing.GapSmall))
+
             content()
         }
     }
@@ -1380,7 +1643,7 @@ private fun ProfileSkeleton() {
                                 .clip(CircleShape)
                                 .shimmerEffect(),
                         )
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.width(KidZoneSpacing.GapSmall))
                         Box(
                             modifier = Modifier
                                 .weight(1f)

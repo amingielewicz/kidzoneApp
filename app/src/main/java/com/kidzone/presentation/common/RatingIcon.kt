@@ -1,5 +1,6 @@
 package com.kidzone.presentation.common
 
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
@@ -9,9 +10,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.size
 import com.kidzone.R
 
+@Suppress("FunctionNaming")
 @Composable
 fun RatingIcon(
     modifier: Modifier = Modifier,
@@ -25,3 +26,4 @@ fun RatingIcon(
         modifier = modifier.then(Modifier.size(size))
     )
 }
+

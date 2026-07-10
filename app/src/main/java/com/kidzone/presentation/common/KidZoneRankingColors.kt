@@ -2,6 +2,7 @@ package com.kidzone.presentation.common
 
 import androidx.compose.ui.graphics.Color
 
+@Suppress("MagicNumber")
 object KidZoneRankingColors {
     val Gold = Color(0xFFE6B84A)
     val GoldContent = Color(0xFF3B2A00)
@@ -12,3 +13,4 @@ object KidZoneRankingColors {
     val Bronze = Color(0xFFC58A52)
     val BronzeContent = Color(0xFF3A2414)
 }
+
