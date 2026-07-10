@@ -126,9 +126,11 @@ fun rememberNetworkStatus(): State<NetworkStatus> {
 
         val networkReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
+                @Suppress("DEPRECATION")
+                val connectivityAction = ConnectivityManager.CONNECTIVITY_ACTION
                 when (intent.action) {
                     Intent.ACTION_AIRPLANE_MODE_CHANGED,
-                    ConnectivityManager.CONNECTIVITY_ACTION -> updateStatus()
+                    connectivityAction -> updateStatus()
                 }
             }
         }
@@ -141,6 +143,7 @@ fun rememberNetworkStatus(): State<NetworkStatus> {
 
         val intentFilter = IntentFilter().apply {
             addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)
+            @Suppress("DEPRECATION")
             addAction(ConnectivityManager.CONNECTIVITY_ACTION)
         }
 

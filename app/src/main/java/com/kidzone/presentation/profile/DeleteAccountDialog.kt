@@ -265,6 +265,7 @@ private fun DeleteAccountWarningIcon() {
     }
 }
 
+
 @Suppress("FunctionNaming")
 @Composable
 private fun GoogleAccountConfirmation() {
@@ -394,3 +395,4 @@ private fun BulletLine(
         )
     }
 }
+

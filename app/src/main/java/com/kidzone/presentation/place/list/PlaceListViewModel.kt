@@ -122,33 +122,33 @@ class PlaceListViewModel @Inject constructor(
         _hasLocationPermission,
         _isLocationServiceEnabled
     ) { args ->
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val category = args[0] as PlaceCategory?
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val amenities = args[1] as Set<Amenity>
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val order = args[2] as SortOrder
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val query = args[3] as String
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val location = args[4] as Pair<Double, Double>?
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val user = args[5] as User?
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val refreshing = args[6] as Boolean
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val loadingMore = args[7] as Boolean
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val paged = args[8] as PagedResult<Place>?
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val error = args[9] as UiText?
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val isUsingStaleLocation = args[10] as Boolean
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val staleLocationAgeMinutes = args[11] as Int?
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val hasLocationPermission = args[12] as Boolean
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val isLocationServiceEnabled = args[13] as Boolean
 
         val places = paged?.items.orEmpty()

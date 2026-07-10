@@ -233,6 +233,7 @@ fun ChangeEmailDialog(
     )
 }
 
+
 /**
  * Pole aktualnego hasła używane podczas zmiany adresu e-mail.
  *
@@ -286,3 +287,4 @@ private fun ChangeEmailPasswordField(
         },
     )
 }
+

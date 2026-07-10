@@ -23,6 +23,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -202,7 +203,7 @@ fun ModalButtonLoadingIndicator(
 @Composable
 fun ModalScrollableTextDialog(
     title: String,
-    content: String,
+    content: AnnotatedString,
     closeText: String,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,

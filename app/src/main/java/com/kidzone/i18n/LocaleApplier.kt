@@ -19,6 +19,7 @@ object LocaleApplier {
             config.setLocale(locale)
             config.setLocales(LocaleList(locale))
         }
+        @Suppress("DEPRECATION")
         context.resources.updateConfiguration(config, context.resources.displayMetrics)
     }
 }

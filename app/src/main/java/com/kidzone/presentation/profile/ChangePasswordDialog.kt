@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -63,7 +64,15 @@ fun ChangePasswordDialog(
         mutableStateOf("")
     }
 
-    var showPasswords by rememberSaveable {
+    var showCurrentPassword by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var showNewPassword by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var showConfirmPassword by rememberSaveable {
         mutableStateOf(false)
     }
 
@@ -73,11 +82,6 @@ fun ChangePasswordDialog(
     val passwordsMismatch =
         confirmPassword.isNotEmpty() &&
                 confirmPassword != newPassword
-
-    val confirmPasswordHelp =
-        confirmPasswordSupportingTextRes(
-            passwordsMismatch = passwordsMismatch,
-        )
 
     val isFormValid =
         currentPassword.isNotBlank() &&
@@ -111,15 +115,15 @@ fun ChangePasswordDialog(
                     label = stringResource(
                         R.string.current_password,
                     ),
-                    showText = showPasswords,
-                    onToggleVisibility = {
-                        showPasswords = !showPasswords
+                    showText = showCurrentPassword,
+                    onShowTextChange = {
+                        showCurrentPassword = it
                     },
                     enabled = !isInProgress,
                 )
 
                 Spacer(
-                    modifier = Modifier.size(8.dp),
+                    modifier = Modifier.height(8.dp),
                 )
 
                 PasswordField(
@@ -130,19 +134,19 @@ fun ChangePasswordDialog(
                     label = stringResource(
                         R.string.new_password,
                     ),
+                    showText = showNewPassword,
+                    onShowTextChange = {
+                        showNewPassword = it
+                    },
+                    enabled = !isInProgress,
                     isError =
                         newPassword.isNotEmpty() &&
                                 !isNewPasswordValid,
-                    showText = showPasswords,
-                    onToggleVisibility = {
-                        showPasswords = !showPasswords
-                    },
-                    enabled = !isInProgress,
                 )
 
                 if (newPassword.isNotEmpty()) {
                     Spacer(
-                        modifier = Modifier.size(8.dp),
+                        modifier = Modifier.height(8.dp),
                     )
 
                     PasswordRequirements(
@@ -151,7 +155,7 @@ fun ChangePasswordDialog(
                 }
 
                 Spacer(
-                    modifier = Modifier.size(8.dp),
+                    modifier = Modifier.height(8.dp),
                 )
 
                 PasswordField(
@@ -162,21 +166,24 @@ fun ChangePasswordDialog(
                     label = stringResource(
                         R.string.repeat_new_password,
                     ),
-                    isError = passwordsMismatch,
-                    supportingText =
-                        confirmPasswordHelp?.let {
-                            stringResource(it)
-                        },
-                    showText = showPasswords,
-                    onToggleVisibility = {
-                        showPasswords = !showPasswords
+                    showText = showConfirmPassword,
+                    onShowTextChange = {
+                        showConfirmPassword = it
                     },
                     enabled = !isInProgress,
+                    isError = passwordsMismatch,
+                    supportingText = if (passwordsMismatch) {
+                        stringResource(
+                            R.string.passwords_do_not_match,
+                        )
+                    } else {
+                        null
+                    },
                 )
 
                 if (errorMessage != null) {
                     Spacer(
-                        modifier = Modifier.size(8.dp),
+                        modifier = Modifier.height(8.dp),
                     )
 
                     Text(
@@ -204,7 +211,9 @@ fun ChangePasswordDialog(
         },
         dismissButton = {
             ModalTextButton(
-                text = stringResource(R.string.cancel),
+                text = stringResource(
+                    R.string.cancel,
+                ),
                 onClick = onDismiss,
                 enabled = !isInProgress,
             )
@@ -212,16 +221,9 @@ fun ChangePasswordDialog(
     )
 }
 
-private fun confirmPasswordSupportingTextRes(
-    passwordsMismatch: Boolean,
-): Int? = if (passwordsMismatch) {
-    R.string.passwords_do_not_match
-} else {
-    null
-}
 
 /**
- * Lista wymagań stawianych nowemu hasłu.
+ * Lista wymagań nowego hasła.
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -235,55 +237,71 @@ private fun PasswordRequirements(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         statuses.forEach { status ->
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val icon = if (status.isSatisfied) {
-                    Icons.Filled.CheckCircle
-                } else {
-                    Icons.Filled.Cancel
-                }
-
-                val color = if (status.isSatisfied) {
-                    MaterialTheme.colorScheme.secondary
-                } else {
-                    MaterialTheme.colorScheme.onSurface.copy(
-                        alpha = 0.4f,
-                    )
-                }
-
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = color,
-                    modifier = Modifier.size(16.dp),
-                )
-
-                Spacer(
-                    modifier = Modifier.size(6.dp),
-                )
-
-                Text(
-                    text = passwordRequirementText(
-                        status.labelKey,
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (status.isSatisfied) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.onSurface.copy(
-                            alpha = 0.7f,
-                        )
-                    },
-                )
-            }
+            PasswordRequirementRow(
+                isSatisfied = status.isSatisfied,
+                text = passwordRequirementText(
+                    status.labelKey,
+                ),
+            )
         }
     }
 }
 
 /**
- * Pole hasła korzystające ze wspólnego przycisku
- * pokazywania i ukrywania treści.
+ * Pojedynczy wiersz wymagania hasła.
+ */
+@Suppress("FunctionNaming")
+@Composable
+private fun PasswordRequirementRow(
+    isSatisfied: Boolean,
+    text: String,
+) {
+    val icon = if (isSatisfied) {
+        Icons.Filled.CheckCircle
+    } else {
+        Icons.Filled.Cancel
+    }
+
+    val iconColor = if (isSatisfied) {
+        MaterialTheme.colorScheme.secondary
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(
+            alpha = 0.4f,
+        )
+    }
+
+    val textColor = if (isSatisfied) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(
+            alpha = 0.7f,
+        )
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconColor,
+            modifier = Modifier.size(16.dp),
+        )
+
+        Spacer(
+            modifier = Modifier.size(6.dp),
+        )
+
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = textColor,
+        )
+    }
+}
+
+/**
+ * Pojedyncze pole hasła.
  */
 @Suppress("LongParameterList", "FunctionNaming")
 @Composable
@@ -292,7 +310,7 @@ private fun PasswordField(
     onValueChange: (String) -> Unit,
     label: String,
     showText: Boolean,
-    onToggleVisibility: () -> Unit,
+    onShowTextChange: (Boolean) -> Unit,
     enabled: Boolean,
     modifier: Modifier = Modifier,
     isError: Boolean = false,
@@ -321,9 +339,15 @@ private fun PasswordField(
         trailingIcon = {
             ModalPasswordVisibilityButton(
                 visible = showText,
-                onVisibleChange = {
-                    onToggleVisibility()
-                },
+                onVisibleChange = onShowTextChange,
+                showPasswordContentDescription =
+                    stringResource(
+                        R.string.show_password,
+                    ),
+                hidePasswordContentDescription =
+                    stringResource(
+                        R.string.hide_password,
+                    ),
                 enabled = enabled,
             )
         },
@@ -337,3 +361,4 @@ private fun PasswordField(
         },
     )
 }
+

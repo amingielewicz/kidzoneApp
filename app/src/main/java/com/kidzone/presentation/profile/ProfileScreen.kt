@@ -78,6 +78,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -327,6 +333,7 @@ fun ProfileScreen(
     }
 }
 
+
 private fun notificationPromptReasonFor(
     userRank: Int?,
     hasNewBadge: Boolean
@@ -424,6 +431,7 @@ private fun ProfileContent(
     }
 }
 
+
 @Suppress("LongMethod", "FunctionNaming")
 @Composable
 private fun ProfileHeaderCard(
@@ -501,6 +509,7 @@ private fun ProfileHeaderCard(
     }
 }
 
+
 private const val USER_RANK_BADGE_LIMIT = 100
 
 @Suppress("FunctionNaming")
@@ -552,6 +561,7 @@ private fun PersonalInfoCard(user: User) {
         }
     }
 }
+
 
 @Suppress("FunctionNaming")
 @Composable
@@ -626,6 +636,7 @@ private fun StatsCard(
         }
     }
 }
+
 
 @Suppress("FunctionNaming")
 @Composable
@@ -735,6 +746,7 @@ private fun BadgesCard(
     }
 }
 
+
 @Suppress("FunctionNaming")
 @Composable
 private fun ProfileBadgesGrid(
@@ -765,6 +777,7 @@ private fun ProfileBadgesGrid(
         }
     }
 }
+
 
 @Suppress("FunctionNaming")
 @Composable
@@ -1028,6 +1041,7 @@ private fun BadgeEarnedDialog(
         }
     }
 }
+
 
 @Suppress("FunctionNaming")
 @Composable
@@ -1529,6 +1543,7 @@ private fun SectionCard(
     }
 }
 
+
 private fun formatDate(millis: Long): String {
     val formatter = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
     return formatter.format(Date(millis))
@@ -1657,3 +1672,4 @@ private fun ProfileSkeleton() {
         }
     }
 }
+

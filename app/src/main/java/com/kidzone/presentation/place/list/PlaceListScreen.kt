@@ -855,7 +855,7 @@ private fun PlaceCard(
                         Spacer(Modifier.weight(1f))
                     }
 
-                    if (showDistanceLabel && distanceKm != null) {
+                    if (showDistanceLabel) {
                         Spacer(Modifier.width(8.dp))
                         ListDistanceLabel(
                             distanceKm = distanceKm,
