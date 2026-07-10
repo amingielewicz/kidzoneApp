@@ -249,6 +249,7 @@ fun AddReviewSheet(
     }
 
     val cameraAccessDenied = stringResource(R.string.camera_access_denied)
+
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -394,13 +395,21 @@ fun AddReviewSheet(
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.gallery_limit, totalPhotoCount, MAX_REVIEW_PHOTOS))
+                        Text(
+                            stringResource(
+                                R.string.gallery_limit,
+                                totalPhotoCount,
+                                MAX_REVIEW_PHOTOS
+                            )
+                        )
                     }
                     OutlinedButton(
                         onClick = {
                             val hasPerm = ContextCompat.checkSelfPermission(
-                                context, Manifest.permission.CAMERA
+                                context,
+                                Manifest.permission.CAMERA
                             ) == PackageManager.PERMISSION_GRANTED
+
                             if (hasPerm) {
                                 launchCamera()
                             } else {
@@ -450,6 +459,7 @@ fun AddReviewSheet(
     }
 }
 
+
 @Composable
 private fun StarRatingInput(
     rating: Int,
@@ -489,3 +499,4 @@ private fun StarRatingInput(
         }
     }
 }
+

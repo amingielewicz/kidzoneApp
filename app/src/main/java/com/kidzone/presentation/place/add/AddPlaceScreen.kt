@@ -270,11 +270,16 @@ fun AddPlaceScreen(
     }
 
     val cameraAccessDenied = stringResource(R.string.camera_access_denied)
+
     val placeCameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) launchPlaceCamera() else coroutineScope.launch {
-            snackbarHostState.showSnackbar(cameraAccessDenied)
+        if (granted) {
+            launchPlaceCamera()
+        } else {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(cameraAccessDenied)
+            }
         }
     }
 
@@ -511,8 +516,8 @@ fun AddPlaceScreen(
                         val hasPerm = ContextCompat.checkSelfPermission(
                             context,
                             Manifest.permission.CAMERA
-                        ) ==
-                            PackageManager.PERMISSION_GRANTED
+                        ) == PackageManager.PERMISSION_GRANTED
+
                         if (hasPerm) {
                             launchPlaceCamera()
                         } else {

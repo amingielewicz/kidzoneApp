@@ -423,7 +423,7 @@
     <string name="photo_index">Zdjęcie %1$d</string>
     <string name="review_photo_index">Zdjęcie opinii %1$d</string>
     <string name="location_permission_denied">Brak uprawnienia do lokalizacji</string>
-    <string name="camera_access_denied">Brak dostępu do aparatu</string>
+    <string name="camera_access_denied">Brak dostępu do aparatu. Nadaj uprawnienie w ustawieniach.</string>
     <string name="camera_unavailable">Nie udało się uruchomić aparatu</string>
     <string name="edit_place_title">Edytuj miejsce</string>
     <string name="place_name_label">Nazwa miejsca</string>
