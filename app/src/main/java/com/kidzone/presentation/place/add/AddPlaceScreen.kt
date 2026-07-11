@@ -40,7 +40,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -91,6 +90,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.presentation.common.LocationActionIcon
 import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.common.amenityIcon
@@ -714,7 +714,7 @@ private fun LocationSection(
                 Spacer(Modifier.size(8.dp))
                 Text("Pobieranie lokalizacji...")
             } else {
-                LocationButtonIcon(isReady = isReady)
+                LocationActionIcon(isReady = isReady)
                 Spacer(Modifier.size(8.dp))
                 Text(
                     text = when {
@@ -732,26 +732,6 @@ private fun LocationSection(
                 text = "GPS: %.5f, %.5f".format(latitude, longitude),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun LocationButtonIcon(isReady: Boolean) {
-    Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-        Icon(
-            imageVector = Icons.Filled.MyLocation,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = if (isReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (!isReady) {
-            Icon(
-                imageVector = Icons.Filled.Close,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(12.dp).align(Alignment.BottomEnd)
             )
         }
     }

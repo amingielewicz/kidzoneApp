@@ -312,6 +312,7 @@
     <string name="notification_prompt_podium">Wskoczyłeś na podium! Włącz powiadomienia, aby śledzić swoje miejsce w rankingu.</string>
     <string name="location_permission_title">Udostępnij lokalizację</string>
     <string name="location_permission_message">Pokażemy miejsca blisko Ciebie, odległości na Start i wygodniej wycentrujemy mapę.</string>
+    <string name="location_permission_action">Zezwól na lokalizację</string>
     <string name="later">Później</string>
     <string name="amenity_filters_title">Filtry udogodnień</string>
     <string name="clear_with_count">Wyczyść (%1$d)</string>

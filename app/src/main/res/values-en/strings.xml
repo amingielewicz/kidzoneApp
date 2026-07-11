@@ -310,6 +310,7 @@
     <string name="notification_prompt_podium">You reached the podium! Enable notifications to follow your ranking position.</string>
     <string name="location_permission_title">Share location</string>
     <string name="location_permission_message">We\'ll show you places near you, distances on Home, and center the map more conveniently.</string>
+    <string name="location_permission_action">Allow location</string>
     <string name="later">Later</string>
     <string name="amenity_filters_title">Amenity filters</string>
     <string name="clear_with_count">Clear (%1$d)</string>
