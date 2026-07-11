@@ -97,6 +97,7 @@ import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.KidZoneSortMenu
 import com.kidzone.presentation.common.NewPlaceBadge
 import com.kidzone.presentation.common.RatingIcon
+import com.kidzone.presentation.common.SortMenuIcon
 import com.kidzone.presentation.common.SortMenuOption
 import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.shimmerEffect
@@ -635,7 +636,8 @@ private fun SortChip(
         .map { order ->
             SortMenuOption(
                 value = order,
-                label = stringResource(order.labelRes)
+                label = stringResource(order.labelRes),
+                icon = order.sortMenuIcon
             )
         }
 
@@ -646,6 +648,15 @@ private fun SortChip(
         onChange = onChange
     )
 }
+
+private val PlaceListViewModel.SortOrder.sortMenuIcon: SortMenuIcon
+    get() = when (this) {
+        PlaceListViewModel.SortOrder.NEAREST -> SortMenuIcon.NEAREST
+        PlaceListViewModel.SortOrder.RECENTLY_ADDED -> SortMenuIcon.RECENT
+        PlaceListViewModel.SortOrder.ADDED_BY_ME -> SortMenuIcon.USER
+        PlaceListViewModel.SortOrder.BEST_RATED -> SortMenuIcon.BEST_RATED
+        PlaceListViewModel.SortOrder.WORST_RATED -> SortMenuIcon.WORST_RATED
+    }
 
 @Composable
 private fun EnableLocationForSortingBanner(onAllowClick: () -> Unit) {

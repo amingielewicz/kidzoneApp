@@ -88,6 +88,7 @@ import com.kidzone.presentation.common.KidZoneSortMenu
 import com.kidzone.presentation.common.NewPlaceBadge
 import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.RankBadge
+import com.kidzone.presentation.common.SortMenuIcon
 import com.kidzone.presentation.common.SortMenuOption
 import com.kidzone.presentation.common.createCameraImageUri
 import com.kidzone.presentation.common.isNewWithoutReviews
@@ -1660,7 +1661,8 @@ private fun ReviewSortDropdown(
         options = PlaceDetailsViewModel.ReviewSortOrder.entries.map { order ->
             SortMenuOption(
                 value = order,
-                label = order.getLabel()
+                label = order.getLabel(),
+                icon = SortMenuIcon.SORT
             )
         },
         onChange = onChange

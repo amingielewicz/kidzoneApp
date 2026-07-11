@@ -7,8 +7,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.DropdownMenu
@@ -22,14 +27,27 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kidzone.R
 
 data class SortMenuOption<T>(
     val value: T,
-    val label: String
+    val label: String,
+    val icon: SortMenuIcon? = null
 )
+
+enum class SortMenuIcon(
+    val imageVector: ImageVector
+) {
+    SORT(Icons.AutoMirrored.Filled.Sort),
+    NEAREST(Icons.Filled.MyLocation),
+    RECENT(Icons.Filled.AccessTime),
+    USER(Icons.Filled.Person),
+    BEST_RATED(Icons.Filled.Star),
+    WORST_RATED(Icons.Filled.StarBorder)
+}
 
 @Composable
 fun <T> KidZoneSortMenu(
@@ -78,6 +96,20 @@ fun <T> KidZoneSortMenu(
             options.forEach { option ->
                 val selected = option.value == current
                 DropdownMenuItem(
+                    leadingIcon = option.icon?.let { icon ->
+                        {
+                            Icon(
+                                imageVector = icon.imageVector,
+                                contentDescription = null,
+                                tint = if (selected) {
+                                    MaterialTheme.colorScheme.secondary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier.size(SORT_MENU_ICON_SIZE)
+                            )
+                        }
+                    },
                     text = {
                         Text(
                             text = option.label,
