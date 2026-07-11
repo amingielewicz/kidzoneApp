@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kidzone.R
+import com.kidzone.presentation.common.EnableLocationDialog
 import com.kidzone.presentation.place.add.LOCATION_SERVICE_DISABLED_MESSAGE
 import com.kidzone.presentation.place.add.LOCATION_TIMEOUT_USER_MESSAGE
 import com.kidzone.presentation.place.add.fetchCurrentLocation
@@ -152,31 +153,13 @@ fun LocationCorrectionDialog(
     )
 
     if (showGpsDialog) {
-        AlertDialog(
-            onDismissRequest = { showGpsDialog = false },
-            icon = {
-                Icon(
-                    imageVector = Icons.Filled.MyLocation,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
+        EnableLocationDialog(
+            onConfirm = {
+                showGpsDialog = false
+                context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
             },
-            title = { Text(stringResource(R.string.gps_disabled_title)) },
-            text = { Text(stringResource(R.string.error_location_service_disabled)) },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showGpsDialog = false
-                        context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-                    }
-                ) {
-                    Text(stringResource(R.string.home_enable_location))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showGpsDialog = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
+            onDismiss = {
+                showGpsDialog = false
             }
         )
     }

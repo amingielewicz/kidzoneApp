@@ -93,6 +93,7 @@ import com.kidzone.presentation.common.SortMenuOption
 import com.kidzone.presentation.common.createCameraImageUri
 import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.rememberNetworkStatus
+import com.kidzone.presentation.common.runOnlineOrShowOffline
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.RatingIcon
 import java.text.SimpleDateFormat
@@ -208,6 +209,7 @@ fun PlaceDetailsScreen(
     var fullscreenPhotoIndex by remember { mutableStateOf(0) }
     var fullscreenPhotosAreMine by remember { mutableStateOf(false) }
     var fullscreenPhotoUploadedBy by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var fullscreenReview by remember { mutableStateOf<Review?>(null) }
     var showReportPhotoDialog by remember { mutableStateOf(false) }
     var photoUrlToReport by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -497,10 +499,11 @@ fun PlaceDetailsScreen(
                                 reviewToReport = review
                                 showReportReviewDialog = true
                             },
-                            onOpenPhotoViewer = { photos, index, areMine ->
+                            onOpenPhotoViewer = { photos, index, areMine, review ->
                                 fullscreenPhotos = photos
                                 fullscreenPhotoIndex = index
                                 fullscreenPhotosAreMine = areMine
+                                fullscreenReview = review
                                 fullscreenPhotoUploadedBy = state.place?.photoUploadedBy.orEmpty()
                             },
                             onAddPlacePhoto = if (currentUser != null) {
@@ -551,9 +554,7 @@ fun PlaceDetailsScreen(
     if (showReportDialog) {
         ReportPlaceDialog(
             onSubmit = { reason, comment ->
-                if (networkStatus == NetworkStatus.UNAVAILABLE) {
-                    scope.launch { snackbarHostState.showSnackbar(offlineMessage) }
-                } else {
+                scope.runOnlineOrShowOffline(networkStatus, snackbarHostState, offlineMessage) {
                     viewModel.reportPlace(reason, comment)
                     showReportDialog = false
                     scope.launch {
@@ -570,9 +571,7 @@ fun PlaceDetailsScreen(
         SuggestEditSheet(
             place = state.place!!,
             onSubmit = { name, description, category, amenities ->
-                if (networkStatus == NetworkStatus.UNAVAILABLE) {
-                    scope.launch { snackbarHostState.showSnackbar(offlineMessage) }
-                } else {
+                scope.runOnlineOrShowOffline(networkStatus, snackbarHostState, offlineMessage) {
                     viewModel.submitSuggestedEdit(name, description, category, amenities)
                     showSuggestEditSheet = false
                     scope.launch {
@@ -588,9 +587,7 @@ fun PlaceDetailsScreen(
         val thankYouLocationCorrection = stringResource(R.string.thank_you_location_correction)
         LocationCorrectionDialog(
             onSubmit = { lat, lng, address ->
-                if (networkStatus == NetworkStatus.UNAVAILABLE) {
-                    scope.launch { snackbarHostState.showSnackbar(offlineMessage) }
-                } else {
+                scope.runOnlineOrShowOffline(networkStatus, snackbarHostState, offlineMessage) {
                     viewModel.submitLocationCorrection(lat, lng, address)
                     showLocationCorrectionDialog = false
                     scope.launch {
@@ -624,9 +621,7 @@ fun PlaceDetailsScreen(
         ReportReviewDialog(
             authorName = reviewToReport!!.authorName,
             onSubmit = { reason, comment ->
-                if (networkStatus == NetworkStatus.UNAVAILABLE) {
-                    scope.launch { snackbarHostState.showSnackbar(offlineMessage) }
-                } else {
+                scope.runOnlineOrShowOffline(networkStatus, snackbarHostState, offlineMessage) {
                     viewModel.reportReview(reviewToReport!!.id, reason, comment)
                     showReportReviewDialog = false
                     reviewToReport = null
@@ -647,7 +642,10 @@ fun PlaceDetailsScreen(
         com.kidzone.presentation.common.FullscreenPhotoViewer(
             photoUrls = fullscreenPhotos,
             initialIndex = fullscreenPhotoIndex,
-            onDismiss = { fullscreenPhotos = emptyList() },
+            onDismiss = {
+                fullscreenPhotos = emptyList()
+                fullscreenReview = null
+            },
             onReportPhoto = if (fullscreenPhotosAreMine) null else { url ->
                 if (!state.reportedPhotoUrls.contains(url)) {
                     photoUrlToReport = url
@@ -661,11 +659,21 @@ fun PlaceDetailsScreen(
                 notMine && notReported
             },
             onDeletePhoto = { url ->
-                viewModel.deletePhotoFromPlace(url)
+                val review = fullscreenReview
+                if (review != null) {
+                    viewModel.deletePhotoFromReview(review, url)
+                } else {
+                    viewModel.deletePhotoFromPlace(url)
+                }
             },
             canDeletePhoto = { url ->
-                val uploaderId = fullscreenPhotoUploadedBy[url]
-                myUserId != null && uploaderId == myUserId
+                val review = fullscreenReview
+                if (review != null) {
+                    myUserId != null && review.userId == myUserId && url in review.photoUrls
+                } else {
+                    val uploaderId = fullscreenPhotoUploadedBy[url]
+                    myUserId != null && uploaderId == myUserId
+                }
             }
         )
     }
@@ -674,9 +682,7 @@ fun PlaceDetailsScreen(
         val thankYouReportPhoto = stringResource(R.string.thank_you_report_photo)
         ReportPhotoDialog(
             onSubmit = { reason, comment ->
-                if (networkStatus == NetworkStatus.UNAVAILABLE) {
-                    scope.launch { snackbarHostState.showSnackbar(offlineMessage) }
-                } else {
+                scope.runOnlineOrShowOffline(networkStatus, snackbarHostState, offlineMessage) {
                     viewModel.reportPhoto(photoUrlToReport!!, reason, comment)
                     showReportPhotoDialog = false
                     photoUrlToReport = null
@@ -710,7 +716,12 @@ private fun PlaceDetailsContent(
     onEditReview: (Review) -> Unit,
     onDeleteReview: (Review) -> Unit,
     onReportReview: (Review) -> Unit,
-    onOpenPhotoViewer: (photos: List<String>, startIndex: Int, areMine: Boolean) -> Unit = { _, _, _ -> },
+    onOpenPhotoViewer: (
+        photos: List<String>,
+        startIndex: Int,
+        areMine: Boolean,
+        review: Review?
+    ) -> Unit = { _, _, _, _ -> },
     onAddPlacePhoto: (() -> Unit)? = null,
     onAddPlaceCamera: (() -> Unit)? = null,
     isUploadingPlacePhoto: Boolean = false,
@@ -755,7 +766,7 @@ private fun PlaceDetailsContent(
                 PlacePhotoGallery(
                     photoUrls = place.photoUrls,
                     onPhotoClick = { index ->
-                        onOpenPhotoViewer(place.photoUrls, index, false)
+                        onOpenPhotoViewer(place.photoUrls, index, false, null)
                     }
                 )
             }
@@ -874,7 +885,12 @@ private fun PlaceDetailsContent(
                 onPhotoClick = if (review.photoUrls.isNotEmpty()) {
                     { index ->
                         val isMyReview = currentUserId != null && review.userId == currentUserId
-                        onOpenPhotoViewer(review.photoUrls, index, isMyReview)
+                        onOpenPhotoViewer(
+                            review.photoUrls,
+                            index,
+                            isMyReview,
+                            review.takeIf { isMyReview }
+                        )
                     }
                 } else null
             )

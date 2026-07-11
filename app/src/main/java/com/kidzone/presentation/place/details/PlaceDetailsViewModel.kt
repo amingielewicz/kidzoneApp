@@ -745,6 +745,33 @@ class PlaceDetailsViewModel @Inject constructor(
         }
     }
 
+    fun deletePhotoFromReview(review: Review, photoUrl: String) {
+        val user = currentUser.value ?: return
+        if (review.userId != user.id || photoUrl !in review.photoUrls) return
+
+        viewModelScope.launch {
+            val updated = review.copy(photoUrls = review.photoUrls - photoUrl)
+            when (reviewRepository.updateReview(updated)) {
+                is OpResult.Success -> {
+                    try {
+                        photoUploader.deletePhoto(photoUrl)
+                    } catch (_: Exception) {
+                    }
+
+                    _uiState.update { state ->
+                        state.copy(
+                            reviews = state.reviews.map {
+                                if (it.id == review.id) updated else it
+                            }
+                        )
+                    }
+                }
+
+                is OpResult.Failure -> Unit
+            }
+        }
+    }
+
     private fun seedPlacePhotoHashes(photoUrls: List<String>) {
         placePhotoHashes.clear()
         if (photoUrls.isEmpty()) return

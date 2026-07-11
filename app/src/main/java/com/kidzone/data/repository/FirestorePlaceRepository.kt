@@ -1,6 +1,7 @@
 package com.kidzone.data.repository
 
 import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.FirebaseFirestore
 import com.kidzone.analytics.PerformanceTraces
 import com.kidzone.data.local.PlaceDao
@@ -25,6 +26,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -241,12 +243,154 @@ class FirestorePlaceRepository @Inject constructor(
         OpResult.success(Unit)
     } catch (e: Exception) { OpResult.failure(e) }
 
-    override suspend fun reportPlace(p: String, r: String, re: String, c: String): OpResult<Unit> = OpResult.success(Unit)
-    override suspend fun submitChangeRequest(p: String, r: String, ch: Map<String, Any>, t: String): OpResult<Unit> = OpResult.success(Unit)
-    override suspend fun reportPhoto(p: String, r: String, re: String, c: String): OpResult<Unit> = OpResult.success(Unit)
-    override suspend fun addPhotoUrl(p: String, ph: String, u: String): OpResult<Unit> = OpResult.success(Unit)
-    override suspend fun removePhotoUrl(p: String, ph: String): OpResult<Unit> = OpResult.success(Unit)
-    override suspend fun hasUserReportedPlace(p: String, u: String): Boolean = false
-    override suspend fun getReportedPhotos(u: String): Set<String> = emptySet()
+    override suspend fun reportPlace(
+        placeId: String,
+        reporterId: String,
+        reason: String,
+        comment: String
+    ): OpResult<Unit> = writeWithTimeout {
+        require(placeId.isNotBlank()) { "placeId nie może być puste" }
+        require(reporterId.isNotBlank()) { "reporterId nie może być puste" }
+        val existing = firestore.collection(FirestoreCollections.PLACE_REPORTS)
+            .whereEqualTo("reporterId", reporterId)
+            .whereEqualTo("placeId", placeId)
+            .get()
+            .await()
+        if (existing.documents.isNotEmpty()) return@writeWithTimeout
+        firestore.collection(FirestoreCollections.PLACE_REPORTS).add(
+            moderationPayload(
+                reporterId = reporterId,
+                reason = reason,
+                comment = comment
+            ) + ("placeId" to placeId)
+        ).await()
+    }
+
+    override suspend fun submitChangeRequest(
+        placeId: String,
+        requesterId: String,
+        changes: Map<String, Any>,
+        type: String
+    ): OpResult<Unit> = writeWithTimeout {
+        require(placeId.isNotBlank()) { "placeId nie może być puste" }
+        require(requesterId.isNotBlank()) { "requesterId nie może być puste" }
+        require(changes.isNotEmpty()) { "changes nie może być puste" }
+        firestore.collection(FirestoreCollections.PLACE_CHANGE_REQUESTS).add(
+            mapOf(
+                "placeId" to placeId,
+                "requesterId" to requesterId,
+                "changes" to changes,
+                "type" to type,
+                "createdAtMillis" to System.currentTimeMillis(),
+                "status" to "pending"
+            )
+        ).await()
+    }
+
+    override suspend fun reportPhoto(
+        photoUrl: String,
+        reporterId: String,
+        reason: String,
+        comment: String
+    ): OpResult<Unit> = writeWithTimeout {
+        require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
+        require(reporterId.isNotBlank()) { "reporterId nie może być puste" }
+        val existing = firestore.collection(FirestoreCollections.PHOTO_REPORTS)
+            .whereEqualTo("reporterId", reporterId)
+            .whereEqualTo("photoUrl", photoUrl)
+            .get()
+            .await()
+        if (existing.documents.isNotEmpty()) return@writeWithTimeout
+        firestore.collection(FirestoreCollections.PHOTO_REPORTS).add(
+            moderationPayload(
+                reporterId = reporterId,
+                reason = reason,
+                comment = comment
+            ) + ("photoUrl" to photoUrl)
+        ).await()
+    }
+
+    override suspend fun addPhotoUrl(
+        placeId: String,
+        photoUrl: String,
+        uploadedByUserId: String
+    ): OpResult<Unit> = writeWithTimeout {
+        require(placeId.isNotBlank()) { "placeId nie może być puste" }
+        require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
+        require(uploadedByUserId.isNotBlank()) { "uploadedByUserId nie może być puste" }
+        placesCollection().document(placeId).set(
+            mapOf(
+                "photoUrls" to FieldValue.arrayUnion(photoUrl),
+                "photoUploadedBy" to mapOf(photoUrl to uploadedByUserId)
+            ),
+            SetOptions.merge()
+        ).await()
+    }
+
+    override suspend fun removePhotoUrl(placeId: String, photoUrl: String): OpResult<Unit> = writeWithTimeout {
+        require(placeId.isNotBlank()) { "placeId nie może być puste" }
+        require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
+        val place = placesCollection().document(placeId).get().await()
+            .toObject(PlaceDto::class.java)
+            ?.toDomain()
+            ?: return@writeWithTimeout
+        placesCollection().document(placeId).update(
+            mapOf(
+                "photoUrls" to place.photoUrls.filterNot { it == photoUrl },
+                "photoUploadedBy" to place.photoUploadedBy - photoUrl
+            )
+        ).await()
+    }
+
+    override suspend fun hasUserReportedPlace(placeId: String, userId: String): Boolean = try {
+        firestore.collection(FirestoreCollections.PLACE_REPORTS)
+            .whereEqualTo("reporterId", userId)
+            .whereEqualTo("placeId", placeId)
+            .get()
+            .await()
+            .documents
+            .isNotEmpty()
+    } catch (_: Exception) {
+        false
+    }
+
+    override suspend fun getReportedPhotos(userId: String): Set<String> = try {
+        firestore.collection(FirestoreCollections.PHOTO_REPORTS)
+            .whereEqualTo("reporterId", userId)
+            .get()
+            .await()
+            .documents
+            .mapNotNull { it.getString("photoUrl") }
+            .toSet()
+    } catch (_: Exception) {
+        emptySet()
+    }
+
+    private suspend fun writeWithTimeout(block: suspend () -> Unit): OpResult<Unit> = try {
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
+            block()
+            true
+        }
+        if (completed == true) {
+            OpResult.success(Unit)
+        } else {
+            OpResult.failure(java.util.concurrent.TimeoutException("Przekroczono czas oczekiwania"))
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
+    private fun moderationPayload(
+        reporterId: String,
+        reason: String,
+        comment: String
+    ): Map<String, Any> = mapOf(
+        "reporterId" to reporterId,
+        "reason" to reason,
+        "comment" to comment,
+        "createdAtMillis" to System.currentTimeMillis(),
+        "status" to "pending"
+    )
+
     private fun placesCollection() = firestore.collection(FirestoreCollections.PLACES)
 }
