@@ -1678,12 +1678,20 @@ private fun ReviewSortDropdown(
             SortMenuOption(
                 value = order,
                 label = order.getLabel(),
-                icon = SortMenuIcon.SORT
+                icon = order.sortMenuIcon
             )
         },
         onChange = onChange
     )
 }
+
+private val PlaceDetailsViewModel.ReviewSortOrder.sortMenuIcon: SortMenuIcon
+    get() = when (this) {
+        PlaceDetailsViewModel.ReviewSortOrder.NEWEST -> SortMenuIcon.RECENT
+        PlaceDetailsViewModel.ReviewSortOrder.OLDEST -> SortMenuIcon.RECENT
+        PlaceDetailsViewModel.ReviewSortOrder.HIGHEST -> SortMenuIcon.BEST_RATED
+        PlaceDetailsViewModel.ReviewSortOrder.LOWEST -> SortMenuIcon.WORST_RATED
+    }
 
 @Composable
 private fun DeleteConfirmationDialog(

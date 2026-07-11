@@ -92,6 +92,7 @@ import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.EmptyState
 import com.kidzone.presentation.common.EmptyStateAction
 import com.kidzone.presentation.common.KidZoneCard
+import com.kidzone.presentation.common.KidZoneCategoryFilterBar
 import com.kidzone.presentation.common.KidZoneFilterChip
 import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.KidZoneSortMenu
@@ -541,29 +542,10 @@ private fun CategoryFilterBar(
     selectedCategory: PlaceCategory?,
     onCategorySelected: (PlaceCategory?) -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        KidZoneFilterChip(
-            selected = selectedCategory == null,
-            onClick = { onCategorySelected(null) },
-            label = stringResource(R.string.category_all)
-        )
-        PlaceCategory.entries.forEach { category ->
-            val style = category.style
-            KidZoneFilterChip(
-                selected = selectedCategory == category,
-                onClick = { onCategorySelected(category) },
-                label = stringResource(category.labelRes),
-                icon = style.icon,
-                inactiveContentColor = style.color
-            )
-        }
-    }
+    KidZoneCategoryFilterBar(
+        selectedCategory = selectedCategory,
+        onCategorySelected = onCategorySelected
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

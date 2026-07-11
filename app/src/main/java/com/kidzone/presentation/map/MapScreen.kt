@@ -110,12 +110,12 @@ import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.model.GeoBounds
 import com.kidzone.presentation.common.CategoryIcon
+import com.kidzone.presentation.common.KidZoneCategoryFilterBar
 import com.kidzone.presentation.common.RatingIcon
 import com.kidzone.presentation.common.KidZoneFilterChip
 import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.rememberNetworkStatus
-import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.fetchCurrentLocation
 import com.kidzone.presentation.place.add.hasLocationPermission
 import com.kidzone.presentation.place.add.isLocationServiceEnabled
@@ -324,10 +324,7 @@ fun MapScreen(
                             context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
                         }
                     }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp)
+                }
             )
 
             Row(
@@ -668,49 +665,36 @@ private fun FiltersOverlay(
     onLocationStatusClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val orderedCategories = PlaceCategory.entries
-
     Surface(
-        modifier = modifier,
+        modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.medium,
-        tonalElevation = 4.dp,
-        shadowElevation = 4.dp
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
     ) {
         Column(modifier = Modifier.padding(vertical = 6.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                if (!isLocationAvailable) {
+            if (!isLocationAvailable) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     LocationStatusChip(onClick = onLocationStatusClick)
-                }
-                KidZoneFilterChip(
-                    selected = selectedCategory == null,
-                    onClick = { onCategorySelected(null) },
-                    label = stringResource(R.string.category_all)
-                )
-                orderedCategories.forEach { category ->
-                    val style = category.style
-                    KidZoneFilterChip(
-                        selected = selectedCategory == category,
-                        onClick = { onCategorySelected(category) },
-                        label = stringResource(category.labelRes),
-                        icon = style.icon,
-                        inactiveContentColor = style.color
-                    )
                 }
             }
 
+            KidZoneCategoryFilterBar(
+                selectedCategory = selectedCategory,
+                onCategorySelected = onCategorySelected
+            )
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 8.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 KidZoneFilterChip(
