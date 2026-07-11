@@ -1,3 +1,5 @@
+@file:Suppress("FunctionNaming", "LongMethod")
+
 package com.kidzone.presentation.place.details
 
 import android.Manifest
@@ -13,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +33,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kidzone.R
 import com.kidzone.presentation.common.EnableLocationDialog
+import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.place.add.LOCATION_SERVICE_DISABLED_MESSAGE
 import com.kidzone.presentation.place.add.LOCATION_TIMEOUT_USER_MESSAGE
 import com.kidzone.presentation.place.add.fetchCurrentLocation
@@ -43,7 +45,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun LocationCorrectionDialog(
     onSubmit: (latitude: Double, longitude: Double, address: String?) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    isOffline: Boolean = false
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -142,10 +145,12 @@ fun LocationCorrectionDialog(
             }
         },
         confirmButton = {
-            Button(
+            OfflineAwareSubmitButton(
+                label = stringResource(R.string.submit_correction),
                 onClick = { if (latitude != null && longitude != null) onSubmit(latitude!!, longitude!!, address) },
+                isOffline = isOffline,
                 enabled = latitude != null && longitude != null
-            ) { Text(stringResource(R.string.submit_correction)) }
+            )
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }

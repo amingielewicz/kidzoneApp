@@ -92,6 +92,7 @@ import com.kidzone.R
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.presentation.common.NetworkStatus
+import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.common.amenityIcon
 import com.kidzone.presentation.common.createCameraImageUri
 import com.kidzone.presentation.common.rememberHapticFeedback
@@ -330,35 +331,20 @@ fun AddPlaceScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Button(
-                        onClick = ::handleSaveClick,
-                        enabled = !isOffline && !state.isSaving && !state.isLoadingPlace && state.isFormValid,
-                        modifier = Modifier.fillMaxWidth().height(48.dp)
-                    ) {
-                        if (state.isSaving) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
+                    OfflineAwareSubmitButton(
+                        label = if (state.isEditMode) {
+                            stringResource(R.string.update_place_action)
                         } else {
-                            Text(
-                                text = when {
-                                    isOffline -> offlineSaveAction
-                                    state.isEditMode -> stringResource(R.string.update_place_action)
-                                    else -> stringResource(R.string.save_place_action)
-                                }
-                            )
-                        }
-                    }
-
-                    if (isOffline) {
-                        Text(
-                            text = offlineHintShort,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                            stringResource(R.string.save_place_action)
+                        },
+                        onClick = ::handleSaveClick,
+                        isOffline = isOffline,
+                        enabled = !state.isLoadingPlace && state.isFormValid,
+                        isLoading = state.isSaving,
+                        offlineLabel = offlineSaveAction,
+                        offlineHint = offlineHintShort,
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
                     saveHint?.let { hint ->
                         Text(

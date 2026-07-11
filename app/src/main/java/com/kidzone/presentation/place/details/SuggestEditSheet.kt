@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -37,6 +36,7 @@ import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.presentation.common.AmenitiesFlowGrid
+import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.PLACE_NAME_MAX_LENGTH
 
@@ -46,7 +46,8 @@ import com.kidzone.presentation.place.add.PLACE_NAME_MAX_LENGTH
 fun SuggestEditSheet(
     place: Place,
     onSubmit: (name: String, description: String, category: String, amenities: Set<String>) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    isOffline: Boolean = false
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -137,17 +138,16 @@ fun SuggestEditSheet(
 
             Spacer(Modifier.height(16.dp))
 
-            Button(
+            OfflineAwareSubmitButton(
+                label = stringResource(R.string.submit_suggested_edit),
                 onClick = {
                     onSubmit(name, description, selectedCategory.name, selectedAmenities.map { it.name }.toSet())
                 },
+                isOffline = isOffline,
                 enabled = name.trim().isNotBlank(),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
-            ) {
-                Text(stringResource(R.string.submit_suggested_edit))
-            }
+            )
 
             Spacer(Modifier.height(16.dp))
         }

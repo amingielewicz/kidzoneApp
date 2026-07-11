@@ -1,3 +1,5 @@
+@file:Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod", "LongParameterList")
+
 package com.kidzone.presentation.place.details
 
 import android.Manifest
@@ -29,8 +31,6 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.kidzone.R
+import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.common.createCameraImageUri
 import kotlinx.coroutines.launch
 import java.security.MessageDigest
@@ -123,6 +124,7 @@ fun AddReviewSheet(
     errorMessage: String?,
     onDismiss: () -> Unit,
     onSubmit: (rating: Int, comment: String, photoUris: List<Uri>, retainedPhotoUrls: List<String>) -> Unit,
+    isOffline: Boolean = false,
     initialRating: Int = 0,
     initialComment: String = "",
     initialPhotoUrls: List<String> = emptyList(),
@@ -427,23 +429,15 @@ fun AddReviewSheet(
 
             Spacer(Modifier.height(20.dp))
 
-            Button(
+            OfflineAwareSubmitButton(
+                label = submitLabel,
                 onClick = { onSubmit(rating, comment, photoUris, existingPhotoUrls) },
+                isOffline = isOffline,
                 enabled = rating in 1..5 && !isSubmitting,
+                isLoading = isSubmitting,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
-            ) {
-                if (isSubmitting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Text(submitLabel)
-                }
-            }
+            )
             Spacer(Modifier.height(8.dp))
             }
             SnackbarHost(
@@ -494,4 +488,3 @@ private fun StarRatingInput(
         }
     }
 }
-

@@ -87,13 +87,13 @@ import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.KidZoneSortMenu
 import com.kidzone.presentation.common.NewPlaceBadge
 import com.kidzone.presentation.common.NetworkStatus
+import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.common.RankBadge
 import com.kidzone.presentation.common.SortMenuIcon
 import com.kidzone.presentation.common.SortMenuOption
 import com.kidzone.presentation.common.createCameraImageUri
 import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.rememberNetworkStatus
-import com.kidzone.presentation.common.runOnlineOrShowOffline
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.RatingIcon
 import java.text.SimpleDateFormat
@@ -216,7 +216,7 @@ fun PlaceDetailsScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val networkStatus by rememberNetworkStatus()
-    val offlineMessage = stringResource(R.string.error_no_internet)
+    val isOffline = networkStatus == NetworkStatus.UNAVAILABLE
 
     val placePhotoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(
@@ -553,13 +553,12 @@ fun PlaceDetailsScreen(
     val thankYouReport = stringResource(R.string.thank_you_report)
     if (showReportDialog) {
         ReportPlaceDialog(
+            isOffline = isOffline,
             onSubmit = { reason, comment ->
-                scope.runOnlineOrShowOffline(networkStatus, snackbarHostState, offlineMessage) {
-                    viewModel.reportPlace(reason, comment)
-                    showReportDialog = false
-                    scope.launch {
-                        snackbarHostState.showSnackbar(thankYouReport)
-                    }
+                viewModel.reportPlace(reason, comment)
+                showReportDialog = false
+                scope.launch {
+                    snackbarHostState.showSnackbar(thankYouReport)
                 }
             },
             onDismiss = { showReportDialog = false }
@@ -570,13 +569,12 @@ fun PlaceDetailsScreen(
         val thankYouSuggestEdit = stringResource(R.string.thank_you_suggest_edit)
         SuggestEditSheet(
             place = state.place!!,
+            isOffline = isOffline,
             onSubmit = { name, description, category, amenities ->
-                scope.runOnlineOrShowOffline(networkStatus, snackbarHostState, offlineMessage) {
-                    viewModel.submitSuggestedEdit(name, description, category, amenities)
-                    showSuggestEditSheet = false
-                    scope.launch {
-                        snackbarHostState.showSnackbar(thankYouSuggestEdit)
-                    }
+                viewModel.submitSuggestedEdit(name, description, category, amenities)
+                showSuggestEditSheet = false
+                scope.launch {
+                    snackbarHostState.showSnackbar(thankYouSuggestEdit)
                 }
             },
             onDismiss = { showSuggestEditSheet = false }
@@ -586,13 +584,12 @@ fun PlaceDetailsScreen(
     if (showLocationCorrectionDialog && state.place != null) {
         val thankYouLocationCorrection = stringResource(R.string.thank_you_location_correction)
         LocationCorrectionDialog(
+            isOffline = isOffline,
             onSubmit = { lat, lng, address ->
-                scope.runOnlineOrShowOffline(networkStatus, snackbarHostState, offlineMessage) {
-                    viewModel.submitLocationCorrection(lat, lng, address)
-                    showLocationCorrectionDialog = false
-                    scope.launch {
-                        snackbarHostState.showSnackbar(thankYouLocationCorrection)
-                    }
+                viewModel.submitLocationCorrection(lat, lng, address)
+                showLocationCorrectionDialog = false
+                scope.launch {
+                    snackbarHostState.showSnackbar(thankYouLocationCorrection)
                 }
             },
             onDismiss = { showLocationCorrectionDialog = false }
@@ -609,6 +606,7 @@ fun PlaceDetailsScreen(
             onSubmit = { rating, comment, photoUris, retainedUrls ->
                 viewModel.submitReview(rating, comment, photoUris, retainedUrls)
             },
+            isOffline = isOffline,
             initialRating = editing?.rating ?: 0,
             initialComment = editing?.comment.orEmpty(),
             initialPhotoUrls = editing?.photoUrls.orEmpty(),
@@ -620,14 +618,13 @@ fun PlaceDetailsScreen(
         val thankYouReportReview = stringResource(R.string.thank_you_report_review)
         ReportReviewDialog(
             authorName = reviewToReport!!.authorName,
+            isOffline = isOffline,
             onSubmit = { reason, comment ->
-                scope.runOnlineOrShowOffline(networkStatus, snackbarHostState, offlineMessage) {
-                    viewModel.reportReview(reviewToReport!!.id, reason, comment)
-                    showReportReviewDialog = false
-                    reviewToReport = null
-                    scope.launch {
-                        snackbarHostState.showSnackbar(thankYouReportReview)
-                    }
+                viewModel.reportReview(reviewToReport!!.id, reason, comment)
+                showReportReviewDialog = false
+                reviewToReport = null
+                scope.launch {
+                    snackbarHostState.showSnackbar(thankYouReportReview)
                 }
             },
             onDismiss = {
@@ -681,14 +678,13 @@ fun PlaceDetailsScreen(
     if (showReportPhotoDialog && photoUrlToReport != null) {
         val thankYouReportPhoto = stringResource(R.string.thank_you_report_photo)
         ReportPhotoDialog(
+            isOffline = isOffline,
             onSubmit = { reason, comment ->
-                scope.runOnlineOrShowOffline(networkStatus, snackbarHostState, offlineMessage) {
-                    viewModel.reportPhoto(photoUrlToReport!!, reason, comment)
-                    showReportPhotoDialog = false
-                    photoUrlToReport = null
-                    scope.launch {
-                        snackbarHostState.showSnackbar(thankYouReportPhoto)
-                    }
+                viewModel.reportPhoto(photoUrlToReport!!, reason, comment)
+                showReportPhotoDialog = false
+                photoUrlToReport = null
+                scope.launch {
+                    snackbarHostState.showSnackbar(thankYouReportPhoto)
                 }
             },
             onDismiss = {
@@ -1749,7 +1745,8 @@ private fun DeleteConfirmationDialog(
 @Composable
 private fun ReportPlaceDialog(
     onSubmit: (reason: String, comment: String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    isOffline: Boolean
 ) {
     val reasons = listOf(
         "NOT_EXISTS" to stringResource(R.string.report_reason_not_exists),
@@ -1809,9 +1806,11 @@ private fun ReportPlaceDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onSubmit(selectedReason, comment.trim()) }) {
-                Text(stringResource(R.string.report_submit))
-            }
+            OfflineAwareSubmitButton(
+                label = stringResource(R.string.report_submit),
+                onClick = { onSubmit(selectedReason, comment.trim()) },
+                isOffline = isOffline
+            )
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
@@ -1825,7 +1824,8 @@ private fun ReportPlaceDialog(
 private fun ReportReviewDialog(
     authorName: String,
     onSubmit: (reason: String, comment: String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    isOffline: Boolean
 ) {
     val reasons = listOf(
         "SPAM" to stringResource(R.string.report_reason_spam),
@@ -1895,9 +1895,11 @@ private fun ReportReviewDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onSubmit(selectedReason, comment.trim()) }) {
-                Text(stringResource(R.string.report_submit))
-            }
+            OfflineAwareSubmitButton(
+                label = stringResource(R.string.report_submit),
+                onClick = { onSubmit(selectedReason, comment.trim()) },
+                isOffline = isOffline
+            )
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
@@ -1973,7 +1975,8 @@ private fun ReviewPhotoRow(
 @Composable
 private fun ReportPhotoDialog(
     onSubmit: (reason: String, comment: String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    isOffline: Boolean
 ) {
     val reasons = listOf(
         "INAPPROPRIATE" to stringResource(R.string.report_reason_inappropriate),
@@ -2033,9 +2036,11 @@ private fun ReportPhotoDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onSubmit(selectedReason, comment.trim()) }) {
-                Text(stringResource(R.string.report_submit))
-            }
+            OfflineAwareSubmitButton(
+                label = stringResource(R.string.report_submit),
+                onClick = { onSubmit(selectedReason, comment.trim()) },
+                isOffline = isOffline
+            )
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
