@@ -23,7 +23,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeoutException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.*
@@ -55,14 +57,14 @@ class FirestorePlaceRepository @Inject constructor(
         val key = PlacesQueryKey(category, normalizedQuery)
         return sharedPlaceFlows.getOrPut(key) {
             placeDao.observeAll(GEO_QUERY_LIMIT)
-                .map { list -> 
+                .map { list ->
                     list.map { it.toDomain() }
                         .filter { category == null || it.category == category }
                 }
         }
     }
 
-    override fun observePlacesByOwner(ownerUserId: String): Flow<List<Place>> = 
+    override fun observePlacesByOwner(ownerUserId: String): Flow<List<Place>> =
         placeDao.observeByOwner(ownerUserId, OWNER_PLACES_LIMIT).map { list -> list.map { it.toDomain() } }
 
     override suspend fun getPlace(placeId: String): OpResult<Place> =
@@ -75,7 +77,7 @@ class FirestorePlaceRepository @Inject constructor(
                 val cached = placeDao.getById(placeId)
                 if (cached != null) OpResult.success(cached.toDomain()) else OpResult.failure(e)
             }
-    }
+        }
 
     override suspend fun getPlacesNear(latitude: Double, longitude: Double, radiusKm: Double): OpResult<List<Place>> =
         performanceTraces.measureResult(PerformanceTraces.NEARBY_PLACES_LOAD) {
@@ -103,7 +105,7 @@ class FirestorePlaceRepository @Inject constructor(
                     .orderBy("averageRating", com.google.firebase.firestore.Query.Direction.DESCENDING)
                     .limit(limit.toLong()).get().await()
                 val places = snapshot.documents.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
-                placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
+                placeDao.upsertAll(places.map(ReviewEntity::fromDomain))
                 OpResult.success(places)
             } catch (e: Exception) {
                 val cached = placeDao.getTopPlaces(limit)
@@ -115,8 +117,6 @@ class FirestorePlaceRepository @Inject constructor(
         return performanceTraces.measureResult(PerformanceTraces.MAP_PLACES_LOAD) {
             val cached = getCachedPlacesInBounds(bounds, category, limit)
             if (cached.isNotEmpty()) {
-                // Rezygnujemy z agresywnego odświeżania w tle przy każdym ruchu,
-                // żeby nie dławić łącza. Dane z cache są wystarczające dla płynności.
                 OpResult.success(cached)
             } else {
                 try {
@@ -173,9 +173,9 @@ class FirestorePlaceRepository @Inject constructor(
             radiusKm < 50 -> 4
             else -> 3
         }
-        val steps = 3 // 3x3 grid (9 points) covers the screen effectively and is much faster
+        val steps = 3
         val lats = (0 until steps).map { bounds.south + latSpan * it / (steps - 1) }
-        val lngs = (0 until steps).map { 
+        val lngs = (0 until steps).map {
             var lng = bounds.west + lngSpan * it / (steps - 1)
             if (lng > 180.0) lng -= 360.0
             if (lng < -180.0) lng += 360.0
@@ -234,12 +234,154 @@ class FirestorePlaceRepository @Inject constructor(
         OpResult.success(Unit)
     } catch (e: Exception) { OpResult.failure(e) }
 
-    override suspend fun reportPlace(p: String, r: String, re: String, c: String): OpResult<Unit> = OpResult.success(Unit)
-    override suspend fun submitChangeRequest(p: String, r: String, ch: Map<String, Any>, t: String): OpResult<Unit> = OpResult.success(Unit)
-    override suspend fun reportPhoto(p: String, r: String, re: String, c: String): OpResult<Unit> = OpResult.success(Unit)
+    override suspend fun reportPlace(
+        placeId: String,
+        reporterId: String,
+        reason: String,
+        comment: String
+    ): OpResult<Unit> = try {
+        require(placeId.isNotBlank()) { "placeId nie może być puste" }
+        require(reporterId.isNotBlank()) { "reporterId nie może być puste" }
+
+        val existing = firestore.collection(FirestoreCollections.PLACE_REPORTS)
+            .whereEqualTo("reporterId", reporterId)
+            .whereEqualTo("placeId", placeId)
+            .get()
+            .await()
+        if (existing.documents.isNotEmpty()) {
+            return OpResult.failure(AlreadyReportedException("Już zgłosiłeś to miejsce"))
+        }
+
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
+            firestore.collection(FirestoreCollections.PLACE_REPORTS)
+                .add(
+                    mapOf(
+                        "placeId" to placeId,
+                        "reporterId" to reporterId,
+                        "reason" to reason,
+                        "comment" to comment,
+                        "createdAtMillis" to System.currentTimeMillis(),
+                        "status" to "pending"
+                    )
+                )
+                .await()
+            true
+        }
+        if (completed == null) {
+            OpResult.failure(TimeoutException("Przekroczono czas oczekiwania na zapis zgłoszenia"))
+        } else {
+            OpResult.success(Unit)
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
+    override suspend fun submitChangeRequest(
+        placeId: String,
+        requesterId: String,
+        changes: Map<String, Any>,
+        type: String
+    ): OpResult<Unit> = try {
+        require(placeId.isNotBlank()) { "placeId nie może być puste" }
+        require(requesterId.isNotBlank()) { "requesterId nie może być puste" }
+        require(changes.isNotEmpty()) { "changes nie może być puste" }
+
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
+            firestore.collection(FirestoreCollections.PLACE_CHANGE_REQUESTS)
+                .add(
+                    mapOf(
+                        "placeId" to placeId,
+                        "requesterId" to requesterId,
+                        "reporterId" to requesterId,
+                        "changes" to changes,
+                        "type" to type,
+                        "createdAtMillis" to System.currentTimeMillis(),
+                        "status" to "pending"
+                    )
+                )
+                .await()
+            true
+        }
+        if (completed == null) {
+            OpResult.failure(TimeoutException("Przekroczono czas oczekiwania na zapis propozycji zmiany"))
+        } else {
+            OpResult.success(Unit)
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
+    override suspend fun reportPhoto(
+        photoUrl: String,
+        reporterId: String,
+        reason: String,
+        comment: String
+    ): OpResult<Unit> = try {
+        require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
+        require(reporterId.isNotBlank()) { "reporterId nie może być puste" }
+
+        val existing = firestore.collection(FirestoreCollections.PHOTO_REPORTS)
+            .whereEqualTo("reporterId", reporterId)
+            .whereEqualTo("photoUrl", photoUrl)
+            .get()
+            .await()
+        if (existing.documents.isNotEmpty()) {
+            return OpResult.failure(AlreadyReportedException("Już zgłosiłeś to zdjęcie"))
+        }
+
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
+            firestore.collection(FirestoreCollections.PHOTO_REPORTS)
+                .add(
+                    mapOf(
+                        "photoUrl" to photoUrl,
+                        "reporterId" to reporterId,
+                        "reason" to reason,
+                        "comment" to comment,
+                        "createdAtMillis" to System.currentTimeMillis(),
+                        "status" to "pending"
+                    )
+                )
+                .await()
+            true
+        }
+        if (completed == null) {
+            OpResult.failure(TimeoutException("Przekroczono czas oczekiwania na zapis zgłoszenia"))
+        } else {
+            OpResult.success(Unit)
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
     override suspend fun addPhotoUrl(p: String, ph: String, u: String): OpResult<Unit> = OpResult.success(Unit)
     override suspend fun removePhotoUrl(p: String, ph: String): OpResult<Unit> = OpResult.success(Unit)
-    override suspend fun hasUserReportedPlace(p: String, u: String): Boolean = false
-    override suspend fun getReportedPhotos(u: String): Set<String> = emptySet()
+
+    override suspend fun hasUserReportedPlace(placeId: String, userId: String): Boolean = try {
+        firestore.collection(FirestoreCollections.PLACE_REPORTS)
+            .whereEqualTo("reporterId", userId)
+            .whereEqualTo("placeId", placeId)
+            .limit(1)
+            .get()
+            .await()
+            .documents
+            .isNotEmpty()
+    } catch (_: Exception) {
+        false
+    }
+
+    override suspend fun getReportedPhotos(userId: String): Set<String> = try {
+        firestore.collection(FirestoreCollections.PHOTO_REPORTS)
+            .whereEqualTo("reporterId", userId)
+            .get()
+            .await()
+            .documents
+            .mapNotNull { it.getString("photoUrl") }
+            .toSet()
+    } catch (_: Exception) {
+        emptySet()
+    }
+
     private fun placesCollection() = firestore.collection(FirestoreCollections.PLACES)
+
+    class AlreadyReportedException(message: String) : IllegalStateException(message)
 }
