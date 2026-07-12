@@ -218,15 +218,28 @@ fun PlaceDetailsScreen(
     val networkStatus by rememberNetworkStatus()
     val isOffline = networkStatus == NetworkStatus.UNAVAILABLE
 
-    val placePhotoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(
-            PLACE_DETAILS_MAX_PHOTOS
-        )
-    ) { uris ->
+    val availablePlacePhotoSlots = (
+        PLACE_DETAILS_MAX_PHOTOS - (state.place?.photoUrls?.size ?: 0)
+    ).coerceAtLeast(0)
+
+    fun addPickedPlacePhotos(uris: List<Uri>) {
         val availableSlots = PLACE_DETAILS_MAX_PHOTOS - (state.place?.photoUrls?.size ?: 0)
         uris.take(availableSlots.coerceAtLeast(0)).forEach { uri ->
             viewModel.addPhotoToPlace(uri)
         }
+    }
+
+    val placePhotoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(
+            availablePlacePhotoSlots.coerceAtLeast(2)
+        )
+    ) { uris ->
+        addPickedPlacePhotos(uris)
+    }
+    val singlePlacePhotoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) addPickedPlacePhotos(listOf(uri))
     }
 
     var placeCameraUriString by rememberSaveable { mutableStateOf<String?>(null) }
@@ -508,11 +521,18 @@ fun PlaceDetailsScreen(
                             },
                             onAddPlacePhoto = if (currentUser != null) {
                                 {
-                                    placePhotoPickerLauncher.launch(
-                                        androidx.activity.result.PickVisualMediaRequest(
-                                            androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
-                                        )
+                                    val request = androidx.activity.result.PickVisualMediaRequest(
+                                        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
                                     )
+                                    when {
+                                        availablePlacePhotoSlots <= 0 -> Unit
+                                        availablePlacePhotoSlots == 1 -> singlePlacePhotoPickerLauncher.launch(
+                                            request
+                                        )
+                                        else -> placePhotoPickerLauncher.launch(
+                                            request
+                                        )
+                                    }
                                 }
                             } else null,
                             onAddPlaceCamera = if (currentUser != null) {

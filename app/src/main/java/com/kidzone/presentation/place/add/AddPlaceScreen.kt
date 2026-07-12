@@ -1,4 +1,4 @@
-@file:Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod", "LongParameterList")
+@file:Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod", "LongParameterList", "NestedBlockDepth")
 
 package com.kidzone.presentation.place.add
 
@@ -209,21 +209,28 @@ fun AddPlaceScreen(
     }
 
     val duplicatePhotoError = stringResource(R.string.duplicate_photo_error)
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(MAX_PLACE_PHOTOS)
-    ) { uris ->
+    val availablePlacePhotoSlots = (
+        MAX_PLACE_PHOTOS - (state.existingPhotoUrls.size + state.photoUris.size)
+    ).coerceAtLeast(0)
+
+    fun addPickedPlacePhotos(uris: List<Uri>) {
         if (uris.isNotEmpty()) {
+            val available = MAX_PLACE_PHOTOS - (state.existingPhotoUrls.size + state.photoUris.size)
+            if (available <= 0) return
+
             val accepted = mutableListOf<Uri>()
             val hashes = photoHashSet.toMutableSet()
             var duplicatesFound = 0
             for (uri in uris) {
-                val hash = computePlacePhotoHash(context, uri)
-                if (hash != null && hash in hashes) {
-                    duplicatesFound++
-                    continue
+                if (accepted.size < available) {
+                    val hash = computePlacePhotoHash(context, uri)
+                    if (hash != null && hash in hashes) {
+                        duplicatesFound++
+                    } else {
+                        if (hash != null) hashes.add(hash)
+                        accepted.add(uri)
+                    }
                 }
-                if (hash != null) hashes.add(hash)
-                accepted.add(uri)
             }
             photoHashSet = hashes
             if (accepted.isNotEmpty()) viewModel.addPhotos(accepted)
@@ -231,6 +238,18 @@ fun AddPlaceScreen(
                 coroutineScope.launch { snackbarHostState.showSnackbar(duplicatePhotoError) }
             }
         }
+    }
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(
+            availablePlacePhotoSlots.coerceAtLeast(2)
+        )
+    ) { uris ->
+        addPickedPlacePhotos(uris)
+    }
+    val singlePhotoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) addPickedPlacePhotos(listOf(uri))
     }
 
     var placeCameraUriString by rememberSaveable { mutableStateOf<String?>(null) }
@@ -486,11 +505,14 @@ fun AddPlaceScreen(
                     isSaving = state.isSaving,
                     placeHashesReady = placeHashesReady,
                     onPickFromGallery = {
-                        photoPickerLauncher.launch(
-                            PickVisualMediaRequest(
-                                ActivityResultContracts.PickVisualMedia.ImageOnly
-                            )
+                        val request = PickVisualMediaRequest(
+                            ActivityResultContracts.PickVisualMedia.ImageOnly
                         )
+                        when {
+                            availablePlacePhotoSlots <= 0 -> Unit
+                            availablePlacePhotoSlots == 1 -> singlePhotoPickerLauncher.launch(request)
+                            else -> photoPickerLauncher.launch(request)
+                        }
                     },
                     onTakePhoto = {
                         val hasPerm = ContextCompat.checkSelfPermission(

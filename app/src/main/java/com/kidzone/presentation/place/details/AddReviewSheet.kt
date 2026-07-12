@@ -174,13 +174,15 @@ fun AddReviewSheet(
         }
     }
 
+    val availableReviewPhotoSlots = (
+        MAX_REVIEW_PHOTOS - (existingPhotoUrls.size + photoUris.size)
+    ).coerceAtLeast(0)
+
     val duplicatePhotoError = stringResource(R.string.duplicate_photo_error)
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(MAX_REVIEW_PHOTOS)
-    ) { uris ->
+    fun addPickedReviewPhotos(uris: List<Uri>) {
         if (uris.isNotEmpty()) {
             val available = MAX_REVIEW_PHOTOS - (existingPhotoUrls.size + photoUris.size)
-            if (available <= 0) return@rememberLauncherForActivityResult
+            if (available <= 0) return
 
             val accepted = mutableListOf<Uri>()
             var duplicatesFound = 0
@@ -202,6 +204,18 @@ fun AddReviewSheet(
                 }
             }
         }
+    }
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(
+            availableReviewPhotoSlots.coerceAtLeast(2)
+        )
+    ) { uris ->
+        addPickedReviewPhotos(uris)
+    }
+    val singlePhotoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) addPickedReviewPhotos(listOf(uri))
     }
 
     var cameraUriString by rememberSaveable { mutableStateOf<String?>(null) }
@@ -379,9 +393,14 @@ fun AddReviewSheet(
                 ) {
                     OutlinedButton(
                         onClick = {
-                            photoPickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            val request = PickVisualMediaRequest(
+                                ActivityResultContracts.PickVisualMedia.ImageOnly
                             )
+                            when {
+                                availableReviewPhotoSlots <= 0 -> Unit
+                                availableReviewPhotoSlots == 1 -> singlePhotoPickerLauncher.launch(request)
+                                else -> photoPickerLauncher.launch(request)
+                            }
                         },
                         enabled = !isSubmitting && hashesReady,
                         modifier = Modifier.weight(1f)

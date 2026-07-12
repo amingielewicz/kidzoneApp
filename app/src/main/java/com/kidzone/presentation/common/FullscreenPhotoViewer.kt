@@ -7,6 +7,8 @@ import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -39,8 +41,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 
-private val VIEWER_ACTION_BUTTON_SIZE = 30.dp
-private val VIEWER_ACTION_ICON_SIZE = 16.dp
+private val VIEWER_ACTION_BUTTON_SIZE = 36.dp
+private val VIEWER_ACTION_ICON_SIZE = 20.dp
+private val VIEWER_ACTION_PADDING = 16.dp
+private val VIEWER_ACTION_SPACING = 8.dp
 private const val VIEWER_ACTION_ICON_ALPHA = 0.75f
 
 /**
@@ -103,12 +107,11 @@ fun FullscreenPhotoViewer(
                 )
             }
 
-            // Close button (top-left)
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(16.dp)
+                    .align(Alignment.TopEnd)
+                    .padding(VIEWER_ACTION_PADDING)
                     .size(VIEWER_ACTION_BUTTON_SIZE)
             ) {
                 Icon(
@@ -124,46 +127,46 @@ fun FullscreenPhotoViewer(
             // updated yet.
             val safeCurrentPage = pagerState.currentPage.coerceIn(0, photoUrls.lastIndex)
 
-            // Report button (top-right) - only if callback provided AND photo is reportable
-            if (onReportPhoto != null && canReportPhoto(photoUrls[safeCurrentPage])) {
-                IconButton(
-                    onClick = {
-                        val currentUrl = photoUrls[safeCurrentPage]
-                        onReportPhoto(currentUrl)
-                    },
+            val currentPhotoUrl = photoUrls[safeCurrentPage]
+            val reportAction = onReportPhoto?.takeIf { canReportPhoto(currentPhotoUrl) }
+            val deleteAction = onDeletePhoto?.takeIf { canDeletePhoto(currentPhotoUrl) }
+            if (reportAction != null || deleteAction != null) {
+                Row(
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(16.dp)
-                        .size(VIEWER_ACTION_BUTTON_SIZE)
+                        .align(Alignment.BottomStart)
+                        .padding(VIEWER_ACTION_PADDING),
+                    horizontalArrangement = Arrangement.spacedBy(VIEWER_ACTION_SPACING)
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Flag,
-                        contentDescription = stringResource(R.string.report_photo),
-                        tint = MaterialTheme.colorScheme.error.copy(alpha = VIEWER_ACTION_ICON_ALPHA),
-                        modifier = Modifier.size(VIEWER_ACTION_ICON_SIZE)
-                    )
-                }
-            }
+                    if (reportAction != null) {
+                        IconButton(
+                            onClick = { reportAction(currentPhotoUrl) },
+                            modifier = Modifier.size(VIEWER_ACTION_BUTTON_SIZE)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Flag,
+                                contentDescription = stringResource(R.string.report_photo),
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = VIEWER_ACTION_ICON_ALPHA),
+                                modifier = Modifier.size(VIEWER_ACTION_ICON_SIZE)
+                            )
+                        }
+                    }
 
-            // Delete button (top-right, below report) - only for user's own photos
-            if (onDeletePhoto != null && canDeletePhoto(photoUrls[safeCurrentPage])) {
-                IconButton(
-                    onClick = {
-                        val currentUrl = photoUrls[safeCurrentPage]
-                        onDeletePhoto(currentUrl)
-                        onDismiss()
-                    },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 52.dp, end = 16.dp)
-                        .size(VIEWER_ACTION_BUTTON_SIZE)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
-                        contentDescription = stringResource(R.string.delete_photo),
-                        tint = MaterialTheme.colorScheme.error.copy(alpha = VIEWER_ACTION_ICON_ALPHA),
-                        modifier = Modifier.size(VIEWER_ACTION_ICON_SIZE)
-                    )
+                    if (deleteAction != null) {
+                        IconButton(
+                            onClick = {
+                                deleteAction(currentPhotoUrl)
+                                onDismiss()
+                            },
+                            modifier = Modifier.size(VIEWER_ACTION_BUTTON_SIZE)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Delete,
+                                contentDescription = stringResource(R.string.delete_photo),
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = VIEWER_ACTION_ICON_ALPHA),
+                                modifier = Modifier.size(VIEWER_ACTION_ICON_SIZE)
+                            )
+                        }
+                    }
                 }
             }
 
