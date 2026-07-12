@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { MouseEvent } from 'react';
 import { Box } from '@mui/material';
+import { doc, getDoc } from 'firebase/firestore';
 import { ChangeRequestsPage } from './ChangeRequestsPage';
 import { db } from '../services/firebase';
 
@@ -11,6 +12,13 @@ const FIREBASE_ICON_SVG = `
     <path fill="#F57C00" d="m5.8 17.8 5.8-10.9 1.8 3.5 5.2 7.3-6.4 3.6-6.4-3.5Z"/>
   </svg>
 `;
+
+function getRequestDescription(data: Record<string, unknown>): string {
+  const changes = data.changes as Record<string, unknown> | undefined;
+  const value = data.comment ?? data.description ?? changes?.description;
+  const description = typeof value === 'string' ? value.trim() : '';
+  return description || '—';
+}
 
 export function ChangeRequestsPageWithRowNavigation() {
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -36,6 +44,16 @@ export function ChangeRequestsPageWithRowNavigation() {
           placeIdHeader.style.whiteSpace = 'nowrap';
         }
 
+        if (!headerRow.querySelector('[data-description-column="true"]')) {
+          const descriptionHeader = document.createElement('th');
+          descriptionHeader.setAttribute('data-description-column', 'true');
+          descriptionHeader.setAttribute('scope', 'col');
+          descriptionHeader.className = 'MuiTableCell-root MuiTableCell-head MuiTableCell-sizeSmall';
+          descriptionHeader.textContent = 'Opis';
+          descriptionHeader.style.minWidth = '180px';
+          headerRow.insertBefore(descriptionHeader, headerRow.children.item(4));
+        }
+
         if (!headerRow.querySelector('[data-firebase-column="true"]')) {
           const headerCell = document.createElement('th');
           headerCell.setAttribute('data-firebase-column', 'true');
@@ -55,7 +73,7 @@ export function ChangeRequestsPageWithRowNavigation() {
 
           if (!detailsButton) {
             const emptyCell = row.querySelector<HTMLTableCellElement>('td[colspan]');
-            if (emptyCell && emptyCell.colSpan !== 7) emptyCell.colSpan = 7;
+            if (emptyCell && emptyCell.colSpan !== 8) emptyCell.colSpan = 8;
             return;
           }
 
@@ -91,6 +109,28 @@ export function ChangeRequestsPageWithRowNavigation() {
               placeIdCell.style.minWidth = 'max-content';
               placeIdCell.style.whiteSpace = 'nowrap';
             }
+          }
+
+          if (!row.querySelector('[data-description-cell="true"]')) {
+            const descriptionCell = document.createElement('td');
+            descriptionCell.setAttribute('data-description-cell', 'true');
+            descriptionCell.className = 'MuiTableCell-root MuiTableCell-body MuiTableCell-sizeSmall';
+            descriptionCell.style.minWidth = '180px';
+            descriptionCell.style.maxWidth = '360px';
+            descriptionCell.style.whiteSpace = 'normal';
+            descriptionCell.style.overflowWrap = 'anywhere';
+            descriptionCell.textContent = 'Ładowanie…';
+            row.insertBefore(descriptionCell, row.children.item(4));
+
+            void getDoc(doc(db, 'place_change_requests', requestId))
+              .then((snapshot) => {
+                descriptionCell.textContent = snapshot.exists()
+                  ? getRequestDescription(snapshot.data() as Record<string, unknown>)
+                  : '—';
+              })
+              .catch(() => {
+                descriptionCell.textContent = '—';
+              });
           }
 
           if (row.querySelector('[data-firebase-cell="true"]')) return;
