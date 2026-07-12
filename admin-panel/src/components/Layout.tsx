@@ -211,31 +211,31 @@ export function Layout({ children }: LayoutProps) {
             kidZone Admin Panel
           </Typography>
 
-          {newReportsCount > 0 && (
-            <IconButton
-              color="inherit"
-              aria-label={`Nowe zgłoszenia: ${newReportsCount}`}
-              onClick={() => navigate('/reports')}
-              sx={{ mr: 1 }}
-            >
-              <Badge badgeContent={newReportsCount} color="error" max={99}>
-                <ReportIcon />
-              </Badge>
-            </IconButton>
-          )}
+          <Box display="flex" alignItems="center" gap={0.5} sx={{ mr: 3 }}>
+            {newReportsCount > 0 && (
+              <IconButton
+                color="inherit"
+                aria-label={`Nowe zgłoszenia: ${newReportsCount}`}
+                onClick={() => navigate('/reports')}
+              >
+                <Badge badgeContent={newReportsCount} color="error" max={99}>
+                  <ReportIcon />
+                </Badge>
+              </IconButton>
+            )}
 
-          {pendingChangeRequestsCount > 0 && (
-            <IconButton
-              color="inherit"
-              aria-label={`Oczekujące propozycje zmian: ${pendingChangeRequestsCount}`}
-              onClick={() => navigate('/change-requests')}
-              sx={{ mr: 1 }}
-            >
-              <Badge badgeContent={pendingChangeRequestsCount} color="error" max={99}>
-                <NotificationsIcon />
-              </Badge>
-            </IconButton>
-          )}
+            {pendingChangeRequestsCount > 0 && (
+              <IconButton
+                color="inherit"
+                aria-label={`Oczekujące propozycje zmian: ${pendingChangeRequestsCount}`}
+                onClick={() => navigate('/change-requests')}
+              >
+                <Badge badgeContent={pendingChangeRequestsCount} color="error" max={99}>
+                  <NotificationsIcon />
+                </Badge>
+              </IconButton>
+            )}
+          </Box>
 
           <IconButton
             color="inherit"
