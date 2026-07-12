@@ -9,8 +9,6 @@ import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -49,8 +47,10 @@ import coil.compose.AsyncImage
 
 private val VIEWER_ACTION_BUTTON_SIZE = 36.dp
 private val VIEWER_ACTION_ICON_SIZE = 20.dp
+private val VIEWER_ACTION_BUTTON_SIZE_LARGE = 44.dp
+private val VIEWER_ACTION_ICON_SIZE_LARGE = 24.dp
 private val VIEWER_ACTION_PADDING = 16.dp
-private val VIEWER_ACTION_SPACING = 8.dp
+private val VIEWER_BOTTOM_ACTION_PADDING = 48.dp
 private const val VIEWER_ACTION_CONTAINER_ALPHA = 0.82f
 
 enum class FullscreenPhotoAction {
@@ -152,19 +152,21 @@ fun FullscreenPhotoViewer(
                 else -> FullscreenPhotoAction.NONE
             }
             if (currentAction != FullscreenPhotoAction.NONE) {
-                Row(
+                Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .navigationBarsPadding()
-                        .padding(VIEWER_ACTION_PADDING)
-                        .zIndex(1f),
-                    horizontalArrangement = Arrangement.spacedBy(VIEWER_ACTION_SPACING)
+                        .padding(
+                            end = VIEWER_ACTION_PADDING,
+                            bottom = VIEWER_BOTTOM_ACTION_PADDING
+                        )
+                        .zIndex(2f)
                 ) {
                     if (currentAction == FullscreenPhotoAction.REPORT && onReportPhoto != null) {
                         IconButton(
                             onClick = { onReportPhoto(currentPhotoUrl) },
                             modifier = Modifier
-                                .size(VIEWER_ACTION_BUTTON_SIZE)
+                                .size(VIEWER_ACTION_BUTTON_SIZE_LARGE)
                                 .background(
                                     color = Color.Black.copy(alpha = VIEWER_ACTION_CONTAINER_ALPHA),
                                     shape = CircleShape
@@ -174,7 +176,7 @@ fun FullscreenPhotoViewer(
                                 imageVector = Icons.Filled.Flag,
                                 contentDescription = stringResource(R.string.report_photo),
                                 tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(VIEWER_ACTION_ICON_SIZE)
+                                modifier = Modifier.size(VIEWER_ACTION_ICON_SIZE_LARGE)
                             )
                         }
                     }
@@ -186,7 +188,7 @@ fun FullscreenPhotoViewer(
                                 onDismiss()
                             },
                             modifier = Modifier
-                                .size(VIEWER_ACTION_BUTTON_SIZE)
+                                .size(VIEWER_ACTION_BUTTON_SIZE_LARGE)
                                 .background(
                                     color = Color.Black.copy(alpha = VIEWER_ACTION_CONTAINER_ALPHA),
                                     shape = CircleShape
@@ -196,7 +198,7 @@ fun FullscreenPhotoViewer(
                                 imageVector = Icons.Filled.Delete,
                                 contentDescription = stringResource(R.string.delete_photo),
                                 tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(VIEWER_ACTION_ICON_SIZE)
+                                modifier = Modifier.size(VIEWER_ACTION_ICON_SIZE_LARGE)
                             )
                         }
                     }

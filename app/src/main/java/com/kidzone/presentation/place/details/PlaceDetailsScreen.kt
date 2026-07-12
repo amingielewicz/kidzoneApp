@@ -915,11 +915,10 @@ private fun PlaceDetailsContent(
                 } else null,
                 onPhotoClick = if (review.photoUrls.isNotEmpty()) {
                     { index ->
-                        val isMyReview = currentUserId != null && review.userId == currentUserId
                         onOpenPhotoViewer(
                             review.photoUrls,
                             index,
-                            review.takeIf { isMyReview }
+                            review
                         )
                     }
                 } else null
