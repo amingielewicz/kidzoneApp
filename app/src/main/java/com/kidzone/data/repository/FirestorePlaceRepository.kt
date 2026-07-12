@@ -2,6 +2,7 @@ package com.kidzone.data.repository
 
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.kidzone.analytics.PerformanceTraces
 import com.kidzone.data.local.PlaceDao
 import com.kidzone.data.local.PlaceEntity
@@ -378,8 +379,62 @@ class FirestorePlaceRepository @Inject constructor(
         OpResult.failure(e)
     }
 
-    override suspend fun addPhotoUrl(p: String, ph: String, u: String): OpResult<Unit> = OpResult.success(Unit)
-    override suspend fun removePhotoUrl(p: String, ph: String): OpResult<Unit> = OpResult.success(Unit)
+    override suspend fun addPhotoUrl(
+        placeId: String,
+        photoUrl: String,
+        uploadedByUserId: String
+    ): OpResult<Unit> = try {
+        require(placeId.isNotBlank()) { "placeId nie może być puste" }
+        require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
+        require(uploadedByUserId.isNotBlank()) { "uploadedByUserId nie może być puste" }
+
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
+            placesCollection().document(placeId).set(
+                mapOf(
+                    "photoUrls" to FieldValue.arrayUnion(photoUrl),
+                    "photoUploadedBy" to mapOf(photoUrl to uploadedByUserId)
+                ),
+                SetOptions.merge()
+            ).await()
+            true
+        }
+        if (completed == null) {
+            OpResult.failure(TimeoutException("Przekroczono czas oczekiwania na zapis zdjęcia"))
+        } else {
+            OpResult.success(Unit)
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
+    override suspend fun removePhotoUrl(
+        placeId: String,
+        photoUrl: String
+    ): OpResult<Unit> = try {
+        require(placeId.isNotBlank()) { "placeId nie może być puste" }
+        require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
+
+        val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
+            val place = placesCollection().document(placeId).get().await()
+                .toObject(PlaceDto::class.java)
+                ?.toDomain()
+                ?: return@withTimeoutOrNull false
+            placesCollection().document(placeId).update(
+                mapOf(
+                    "photoUrls" to place.photoUrls.filterNot { it == photoUrl },
+                    "photoUploadedBy" to place.photoUploadedBy - photoUrl
+                )
+            ).await()
+            true
+        }
+        if (completed == true) {
+            OpResult.success(Unit)
+        } else {
+            OpResult.failure(TimeoutException("Przekroczono czas oczekiwania na usunięcie zdjęcia"))
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
 
     override suspend fun hasUserReportedPlace(placeId: String, userId: String): Boolean = try {
         firestore.collection(FirestoreCollections.PLACE_REPORTS)
