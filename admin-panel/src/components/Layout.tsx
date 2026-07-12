@@ -211,7 +211,7 @@ export function Layout({ children }: LayoutProps) {
             kidZone Admin Panel
           </Typography>
 
-          <Box display="flex" alignItems="center" gap={0.5} sx={{ mr: 3 }}>
+          <Box display="flex" alignItems="center" gap={0.5} sx={{ mr: 6 }}>
             {newReportsCount > 0 && (
               <IconButton
                 color="inherit"
