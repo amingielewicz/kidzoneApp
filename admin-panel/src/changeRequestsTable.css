@@ -99,9 +99,9 @@
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-description-column="true"],
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-description-cell="true"] {
-  width: 360px;
-  min-width: 360px;
-  max-width: 360px;
+  width: 390px;
+  min-width: 390px;
+  max-width: 390px;
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-description-column="true"] {
@@ -110,19 +110,31 @@
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-description-cell="true"] {
+  position: relative;
   overflow: hidden;
   white-space: normal;
-  overflow-wrap: anywhere;
   text-align: left;
   font-size: 0.78rem;
   line-height: 1.35;
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-description-text="true"] {
+  display: inline-block;
+  width: 340px;
+  max-height: 2.7em;
+  padding-right: 24px;
+  overflow: hidden;
+  box-sizing: border-box;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
   color: inherit;
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-description-ellipsis="true"] {
+  display: inline-block;
+  margin-left: -22px;
+  vertical-align: bottom;
   color: #d32f2f;
   font-weight: 700;
   white-space: nowrap;
