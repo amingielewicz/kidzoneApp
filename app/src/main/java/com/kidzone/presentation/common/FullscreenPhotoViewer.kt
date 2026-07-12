@@ -133,7 +133,7 @@ fun FullscreenPhotoViewer(
             if (reportAction != null || deleteAction != null) {
                 Row(
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
+                        .align(Alignment.BottomEnd)
                         .padding(VIEWER_ACTION_PADDING),
                     horizontalArrangement = Arrangement.spacedBy(VIEWER_ACTION_SPACING)
                 ) {

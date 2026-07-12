@@ -225,9 +225,7 @@ fun PlaceDetailsScreen(
 
     fun addPickedPlacePhotos(uris: List<Uri>) {
         val availableSlots = PLACE_DETAILS_MAX_PHOTOS - (state.place?.photoUrls?.size ?: 0)
-        uris.take(availableSlots.coerceAtLeast(0)).forEach { uri ->
-            viewModel.addPhotoToPlace(uri)
-        }
+        viewModel.addPhotosToPlace(uris.take(availableSlots.coerceAtLeast(0)))
     }
 
     val placePhotoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(

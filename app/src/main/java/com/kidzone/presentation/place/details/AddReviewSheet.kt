@@ -70,7 +70,7 @@ import java.security.MessageDigest
 private const val COMMENT_MAX_LENGTH = 1000
 
 /** Maksymalna liczba zdjęć na opinię. */
-private const val MAX_REVIEW_PHOTOS = 5
+private const val MAX_REVIEW_PHOTOS = 3
 
 /**
  * Oblicza MD5 hash zawartości URI.

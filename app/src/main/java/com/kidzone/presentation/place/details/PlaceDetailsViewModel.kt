@@ -642,6 +642,12 @@ class PlaceDetailsViewModel @Inject constructor(
 
     private val placePhotoHashes = mutableSetOf<String>()
 
+    private enum class PlacePhotoUploadResult {
+        ADDED,
+        DUPLICATE,
+        SKIPPED
+    }
+
     fun consumePlacePhotoDuplicateEvent() {
         _uiState.update { it.copy(placePhotoDuplicateEvent = false) }
     }
@@ -651,60 +657,94 @@ class PlaceDetailsViewModel @Inject constructor(
     }
 
     fun addPhotoToPlace(photoUri: android.net.Uri) {
-        val place = _uiState.value.place ?: return
-        val user = currentUser.value ?: return
-        if (place.photoUrls.size >= MAX_PLACE_PHOTOS_ON_DETAILS) {
+        addPhotosToPlace(listOf(photoUri))
+    }
+
+    fun addPhotosToPlace(photoUris: List<android.net.Uri>) {
+        if (photoUris.isEmpty()) {
             return
         }
+        val user = currentUser.value ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isUploadingPlacePhoto = true) }
+            val duplicateSkipped = uploadPickedPlacePhotos(photoUris, user.id)
 
-            val newBytes = imageCompressor.compressToWebp(photoUri)
-            if (newBytes == null) {
-                _uiState.update { it.copy(isUploadingPlacePhoto = false) }
-                return@launch
-            }
-
-            val newHash = java.security.MessageDigest.getInstance("MD5")
-                .digest(newBytes)
-                .joinToString("") { "%02x".format(it) }
-
-            if (newHash in placePhotoHashes) {
-                _uiState.update {
-                    it.copy(
-                        isUploadingPlacePhoto = false,
-                        placePhotoDuplicateEvent = true
-                    )
-                }
-                return@launch
-            }
-
-            try {
-                val url = photoUploader.uploadPlacePhoto(
-                    ownerUserId = user.id,
-                    placeId = place.id,
-                    imageBytes = newBytes
+            _uiState.update {
+                it.copy(
+                    isUploadingPlacePhoto = false,
+                    placePhotoDuplicateEvent = it.placePhotoDuplicateEvent || duplicateSkipped
                 )
-                when (placeRepository.addPhotoUrl(place.id, url, user.id)) {
-                    is OpResult.Success -> {
-                        placePhotoHashes.add(newHash)
-                        _uiState.update {
-                            it.copy(
-                                place = place.copy(
-                                    photoUrls = place.photoUrls + url,
-                                    photoUploadedBy = place.photoUploadedBy + (url to user.id)
-                                ),
-                                isUploadingPlacePhoto = false
-                            )
-                        }
-                    }
+            }
+        }
+    }
 
-                    is OpResult.Failure -> {
-                        _uiState.update { it.copy(isUploadingPlacePhoto = false) }
-                    }
+    private suspend fun uploadPickedPlacePhotos(
+        photoUris: List<android.net.Uri>,
+        userId: String
+    ): Boolean {
+        var duplicateSkipped = false
+        for (photoUri in photoUris) {
+            val place = _uiState.value.place ?: return duplicateSkipped
+            if (place.photoUrls.size >= MAX_PLACE_PHOTOS_ON_DETAILS) {
+                return duplicateSkipped
+            }
+            val result = uploadPickedPlacePhoto(photoUri, place, userId)
+            duplicateSkipped = duplicateSkipped || result == PlacePhotoUploadResult.DUPLICATE
+        }
+        return duplicateSkipped
+    }
+
+    private suspend fun uploadPickedPlacePhoto(
+        photoUri: android.net.Uri,
+        place: Place,
+        userId: String
+    ): PlacePhotoUploadResult {
+        val newBytes = imageCompressor.compressToWebp(photoUri)
+            ?: return PlacePhotoUploadResult.SKIPPED
+        val newHash = java.security.MessageDigest.getInstance("MD5")
+            .digest(newBytes)
+            .joinToString("") { "%02x".format(it) }
+
+        if (newHash in placePhotoHashes) {
+            return PlacePhotoUploadResult.DUPLICATE
+        }
+
+        return try {
+            val url = photoUploader.uploadPlacePhoto(
+                ownerUserId = userId,
+                placeId = place.id,
+                imageBytes = newBytes
+            )
+            when (placeRepository.addPhotoUrl(place.id, url, userId)) {
+                is OpResult.Success -> {
+                    addUploadedPlacePhoto(url, userId, newHash)
+                    PlacePhotoUploadResult.ADDED
                 }
-            } catch (_: Exception) {
-                _uiState.update { it.copy(isUploadingPlacePhoto = false) }
+
+                is OpResult.Failure -> PlacePhotoUploadResult.SKIPPED
+            }
+        } catch (_: Exception) {
+            PlacePhotoUploadResult.SKIPPED
+        }
+    }
+
+    private fun addUploadedPlacePhoto(
+        url: String,
+        userId: String,
+        hash: String
+    ) {
+        placePhotoHashes.add(hash)
+        _uiState.update { state ->
+            val place = state.place ?: return@update state
+            if (place.photoUrls.size >= MAX_PLACE_PHOTOS_ON_DETAILS || url in place.photoUrls) {
+                state
+            } else {
+                state.copy(
+                    place = place.copy(
+                        photoUrls = place.photoUrls + url,
+                        photoUploadedBy = place.photoUploadedBy + (url to userId)
+                    )
+                )
             }
         }
     }
