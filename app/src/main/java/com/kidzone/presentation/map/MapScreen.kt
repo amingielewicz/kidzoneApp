@@ -119,6 +119,9 @@ import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.place.add.fetchCurrentLocation
 import com.kidzone.presentation.place.add.hasLocationPermission
 import com.kidzone.presentation.place.add.isLocationServiceEnabled
+import android.app.Activity
+import android.content.ContextWrapper
+import androidx.core.app.ActivityCompat
 
 private val DEFAULT_CAMERA_TARGET = LatLng(52.2297, 21.0122)
 private const val DEFAULT_CAMERA_ZOOM = 11f
@@ -131,7 +134,8 @@ private const val SPIDERFY_RADIUS_DEGREES = 0.00012
 private const val SPIDERFY_RADIUS_STEP_DEGREES = 0.000015
 private const val SPIDERFY_MAX_EXTRA = 8
 private val MAP_TOP_OVERLAY_SPACING = 8.dp
-
+private const val LOCATION_PERMISSION_PREFS = "location_permission_preferences"
+private const val LOCATION_PERMISSION_REQUESTED_KEY = "fine_location_requested"
 @SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class)
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
@@ -317,11 +321,20 @@ fun MapScreen(
                 onLocationStatusClick = {
                     when {
                         !locationPermissionGranted -> {
-                            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                            requestLocationPermissionOrOpenSettings(
+                                context = context,
+                                requestPermission = {
+                                    locationPermissionLauncher.launch(
+                                        Manifest.permission.ACCESS_FINE_LOCATION
+                                    )
+                                }
+                            )
                         }
 
                         !gpsEnabled -> {
-                            context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                            context.startActivity(
+                                Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                            )
                         }
                     }
                 }
@@ -351,9 +364,15 @@ fun MapScreen(
                     onClick = {
                         when {
                             !locationPermissionGranted -> {
-                                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                                requestLocationPermissionOrOpenSettings(
+                                    context = context,
+                                    requestPermission = {
+                                        locationPermissionLauncher.launch(
+                                            Manifest.permission.ACCESS_FINE_LOCATION
+                                        )
+                                    }
+                                )
                             }
-
                             !gpsEnabled -> {
                                 context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
                             }
@@ -1056,3 +1075,55 @@ private suspend fun recenterOnUser(
         )
     )
 }
+
+private fun requestLocationPermissionOrOpenSettings(
+    context: Context,
+    requestPermission: () -> Unit
+) {
+    val preferences = context.getSharedPreferences(
+        LOCATION_PERMISSION_PREFS,
+        Context.MODE_PRIVATE
+    )
+
+    val wasRequestedBefore = preferences.getBoolean(
+        LOCATION_PERMISSION_REQUESTED_KEY,
+        false
+    )
+
+    val activity = context.findActivity()
+
+    val permanentlyDenied = wasRequestedBefore &&
+            activity != null &&
+            !ActivityCompat.shouldShowRequestPermissionRationale(
+                activity,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            )
+
+    if (permanentlyDenied) {
+        openApplicationSettings(context)
+    } else {
+        preferences.edit()
+            .putBoolean(LOCATION_PERMISSION_REQUESTED_KEY, true)
+            .apply()
+
+        requestPermission()
+    }
+}
+
+private fun openApplicationSettings(context: Context) {
+    val intent = Intent(
+        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+        Uri.fromParts("package", context.packageName, null)
+    ).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
+    context.startActivity(intent)
+}
+
+private tailrec fun Context.findActivity(): Activity? =
+    when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
+    }
