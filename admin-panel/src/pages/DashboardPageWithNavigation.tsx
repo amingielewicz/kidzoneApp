@@ -1,4 +1,4 @@
-import { KeyboardEvent, MouseEvent, useCallback } from 'react';
+import { KeyboardEvent, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box } from '@mui/material';
 import { DashboardPage } from './DashboardPageV2';
@@ -17,11 +17,13 @@ export function DashboardPageWithNavigation() {
     if (!card) return null;
 
     const label = Object.keys(CARD_ROUTES).find((name) => card.textContent?.includes(name));
-    return label ? CARD_ROUTES[label] : null;
+    if (!label) return null;
+
+    return CARD_ROUTES[label] ?? null;
   }, []);
 
   const handleClick = useCallback(
-    (event: MouseEvent<HTMLDivElement>) => {
+    (event: React.MouseEvent<HTMLDivElement>) => {
       const route = getRoute(event.target);
       if (route) navigate(route);
     },
