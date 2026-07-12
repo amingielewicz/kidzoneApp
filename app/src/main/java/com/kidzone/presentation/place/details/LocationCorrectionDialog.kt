@@ -19,8 +19,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -29,13 +29,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.kidzone.R
 import com.kidzone.presentation.common.KidZoneActionDialog
 import com.kidzone.presentation.common.LocationActionIcon
 import com.kidzone.presentation.common.OfflineAwareSubmitButton
+import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.place.add.LOCATION_SERVICE_DISABLED_MESSAGE
 import com.kidzone.presentation.place.add.LOCATION_TIMEOUT_USER_MESSAGE
 import com.kidzone.presentation.place.add.fetchCurrentLocation
@@ -51,35 +49,23 @@ fun LocationCorrectionDialog(
     isOffline: Boolean = false
 ) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
+    var locationRefreshSignal by remember { mutableIntStateOf(0) }
+    val locationServiceEnabled = rememberLocationServiceEnabled(locationRefreshSignal)
 
     var latitude by remember { mutableStateOf<Double?>(null) }
     var longitude by remember { mutableStateOf<Double?>(null) }
     var address by remember { mutableStateOf<String?>(null) }
     var isFetching by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var locationServiceEnabled by remember { mutableStateOf(isLocationServiceEnabled(context)) }
-
-    DisposableEffect(lifecycleOwner, context) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                locationServiceEnabled = isLocationServiceEnabled(context)
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
 
     val locationPermissionDenied = stringResource(R.string.location_permission_denied)
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            locationServiceEnabled = isLocationServiceEnabled(context)
-            if (locationServiceEnabled) {
+            if (isLocationServiceEnabled(context)) {
+                locationRefreshSignal++
                 isFetching = true
                 scope.launch {
                     fetchLocationInternal(context) { lat, lng, addr, err ->
@@ -120,8 +106,9 @@ fun LocationCorrectionDialog(
                 OutlinedButton(
                     onClick = {
                         errorMessage = null
-                        locationServiceEnabled = isLocationServiceEnabled(context)
-                        if (!locationServiceEnabled) {
+                        val currentLocationServiceEnabled = isLocationServiceEnabled(context)
+                        locationRefreshSignal++
+                        if (!currentLocationServiceEnabled) {
                             isFetching = false
                             context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
                         } else if (hasLocationPermission(context)) {

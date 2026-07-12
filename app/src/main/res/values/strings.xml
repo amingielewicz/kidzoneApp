@@ -222,6 +222,7 @@
     <string name="contact_support_subject_label">Temat</string>
     <string name="contact_support_message_label">Wiadomość</string>
     <string name="contact_support_send">Wyślij</string>
+    <string name="contact_support_offline_send_action">Wyślij po odzyskaniu internetu</string>
     <string name="contact_support_subject_counter">%1$d/%2$d znaków, min. 3</string>
     <string name="contact_support_message_counter">%1$d/%2$d znaków, min. 10</string>
     <string name="contact_support_hint">Wiadomość zostanie zapisana jako zgłoszenie i przekazana e-mailem do obsługi.</string>
@@ -364,6 +365,7 @@
     <string name="account_security_title">Konto i bezpieczeństwo</string>
     <string name="change_email">Zmień adres e-mail</string>
     <string name="delete_account">Usuń konto</string>
+    <string name="delete_account_offline_action">Usuń po odzyskaniu internetu</string>
     <string name="thank_you_review">Dziękujemy za opinię!</string>
     <string name="review_updated">Opinia zaktualizowana</string>
     <string name="duplicate_photo_error">To zdjęcie zostało już dodane. Nie można dodać duplikatu.</string>
