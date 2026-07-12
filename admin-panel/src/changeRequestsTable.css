@@ -76,7 +76,7 @@
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-changes-cell="true"] {
-  line-height: 1;
+  line-height: normal;
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-changes-cell="true"] .MuiChip-root {
@@ -85,6 +85,14 @@
   max-width: none;
   margin: 3px 8px 3px 0;
   vertical-align: middle;
+  overflow: visible;
+}
+
+.MuiTableContainer-root:has([data-change-requests-table="true"]) [data-changes-cell="true"] .MuiChip-label {
+  line-height: 1.4;
+  padding-top: 1px;
+  padding-bottom: 2px;
+  overflow: visible;
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-description-column="true"],
