@@ -105,7 +105,7 @@ class FirestorePlaceRepository @Inject constructor(
                     .orderBy("averageRating", com.google.firebase.firestore.Query.Direction.DESCENDING)
                     .limit(limit.toLong()).get().await()
                 val places = snapshot.documents.mapNotNull { it.toObject(PlaceDto::class.java)?.toDomain() }
-                placeDao.upsertAll(places.map(ReviewEntity::fromDomain))
+                placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
                 OpResult.success(places)
             } catch (e: Exception) {
                 val cached = placeDao.getTopPlaces(limit)
