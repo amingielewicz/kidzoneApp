@@ -1,28 +1,54 @@
 package com.kidzone.presentation.place.details
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Accessible
+import androidx.compose.material.icons.filled.BabyChangingStation
+import androidx.compose.material.icons.filled.Chair
+import androidx.compose.material.icons.filled.ChildCare
+import androidx.compose.material.icons.filled.Deck
+import androidx.compose.material.icons.filled.Fence
+import androidx.compose.material.icons.filled.Grass
+import androidx.compose.material.icons.filled.LocalParking
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Microwave
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Stroller
+import androidx.compose.material.icons.filled.Toys
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.Wc
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -31,9 +57,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.kidzone.R
 import com.kidzone.domain.model.Amenity
@@ -41,6 +70,11 @@ import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.PLACE_NAME_MAX_LENGTH
+
+private const val COMMENT_MAX_LENGTH = 500
+internal const val CHANGE_REQUEST_COMMENT_PREFIX = "__KIDZONE_COMMENT__:"
+private val SelectedAmenityColor = Color(0xFF2E7D32)
+private val FocusedFieldColor = Color(0xFF1976D2)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -55,6 +89,14 @@ fun SuggestEditSheet(
     var description by remember { mutableStateOf(place.description) }
     var selectedCategory by remember { mutableStateOf(place.category) }
     var selectedAmenities by remember { mutableStateOf(place.amenities.map { it.name }.toSet()) }
+    var comment by remember { mutableStateOf("") }
+
+    val originalAmenities = remember(place.amenities) { place.amenities.map { it.name }.toSet() }
+    val hasChanges = name.trim() != place.name ||
+        description.trim() != place.description ||
+        selectedCategory != place.category ||
+        selectedAmenities != originalAmenities
+    val canSubmit = name.trim().isNotBlank() && comment.trim().isNotBlank() && hasChanges
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -64,7 +106,7 @@ fun SuggestEditSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .heightIn(max = 600.dp)
+                .heightIn(max = 700.dp)
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
@@ -119,37 +161,89 @@ fun SuggestEditSheet(
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
             val applicable = remember(selectedCategory) {
                 Amenity.forCategory(selectedCategory)
             }
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 applicable.forEach { amenity ->
+                    val selected = amenity.name in selectedAmenities
                     FilterChip(
-                        selected = amenity.name in selectedAmenities,
+                        selected = selected,
                         onClick = {
-                            selectedAmenities = if (amenity.name in selectedAmenities) {
+                            selectedAmenities = if (selected) {
                                 selectedAmenities - amenity.name
                             } else {
                                 selectedAmenities + amenity.name
                             }
                         },
-                        label = { Text(stringResource(amenity.labelRes)) }
+                        label = { Text(stringResource(amenity.labelRes)) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = amenityIcon(amenity),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = if (selected) SelectedAmenityColor else MaterialTheme.colorScheme.outlineVariant
+                        ),
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = Color.White,
+                            labelColor = MaterialTheme.colorScheme.onSurface,
+                            iconColor = MaterialTheme.colorScheme.onSurface,
+                            selectedContainerColor = SelectedAmenityColor,
+                            selectedLabelColor = Color.White,
+                            selectedLeadingIconColor = Color.White
+                        )
                     )
                 }
             }
 
             Spacer(Modifier.height(16.dp))
 
+            OutlinedTextField(
+                value = comment,
+                onValueChange = { comment = it.take(COMMENT_MAX_LENGTH) },
+                label = {
+                    Row {
+                        Text("Opisz, co i dlaczego zmieniono")
+                        Text(" *", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                minLines = 3,
+                maxLines = 5,
+                supportingText = {
+                    Text(
+                        text = "${comment.length}/$COMMENT_MAX_LENGTH",
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.End
+                    )
+                },
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = FocusedFieldColor,
+                    focusedLabelColor = FocusedFieldColor,
+                    cursorColor = FocusedFieldColor
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(16.dp))
+
             Button(
                 onClick = {
-                    onSubmit(name, description, selectedCategory.name, selectedAmenities)
+                    val payloadAmenities = selectedAmenities +
+                        "$CHANGE_REQUEST_COMMENT_PREFIX${comment.trim()}"
+                    onSubmit(name, description, selectedCategory.name, payloadAmenities)
                 },
-                enabled = name.trim().isNotBlank(),
+                enabled = canSubmit,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
@@ -160,6 +254,31 @@ fun SuggestEditSheet(
             Spacer(Modifier.height(16.dp))
         }
     }
+}
+
+private fun amenityIcon(amenity: Amenity): ImageVector = when (amenity) {
+    Amenity.CHANGING_TABLE -> Icons.Filled.BabyChangingStation
+    Amenity.TOILET -> Icons.Filled.Wc
+    Amenity.STROLLER_ACCESS, Amenity.WIDE_DOORS -> Icons.Filled.Accessible
+    Amenity.PARKING, Amenity.FAMILY_PARKING -> Icons.Filled.LocalParking
+    Amenity.FENCING -> Icons.Filled.Fence
+    Amenity.SOFT_SURFACE, Amenity.SOFT_PROTECTION -> Icons.Filled.Grass
+    Amenity.SHADED_BENCHES, Amenity.REST_AREAS, Amenity.PARENT_ZONE -> Icons.Filled.Deck
+    Amenity.TODDLER_ZONE, Amenity.AGE_ZONES, Amenity.PARENT_CHILD_ROOM -> Icons.Filled.ChildCare
+    Amenity.KIDS_MENU, Amenity.KIDS_TABLEWARE, Amenity.FAST_SERVICE -> Icons.Filled.Restaurant
+    Amenity.HIGH_CHAIR -> Icons.Filled.Chair
+    Amenity.KIDS_ENTERTAINMENT, Amenity.SENSORY_TOYS, Amenity.TOY_SANITIZATION -> Icons.Filled.Toys
+    Amenity.MONITORING -> Icons.Filled.Videocam
+    Amenity.LOCKERS -> Icons.Filled.Lock
+    Amenity.WIFI -> Icons.Filled.Wifi
+    Amenity.MICROWAVE -> Icons.Filled.Microwave
+    Amenity.NO_LOUD_MUSIC, Amenity.QUIET_AREAS, Amenity.QUIET_FEEDING -> Icons.Filled.VolumeOff
+    Amenity.DRINKING_WATER, Amenity.BREASTFEEDING_AREA -> Icons.Filled.WaterDrop
+    Amenity.STROLLER_RENTAL -> Icons.Filled.Stroller
+    Amenity.KIDS_CORNER_VISIBLE, Amenity.GOOD_LIGHTING -> Icons.Filled.Star
+    Amenity.CAR_FREE_AREA, Amenity.PICNIC_AREA, Amenity.SAFE_PATHS,
+    Amenity.FAMILY_FAST_TRACK, Amenity.LOST_CHILD_POINT, Amenity.KID_FRIENDLY_SIGNS,
+    Amenity.ANIMATOR -> Icons.Filled.LocationOn
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
