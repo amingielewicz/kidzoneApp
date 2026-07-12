@@ -97,6 +97,7 @@ import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.RatingIcon
+import com.kidzone.presentation.common.selectUniquePhotoUris
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -172,7 +173,6 @@ private const val METERS_PER_KILOMETER = 1000
 private const val DISTANCE_ROUNDING_OFFSET_METERS = 25
 private const val DISTANCE_ROUNDING_STEP_METERS = 50
 private const val EARTH_RADIUS_KM = 6371.0
-
 /**
  * Szczegóły miejsca.
  */
@@ -208,7 +208,6 @@ fun PlaceDetailsScreen(
 
     var fullscreenPhotos by remember { mutableStateOf<List<String>>(emptyList()) }
     var fullscreenPhotoIndex by remember { mutableStateOf(0) }
-    var fullscreenPhotosAreMine by remember { mutableStateOf(false) }
     var fullscreenPhotoUploadedBy by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var fullscreenReview by remember { mutableStateOf<Review?>(null) }
     var showReportPhotoDialog by remember { mutableStateOf(false) }
@@ -222,10 +221,26 @@ fun PlaceDetailsScreen(
     val availablePlacePhotoSlots = (
         PLACE_DETAILS_MAX_PHOTOS - (state.place?.photoUrls?.size ?: 0)
     ).coerceAtLeast(0)
+    val duplicatePhotoError = stringResource(R.string.duplicate_photo_error)
 
     fun addPickedPlacePhotos(uris: List<Uri>) {
         val availableSlots = PLACE_DETAILS_MAX_PHOTOS - (state.place?.photoUrls?.size ?: 0)
-        viewModel.addPhotosToPlace(uris.take(availableSlots.coerceAtLeast(0)))
+        if (uris.isEmpty() || availableSlots <= 0) return
+
+        val selection = selectUniquePhotoUris(
+            context = context,
+            uris = uris,
+            availableSlots = availableSlots
+        )
+
+        if (selection.acceptedUris.isNotEmpty()) {
+            viewModel.addPhotosToPlace(selection.acceptedUris)
+        }
+        if (selection.duplicatesFound > 0) {
+            scope.launch {
+                snackbarHostState.showSnackbar(duplicatePhotoError)
+            }
+        }
     }
 
     val placePhotoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -307,7 +322,6 @@ fun PlaceDetailsScreen(
         viewModel.consumeReviewActionEvent()
     }
 
-    val duplicatePhotoError = stringResource(R.string.duplicate_photo_error)
     LaunchedEffect(state.placePhotoDuplicateEvent) {
         if (state.placePhotoDuplicateEvent) {
             snackbarHostState.showSnackbar(duplicatePhotoError)
@@ -501,10 +515,9 @@ fun PlaceDetailsScreen(
                                 reviewToReport = review
                                 showReportReviewDialog = true
                             },
-                            onOpenPhotoViewer = { photos, index, areMine, review ->
+                            onOpenPhotoViewer = { photos, index, review ->
                                 fullscreenPhotos = photos
                                 fullscreenPhotoIndex = index
-                                fullscreenPhotosAreMine = areMine
                                 fullscreenReview = review
                                 fullscreenPhotoUploadedBy = state.place?.photoUploadedBy.orEmpty()
                             },
@@ -652,7 +665,7 @@ fun PlaceDetailsScreen(
                 fullscreenPhotos = emptyList()
                 fullscreenReview = null
             },
-            onReportPhoto = if (fullscreenPhotosAreMine) null else { url ->
+            onReportPhoto = { url ->
                 if (!state.reportedPhotoUrls.contains(url)) {
                     photoUrlToReport = url
                     showReportPhotoDialog = true
@@ -724,9 +737,8 @@ private fun PlaceDetailsContent(
     onOpenPhotoViewer: (
         photos: List<String>,
         startIndex: Int,
-        areMine: Boolean,
         review: Review?
-    ) -> Unit = { _, _, _, _ -> },
+    ) -> Unit = { _, _, _ -> },
     onAddPlacePhoto: (() -> Unit)? = null,
     onAddPlaceCamera: (() -> Unit)? = null,
     isUploadingPlacePhoto: Boolean = false,
@@ -771,7 +783,7 @@ private fun PlaceDetailsContent(
                 PlacePhotoGallery(
                     photoUrls = place.photoUrls,
                     onPhotoClick = { index ->
-                        onOpenPhotoViewer(place.photoUrls, index, false, null)
+                        onOpenPhotoViewer(place.photoUrls, index, null)
                     }
                 )
             }
@@ -893,7 +905,6 @@ private fun PlaceDetailsContent(
                         onOpenPhotoViewer(
                             review.photoUrls,
                             index,
-                            isMyReview,
                             review.takeIf { isMyReview }
                         )
                     }
