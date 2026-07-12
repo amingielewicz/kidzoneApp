@@ -1,4 +1,4 @@
-import { KeyboardEvent, useCallback } from 'react';
+import { KeyboardEvent, MouseEvent, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box } from '@mui/material';
 import { DashboardPage } from './DashboardPageV2';
@@ -21,7 +21,7 @@ export function DashboardPageWithNavigation() {
   }, []);
 
   const handleClick = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
+    (event: MouseEvent<HTMLDivElement>) => {
       const route = getRoute(event.target);
       if (route) navigate(route);
     },
@@ -41,20 +41,7 @@ export function DashboardPageWithNavigation() {
   );
 
   return (
-    <Box
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
-      sx={{
-        '& .MuiCard-root:has(.MuiTypography-root:nth-of-type(2))': {
-          transition: 'box-shadow 0.2s ease, transform 0.2s ease',
-        },
-        '& .MuiCard-root': {
-          '&:has(.MuiTypography-root:last-child)': {
-            cursor: 'default',
-          },
-        },
-      }}
-    >
+    <Box onClick={handleClick} onKeyDown={handleKeyDown}>
       <DashboardPage />
     </Box>
   );
