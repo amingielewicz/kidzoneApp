@@ -59,16 +59,18 @@
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-changes-column="true"],
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-changes-cell="true"] {
   width: 1%;
-  min-width: 150px;
+  min-width: 280px;
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-changes-cell="true"] > * {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  max-width: 240px;
-  max-height: 58px;
+  align-content: center;
+  column-gap: 8px;
+  row-gap: 6px;
+  max-width: 340px;
+  max-height: 66px;
   overflow: hidden;
 }
 
@@ -110,13 +112,23 @@
   min-width: 64px;
 }
 
+.MuiTableContainer-root:has([data-change-requests-table="true"]) [data-firebase-column="true"],
+.MuiTableContainer-root:has([data-change-requests-table="true"]) [data-firebase-cell="true"] {
+  padding-right: 18px;
+}
+
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-firebase-cell="true"] a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   cursor: pointer;
   text-decoration: none;
+}
+
+.MuiTableContainer-root:has([data-change-requests-table="true"]) [data-firebase-cell="true"] svg {
+  width: 24px;
+  height: 24px;
 }
