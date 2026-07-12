@@ -24,7 +24,7 @@ function decorateAdminEmailHtml(html: string): string {
 
   const panelButton =
     `<a class="btn" href="${ADMIN_PANEL_URL}" ` +
-    `style="background:#1976D2; margin-right:8px;">Otwórz panel admina</a>`;
+    "style=\"background:#1976D2; margin-right:8px;\">Otwórz panel admina</a>";
 
   return html.replace(
     /(<a\b[^>]*href="[^"]*console\.firebase\.google\.com[^"]*"[^>]*>[^<]*Firebase Console[^<]*<\/a>)/i,
