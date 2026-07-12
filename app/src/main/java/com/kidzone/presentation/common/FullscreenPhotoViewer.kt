@@ -50,7 +50,7 @@ private val VIEWER_ACTION_ICON_SIZE = 20.dp
 private val VIEWER_ACTION_BUTTON_SIZE_LARGE = 44.dp
 private val VIEWER_ACTION_ICON_SIZE_LARGE = 24.dp
 private val VIEWER_ACTION_PADDING = 16.dp
-private val VIEWER_BOTTOM_ACTION_PADDING = 48.dp
+private val VIEWER_BOTTOM_ACTION_PADDING = 96.dp
 private const val VIEWER_ACTION_CONTAINER_ALPHA = 0.82f
 
 enum class FullscreenPhotoAction {
