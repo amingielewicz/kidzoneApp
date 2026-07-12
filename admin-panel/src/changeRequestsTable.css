@@ -15,6 +15,15 @@
   border-bottom: 1px solid rgba(224, 224, 224, 1);
 }
 
+.MuiTableContainer-root:has([data-change-requests-table="true"]) th {
+  text-align: center;
+}
+
+.MuiTableContainer-root:has([data-change-requests-table="true"]) th .MuiTableSortLabel-root {
+  width: 100%;
+  justify-content: center;
+}
+
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-date-column="true"],
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-date-cell="true"],
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-type-column="true"],
@@ -83,16 +92,17 @@
   width: 360px;
   min-width: 360px;
   max-width: 360px;
-  text-align: left;
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-description-column="true"] {
   font-weight: 700;
+  text-align: center;
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-description-cell="true"] {
   overflow: hidden;
   white-space: nowrap;
+  text-align: left;
   font-size: 0.78rem;
   line-height: 1.3;
 }
