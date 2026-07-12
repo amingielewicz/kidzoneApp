@@ -41,6 +41,7 @@ import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.PLACE_NAME_MAX_LENGTH
 
 private const val COMMENT_MAX_LENGTH = 500
+private const val COMMENT_WARNING_LENGTH = 480
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming", "LongMethod")
@@ -173,7 +174,12 @@ fun SuggestEditSheet(
                             R.string.suggest_edit_comment_counter,
                             comment.length,
                             COMMENT_MAX_LENGTH
-                        )
+                        ),
+                        color = if (comment.length >= COMMENT_WARNING_LENGTH) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
                     )
                 },
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
