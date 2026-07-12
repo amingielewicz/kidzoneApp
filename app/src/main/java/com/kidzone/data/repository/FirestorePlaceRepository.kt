@@ -47,6 +47,8 @@ class FirestorePlaceRepository @Inject constructor(
         private const val KM_PER_DEGREE = 111.0
         private const val MIN_LONGITUDE_COSINE = 0.1
         private const val ROOM_CURSOR_PREFIX = "room:"
+        private const val CHANGE_REQUEST_COMMENT_PREFIX = "__KIDZONE_COMMENT__:"
+        private const val CHANGE_REQUEST_COMMENT_MAX_LENGTH = 500
     }
 
     private data class PlacesQueryKey(val category: PlaceCategory?, val query: String?)
@@ -286,6 +288,28 @@ class FirestorePlaceRepository @Inject constructor(
         require(requesterId.isNotBlank()) { "requesterId nie może być puste" }
         require(changes.isNotEmpty()) { "changes nie może być puste" }
 
+        val sanitizedChanges = changes.toMutableMap()
+        val amenityValues = (sanitizedChanges["amenities"] as? Iterable<*>)
+            ?.filterIsInstance<String>()
+            .orEmpty()
+        val commentEntry = amenityValues.firstOrNull {
+            it.startsWith(CHANGE_REQUEST_COMMENT_PREFIX)
+        }
+        val comment = commentEntry
+            ?.removePrefix(CHANGE_REQUEST_COMMENT_PREFIX)
+            .orEmpty()
+            .trim()
+            .take(CHANGE_REQUEST_COMMENT_MAX_LENGTH)
+
+        if (commentEntry != null) {
+            sanitizedChanges["amenities"] = amenityValues.filterNot {
+                it.startsWith(CHANGE_REQUEST_COMMENT_PREFIX)
+            }
+        }
+        if (type == "EDIT") {
+            require(comment.isNotBlank()) { "comment nie może być pusty" }
+        }
+
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             firestore.collection(FirestoreCollections.PLACE_CHANGE_REQUESTS)
                 .add(
@@ -293,7 +317,8 @@ class FirestorePlaceRepository @Inject constructor(
                         "placeId" to placeId,
                         "requesterId" to requesterId,
                         "reporterId" to requesterId,
-                        "changes" to changes,
+                        "changes" to sanitizedChanges,
+                        "comment" to comment,
                         "type" to type,
                         "createdAtMillis" to System.currentTimeMillis(),
                         "status" to "pending"
