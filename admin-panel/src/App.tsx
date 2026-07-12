@@ -1,9 +1,9 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { LoginPage } from './pages/LoginPage';
-import { DashboardPage } from './pages/DashboardPage';
+import { DashboardPageWithNavigation } from './pages/DashboardPageWithNavigation';
 import { ReportsPage } from './pages/ReportsPage';
-import { ChangeRequestsPage } from './pages/ChangeRequestsPage';
+import { ChangeRequestsPageWithRowNavigation } from './pages/ChangeRequestsPageWithRowNavigation';
 import { PlacesPage } from './pages/PlacesPage';
 import { UsersPage } from './pages/UsersPage';
 import { Layout } from './components/Layout';
@@ -40,9 +40,9 @@ function App() {
   return (
     <Layout>
       <Routes>
-        <Route path="/" element={<DashboardPage />} />
+        <Route path="/" element={<DashboardPageWithNavigation />} />
         <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/change-requests" element={<ChangeRequestsPage />} />
+        <Route path="/change-requests" element={<ChangeRequestsPageWithRowNavigation />} />
         <Route path="/places" element={<PlacesPage />} />
         <Route path="/users" element={<UsersPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

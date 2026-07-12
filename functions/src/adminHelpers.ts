@@ -1,6 +1,61 @@
+import Mailer from "nodemailer/lib/mailer";
+
 export type HttpRequestHeaders = {
   authorization?: string | string[];
 };
+
+const ADMIN_PANEL_URL = "https://kidzone-admin-panel.web.app/";
+const EMAIL_DECORATOR_FLAG = Symbol.for("kidzone.adminEmailDecoratorInstalled");
+
+type MailOptions = {
+  html?: string;
+  subject?: string;
+};
+
+type MailerPrototype = {
+  sendMail: (mailOptions: MailOptions, callback?: unknown) => unknown;
+  [EMAIL_DECORATOR_FLAG]?: boolean;
+};
+
+function decorateAdminEmailHtml(html: string): string {
+  if (!html.includes("Firebase Console") || html.includes("Otwórz panel admina")) {
+    return html;
+  }
+
+  const panelButton =
+    `<a class="btn" href="${ADMIN_PANEL_URL}" ` +
+    "style=\"background:#1976D2; margin-right:8px;\">Otwórz panel admina</a>";
+
+  return html.replace(
+    /(<a\b[^>]*href="[^"]*console\.firebase\.google\.com[^"]*"[^>]*>[^<]*Firebase Console[^<]*<\/a>)/i,
+    `${panelButton}$1`
+  );
+}
+
+function installAdminEmailDecorator(): void {
+  const prototype = Mailer.prototype as MailerPrototype;
+  if (prototype[EMAIL_DECORATOR_FLAG]) return;
+
+  const originalSendMail = prototype.sendMail;
+  prototype.sendMail = function sendMailWithAdminPanelButton(
+    mailOptions: MailOptions,
+    callback?: unknown
+  ): unknown {
+    const decoratedOptions: MailOptions = {...mailOptions};
+    if (typeof decoratedOptions.html === "string") {
+      decoratedOptions.html = decorateAdminEmailHtml(decoratedOptions.html)
+        .replace(/Zmiana danych/g, "Propozycja zmiany danych");
+    }
+    if (typeof decoratedOptions.subject === "string") {
+      decoratedOptions.subject = decoratedOptions.subject
+        .replace(/Zmiana danych/g, "Propozycja zmiany danych");
+    }
+    return originalSendMail.call(this, decoratedOptions, callback);
+  };
+  prototype[EMAIL_DECORATOR_FLAG] = true;
+}
+
+installAdminEmailDecorator();
 
 export function extractBearerToken(headers: HttpRequestHeaders): string | null {
   const rawAuthHeader = headers.authorization || "";
