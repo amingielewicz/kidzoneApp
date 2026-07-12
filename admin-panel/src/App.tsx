@@ -3,7 +3,7 @@ import { useAuth } from './hooks/useAuth';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPageWithNavigation } from './pages/DashboardPageWithNavigation';
 import { ReportsPage } from './pages/ReportsPage';
-import { ChangeRequestsPage } from './pages/ChangeRequestsPage';
+import { ChangeRequestsPageWithRowNavigation } from './pages/ChangeRequestsPageWithRowNavigation';
 import { PlacesPage } from './pages/PlacesPage';
 import { UsersPage } from './pages/UsersPage';
 import { Layout } from './components/Layout';
@@ -42,7 +42,7 @@ function App() {
       <Routes>
         <Route path="/" element={<DashboardPageWithNavigation />} />
         <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/change-requests" element={<ChangeRequestsPage />} />
+        <Route path="/change-requests" element={<ChangeRequestsPageWithRowNavigation />} />
         <Route path="/places" element={<PlacesPage />} />
         <Route path="/users" element={<UsersPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
