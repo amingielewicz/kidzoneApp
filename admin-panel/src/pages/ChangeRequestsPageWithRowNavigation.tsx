@@ -44,6 +44,12 @@ export function ChangeRequestsPageWithRowNavigation() {
           placeIdHeader.style.whiteSpace = 'nowrap';
         }
 
+        const changesHeader = headerRow.children.item(3) as HTMLTableCellElement | null;
+        if (changesHeader) {
+          changesHeader.style.width = '1%';
+          changesHeader.style.whiteSpace = 'nowrap';
+        }
+
         if (!headerRow.querySelector('[data-description-column="true"]')) {
           const descriptionHeader = document.createElement('th');
           descriptionHeader.setAttribute('data-description-column', 'true');
@@ -109,6 +115,16 @@ export function ChangeRequestsPageWithRowNavigation() {
               placeIdCell.style.minWidth = 'max-content';
               placeIdCell.style.whiteSpace = 'nowrap';
             }
+          }
+
+          const changesCell = row.children.item(3) as HTMLTableCellElement | null;
+          if (changesCell) {
+            changesCell.style.width = '1%';
+            changesCell.style.whiteSpace = 'nowrap';
+            const chips = changesCell.querySelectorAll<HTMLElement>('.MuiChip-root');
+            chips.forEach((chip) => {
+              chip.style.marginBottom = '0';
+            });
           }
 
           if (!row.querySelector('[data-description-cell="true"]')) {
