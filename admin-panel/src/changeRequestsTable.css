@@ -1,19 +1,34 @@
 .MuiTableContainer-root:has([data-description-column="true"]) {
-  overflow-x: auto;
+  overflow-x: hidden;
 }
 
 .MuiTableContainer-root:has([data-description-column="true"]) table {
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
+  table-layout: fixed;
 }
 
 .MuiTableContainer-root:has([data-description-column="true"]) th,
 .MuiTableContainer-root:has([data-description-column="true"]) td {
-  white-space: nowrap !important;
-  overflow-wrap: normal !important;
-  word-break: normal !important;
+  vertical-align: middle;
+}
+
+.MuiTableContainer-root:has([data-description-column="true"]) [data-description-column="true"],
+.MuiTableContainer-root:has([data-description-column="true"]) [data-description-cell="true"] {
+  width: 280px;
+  max-width: 280px;
 }
 
 .MuiTableContainer-root:has([data-description-column="true"]) [data-description-cell="true"] {
-  max-width: none !important;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.MuiTableContainer-root:has([data-description-column="true"]) [data-description-text="true"] {
+  display: inline;
+  color: inherit;
+}
+
+.MuiTableContainer-root:has([data-description-column="true"]) [data-description-ellipsis="true"] {
+  color: #d32f2f;
+  font-weight: 700;
 }
