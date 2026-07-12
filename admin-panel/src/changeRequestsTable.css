@@ -1,0 +1,19 @@
+.MuiTableContainer-root:has([data-description-column="true"]) {
+  overflow-x: auto;
+}
+
+.MuiTableContainer-root:has([data-description-column="true"]) table {
+  width: max-content;
+  min-width: 100%;
+}
+
+.MuiTableContainer-root:has([data-description-column="true"]) th,
+.MuiTableContainer-root:has([data-description-column="true"]) td {
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+}
+
+.MuiTableContainer-root:has([data-description-column="true"]) [data-description-cell="true"] {
+  max-width: none !important;
+}
