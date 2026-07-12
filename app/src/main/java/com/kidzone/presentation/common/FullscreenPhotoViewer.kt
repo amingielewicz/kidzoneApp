@@ -1,3 +1,5 @@
+@file:Suppress("FunctionNaming", "LongMethod", "LongParameterList")
+
 package com.kidzone.presentation.common
 
 import androidx.compose.foundation.background
@@ -39,6 +41,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.kidzone.R
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -49,6 +52,12 @@ private val VIEWER_ACTION_ICON_SIZE = 20.dp
 private val VIEWER_ACTION_PADDING = 16.dp
 private val VIEWER_ACTION_SPACING = 8.dp
 private const val VIEWER_ACTION_CONTAINER_ALPHA = 0.82f
+
+enum class FullscreenPhotoAction {
+    NONE,
+    REPORT,
+    DELETE
+}
 
 /**
  * Fullscreen photo viewer z nawigacją swipe + pinch-to-zoom.
@@ -71,7 +80,8 @@ fun FullscreenPhotoViewer(
     onReportPhoto: ((photoUrl: String) -> Unit)? = null,
     canReportPhoto: (photoUrl: String) -> Boolean = { true },
     onDeletePhoto: ((photoUrl: String) -> Unit)? = null,
-    canDeletePhoto: (photoUrl: String) -> Boolean = { false }
+    canDeletePhoto: (photoUrl: String) -> Boolean = { false },
+    photoAction: ((photoUrl: String) -> FullscreenPhotoAction)? = null
 ) {
     if (photoUrls.isEmpty()) {
         onDismiss()
@@ -136,19 +146,23 @@ fun FullscreenPhotoViewer(
             val safeCurrentPage = pagerState.currentPage.coerceIn(0, photoUrls.lastIndex)
 
             val currentPhotoUrl = photoUrls[safeCurrentPage]
-            val reportAction = onReportPhoto?.takeIf { canReportPhoto(currentPhotoUrl) }
-            val deleteAction = onDeletePhoto?.takeIf { canDeletePhoto(currentPhotoUrl) }
-            if (reportAction != null || deleteAction != null) {
+            val currentAction = photoAction?.invoke(currentPhotoUrl) ?: when {
+                onDeletePhoto != null && canDeletePhoto(currentPhotoUrl) -> FullscreenPhotoAction.DELETE
+                onReportPhoto != null && canReportPhoto(currentPhotoUrl) -> FullscreenPhotoAction.REPORT
+                else -> FullscreenPhotoAction.NONE
+            }
+            if (currentAction != FullscreenPhotoAction.NONE) {
                 Row(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .navigationBarsPadding()
-                        .padding(VIEWER_ACTION_PADDING),
+                        .padding(VIEWER_ACTION_PADDING)
+                        .zIndex(1f),
                     horizontalArrangement = Arrangement.spacedBy(VIEWER_ACTION_SPACING)
                 ) {
-                    if (reportAction != null) {
+                    if (currentAction == FullscreenPhotoAction.REPORT && onReportPhoto != null) {
                         IconButton(
-                            onClick = { reportAction(currentPhotoUrl) },
+                            onClick = { onReportPhoto(currentPhotoUrl) },
                             modifier = Modifier
                                 .size(VIEWER_ACTION_BUTTON_SIZE)
                                 .background(
@@ -165,10 +179,10 @@ fun FullscreenPhotoViewer(
                         }
                     }
 
-                    if (deleteAction != null) {
+                    if (currentAction == FullscreenPhotoAction.DELETE && onDeletePhoto != null) {
                         IconButton(
                             onClick = {
-                                deleteAction(currentPhotoUrl)
+                                onDeletePhoto(currentPhotoUrl)
                                 onDismiss()
                             },
                             modifier = Modifier
