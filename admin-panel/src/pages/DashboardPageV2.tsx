@@ -53,9 +53,8 @@ interface RecentUser {
 interface RecentPlace {
   id: string;
   name: string;
-  category: string;
-  createdAtMillis: number;
   averageRating: number;
+  createdAtMillis: number;
 }
 
 interface RecentReview {
@@ -123,32 +122,16 @@ export function DashboardPage() {
 
       let pendingReportsCount = 0;
       try {
-        const reportQueries = ['place_reports', 'review_reports', 'photo_reports'].map((name) =>
-          query(collection(db, name), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc')),
-        );
-        const [prSnap, rrSnap, phSnap] = await Promise.all(reportQueries.map((q) => getDocs(q)));
+        const [prSnap, rrSnap, phSnap] = await Promise.all([
+          getDocs(query(collection(db, 'place_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'))),
+          getDocs(query(collection(db, 'review_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'))),
+          getDocs(query(collection(db, 'photo_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'))),
+        ]);
+
         const reports: RecentReport[] = [
-          ...prSnap.docs.map((d) => ({
-            id: d.id,
-            type: 'place' as const,
-            reason: d.data().reason || '',
-            comment: d.data().comment || '',
-            createdAtMillis: d.data().createdAtMillis || 0,
-          })),
-          ...rrSnap.docs.map((d) => ({
-            id: d.id,
-            type: 'review' as const,
-            reason: d.data().reason || '',
-            comment: d.data().comment || '',
-            createdAtMillis: d.data().createdAtMillis || 0,
-          })),
-          ...phSnap.docs.map((d) => ({
-            id: d.id,
-            type: 'photo' as const,
-            reason: d.data().reason || '',
-            comment: d.data().comment || '',
-            createdAtMillis: d.data().createdAtMillis || 0,
-          })),
+          ...prSnap.docs.map((d) => ({ id: d.id, type: 'place' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
+          ...rrSnap.docs.map((d) => ({ id: d.id, type: 'review' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
+          ...phSnap.docs.map((d) => ({ id: d.id, type: 'photo' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
         ].sort((a, b) => b.createdAtMillis - a.createdAtMillis);
 
         pendingReportsCount = reports.length;
@@ -189,11 +172,7 @@ export function DashboardPage() {
   }
 
   if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" py={6}>
-        <CircularProgress />
-      </Box>
-    );
+    return <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>;
   }
 
   const statCards = [
@@ -206,9 +185,7 @@ export function DashboardPage() {
   return (
     <Box>
       <Typography variant="h4" fontWeight={700} mb={1}>Dashboard</Typography>
-      <Typography variant="body2" color="text.secondary" mb={3}>
-        Podsumowanie statystyk i ostatnia aktywność w kidZone.
-      </Typography>
+      <Typography variant="body2" color="text.secondary" mb={3}>Podsumowanie statystyk i ostatnia aktywność w kidZone.</Typography>
 
       <Grid container spacing={3} mb={4}>
         {statCards.map((card) => (
@@ -229,19 +206,9 @@ export function DashboardPage() {
       <Grid container spacing={3}>
         <Grid item xs={12} md={4}>
           <Paper sx={{ p: 2, overflow: 'hidden' }}>
-            <Box display="flex" alignItems="center" gap={1} mb={2}>
-              <PersonAddIcon color="primary" />
-              <Typography variant="h6" fontWeight={600}>Nowi użytkownicy</Typography>
-            </Box>
+            <Box display="flex" alignItems="center" gap={1} mb={2}><PersonAddIcon color="primary" /><Typography variant="h6" fontWeight={600}>Nowi użytkownicy</Typography></Box>
             <List dense disablePadding>
-              {recentUsers.map((u) => (
-                <ListItem key={u.id} disableGutters>
-                  <ListItemAvatar>
-                    <Avatar src={u.avatarUrl} sx={{ width: 32, height: 32, fontSize: 14 }}>{u.name?.charAt(0) || '?'}</Avatar>
-                  </ListItemAvatar>
-                  <ListItemText primary={u.name || u.email} secondary={formatDate(u.createdAtMillis)} primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }} secondaryTypographyProps={{ variant: 'caption' }} />
-                </ListItem>
-              ))}
+              {recentUsers.map((u) => <ListItem key={u.id} disableGutters><ListItemAvatar><Avatar src={u.avatarUrl} sx={{ width: 32, height: 32, fontSize: 14 }}>{u.name?.charAt(0) || '?'}</Avatar></ListItemAvatar><ListItemText primary={u.name || u.email} secondary={formatDate(u.createdAtMillis)} /></ListItem>)}
               {recentUsers.length === 0 && <Typography variant="body2" color="text.secondary">Brak</Typography>}
             </List>
           </Paper>
@@ -249,20 +216,9 @@ export function DashboardPage() {
 
         <Grid item xs={12} md={4}>
           <Paper sx={{ p: 2 }}>
-            <Box display="flex" alignItems="center" gap={1} mb={2}>
-              <NewReleasesIcon color="primary" />
-              <Typography variant="h6" fontWeight={600}>Nowe miejsca</Typography>
-            </Box>
+            <Box display="flex" alignItems="center" gap={1} mb={2}><NewReleasesIcon color="primary" /><Typography variant="h6" fontWeight={600}>Nowe miejsca</Typography></Box>
             <List dense disablePadding>
-              {recentPlaces.map((p) => (
-                <ListItem key={p.id} disableGutters sx={{ minWidth: 0 }}>
-                  <ListItemAvatar>
-                    <Avatar sx={{ width: 32, height: 32, bgcolor: '#e3f2fd' }}><PlaceIcon sx={{ fontSize: 18, color: '#1976D2' }} /></Avatar>
-                  </ListItemAvatar>
-                  <ListItemText primary={p.name} secondary={formatDate(p.createdAtMillis)} sx={{ minWidth: 0, pr: 1 }} primaryTypographyProps={{ variant: 'body2', fontWeight: 500, sx: { overflowWrap: 'anywhere', wordBreak: 'break-word' } }} secondaryTypographyProps={{ variant: 'caption' }} />
-                  {p.averageRating > 0 && <Chip label={p.averageRating.toFixed(1)} size="small" />}
-                </ListItem>
-              ))}
+              {recentPlaces.map((p) => <ListItem key={p.id} disableGutters><ListItemAvatar><Avatar sx={{ width: 32, height: 32, bgcolor: '#e3f2fd' }}><PlaceIcon sx={{ fontSize: 18, color: '#1976D2' }} /></Avatar></ListItemAvatar><ListItemText primary={p.name} secondary={formatDate(p.createdAtMillis)} />{p.averageRating > 0 && <Chip label={p.averageRating.toFixed(1)} size="small" />}</ListItem>)}
               {recentPlaces.length === 0 && <Typography variant="body2" color="text.secondary">Brak</Typography>}
             </List>
           </Paper>
@@ -270,16 +226,9 @@ export function DashboardPage() {
 
         <Grid item xs={12} md={4}>
           <Paper sx={{ p: 2, overflow: 'hidden' }}>
-            <Box display="flex" alignItems="center" gap={1} mb={2}>
-              <ReviewsIcon color="primary" />
-              <Typography variant="h6" fontWeight={600}>Nowe opinie</Typography>
-            </Box>
+            <Box display="flex" alignItems="center" gap={1} mb={2}><ReviewsIcon color="primary" /><Typography variant="h6" fontWeight={600}>Nowe opinie</Typography></Box>
             <List dense disablePadding>
-              {recentReviews.map((r) => (
-                <ListItem key={r.id} disableGutters sx={{ alignItems: 'flex-start' }}>
-                  <ListItemText primary={<Box display="flex" alignItems="center" gap={1} minWidth={0} flexWrap="wrap"><Typography variant="body2" fontWeight={500} sx={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{r.authorName || 'Anonim'}</Typography><Rating value={r.rating} size="small" readOnly /></Box>} secondary={r.comment ? (r.comment.length > 60 ? `${r.comment.slice(0, 60)}...` : r.comment) : '(bez komentarza)'} secondaryTypographyProps={{ variant: 'caption' }} />
-                </ListItem>
-              ))}
+              {recentReviews.map((r) => <ListItem key={r.id} disableGutters><ListItemText primary={<Box display="flex" alignItems="center" gap={1}><Typography variant="body2" fontWeight={500}>{r.authorName || 'Anonim'}</Typography><Rating value={r.rating} size="small" readOnly /></Box>} secondary={r.comment || '(bez komentarza)'} /></ListItem>)}
               {recentReviews.length === 0 && <Typography variant="body2" color="text.secondary">Brak</Typography>}
             </List>
           </Paper>
@@ -307,7 +256,7 @@ export function DashboardPage() {
                     {r.type === 'photo' && <PhotoIcon sx={{ fontSize: 18, color: '#C2185B' }} />}
                   </Avatar>
                 </ListItemAvatar>
-                <ListItemText primary={<Box display="flex" alignItems="center" gap={1}><Chip label={r.type === 'place' ? 'Miejsce' : r.type === 'review' ? 'Opinia' : 'Zdjęcie'} size="small" variant="outlined" color={r.type === 'place' ? 'error' : r.type === 'review' ? 'warning' : 'secondary'} /><Typography variant="body2">{REASON_LABELS[r.reason] || r.reason}</Typography></Box>} secondary={`${formatDate(r.createdAtMillis)}${r.comment ? ` — ${r.comment.length > 40 ? `${r.comment.slice(0, 40)}...` : r.comment}` : ''}`} secondaryTypographyProps={{ variant: 'caption' }} />
+                <ListItemText primary={<Box display="flex" alignItems="center" gap={1}><Chip label={r.type === 'place' ? 'Miejsce' : r.type === 'review' ? 'Opinia' : 'Zdjęcie'} size="small" variant="outlined" /><Typography variant="body2">{REASON_LABELS[r.reason] || r.reason}</Typography></Box>} secondary={`${formatDate(r.createdAtMillis)}${r.comment ? ` — ${r.comment}` : ''}`} />
               </ListItemButton>
             ))}
           </List>
