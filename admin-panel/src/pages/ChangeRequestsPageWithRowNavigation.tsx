@@ -5,7 +5,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { ChangeRequestsPage } from './ChangeRequestsPage';
 import { db } from '../services/firebase';
 
-const DESCRIPTION_MAX_LENGTH = 72;
+const DESCRIPTION_MAX_LENGTH = 120;
 
 const FIREBASE_ICON_SVG = `
   <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
@@ -93,7 +93,7 @@ function setDescriptionContent(cell: HTMLTableCellElement, value: string): void 
   text.textContent = value.slice(0, DESCRIPTION_MAX_LENGTH).trimEnd();
   const ellipsis = document.createElement('span');
   ellipsis.setAttribute('data-description-ellipsis', 'true');
-  ellipsis.textContent = '...';
+  ellipsis.textContent = ' ...';
 
   cell.append(text, ellipsis);
 }
