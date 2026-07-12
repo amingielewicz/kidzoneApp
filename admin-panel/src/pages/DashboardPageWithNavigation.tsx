@@ -6,6 +6,7 @@ import { DashboardPage } from './DashboardPageV2';
 const CARD_ROUTES: Record<string, string> = {
   Miejsca: '/places',
   Użytkownicy: '/users',
+  'Propozycje zmian': '/change-requests',
   'Zgłoszenia oczekujące': '/reports',
 };
 
@@ -47,7 +48,7 @@ export function DashboardPageWithNavigation() {
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       sx={{
-        '& > .MuiGrid-root:first-of-type > .MuiGrid-item:nth-of-type(1) .MuiCard-root, & > .MuiGrid-root:first-of-type > .MuiGrid-item:nth-of-type(3) .MuiCard-root, & > .MuiGrid-root:first-of-type > .MuiGrid-item:nth-of-type(4) .MuiCard-root': {
+        '& > .MuiGrid-root:first-of-type > .MuiGrid-item:nth-of-type(1) .MuiCard-root, & > .MuiGrid-root:first-of-type > .MuiGrid-item:nth-of-type(3) .MuiCard-root, & > .MuiGrid-root:first-of-type > .MuiGrid-item:nth-of-type(4) .MuiCard-root, & > .MuiGrid-root:first-of-type > .MuiGrid-item:nth-of-type(5) .MuiCard-root': {
           cursor: 'pointer',
           transition: 'transform 0.15s ease, box-shadow 0.15s ease',
           '&:hover': {
