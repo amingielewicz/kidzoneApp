@@ -60,23 +60,20 @@
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-changes-cell="true"] {
   width: 1%;
   min-width: 280px;
+  max-width: 340px;
+  white-space: normal;
 }
 
-.MuiTableContainer-root:has([data-change-requests-table="true"]) [data-changes-cell="true"] > * {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  align-content: center;
-  column-gap: 8px;
-  row-gap: 6px;
-  max-width: 340px;
-  max-height: 66px;
-  overflow: hidden;
+.MuiTableContainer-root:has([data-change-requests-table="true"]) [data-changes-cell="true"] {
+  line-height: 1;
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-changes-cell="true"] .MuiChip-root {
-  flex: 0 0 auto;
-  margin: 0;
+  display: inline-flex;
+  width: auto;
+  max-width: none;
+  margin: 3px 8px 3px 0;
+  vertical-align: middle;
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-description-column="true"] {
