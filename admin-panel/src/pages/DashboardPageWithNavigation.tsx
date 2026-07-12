@@ -43,7 +43,20 @@ export function DashboardPageWithNavigation() {
   );
 
   return (
-    <Box onClick={handleClick} onKeyDown={handleKeyDown}>
+    <Box
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      sx={{
+        '& > .MuiGrid-root:first-of-type > .MuiGrid-item:nth-of-type(1) .MuiCard-root, & > .MuiGrid-root:first-of-type > .MuiGrid-item:nth-of-type(3) .MuiCard-root, & > .MuiGrid-root:first-of-type > .MuiGrid-item:nth-of-type(4) .MuiCard-root': {
+          cursor: 'pointer',
+          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            boxShadow: 4,
+          },
+        },
+      }}
+    >
       <DashboardPage />
     </Box>
   );
