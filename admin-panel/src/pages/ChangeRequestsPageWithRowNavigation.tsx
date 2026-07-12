@@ -98,6 +98,25 @@ function setDescriptionContent(cell: HTMLTableCellElement, value: string): void 
   cell.append(text, ellipsis);
 }
 
+function formatDateCell(cell: HTMLTableCellElement): void {
+  if (cell.hasAttribute('data-date-formatted')) return;
+
+  const value = cell.textContent?.trim() || '';
+  const match = value.match(/^(\d{2}\.\d{2}\.\d{4}),\s*(\d{2}:\d{2})$/);
+  if (!match) return;
+
+  const date = document.createElement('span');
+  date.setAttribute('data-date-part', 'true');
+  date.textContent = match[1];
+
+  const time = document.createElement('span');
+  time.setAttribute('data-time-part', 'true');
+  time.textContent = match[2];
+
+  cell.replaceChildren(date, time);
+  cell.setAttribute('data-date-formatted', 'true');
+}
+
 export function ChangeRequestsPageWithRowNavigation() {
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -118,11 +137,22 @@ export function ChangeRequestsPageWithRowNavigation() {
 
         table.setAttribute('data-change-requests-table', 'true');
 
-        const placeIdHeader = headerRow.children.item(2) as HTMLTableCellElement | null;
-        placeIdHeader?.setAttribute('data-place-id-column', 'true');
-
-        const changesHeader = headerRow.children.item(3) as HTMLTableCellElement | null;
-        changesHeader?.setAttribute('data-changes-column', 'true');
+        (headerRow.children.item(0) as HTMLTableCellElement | null)?.setAttribute(
+          'data-date-column',
+          'true',
+        );
+        (headerRow.children.item(1) as HTMLTableCellElement | null)?.setAttribute(
+          'data-type-column',
+          'true',
+        );
+        (headerRow.children.item(2) as HTMLTableCellElement | null)?.setAttribute(
+          'data-place-id-column',
+          'true',
+        );
+        (headerRow.children.item(3) as HTMLTableCellElement | null)?.setAttribute(
+          'data-changes-column',
+          'true',
+        );
 
         if (!headerRow.querySelector('[data-description-column="true"]')) {
           const descriptionHeader = document.createElement('th');
@@ -132,6 +162,15 @@ export function ChangeRequestsPageWithRowNavigation() {
           descriptionHeader.textContent = 'Opis';
           headerRow.insertBefore(descriptionHeader, headerRow.children.item(4));
         }
+
+        (headerRow.children.item(5) as HTMLTableCellElement | null)?.setAttribute(
+          'data-status-column',
+          'true',
+        );
+        (headerRow.children.item(6) as HTMLTableCellElement | null)?.setAttribute(
+          'data-actions-column',
+          'true',
+        );
 
         if (!headerRow.querySelector('[data-firebase-column="true"]')) {
           const firebaseHeader = document.createElement('th');
@@ -157,6 +196,17 @@ export function ChangeRequestsPageWithRowNavigation() {
             .getAttribute('aria-label')
             ?.replace('Pokaż szczegóły propozycji zmian ', '');
           if (!requestId) return;
+
+          const dateCell = row.children.item(0) as HTMLTableCellElement | null;
+          if (dateCell) {
+            dateCell.setAttribute('data-date-cell', 'true');
+            formatDateCell(dateCell);
+          }
+
+          (row.children.item(1) as HTMLTableCellElement | null)?.setAttribute(
+            'data-type-cell',
+            'true',
+          );
 
           const copyButton = row.querySelector<HTMLButtonElement>(
             'button[aria-label^="Kopiuj ID miejsca "]',
@@ -196,6 +246,15 @@ export function ChangeRequestsPageWithRowNavigation() {
                 setDescriptionContent(descriptionCell!, '—');
               });
           }
+
+          (row.children.item(5) as HTMLTableCellElement | null)?.setAttribute(
+            'data-status-cell',
+            'true',
+          );
+          (row.children.item(6) as HTMLTableCellElement | null)?.setAttribute(
+            'data-actions-cell',
+            'true',
+          );
 
           if (row.querySelector('[data-firebase-cell="true"]')) return;
 
