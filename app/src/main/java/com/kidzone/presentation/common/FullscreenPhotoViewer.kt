@@ -10,10 +10,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -45,7 +48,7 @@ private val VIEWER_ACTION_BUTTON_SIZE = 36.dp
 private val VIEWER_ACTION_ICON_SIZE = 20.dp
 private val VIEWER_ACTION_PADDING = 16.dp
 private val VIEWER_ACTION_SPACING = 8.dp
-private const val VIEWER_ACTION_ICON_ALPHA = 0.75f
+private const val VIEWER_ACTION_CONTAINER_ALPHA = 0.82f
 
 /**
  * Fullscreen photo viewer z nawigacją swipe + pinch-to-zoom.
@@ -111,8 +114,13 @@ fun FullscreenPhotoViewer(
                 onClick = onDismiss,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
+                    .statusBarsPadding()
                     .padding(VIEWER_ACTION_PADDING)
                     .size(VIEWER_ACTION_BUTTON_SIZE)
+                    .background(
+                        color = Color.Black.copy(alpha = VIEWER_ACTION_CONTAINER_ALPHA),
+                        shape = CircleShape
+                    )
             ) {
                 Icon(
                     imageVector = Icons.Filled.Close,
@@ -133,19 +141,25 @@ fun FullscreenPhotoViewer(
             if (reportAction != null || deleteAction != null) {
                 Row(
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
+                        .align(Alignment.BottomEnd)
+                        .navigationBarsPadding()
                         .padding(VIEWER_ACTION_PADDING),
                     horizontalArrangement = Arrangement.spacedBy(VIEWER_ACTION_SPACING)
                 ) {
                     if (reportAction != null) {
                         IconButton(
                             onClick = { reportAction(currentPhotoUrl) },
-                            modifier = Modifier.size(VIEWER_ACTION_BUTTON_SIZE)
+                            modifier = Modifier
+                                .size(VIEWER_ACTION_BUTTON_SIZE)
+                                .background(
+                                    color = Color.Black.copy(alpha = VIEWER_ACTION_CONTAINER_ALPHA),
+                                    shape = CircleShape
+                                )
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Flag,
                                 contentDescription = stringResource(R.string.report_photo),
-                                tint = MaterialTheme.colorScheme.error.copy(alpha = VIEWER_ACTION_ICON_ALPHA),
+                                tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(VIEWER_ACTION_ICON_SIZE)
                             )
                         }
@@ -157,12 +171,17 @@ fun FullscreenPhotoViewer(
                                 deleteAction(currentPhotoUrl)
                                 onDismiss()
                             },
-                            modifier = Modifier.size(VIEWER_ACTION_BUTTON_SIZE)
+                            modifier = Modifier
+                                .size(VIEWER_ACTION_BUTTON_SIZE)
+                                .background(
+                                    color = Color.Black.copy(alpha = VIEWER_ACTION_CONTAINER_ALPHA),
+                                    shape = CircleShape
+                                )
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Delete,
                                 contentDescription = stringResource(R.string.delete_photo),
-                                tint = MaterialTheme.colorScheme.error.copy(alpha = VIEWER_ACTION_ICON_ALPHA),
+                                tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(VIEWER_ACTION_ICON_SIZE)
                             )
                         }

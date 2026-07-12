@@ -12,7 +12,6 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.core.content.ContextCompat
-import java.security.MessageDigest
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -94,9 +93,12 @@ import com.kidzone.presentation.common.LocationActionIcon
 import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.common.amenityIcon
+import com.kidzone.presentation.common.computePhotoContentHash
+import com.kidzone.presentation.common.computeRemotePhotoContentHash
 import com.kidzone.presentation.common.createCameraImageUri
 import com.kidzone.presentation.common.rememberHapticFeedback
 import com.kidzone.presentation.common.rememberNetworkStatus
+import com.kidzone.presentation.common.selectUniquePhotoUris
 import com.kidzone.presentation.common.style
 import com.kidzone.utils.UiText
 import kotlinx.coroutines.launch
@@ -199,7 +201,7 @@ fun AddPlaceScreen(
             val hashes = mutableSetOf<String>()
             for (url in state.existingPhotoUrls) {
                 val hash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    computeRemotePlacePhotoHash(url)
+                    computeRemotePhotoContentHash(url)
                 }
                 if (hash != null) hashes.add(hash)
             }
@@ -218,23 +220,15 @@ fun AddPlaceScreen(
             val available = MAX_PLACE_PHOTOS - (state.existingPhotoUrls.size + state.photoUris.size)
             if (available <= 0) return
 
-            val accepted = mutableListOf<Uri>()
-            val hashes = photoHashSet.toMutableSet()
-            var duplicatesFound = 0
-            for (uri in uris) {
-                if (accepted.size < available) {
-                    val hash = computePlacePhotoHash(context, uri)
-                    if (hash != null && hash in hashes) {
-                        duplicatesFound++
-                    } else {
-                        if (hash != null) hashes.add(hash)
-                        accepted.add(uri)
-                    }
-                }
-            }
-            photoHashSet = hashes
-            if (accepted.isNotEmpty()) viewModel.addPhotos(accepted)
-            if (duplicatesFound > 0) {
+            val selection = selectUniquePhotoUris(
+                context = context,
+                uris = uris,
+                availableSlots = available,
+                knownHashes = photoHashSet
+            )
+            photoHashSet = photoHashSet + selection.acceptedHashes
+            if (selection.acceptedUris.isNotEmpty()) viewModel.addPhotos(selection.acceptedUris)
+            if (selection.duplicatesFound > 0) {
                 coroutineScope.launch { snackbarHostState.showSnackbar(duplicatePhotoError) }
             }
         }
@@ -258,7 +252,7 @@ fun AddPlaceScreen(
     ) { success ->
         val uri = placeCameraUriString?.let(Uri::parse)
         if (success && uri != null) {
-            val hash = computePlacePhotoHash(context, uri)
+            val hash = computePhotoContentHash(context, uri)
             if (hash == null || hash !in photoHashSet) {
                 if (hash != null) photoHashSet = photoHashSet + hash
                 viewModel.addPhotos(listOf(uri))
@@ -531,14 +525,14 @@ fun AddPlaceScreen(
                         viewModel.removeExistingPhoto(index)
                         coroutineScope.launch {
                             val hash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                computeRemotePlacePhotoHash(removedUrl)
+                                computeRemotePhotoContentHash(removedUrl)
                             }
                             if (hash != null) photoHashSet = photoHashSet - hash
                         }
                     },
                     onRemoveNew = { index ->
                         val removedUri = state.photoUris[index]
-                        val hash = computePlacePhotoHash(context, removedUri)
+                        val hash = computePhotoContentHash(context, removedUri)
                         viewModel.removeNewPhoto(index)
                         if (hash != null) photoHashSet = photoHashSet - hash
                     }
@@ -964,35 +958,4 @@ private fun DuplicateWarningDialog(
         confirmButton = { Button(onClick = onConfirm) { Text(stringResource(R.string.duplicate_warning_confirm)) } },
         dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
     )
-}
-
-private fun computePlacePhotoHash(context: android.content.Context, uri: Uri): String? {
-    return try {
-        val inputStream = context.contentResolver.openInputStream(uri) ?: return null
-        val md = MessageDigest.getInstance("MD5")
-        val buffer = ByteArray(8192)
-        var bytesRead: Int
-        while (inputStream.read(buffer).also { bytesRead = it } != -1) md.update(buffer, 0, bytesRead)
-        inputStream.close()
-        md.digest().joinToString("") { "%02x".format(it) }
-    } catch (_: Exception) {
-        null
-    }
-}
-
-private fun computeRemotePlacePhotoHash(url: String): String? {
-    return try {
-        val connection = java.net.URL(url).openConnection()
-        connection.connectTimeout = 10_000
-        connection.readTimeout = 10_000
-        val inputStream = connection.getInputStream()
-        val md = MessageDigest.getInstance("MD5")
-        val buffer = ByteArray(8192)
-        var bytesRead: Int
-        while (inputStream.read(buffer).also { bytesRead = it } != -1) md.update(buffer, 0, bytesRead)
-        inputStream.close()
-        md.digest().joinToString("") { "%02x".format(it) }
-    } catch (_: Exception) {
-        null
-    }
 }

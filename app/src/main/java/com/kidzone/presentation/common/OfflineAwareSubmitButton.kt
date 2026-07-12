@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,6 +29,7 @@ fun OfflineAwareSubmitButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     isLoading: Boolean = false,
+    colors: ButtonColors = ButtonDefaults.buttonColors(),
     offlineLabel: String = stringResource(R.string.add_place_offline_save_action),
     offlineHint: String = stringResource(R.string.add_place_offline_hint_short)
 ) {
@@ -38,6 +41,7 @@ fun OfflineAwareSubmitButton(
         Button(
             onClick = onClick,
             enabled = enabled && !isOffline && !isLoading,
+            colors = colors,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(OFFLINE_SUBMIT_BUTTON_HEIGHT)

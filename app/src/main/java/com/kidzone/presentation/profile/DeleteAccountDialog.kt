@@ -15,6 +15,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -41,8 +42,8 @@ import com.kidzone.presentation.auth.rememberGoogleSignInLauncher
 import com.kidzone.presentation.common.ModalDangerColor
 import com.kidzone.presentation.common.ModalDialogShape
 import com.kidzone.presentation.common.ModalPasswordVisibilityButton
-import com.kidzone.presentation.common.ModalPrimaryButton
 import com.kidzone.presentation.common.ModalTextButton
+import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.common.RequiredFieldLabel
 import com.kidzone.utils.UiText
 
@@ -59,6 +60,7 @@ fun DeleteAccountDialog(
     placesCount: Int,
     reviewsCount: Int,
     isInProgress: Boolean,
+    isOffline: Boolean,
     errorMessage: UiText?,
     isGoogleUser: Boolean = false,
     onDismiss: () -> Unit,
@@ -206,8 +208,8 @@ fun DeleteAccountDialog(
             }
         },
         confirmButton = {
-            ModalPrimaryButton(
-                text = if (isGoogleUser) {
+            OfflineAwareSubmitButton(
+                label = if (isGoogleUser) {
                     stringResource(
                         R.string.confirm_google_button,
                     )
@@ -223,13 +225,22 @@ fun DeleteAccountDialog(
                         onConfirm(password)
                     }
                 },
+                isOffline = isOffline,
                 enabled = isFormValid,
                 isLoading = isInProgress,
-                containerColor = ModalDangerColor,
-                disabledContainerColor =
-                    ModalDangerColor.copy(
+                offlineLabel = stringResource(
+                    R.string.delete_account_offline_action,
+                ),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ModalDangerColor,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                    disabledContainerColor = ModalDangerColor.copy(
                         alpha = 0.35f,
                     ),
+                    disabledContentColor = MaterialTheme.colorScheme.onError.copy(
+                        alpha = 0.75f,
+                    ),
+                ),
             )
         },
         dismissButton = {
@@ -395,4 +406,3 @@ private fun BulletLine(
         )
     }
 }
-

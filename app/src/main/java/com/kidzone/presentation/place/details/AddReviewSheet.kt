@@ -3,7 +3,6 @@
 package com.kidzone.presentation.place.details
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -60,9 +59,11 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.kidzone.R
 import com.kidzone.presentation.common.OfflineAwareSubmitButton
+import com.kidzone.presentation.common.computePhotoContentHash
+import com.kidzone.presentation.common.computeRemotePhotoContentHash
 import com.kidzone.presentation.common.createCameraImageUri
+import com.kidzone.presentation.common.selectUniquePhotoUris
 import kotlinx.coroutines.launch
-import java.security.MessageDigest
 
 /**
  * Maksymalna długość komentarza opinii.
@@ -70,48 +71,7 @@ import java.security.MessageDigest
 private const val COMMENT_MAX_LENGTH = 1000
 
 /** Maksymalna liczba zdjęć na opinię. */
-private const val MAX_REVIEW_PHOTOS = 5
-
-/**
- * Oblicza MD5 hash zawartości URI.
- */
-private fun computeContentHash(context: Context, uri: Uri): String? {
-    return try {
-        val inputStream = context.contentResolver.openInputStream(uri) ?: return null
-        val md = MessageDigest.getInstance("MD5")
-        val buffer = ByteArray(8192)
-        var bytesRead: Int
-        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-            md.update(buffer, 0, bytesRead)
-        }
-        inputStream.close()
-        md.digest().joinToString("") { "%02x".format(it) }
-    } catch (_: Exception) {
-        null
-    }
-}
-
-/**
- * Pobiera zdjęcie z remote URL i oblicza MD5 hash.
- */
-private fun computeRemoteContentHash(url: String): String? {
-    return try {
-        val connection = java.net.URL(url).openConnection()
-        connection.connectTimeout = 10_000
-        connection.readTimeout = 10_000
-        val inputStream = connection.getInputStream()
-        val md = MessageDigest.getInstance("MD5")
-        val buffer = ByteArray(8192)
-        var bytesRead: Int
-        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-            md.update(buffer, 0, bytesRead)
-        }
-        inputStream.close()
-        md.digest().joinToString("") { "%02x".format(it) }
-    } catch (_: Exception) {
-        null
-    }
-}
+private const val MAX_REVIEW_PHOTOS = 3
 
 /**
  * Bottom sheet z formularzem dodawania LUB edycji opinii o miejscu.
@@ -149,7 +109,7 @@ fun AddReviewSheet(
             val hashes = mutableListOf<String>()
             for (url in initialPhotoUrls) {
                 val hash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    computeRemoteContentHash(url)
+                    computeRemotePhotoContentHash(url)
                 }
                 if (hash != null) hashes.add(hash)
             }
@@ -163,12 +123,12 @@ fun AddReviewSheet(
     val totalPhotoCount = existingPhotoUrls.size + photoUris.size
 
     fun isDuplicate(uri: Uri): Boolean {
-        val hash = computeContentHash(context, uri) ?: return false
+        val hash = computePhotoContentHash(context, uri) ?: return false
         return hash in photoHashList
     }
 
     fun addHashForUri(uri: Uri) {
-        val hash = computeContentHash(context, uri)
+        val hash = computePhotoContentHash(context, uri)
         if (hash != null && hash !in photoHashList) {
             photoHashList = photoHashList + hash
         }
@@ -184,21 +144,17 @@ fun AddReviewSheet(
             val available = MAX_REVIEW_PHOTOS - (existingPhotoUrls.size + photoUris.size)
             if (available <= 0) return
 
-            val accepted = mutableListOf<Uri>()
-            var duplicatesFound = 0
-            for (uri in uris) {
-                if (accepted.size >= available) break
-                if (isDuplicate(uri)) {
-                    duplicatesFound++
-                    continue
-                }
-                addHashForUri(uri)
-                accepted.add(uri)
+            val selection = selectUniquePhotoUris(
+                context = context,
+                uris = uris,
+                availableSlots = available,
+                knownHashes = photoHashList.toSet()
+            )
+            if (selection.acceptedUris.isNotEmpty()) {
+                photoHashList = photoHashList + selection.acceptedHashes
+                photoUris = photoUris + selection.acceptedUris
             }
-            if (accepted.isNotEmpty()) {
-                photoUris = photoUris + accepted
-            }
-            if (duplicatesFound > 0) {
+            if (selection.duplicatesFound > 0) {
                 scope.launch {
                     snackbarHostState.showSnackbar(duplicatePhotoError)
                 }
@@ -360,7 +316,7 @@ fun AddReviewSheet(
                                 existingPhotoUrls = existingPhotoUrls.toMutableList().apply { removeAt(index) }
                                 scope.launch {
                                     val hash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                        computeRemoteContentHash(removedUrl)
+                                        computeRemotePhotoContentHash(removedUrl)
                                     }
                                     if (hash != null) {
                                         photoHashList = photoHashList.filter { it != hash }
@@ -374,7 +330,7 @@ fun AddReviewSheet(
                             model = uri,
                             onRemove = {
                                 val removedUri = photoUris[index]
-                                val hash = computeContentHash(context, removedUri)
+                                val hash = computePhotoContentHash(context, removedUri)
                                 photoUris = photoUris.toMutableList().apply { removeAt(index) }
                                 if (hash != null) {
                                     photoHashList = photoHashList.filter { it != hash }

@@ -24,8 +24,8 @@ import androidx.compose.ui.unit.dp
 import com.kidzone.R
 import com.kidzone.presentation.common.ModalActionColor
 import com.kidzone.presentation.common.ModalDialogShape
-import com.kidzone.presentation.common.ModalPrimaryButton
 import com.kidzone.presentation.common.ModalTextButton
+import com.kidzone.presentation.common.OfflineAwareSubmitButton
 
 data class NotificationPrefs(
     val newReviewOnMyPlace: Boolean = true,
@@ -39,6 +39,7 @@ data class NotificationPrefs(
 @Composable
 fun NotificationPreferencesDialog(
     currentPrefs: NotificationPrefs,
+    isOffline: Boolean,
     onSave: (NotificationPrefs) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -181,13 +182,14 @@ fun NotificationPreferencesDialog(
             }
         },
         confirmButton = {
-            ModalPrimaryButton(
-                text = stringResource(
+            OfflineAwareSubmitButton(
+                label = stringResource(
                     R.string.save_changes,
                 ),
                 onClick = {
                     onSave(prefs)
                 },
+                isOffline = isOffline,
                 enabled = hasChanges,
             )
         },
@@ -247,4 +249,3 @@ private fun NotificationToggle(
         )
     }
 }
-

@@ -96,6 +96,8 @@ import com.kidzone.i18n.AppLanguage
 import com.kidzone.presentation.common.BadgeRowItem
 import com.kidzone.presentation.common.KidZoneCard
 import com.kidzone.presentation.common.ModalDialogShape
+import com.kidzone.presentation.common.NetworkStatus
+import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.common.ModalPrimaryButton
 import com.kidzone.presentation.common.ModalTextButton
 import com.kidzone.presentation.common.NotificationPromptReason
@@ -107,6 +109,7 @@ import com.kidzone.presentation.common.rememberReducedMotionEnabled
 import com.kidzone.presentation.common.shouldShowNotificationPrompt
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.RequiredFieldLabel
+import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.utils.UiText
 import nl.dionsegijn.konfetti.compose.KonfettiView
 import nl.dionsegijn.konfetti.core.Party
@@ -160,11 +163,12 @@ fun ProfileScreen(
         }
     }
 
-    val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
+    val networkStatus by rememberNetworkStatus()
+    val isOffline = networkStatus == NetworkStatus.UNAVAILABLE
     var previousNetworkStatus by remember { mutableStateOf(networkStatus) }
     LaunchedEffect(networkStatus) {
-        if ((previousNetworkStatus == com.kidzone.presentation.common.NetworkStatus.UNAVAILABLE)
-            && (networkStatus == com.kidzone.presentation.common.NetworkStatus.AVAILABLE)
+        if ((previousNetworkStatus == NetworkStatus.UNAVAILABLE)
+            && (networkStatus == NetworkStatus.AVAILABLE)
         ) {
             viewModel.refreshProfile()
         }
@@ -247,6 +251,7 @@ fun ProfileScreen(
     if (ui.isContactOpen) {
         ContactSupportDialog(
             isSubmitting = ui.isAccountActionInProgress,
+            isOffline = isOffline,
             errorMessage = ui.accountActionError,
             onDismiss = viewModel::dismissContact,
             onSubmit = viewModel::submitContactMessage,
@@ -256,6 +261,7 @@ fun ProfileScreen(
     if (ui.isNotificationPrefsOpen) {
         NotificationPreferencesDialog(
             currentPrefs = ui.notificationPrefs,
+            isOffline = isOffline,
             onSave = viewModel::saveNotificationPrefs,
             onDismiss = viewModel::dismissNotificationPrefs,
         )
@@ -296,6 +302,7 @@ fun ProfileScreen(
             placesCount = user!!.placesAddedCount,
             reviewsCount = user!!.reviewsCount,
             isInProgress = ui.isAccountActionInProgress,
+            isOffline = isOffline,
             errorMessage = ui.accountActionError,
             isGoogleUser = ui.signInProvider == SignInProvider.GOOGLE,
             onDismiss = viewModel::dismissDeleteAccount,
@@ -1156,6 +1163,7 @@ private fun SettingsCard(
 @Suppress("FunctionNaming", "LongMethod")
 private fun ContactSupportDialog(
     isSubmitting: Boolean,
+    isOffline: Boolean,
     errorMessage: UiText?,
     onDismiss: () -> Unit,
     onSubmit: (
@@ -1309,8 +1317,8 @@ private fun ContactSupportDialog(
             }
         },
         confirmButton = {
-            ModalPrimaryButton(
-                text = stringResource(
+            OfflineAwareSubmitButton(
+                label = stringResource(
                     R.string.contact_support_send,
                 ),
                 onClick = {
@@ -1319,8 +1327,12 @@ private fun ContactSupportDialog(
                         message.trim(),
                     )
                 },
+                isOffline = isOffline,
                 enabled = subjectValid && messageValid,
                 isLoading = isSubmitting,
+                offlineLabel = stringResource(
+                    R.string.contact_support_offline_send_action,
+                ),
             )
         },
         dismissButton = {
@@ -1672,4 +1684,3 @@ private fun ProfileSkeleton() {
         }
     }
 }
-
