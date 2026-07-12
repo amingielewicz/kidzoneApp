@@ -16,7 +16,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Accessible
+import androidx.compose.material.icons.automirrored.filled.Accessible
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.filled.BabyChangingStation
 import androidx.compose.material.icons.filled.Chair
 import androidx.compose.material.icons.filled.ChildCare
@@ -32,7 +33,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Stroller
 import androidx.compose.material.icons.filled.Toys
 import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.Wc
 import androidx.compose.material.icons.filled.Wifi
@@ -73,7 +73,9 @@ import com.kidzone.presentation.place.add.PLACE_NAME_MAX_LENGTH
 
 private const val COMMENT_MAX_LENGTH = 500
 internal const val CHANGE_REQUEST_COMMENT_PREFIX = "__KIDZONE_COMMENT__:"
+@Suppress("MagicNumber")
 private val SelectedAmenityColor = Color(0xFF2E7D32)
+@Suppress("MagicNumber")
 private val FocusedFieldColor = Color(0xFF1976D2)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -256,10 +258,11 @@ fun SuggestEditSheet(
     }
 }
 
+@Suppress("CyclomaticComplexMethod")
 private fun amenityIcon(amenity: Amenity): ImageVector = when (amenity) {
     Amenity.CHANGING_TABLE -> Icons.Filled.BabyChangingStation
     Amenity.TOILET -> Icons.Filled.Wc
-    Amenity.STROLLER_ACCESS, Amenity.WIDE_DOORS -> Icons.Filled.Accessible
+    Amenity.STROLLER_ACCESS, Amenity.WIDE_DOORS -> Icons.AutoMirrored.Filled.Accessible
     Amenity.PARKING, Amenity.FAMILY_PARKING -> Icons.Filled.LocalParking
     Amenity.FENCING -> Icons.Filled.Fence
     Amenity.SOFT_SURFACE, Amenity.SOFT_PROTECTION -> Icons.Filled.Grass
@@ -272,7 +275,7 @@ private fun amenityIcon(amenity: Amenity): ImageVector = when (amenity) {
     Amenity.LOCKERS -> Icons.Filled.Lock
     Amenity.WIFI -> Icons.Filled.Wifi
     Amenity.MICROWAVE -> Icons.Filled.Microwave
-    Amenity.NO_LOUD_MUSIC, Amenity.QUIET_AREAS, Amenity.QUIET_FEEDING -> Icons.Filled.VolumeOff
+    Amenity.NO_LOUD_MUSIC, Amenity.QUIET_AREAS, Amenity.QUIET_FEEDING -> Icons.AutoMirrored.Filled.VolumeOff
     Amenity.DRINKING_WATER, Amenity.BREASTFEEDING_AREA -> Icons.Filled.WaterDrop
     Amenity.STROLLER_RENTAL -> Icons.Filled.Stroller
     Amenity.KIDS_CORNER_VISIBLE, Amenity.GOOD_LIGHTING -> Icons.Filled.Star
