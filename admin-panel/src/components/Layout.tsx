@@ -2,9 +2,9 @@ import { ReactNode, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   AppBar,
+  Avatar,
   Badge,
   Box,
-  Button,
   Divider,
   Drawer,
   IconButton,
@@ -12,6 +12,8 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Menu,
+  MenuItem,
   Toolbar,
   Typography,
 } from '@mui/material';
@@ -46,7 +48,10 @@ const administrationItems = [
   { path: '/users', label: 'Użytkownicy', icon: <PeopleIcon /> },
 ];
 
-type MenuItem = (typeof dashboardItems)[number] | (typeof communityItems)[number] | (typeof administrationItems)[number];
+type MenuItemDefinition =
+  | (typeof dashboardItems)[number]
+  | (typeof communityItems)[number]
+  | (typeof administrationItems)[number];
 
 interface LayoutProps {
   children: ReactNode;
@@ -55,6 +60,7 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [newReportsCount, setNewReportsCount] = useState(0);
+  const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { signOut, user } = useAuth();
@@ -97,11 +103,9 @@ export function Layout({ children }: LayoutProps) {
       const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
       if (!dialog) return;
 
-      if (event.key === 'Escape') {
-        return;
-      }
-
+      if (event.key === 'Escape') return;
       if (event.key !== 'Enter') return;
+
       const target = event.target as HTMLElement | null;
       if (target?.matches('textarea, input, [contenteditable="true"]')) return;
 
@@ -119,7 +123,7 @@ export function Layout({ children }: LayoutProps) {
     return () => document.removeEventListener('keydown', handleConfirmationKeys);
   }, []);
 
-  function renderMenuItems(items: MenuItem[]) {
+  function renderMenuItems(items: MenuItemDefinition[]) {
     return items.map((item) => (
       <ListItemButton
         key={item.path}
@@ -135,6 +139,14 @@ export function Layout({ children }: LayoutProps) {
       </ListItemButton>
     ));
   }
+
+  async function handleSignOut() {
+    setProfileAnchor(null);
+    await signOut();
+  }
+
+  const avatarLabel = user?.displayName?.trim() || user?.email?.trim() || 'Administrator';
+  const avatarInitial = avatarLabel.charAt(0).toUpperCase();
 
   const drawer = (
     <Box component="nav" aria-label="Nawigacja panelu administracyjnego">
@@ -179,12 +191,55 @@ export function Layout({ children }: LayoutProps) {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             kidZone Admin Panel
           </Typography>
-          <IconButton color="inherit" aria-label={`Nowe zgłoszenia: ${newReportsCount}`} onClick={() => navigate('/')} sx={{ mr: 1 }}>
+          <IconButton
+            color="inherit"
+            aria-label={`Nowe zgłoszenia: ${newReportsCount}`}
+            onClick={() => navigate('/')}
+            sx={{ mr: 1 }}
+          >
             <Badge badgeContent={newReportsCount} color="error" max={99}>
               <ReportIcon />
             </Badge>
           </IconButton>
-          <Button color="inherit" startIcon={<LogoutIcon />} onClick={signOut}>Wyloguj</Button>
+          <IconButton
+            color="inherit"
+            aria-label="Otwórz menu profilu administratora"
+            aria-controls={profileAnchor ? 'admin-profile-menu' : undefined}
+            aria-haspopup="true"
+            aria-expanded={profileAnchor ? 'true' : undefined}
+            onClick={(event) => setProfileAnchor(event.currentTarget)}
+            sx={{ p: 0.5 }}
+          >
+            <Avatar
+              src={user?.photoURL || undefined}
+              alt={avatarLabel}
+              sx={{ width: 36, height: 36, bgcolor: 'secondary.main', fontSize: 16 }}
+            >
+              {avatarInitial}
+            </Avatar>
+          </IconButton>
+          <Menu
+            id="admin-profile-menu"
+            anchorEl={profileAnchor}
+            open={Boolean(profileAnchor)}
+            onClose={() => setProfileAnchor(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          >
+            <Box sx={{ px: 2, py: 1, maxWidth: 260 }}>
+              <Typography variant="body2" fontWeight={600} noWrap>{avatarLabel}</Typography>
+              {user?.displayName && user?.email && (
+                <Typography variant="caption" color="text.secondary" noWrap>{user.email}</Typography>
+              )}
+            </Box>
+            <Divider />
+            <MenuItem onClick={() => void handleSignOut()}>
+              <ListItemIcon>
+                <LogoutIcon fontSize="small" />
+              </ListItemIcon>
+              Wyloguj
+            </MenuItem>
+          </Menu>
         </Toolbar>
       </AppBar>
 
