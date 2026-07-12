@@ -24,6 +24,12 @@ export function ChangeRequestsPageWithRowNavigation() {
       const headerRow = table?.querySelector<HTMLTableRowElement>('thead tr');
       if (!table || !headerRow) return;
 
+      const placeIdHeader = headerRow.children.item(2) as HTMLTableCellElement | null;
+      if (placeIdHeader) {
+        placeIdHeader.style.width = '1%';
+        placeIdHeader.style.whiteSpace = 'nowrap';
+      }
+
       if (!headerRow.querySelector('[data-firebase-column="true"]')) {
         const headerCell = document.createElement('th');
         headerCell.setAttribute('data-firebase-column', 'true');
@@ -32,6 +38,7 @@ export function ChangeRequestsPageWithRowNavigation() {
         headerCell.textContent = 'Firebase';
         headerCell.style.width = '72px';
         headerCell.style.textAlign = 'center';
+        headerCell.style.whiteSpace = 'nowrap';
         headerRow.appendChild(headerCell);
       }
 
@@ -61,9 +68,19 @@ export function ChangeRequestsPageWithRowNavigation() {
         if (placeId && copyButton) {
           const placeIdCell = copyButton.closest<HTMLTableCellElement>('td');
           const placeIdText = placeIdCell?.querySelector<HTMLElement>('.MuiTypography-root');
-          if (placeIdText) placeIdText.textContent = placeId;
+          const placeIdContainer = copyButton.parentElement;
+
+          if (placeIdText) {
+            placeIdText.textContent = placeId;
+            placeIdText.style.whiteSpace = 'nowrap';
+          }
+          if (placeIdContainer) {
+            placeIdContainer.style.width = 'max-content';
+            placeIdContainer.style.flexWrap = 'nowrap';
+          }
           if (placeIdCell) {
             placeIdCell.style.width = '1%';
+            placeIdCell.style.minWidth = 'max-content';
             placeIdCell.style.whiteSpace = 'nowrap';
           }
         }
