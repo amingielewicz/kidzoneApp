@@ -5,12 +5,14 @@
 .MuiTableContainer-root:has([data-change-requests-table="true"]) table {
   width: 100%;
   table-layout: auto;
+  border-collapse: collapse;
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) th,
 .MuiTableContainer-root:has([data-change-requests-table="true"]) td {
   vertical-align: middle;
   box-sizing: border-box;
+  border-bottom: 1px solid rgba(224, 224, 224, 1);
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-date-column="true"],
@@ -76,14 +78,19 @@
   vertical-align: middle;
 }
 
+.MuiTableContainer-root:has([data-change-requests-table="true"]) [data-description-column="true"],
+.MuiTableContainer-root:has([data-change-requests-table="true"]) [data-description-cell="true"] {
+  width: 360px;
+  min-width: 360px;
+  max-width: 360px;
+  text-align: left;
+}
+
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-description-column="true"] {
-  min-width: 220px;
+  font-weight: 700;
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-description-cell="true"] {
-  width: auto;
-  min-width: 220px;
-  max-width: 420px;
   overflow: hidden;
   white-space: nowrap;
   font-size: 0.78rem;
