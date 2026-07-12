@@ -32,8 +32,11 @@ import {
 
 const DRAWER_WIDTH = 240;
 
-const communityItems = [
+const dashboardItems = [
   { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
+];
+
+const communityItems = [
   { path: '/reports', label: 'Zgłoszenia', icon: <ReportIcon /> },
   { path: '/change-requests', label: 'Propozycje zmian', icon: <EditNoteIcon /> },
 ];
@@ -42,6 +45,8 @@ const administrationItems = [
   { path: '/places', label: 'Miejsca', icon: <PlaceIcon /> },
   { path: '/users', label: 'Użytkownicy', icon: <PeopleIcon /> },
 ];
+
+type MenuItem = (typeof dashboardItems)[number] | (typeof communityItems)[number] | (typeof administrationItems)[number];
 
 interface LayoutProps {
   children: ReactNode;
@@ -114,7 +119,7 @@ export function Layout({ children }: LayoutProps) {
     return () => document.removeEventListener('keydown', handleConfirmationKeys);
   }, []);
 
-  function renderMenuItems(items: typeof communityItems) {
+  function renderMenuItems(items: MenuItem[]) {
     return items.map((item) => (
       <ListItemButton
         key={item.path}
@@ -137,6 +142,10 @@ export function Layout({ children }: LayoutProps) {
         <Typography variant="h6" fontWeight={700} color="primary">kidZone Admin</Typography>
       </Toolbar>
       <Divider />
+      <List aria-label="Dashboard">
+        {renderMenuItems(dashboardItems)}
+      </List>
+      <Divider sx={{ mx: 2 }} />
       <List aria-label="Zgłoszenia społeczności">
         {renderMenuItems(communityItems)}
       </List>
