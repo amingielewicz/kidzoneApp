@@ -83,6 +83,7 @@ import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.model.User
 import com.kidzone.presentation.common.CategoryIcon
+import com.kidzone.presentation.common.KidZoneActionDialog
 import com.kidzone.presentation.common.KidZoneDropdownMenuItem
 import com.kidzone.presentation.common.KidZoneSortMenu
 import com.kidzone.presentation.common.NewPlaceBadge
@@ -1768,66 +1769,55 @@ private fun ReportPlaceDialog(
     var selectedReason by remember { mutableStateOf(reasons.first().first) }
     var comment by remember { mutableStateOf("") }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Filled.Flag,
-                contentDescription = stringResource(R.string.report),
-                tint = MaterialTheme.colorScheme.error
-            )
-        },
-        title = { Text(stringResource(R.string.report)) },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = stringResource(R.string.report_choose_reason),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
-                reasons.forEach { (code, label) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { selectedReason = code }
-                            .padding(vertical = PLACE_DETAILS_DIALOG_OPTION_VERTICAL_PADDING),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        androidx.compose.material3.RadioButton(
-                            selected = selectedReason == code,
-                            onClick = { selectedReason = code }
-                        )
-                        Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-                Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
-                androidx.compose.material3.OutlinedTextField(
-                    value = comment,
-                    onValueChange = { comment = it },
-                    label = { Text(stringResource(R.string.report_comment_label)) },
-                    maxLines = 3,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
+    KidZoneActionDialog(
+        title = stringResource(R.string.report),
+        icon = Icons.Filled.Flag,
+        iconTint = MaterialTheme.colorScheme.error,
+        onDismiss = onDismiss,
         confirmButton = {
             OfflineAwareSubmitButton(
                 label = stringResource(R.string.report_submit),
                 onClick = { onSubmit(selectedReason, comment.trim()) },
                 isOffline = isOffline
             )
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
         }
-    )
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.report_choose_reason),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
+            reasons.forEach { (code, label) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { selectedReason = code }
+                        .padding(vertical = PLACE_DETAILS_DIALOG_OPTION_VERTICAL_PADDING),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    androidx.compose.material3.RadioButton(
+                        selected = selectedReason == code,
+                        onClick = { selectedReason = code }
+                    )
+                    Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+            Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
+            androidx.compose.material3.OutlinedTextField(
+                value = comment,
+                onValueChange = { comment = it },
+                label = { Text(stringResource(R.string.report_comment_label)) },
+                maxLines = 3,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
 }
 
 @Composable

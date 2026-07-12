@@ -14,13 +14,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -36,6 +33,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.kidzone.R
+import com.kidzone.presentation.common.KidZoneActionDialog
 import com.kidzone.presentation.common.LocationActionIcon
 import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.place.add.LOCATION_SERVICE_DISABLED_MESSAGE
@@ -96,17 +94,19 @@ fun LocationCorrectionDialog(
         }
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Filled.MyLocation,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
+    KidZoneActionDialog(
+        title = stringResource(R.string.correct_location),
+        icon = Icons.Filled.MyLocation,
+        onDismiss = onDismiss,
+        confirmButton = {
+            OfflineAwareSubmitButton(
+                label = stringResource(R.string.submit_correction),
+                onClick = { if (latitude != null && longitude != null) onSubmit(latitude!!, longitude!!, address) },
+                isOffline = isOffline,
+                enabled = latitude != null && longitude != null
             )
-        },
-        title = { Text(stringResource(R.string.correct_location)) },
-        text = {
+        }
+    ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -173,19 +173,7 @@ fun LocationCorrectionDialog(
                     Text(text = msg, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
             }
-        },
-        confirmButton = {
-            OfflineAwareSubmitButton(
-                label = stringResource(R.string.submit_correction),
-                onClick = { if (latitude != null && longitude != null) onSubmit(latitude!!, longitude!!, address) },
-                isOffline = isOffline,
-                enabled = latitude != null && longitude != null
-            )
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-        }
-    )
+    }
 }
 
 private suspend fun fetchLocationInternal(
