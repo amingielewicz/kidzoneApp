@@ -48,7 +48,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -62,27 +61,31 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.kidzone.R
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.presentation.common.RequiredFieldLabel
 import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.PLACE_NAME_MAX_LENGTH
 
 private const val COMMENT_MAX_LENGTH = 500
-internal const val CHANGE_REQUEST_COMMENT_PREFIX = "__KIDZONE_COMMENT__:"
 @Suppress("MagicNumber")
 private val SelectedAmenityColor = Color(0xFF2E7D32)
-@Suppress("MagicNumber")
-private val FocusedFieldColor = Color(0xFF1976D2)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 fun SuggestEditSheet(
     place: Place,
-    onSubmit: (name: String, description: String, category: String, amenities: Set<String>) -> Unit,
+    onSubmit: (
+        name: String,
+        description: String,
+        category: String,
+        amenities: Set<String>,
+        comment: String
+    ) -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -214,26 +217,22 @@ fun SuggestEditSheet(
                 value = comment,
                 onValueChange = { comment = it.take(COMMENT_MAX_LENGTH) },
                 label = {
-                    Row {
-                        Text("Opisz, co i dlaczego zmieniono")
-                        Text(" *", color = MaterialTheme.colorScheme.error)
-                    }
+                    RequiredFieldLabel(
+                        label = stringResource(R.string.suggest_edit_comment_label)
+                    )
                 },
-                minLines = 3,
-                maxLines = 5,
+                minLines = 4,
+                maxLines = 7,
                 supportingText = {
                     Text(
-                        text = "${comment.length}/$COMMENT_MAX_LENGTH",
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.End
+                        text = stringResource(
+                            R.string.suggest_edit_comment_counter,
+                            comment.length,
+                            COMMENT_MAX_LENGTH
+                        )
                     )
                 },
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = FocusedFieldColor,
-                    focusedLabelColor = FocusedFieldColor,
-                    cursorColor = FocusedFieldColor
-                ),
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -241,9 +240,13 @@ fun SuggestEditSheet(
 
             Button(
                 onClick = {
-                    val payloadAmenities = selectedAmenities +
-                        "$CHANGE_REQUEST_COMMENT_PREFIX${comment.trim()}"
-                    onSubmit(name, description, selectedCategory.name, payloadAmenities)
+                    onSubmit(
+                        name,
+                        description,
+                        selectedCategory.name,
+                        selectedAmenities,
+                        comment.trim()
+                    )
                 },
                 enabled = canSubmit,
                 modifier = Modifier
