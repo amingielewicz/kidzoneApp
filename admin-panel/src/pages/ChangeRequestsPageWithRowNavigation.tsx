@@ -155,6 +155,9 @@ export function ChangeRequestsPageWithRowNavigation() {
         '& tbody .MuiTableRow-root:has(button[aria-label^="Pokaż szczegóły propozycji zmian "])': {
           cursor: 'pointer',
         },
+        '& button[aria-label^="Pokaż szczegóły propozycji zmian "]': {
+          display: 'none',
+        },
         '& [data-firebase-cell="true"] a:hover': {
           backgroundColor: 'action.hover',
         },
