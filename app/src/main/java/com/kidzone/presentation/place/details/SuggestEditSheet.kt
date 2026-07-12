@@ -262,11 +262,11 @@ fun SuggestEditSheet(
 private fun amenityIcon(amenity: Amenity): ImageVector = when (amenity) {
     Amenity.CHANGING_TABLE -> Icons.Filled.BabyChangingStation
     Amenity.TOILET -> Icons.Filled.Wc
-    Amenity.STROLLER_ACCESS, Amenity.WIDE_DOORS -> Icons.AutoMirrored.Filled.Accessible
+    Amenity.WHEELCHAIR_ACCESSIBLE, Amenity.WIDE_DOORS -> Icons.AutoMirrored.Filled.Accessible
     Amenity.PARKING, Amenity.FAMILY_PARKING -> Icons.Filled.LocalParking
-    Amenity.FENCING -> Icons.Filled.Fence
-    Amenity.SOFT_SURFACE, Amenity.SOFT_PROTECTION -> Icons.Filled.Grass
-    Amenity.SHADED_BENCHES, Amenity.REST_AREAS, Amenity.PARENT_ZONE -> Icons.Filled.Deck
+    Amenity.FENCED -> Icons.Filled.Fence
+    Amenity.SOFT_SURFACE, Amenity.SOFT_SAFETY -> Icons.Filled.Grass
+    Amenity.SHADE, Amenity.REST_AREAS, Amenity.PARENT_ZONE -> Icons.Filled.Deck
     Amenity.TODDLER_ZONE, Amenity.AGE_ZONES, Amenity.PARENT_CHILD_ROOM -> Icons.Filled.ChildCare
     Amenity.KIDS_MENU, Amenity.KIDS_TABLEWARE, Amenity.FAST_SERVICE -> Icons.Filled.Restaurant
     Amenity.HIGH_CHAIR -> Icons.Filled.Chair
@@ -278,8 +278,8 @@ private fun amenityIcon(amenity: Amenity): ImageVector = when (amenity) {
     Amenity.NO_LOUD_MUSIC, Amenity.QUIET_AREAS, Amenity.QUIET_FEEDING -> Icons.AutoMirrored.Filled.VolumeOff
     Amenity.DRINKING_WATER, Amenity.BREASTFEEDING_AREA -> Icons.Filled.WaterDrop
     Amenity.STROLLER_RENTAL -> Icons.Filled.Stroller
-    Amenity.KIDS_CORNER_VISIBLE, Amenity.GOOD_LIGHTING -> Icons.Filled.Star
-    Amenity.CAR_FREE_AREA, Amenity.PICNIC_AREA, Amenity.SAFE_PATHS,
+    Amenity.KIDS_CORNER_VISIBLE, Amenity.EVENING_LIGHTING -> Icons.Filled.Star
+    Amenity.LOW_TRAFFIC, Amenity.PICNIC_AREA, Amenity.SAFE_PATHS,
     Amenity.FAMILY_FAST_TRACK, Amenity.LOST_CHILD_POINT, Amenity.KID_FRIENDLY_SIGNS,
     Amenity.ANIMATOR -> Icons.Filled.LocationOn
 }

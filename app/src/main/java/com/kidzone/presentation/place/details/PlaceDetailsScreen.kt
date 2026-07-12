@@ -580,7 +580,6 @@ fun PlaceDetailsScreen(
         val thankYouSuggestEdit = stringResource(R.string.thank_you_suggest_edit)
         SuggestEditSheet(
             place = state.place!!,
-            isOffline = isOffline,
             onSubmit = { name, description, category, amenities ->
                 viewModel.submitSuggestedEdit(name, description, category, amenities)
                 showSuggestEditSheet = false
