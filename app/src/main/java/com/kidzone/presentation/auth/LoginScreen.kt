@@ -67,11 +67,16 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import com.kidzone.presentation.common.SystemStatusIcons
 import com.kidzone.R
 import com.kidzone.presentation.common.NetworkStatus
-import com.kidzone.presentation.common.NoInternetBanner
 import com.kidzone.presentation.common.rememberNetworkStatus
 import kotlinx.coroutines.launch
+
+private const val LOGIN_CONNECTION_ERROR =
+    "Błąd połączenia. Sprawdź internet i spróbuj ponownie."
 
 /**
  * Ekran logowania - e-mail/hasło + Google + reset hasła.
@@ -106,6 +111,9 @@ fun LoginScreen(
     val context = LocalContext.current
     val activity = context.findActivity()
     val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val networkStatus by rememberNetworkStatus()
+    val isNetworkAvailable = networkStatus == NetworkStatus.AVAILABLE
 
     // Legacy Google Sign-In launcher (fallback dla Xiaomi/MIUI/emulatorów
     // gdzie Credential Manager nie działa)
@@ -126,6 +134,14 @@ fun LoginScreen(
         if (state.isSignedIn) onLoginSuccess()
     }
 
+    LaunchedEffect(state.message, state.isMessageError) {
+        val message = state.message
+        if (message != null && state.isMessageError) {
+            snackbarHostState.showSnackbar(message.asString(context))
+            viewModel.consumeMessage()
+        }
+    }
+
     // Kolory tła gradient są celowo oparte na #F5F8FB (jak SplashScreen) +
     // czysty biały - dzięki temu przejście Splash -> Login jest płynne,
     // bez "klatki" o innym tonie.
@@ -136,10 +152,15 @@ fun LoginScreen(
         )
     )
 
-    val networkStatus by rememberNetworkStatus()
+    fun showConnectionError() {
+        coroutineScope.launch {
+            snackbarHostState.showSnackbar(LOGIN_CONNECTION_ERROR)
+        }
+    }
 
     Scaffold(
-        containerColor = Color.Transparent
+        containerColor = Color.Transparent,
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Box(
             modifier = Modifier
@@ -147,6 +168,16 @@ fun LoginScreen(
                 .background(backgroundBrush)
                 .padding(padding)
         ) {
+            SystemStatusIcons(
+                isNetworkAvailable = isNetworkAvailable,
+                isLocationAvailable = true,
+                onNetworkClick = ::showConnectionError,
+                onLocationClick = {},
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 12.dp, end = 16.dp)
+            )
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -155,10 +186,6 @@ fun LoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                if (networkStatus == NetworkStatus.UNAVAILABLE) {
-                    NoInternetBanner()
-                    Spacer(Modifier.height(12.dp))
-                }
 
                 Spacer(Modifier.height(24.dp))
 
@@ -307,11 +334,13 @@ fun LoginScreen(
 
                         // Komunikat (błąd lub info, np. po "zapomniałem hasła").
                         state.message?.let { msg ->
-                            Spacer(Modifier.height(4.dp))
-                            MessageBanner(
-                                text = msg.asString(),
-                                isError = state.isMessageError
-                            )
+                            if (!state.isMessageError) {
+                                Spacer(Modifier.height(4.dp))
+                                MessageBanner(
+                                    text = msg.asString(),
+                                    isError = false
+                                )
+                            }
                         }
 
                         // Przycisk "Wyślij ponownie" link weryfikacyjny
@@ -329,7 +358,13 @@ fun LoginScreen(
                         Spacer(Modifier.height(16.dp))
 
                         Button(
-                            onClick = viewModel::signIn,
+                            onClick = {
+                                if (isNetworkAvailable) {
+                                    viewModel.signIn()
+                                } else {
+                                    viewModel.showConnectionError()
+                                }
+                            },
                             enabled = !state.isLoading && state.isFormValid && !emailFormatInvalid,
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
@@ -363,6 +398,10 @@ fun LoginScreen(
                         // 3) aktualnego google-services.json.
                         OutlinedButton(
                             onClick = {
+                                if (!isNetworkAvailable) {
+                                    viewModel.showConnectionError()
+                                    return@OutlinedButton
+                                }
                                 coroutineScope.launch {
                                     // Web Client ID czytamy w runtime, żeby brak
                                     // konfiguracji Firebase nie blokował kompilacji

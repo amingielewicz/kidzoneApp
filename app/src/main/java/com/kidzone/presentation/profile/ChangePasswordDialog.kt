@@ -5,21 +5,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,34 +29,17 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.kidzone.R
+import com.kidzone.presentation.common.ModalDialogShape
+import com.kidzone.presentation.common.ModalPasswordVisibilityButton
+import com.kidzone.presentation.common.ModalPrimaryButton
+import com.kidzone.presentation.common.ModalTextButton
+import com.kidzone.presentation.common.RequiredFieldLabel
 import com.kidzone.presentation.common.passwordRequirementText
 import com.kidzone.utils.PasswordPolicy
 import com.kidzone.utils.UiText
 
 /**
  * Dialog zmiany hasła.
- *
- * 3 pola:
- *  - aktualne hasło (do reauth),
- *  - nowe hasło,
- *  - powtórz nowe hasło.
- *
- * Walidacje (klient-side, jednolite z rejestracją - zob. [PasswordPolicy]):
- *  - wszystkie 3 pola niepuste,
- *  - nowe hasło spełnia [PasswordPolicy] (8+ znaków, mała + duża litera,
- *    znak specjalny),
- *  - oba "nowe" pola identyczne.
- *
- * Pod polem "Nowe hasło" pokazujemy dynamiczny checklist wymagań -
- * user widzi w czasie rzeczywistym, co jeszcze musi spełnić.
- *
- * Błędy z repo (np. niepoprawne aktualne hasło) lądują w [errorMessage] -
- * dialog pozostaje otwarty, user widzi co poprawić.
- *
- * Pola przeżywają rotację (rememberSaveable), ale dialog nie pamięta
- * wpisanego hasła między otwarciami - kolejny `open` resetuje state
- * (rememberSaveable jest scope'owany do composition, dialog znika
- * z drzewa gdy `isOpen=false`).
  */
 @Suppress("LongMethod", "FunctionNaming")
 @Composable
@@ -68,203 +47,318 @@ fun ChangePasswordDialog(
     isInProgress: Boolean,
     errorMessage: UiText?,
     onDismiss: () -> Unit,
-    onConfirm: (currentPassword: String, newPassword: String) -> Unit
+    onConfirm: (
+        currentPassword: String,
+        newPassword: String,
+    ) -> Unit,
 ) {
-    var currentPassword by rememberSaveable { mutableStateOf("") }
-    var newPassword by rememberSaveable { mutableStateOf("") }
-    var confirmPassword by rememberSaveable { mutableStateOf("") }
-    var showPasswords by rememberSaveable { mutableStateOf(false) }
+    var currentPassword by rememberSaveable {
+        mutableStateOf("")
+    }
 
-    val isNewPasswordValid = PasswordPolicy.isValid(newPassword)
-    val passwordsMismatch = confirmPassword.isNotEmpty() && confirmPassword != newPassword
-    val confirmPasswordHelp = confirmPasswordSupportingTextRes(confirmPassword, passwordsMismatch)
-    val isFormValid = currentPassword.isNotBlank() &&
-        isNewPasswordValid &&
-        confirmPassword == newPassword
+    var newPassword by rememberSaveable {
+        mutableStateOf("")
+    }
+
+    var confirmPassword by rememberSaveable {
+        mutableStateOf("")
+    }
+
+    var showCurrentPassword by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var showNewPassword by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var showConfirmPassword by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    val isNewPasswordValid =
+        PasswordPolicy.isValid(newPassword)
+
+    val passwordsMismatch =
+        confirmPassword.isNotEmpty() &&
+                confirmPassword != newPassword
+
+    val isFormValid =
+        currentPassword.isNotBlank() &&
+                isNewPasswordValid &&
+                confirmPassword.isNotBlank() &&
+                confirmPassword == newPassword
 
     AlertDialog(
-        onDismissRequest = { if (!isInProgress) onDismiss() },
-        title = { Text(stringResource(R.string.change_password_title)) },
+        onDismissRequest = {
+            if (!isInProgress) {
+                onDismiss()
+            }
+        },
+        shape = ModalDialogShape,
+        title = {
+            Text(
+                text = stringResource(
+                    R.string.change_password_title,
+                ),
+            )
+        },
         text = {
-            Column {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 PasswordField(
                     value = currentPassword,
-                    onValueChange = { currentPassword = it },
-                    label = stringResource(R.string.current_password),
-                    supportingText = if (currentPassword.isBlank()) {
-                        stringResource(R.string.field_required)
-                    } else {
-                        null
+                    onValueChange = {
+                        currentPassword = it
                     },
-                    showText = showPasswords,
-                    onToggleVisibility = { showPasswords = !showPasswords },
-                    enabled = !isInProgress
+                    label = stringResource(
+                        R.string.current_password,
+                    ),
+                    showText = showCurrentPassword,
+                    onShowTextChange = {
+                        showCurrentPassword = it
+                    },
+                    enabled = !isInProgress,
                 )
-                Spacer(Modifier.size(8.dp))
+
+                Spacer(
+                    modifier = Modifier.height(8.dp),
+                )
+
                 PasswordField(
                     value = newPassword,
-                    onValueChange = { newPassword = it },
-                    label = stringResource(R.string.new_password),
-                    isError = newPassword.isNotEmpty() && !isNewPasswordValid,
-                    supportingText = if (newPassword.isBlank()) {
-                        stringResource(R.string.field_required)
+                    onValueChange = {
+                        newPassword = it
+                    },
+                    label = stringResource(
+                        R.string.new_password,
+                    ),
+                    showText = showNewPassword,
+                    onShowTextChange = {
+                        showNewPassword = it
+                    },
+                    enabled = !isInProgress,
+                    isError =
+                        newPassword.isNotEmpty() &&
+                                !isNewPasswordValid,
+                )
+
+                if (newPassword.isNotEmpty()) {
+                    Spacer(
+                        modifier = Modifier.height(8.dp),
+                    )
+
+                    PasswordRequirements(
+                        password = newPassword,
+                    )
+                }
+
+                Spacer(
+                    modifier = Modifier.height(8.dp),
+                )
+
+                PasswordField(
+                    value = confirmPassword,
+                    onValueChange = {
+                        confirmPassword = it
+                    },
+                    label = stringResource(
+                        R.string.repeat_new_password,
+                    ),
+                    showText = showConfirmPassword,
+                    onShowTextChange = {
+                        showConfirmPassword = it
+                    },
+                    enabled = !isInProgress,
+                    isError = passwordsMismatch,
+                    supportingText = if (passwordsMismatch) {
+                        stringResource(
+                            R.string.passwords_do_not_match,
+                        )
                     } else {
                         null
                     },
-                    showText = showPasswords,
-                    onToggleVisibility = { showPasswords = !showPasswords },
-                    enabled = !isInProgress
                 )
-                if (newPassword.isNotEmpty()) {
-                    Spacer(Modifier.size(6.dp))
-                    PasswordRequirements(password = newPassword)
-                }
-                Spacer(Modifier.size(8.dp))
-                PasswordField(
-                    value = confirmPassword,
-                    onValueChange = { confirmPassword = it },
-                    label = stringResource(R.string.repeat_new_password),
-                    isError = passwordsMismatch,
-                    supportingText = confirmPasswordHelp?.let { stringResource(it) },
-                    showText = showPasswords,
-                    onToggleVisibility = { showPasswords = !showPasswords },
-                    enabled = !isInProgress
-                )
+
                 if (errorMessage != null) {
-                    Spacer(Modifier.size(8.dp))
+                    Spacer(
+                        modifier = Modifier.height(8.dp),
+                    )
+
                     Text(
                         text = errorMessage.asString(),
                         color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = { onConfirm(currentPassword, newPassword) },
-                enabled = isFormValid && !isInProgress
-            ) {
-                if (isInProgress) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp
+            ModalPrimaryButton(
+                text = stringResource(
+                    R.string.change_password_action,
+                ),
+                onClick = {
+                    onConfirm(
+                        currentPassword,
+                        newPassword,
                     )
-                } else {
-                    Text(stringResource(R.string.change_password_action))
-                }
-            }
+                },
+                enabled = isFormValid,
+                isLoading = isInProgress,
+            )
         },
         dismissButton = {
-            TextButton(
+            ModalTextButton(
+                text = stringResource(
+                    R.string.cancel,
+                ),
                 onClick = onDismiss,
-                enabled = !isInProgress
-            ) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
+                enabled = !isInProgress,
+            )
+        },
     )
 }
 
-private fun confirmPasswordSupportingTextRes(
-    confirmPassword: String,
-    passwordsMismatch: Boolean
-): Int? = when {
-    confirmPassword.isBlank() -> R.string.field_required
-    passwordsMismatch -> R.string.passwords_do_not_match
-    else -> null
-}
 
 /**
- * Wewnętrzna lista wymagań - "lokalna" wersja checklisty z rejestracji
- * (RegisterScreen.PasswordRequirementsChecklist), trzymana osobno żeby
- * dialog mógł się kompilować bez kross-modułowych zależności na ekranie
- * auth. Treść identyczna - obie korzystają z [PasswordPolicy.evaluate].
+ * Lista wymagań nowego hasła.
  */
+@Suppress("FunctionNaming")
 @Composable
-private fun PasswordRequirements(password: String) {
+private fun PasswordRequirements(
+    password: String,
+) {
     val statuses = PasswordPolicy.evaluate(password)
+
     Column(
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier.fillMaxWidth()
     ) {
         statuses.forEach { status ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val (icon, color) = if (status.isSatisfied) {
-                    Icons.Filled.CheckCircle to MaterialTheme.colorScheme.secondary
-                } else {
-                    Icons.Filled.Cancel to MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                }
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = color,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    text = passwordRequirementText(status.labelKey),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (status.isSatisfied) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    }
-                )
-            }
+            PasswordRequirementRow(
+                isSatisfied = status.isSatisfied,
+                text = passwordRequirementText(
+                    status.labelKey,
+                ),
+            )
         }
     }
 }
 
 /**
- * Pojedyncze pole hasła z wspólnym toggle "pokaż/ukryj".
- *
- * Świadomie współdzielimy [showText] między 3 pola - jeśli user kliknie
- * na jakimkolwiek "oczku", pokazują się wszystkie 3. Tak jest mniej
- * frustrująco niż per-field, kiedy walczy z mismatch i chce sprawdzić
- * co wpisał w obu polach "nowego" hasła.
+ * Pojedynczy wiersz wymagania hasła.
  */
+@Suppress("FunctionNaming")
+@Composable
+private fun PasswordRequirementRow(
+    isSatisfied: Boolean,
+    text: String,
+) {
+    val icon = if (isSatisfied) {
+        Icons.Filled.CheckCircle
+    } else {
+        Icons.Filled.Cancel
+    }
+
+    val iconColor = if (isSatisfied) {
+        MaterialTheme.colorScheme.secondary
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(
+            alpha = 0.4f,
+        )
+    }
+
+    val textColor = if (isSatisfied) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(
+            alpha = 0.7f,
+        )
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconColor,
+            modifier = Modifier.size(16.dp),
+        )
+
+        Spacer(
+            modifier = Modifier.size(6.dp),
+        )
+
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = textColor,
+        )
+    }
+}
+
+/**
+ * Pojedyncze pole hasła.
+ */
+@Suppress("LongParameterList", "FunctionNaming")
 @Composable
 private fun PasswordField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
     showText: Boolean,
-    onToggleVisibility: () -> Unit,
+    onShowTextChange: (Boolean) -> Unit,
     enabled: Boolean,
+    modifier: Modifier = Modifier,
     isError: Boolean = false,
-    supportingText: String? = null
+    supportingText: String? = null,
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text(label) },
-        singleLine = true,
-        isError = isError,
         enabled = enabled,
+        isError = isError,
+        singleLine = true,
+        modifier = modifier.fillMaxWidth(),
+        label = {
+            RequiredFieldLabel(
+                label = label,
+            )
+        },
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Password,
+        ),
         visualTransformation = if (showText) {
             VisualTransformation.None
         } else {
             PasswordVisualTransformation()
         },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         trailingIcon = {
-            IconButton(onClick = onToggleVisibility, enabled = enabled) {
-                Icon(
-                    imageVector = if (showText) {
-                        Icons.Filled.VisibilityOff
-                    } else {
-                        Icons.Filled.Visibility
-                    },
-                    contentDescription = if (showText) {
-                        stringResource(R.string.hide_password)
-                    } else {
-                        stringResource(R.string.show_password)
-                    }
+            ModalPasswordVisibilityButton(
+                visible = showText,
+                onVisibleChange = onShowTextChange,
+                showPasswordContentDescription =
+                    stringResource(
+                        R.string.show_password,
+                    ),
+                hidePasswordContentDescription =
+                    stringResource(
+                        R.string.hide_password,
+                    ),
+                enabled = enabled,
+            )
+        },
+        supportingText = supportingText?.let { message ->
+            {
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
         },
-        supportingText = supportingText?.let { { Text(it) } },
-        modifier = Modifier.fillMaxWidth()
     )
 }
+

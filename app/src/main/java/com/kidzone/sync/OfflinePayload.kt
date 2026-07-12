@@ -7,17 +7,9 @@ import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.model.Review
 
-/**
- * Serialization helpers for offline queue payloads.
- *
- * Uses Gson (already in project via Retrofit) for JSON serialization.
- * Each operation type has a specific payload structure.
- */
 object OfflinePayload {
 
     private val gson = Gson()
-
-    // ─── Place payloads ──────────────────────────────────────────────────
 
     data class PlacePayload(
         val id: String,
@@ -28,8 +20,14 @@ object OfflinePayload {
         val latitude: Double,
         val longitude: Double,
         val address: String,
+        val averageRating: Double,
+        val reviewsCount: Int,
         val amenities: List<String>,
-        val photoUrls: List<String>
+        val photoUrls: List<String>,
+        val photoUploadedBy: Map<String, String>,
+        val photoHashes: List<String>,
+        val createdAtMillis: Long,
+        val updatedAtMillis: Long
     )
 
     fun serializePlace(place: Place): String {
@@ -42,8 +40,14 @@ object OfflinePayload {
             latitude = place.latitude,
             longitude = place.longitude,
             address = place.address,
+            averageRating = place.averageRating,
+            reviewsCount = place.reviewsCount,
             amenities = place.amenities.map { it.name },
-            photoUrls = place.photoUrls
+            photoUrls = place.photoUrls,
+            photoUploadedBy = place.photoUploadedBy,
+            photoHashes = place.photoHashes,
+            createdAtMillis = place.createdAtMillis,
+            updatedAtMillis = place.updatedAtMillis
         )
         return gson.toJson(payload)
     }
@@ -59,12 +63,16 @@ object OfflinePayload {
             latitude = payload.latitude,
             longitude = payload.longitude,
             address = payload.address,
+            averageRating = payload.averageRating,
+            reviewsCount = payload.reviewsCount,
             amenities = payload.amenities.map { Amenity.valueOf(it) }.toSet(),
-            photoUrls = payload.photoUrls
+            photoUrls = payload.photoUrls,
+            photoUploadedBy = payload.photoUploadedBy,
+            photoHashes = payload.photoHashes,
+            createdAtMillis = payload.createdAtMillis,
+            updatedAtMillis = payload.updatedAtMillis
         )
     }
-
-    // ─── Review payloads ─────────────────────────────────────────────────
 
     data class ReviewPayload(
         val id: String,
@@ -104,8 +112,6 @@ object OfflinePayload {
             createdAtMillis = payload.createdAtMillis
         )
     }
-
-    // ─── Simple ID payloads (delete operations) ──────────────────────────
 
     fun serializeId(id: String): String = gson.toJson(mapOf("id" to id))
 

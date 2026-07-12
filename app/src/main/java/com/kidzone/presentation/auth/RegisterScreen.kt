@@ -36,6 +36,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -52,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -60,16 +63,16 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
 import com.kidzone.presentation.common.NetworkStatus
-import com.kidzone.presentation.common.NoInternetBanner
+import com.kidzone.presentation.common.SystemStatusIcons
 import com.kidzone.presentation.common.passwordRequirementText
 import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.utils.PasswordPolicy
@@ -96,11 +99,26 @@ fun RegisterScreen(
     val state by viewModel.uiState.collectAsState()
 
     var isPasswordVisible by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
     val networkStatus by rememberNetworkStatus()
+    val isNetworkAvailable = networkStatus == NetworkStatus.AVAILABLE
+
+    fun showConnectionError() {
+        viewModel.showConnectionError()
+    }
 
     LaunchedEffect(state.isRegistered) {
         // Nie nawigujemy od razu – pokazujemy komunikat o weryfikacji emaila.
         // User musi sam kliknąć "Przejdź do logowania" po przeczytaniu.
+    }
+
+    LaunchedEffect(state.errorMessage) {
+        val message = state.errorMessage
+        if (message != null) {
+            snackbarHostState.showSnackbar(message.asString(context))
+            viewModel.consumeErrorMessage()
+        }
     }
 
     val backgroundBrush = Brush.verticalGradient(
@@ -112,6 +130,7 @@ fun RegisterScreen(
 
     Scaffold(
         containerColor = Color.Transparent,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { /* tytuł świadomie pusty - hierarchia w karcie */ },
@@ -122,6 +141,14 @@ fun RegisterScreen(
                             contentDescription = stringResource(R.string.back)
                         )
                     }
+                },
+                actions = {
+                    SystemStatusIcons(
+                        isNetworkAvailable = isNetworkAvailable,
+                        isLocationAvailable = true,
+                        onNetworkClick = ::showConnectionError,
+                        onLocationClick = {}
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent
@@ -142,14 +169,6 @@ fun RegisterScreen(
                     .padding(horizontal = 24.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                if (networkStatus == NetworkStatus.UNAVAILABLE) {
-                    NoInternetBanner()
-                    Spacer(Modifier.height(8.dp))
-                }
-
-                // Logo brandu - mniejsze niż na LoginScreen, bo ekran ma
-                // jeszcze TopAppBar i nagłówek karty pod spodem. fillMaxWidth(0.4f)
-                // daje proporcję ~120-180dp na typowych telefonach.
                 Image(
                     painter = painterResource(R.drawable.ic_splash_logo),
                     contentDescription = stringResource(R.string.app_name),
@@ -298,23 +317,14 @@ fun RegisterScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
 
-                        // Checklist wymagań hasła. Pojawia się dopiero po
-                        // wpisaniu pierwszego znaku, żeby pusty formularz
-                        // nie wyglądał na "obstawiony" wymaganiami.
                         if (state.password.isNotEmpty()) {
                             Spacer(Modifier.height(8.dp))
                             PasswordRequirementsChecklist(password = state.password)
                         }
 
-                        state.errorMessage?.let { msg ->
-                            Spacer(Modifier.height(12.dp))
-                            ErrorMessageBanner(text = msg.asString())
-                        }
-
-                        // Po rejestracji: komunikat o weryfikacji emaila
                         if (state.isRegistered) {
                             Spacer(Modifier.height(16.dp))
-                            androidx.compose.material3.Surface(
+                            Surface(
                                 modifier = Modifier.fillMaxWidth(),
                                 color = MaterialTheme.colorScheme.primaryContainer,
                                 shape = RoundedCornerShape(12.dp)
@@ -355,33 +365,37 @@ fun RegisterScreen(
                         }
 
                         if (!state.isRegistered) {
-                        Spacer(Modifier.height(20.dp))
-                        Button(
-                            onClick = viewModel::register,
-                            enabled = !state.isLoading && state.isFormValid,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
-                        ) {
-                            if (state.isLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                            } else {
-                                Text(
-                                    text = stringResource(R.string.register),
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                            Spacer(Modifier.height(20.dp))
+                            Button(
+                                onClick = {
+                                    if (isNetworkAvailable) {
+                                        viewModel.register()
+                                    } else {
+                                        viewModel.showConnectionError()
+                                    }
+                                },
+                                enabled = !state.isLoading && state.isFormValid,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp)
+                            ) {
+                                if (state.isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                } else {
+                                    Text(
+                                        text = stringResource(R.string.register),
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
-                        }
                         }
                     }
                 }
-
-                Spacer(Modifier.height(16.dp))
 
                 // Stopka - powrót do logowania.
                 Row(
@@ -463,24 +477,4 @@ private fun RequiredFieldLabel(text: String) {
             }
         }
     )
-}
-
-@Composable
-private fun ErrorMessageBanner(text: String) {
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.errorContainer,
-        modifier = Modifier
-            .fillMaxWidth()
-            .semantics {
-                liveRegion = LiveRegionMode.Assertive
-            }
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-        )
-    }
 }

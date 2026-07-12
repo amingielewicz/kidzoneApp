@@ -1,27 +1,26 @@
+@file:Suppress("CyclomaticComplexMethod")
+
 package com.kidzone.presentation.main
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
+import android.content.IntentSender
 import android.content.pm.PackageManager
-import android.os.Build
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContentScope
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,35 +31,29 @@ import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -70,48 +63,34 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.google.android.gms.common.api.ResolvableApiException
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationSettingsRequest
+import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.model.LatLng
 import com.kidzone.R
 import com.kidzone.navigation.Route
 import com.kidzone.presentation.common.NetworkStatus
-import com.kidzone.presentation.common.NoInternetBanner
+import com.kidzone.presentation.common.NotificationPromptReason
+import com.kidzone.presentation.common.NotificationSoftPromptDialog
+import com.kidzone.presentation.common.SystemStatusIcons
+import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.rememberNetworkStatus
+import com.kidzone.presentation.common.shouldShowNotificationPrompt
 import com.kidzone.presentation.home.HomeScreen
 import com.kidzone.presentation.map.MapScreen
+import com.kidzone.presentation.place.add.isLocationServiceEnabled
 import com.kidzone.presentation.place.list.PlaceListScreen
 import com.kidzone.presentation.profile.ProfileScreen
 import com.kidzone.presentation.ranking.RankingScreen
 
-@Suppress("MagicNumber")
-private val NotificationBannerContainer = Color(0xFFFFF3E0)
-@Suppress("MagicNumber")
-private val NotificationBannerContent = Color(0xFF4E342E)
-@Suppress("MagicNumber")
-private val NotificationBannerButtonContainer = Color(0xFFF57C00)
-private val NotificationBannerButtonContent = Color.White
-@Suppress("MagicNumber")
-private val LocationBannerContainer = Color(0xFFF3E5F5)
-@Suppress("MagicNumber")
-private val LocationBannerContent = Color(0xFF4A148C)
-@Suppress("MagicNumber")
-private val LocationBannerButtonContainer = Color(0xFF8E24AA)
-private val LocationBannerButtonContent = Color.White
+private const val MAIN_UI_PREFS = "main_ui_prefs"
+private const val KEY_HOME_INTRO_USED = "home_intro_used"
+private const val KEY_ADD_PLACE_FAB_LABEL_USED = "add_place_fab_label_used"
+private const val LOCATION_REQUEST_INTERVAL_MS = 10_000L
+private const val LOCATION_REQUEST_MIN_INTERVAL_MS = 5_000L
 
-/**
- * Główny shell aplikacji po zalogowaniu – zawiera własny [NavHost]
- * z kartami (home, map, list, ranking, profile) i [NavigationBar].
- *
- * Otwarcie ekranów stackowych (szczegóły, dodawanie miejsca) lub wylogowanie
- * jest delegowane do rodzica przez callbacki.
- *
- * @param focusLatitude / [focusLongitude] – jeśli niepuste, ekran przełączy
- *   się na zakładkę "Mapa" i wycentruje kamerę na tych współrzędnych.
- *   Wykorzystywane po pomyślnym dodaniu nowego miejsca przez [AddPlaceScreen]
- *   (parent NavGraph wstrzykuje wartości przez `savedStateHandle`).
- * @param onFocusConsumed wywołane raz po skonsumowaniu sygnału (czyści
- *   savedStateHandle, żeby kolejne wejście na ten ekran bez nowego dodawania
- *   nie odpalało powtórnie nawigacji).
- */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
@@ -135,47 +114,97 @@ fun MainScreen(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val context = LocalContext.current
+    val prefs = remember(context) {
+        context.getSharedPreferences(MAIN_UI_PREFS, Context.MODE_PRIVATE)
+    }
     val networkStatus by rememberNetworkStatus()
+    var showHomeIntro by remember {
+        mutableStateOf(
+            !prefs.getBoolean(KEY_HOME_INTRO_USED, false) &&
+                !hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+        )
+    }
+    var showAddPlaceFabLabel by remember {
+        mutableStateOf(!prefs.getBoolean(KEY_ADD_PLACE_FAB_LABEL_USED, false))
+    }
+    var notificationPromptReason by remember {
+        mutableStateOf<NotificationPromptReason?>(null)
+    }
+    var locationPermissionGranted by remember {
+        mutableStateOf(hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION))
+    }
+    var locationRefreshSignal by remember { mutableIntStateOf(0) }
+    val locationServiceEnabled = rememberLocationServiceEnabled(locationRefreshSignal)
+
+    fun markHomeIntroUsed() {
+        if (showHomeIntro) {
+            showHomeIntro = false
+            prefs.edit().putBoolean(KEY_HOME_INTRO_USED, true).apply()
+        }
+    }
+
+    fun openAddPlaceFromFab() {
+        if (showAddPlaceFabLabel) {
+            showAddPlaceFabLabel = false
+            prefs.edit().putBoolean(KEY_ADD_PLACE_FAB_LABEL_USED, true).apply()
+        }
+        onOpenAddPlace()
+    }
+
+    val locationSettingsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) {
+        locationPermissionGranted = hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+        if (locationPermissionGranted) {
+            markHomeIntroUsed()
+            locationRefreshSignal += 1
+        }
+    }
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        locationPermissionGranted = granted
+        if (granted) {
+            markHomeIntroUsed()
+            context.checkLocationSettings(
+                onResolutionRequired = { request -> locationSettingsLauncher.launch(request) },
+                onFallbackToSettings = { context.openLocationSettings() }
+            )
+            locationRefreshSignal += 1
+        }
+    }
     val showAddPlaceFab = currentRoute in setOf(
         Route.Home.path,
         Route.Map.path,
         Route.PlaceList.path
     )
 
-    var locationPermissionGranted by remember {
-        mutableStateOf(hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION))
-    }
-    var notificationPermissionGranted by remember {
-        mutableStateOf(hasNotificationPermission(context))
-    }
-    var locationRationaleDismissed by remember { mutableStateOf(false) }
-    var notificationRationaleDismissed by remember { mutableStateOf(false) }
-
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        locationPermissionGranted = granted
-        locationRationaleDismissed = granted
-    }
-
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        notificationPermissionGranted = granted
-        notificationRationaleDismissed = granted
-    }
-
-    val showNotificationRationale = !notificationPermissionGranted && !notificationRationaleDismissed
-    val showLocationRationale = currentRoute != Route.Map.path &&
-        !locationPermissionGranted &&
-        !locationRationaleDismissed
-
-    // Lokalny stan przekazywany dalej do MapScreen. Trzymamy go obok sygnału
-    // z parent NavGraph, bo `onFocusConsumed()` od razu wyczyści savedStateHandle,
-    // a my chcemy, by MapScreen otrzymał współrzędne i sam je skonsumował, gdy
-    // zakończy animację kamery.
     var pendingMapFocus by remember { mutableStateOf<LatLng?>(null) }
     var pendingRankingTab by remember { mutableStateOf(rankingTab) }
+
+    fun requestLocationFromHome() {
+        if (hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
+            locationPermissionGranted = true
+            markHomeIntroUsed()
+            context.checkLocationSettings(
+                onResolutionRequired = { request -> locationSettingsLauncher.launch(request) },
+                onFallbackToSettings = { context.openLocationSettings() }
+            )
+            locationRefreshSignal += 1
+        } else {
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    fun openMapFromHome() {
+        navController.navigate(Route.Map.path) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     LaunchedEffect(rankingTab) {
         if (rankingTab.isNotBlank()) {
@@ -183,13 +212,10 @@ fun MainScreen(
         }
     }
 
-    // Rejestruj FCM token po zalogowaniu – Application.onCreate() może
-    // nie mieć uid (cold start bez sesji). Tu user jest na pewno zalogowany.
     LaunchedEffect(Unit) {
         com.kidzone.messaging.KidZoneMessagingService.registerCurrentToken(context)
     }
 
-    // Deep link: przełączenie na konkretną zakładkę (profile, ranking, map)
     LaunchedEffect(focusTab) {
         if (focusTab.isNotBlank()) {
             navController.navigate(focusTab) {
@@ -206,9 +232,6 @@ fun MainScreen(
     LaunchedEffect(focusLatitude, focusLongitude) {
         if (focusLatitude != null && focusLongitude != null) {
             pendingMapFocus = LatLng(focusLatitude, focusLongitude)
-            // Przełącz na zakładkę Map z pełną semantyką bottom-nav (saveState /
-            // restoreState), żeby zachowanie kart pozostało spójne z klikaniem
-            // ich ręcznie.
             navController.navigate(Route.Map.path) {
                 popUpTo(navController.graph.findStartDestination().id) {
                     saveState = true
@@ -217,27 +240,46 @@ fun MainScreen(
                 restoreState = true
             }
             Toast.makeText(context, context.getString(R.string.place_added_success), Toast.LENGTH_SHORT).show()
+            if (shouldShowNotificationPrompt(context, NotificationPromptReason.FirstPlace)) {
+                notificationPromptReason = NotificationPromptReason.FirstPlace
+            }
             onFocusConsumed()
         }
     }
 
     Scaffold(
         topBar = {
-            TopAppBar(title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painter = painterResource(R.drawable.ic_launcher_foreground),
-                        contentDescription = null,
-                        modifier = Modifier.size(52.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = stringResource(R.string.app_name),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(R.drawable.ic_launcher_foreground),
+                            contentDescription = null,
+                            modifier = Modifier.size(52.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(R.string.app_name),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                },
+                actions = {
+                    SystemStatusIcons(
+                        isNetworkAvailable = networkStatus == NetworkStatus.AVAILABLE,
+                        isLocationAvailable = locationPermissionGranted && locationServiceEnabled,
+                        onNetworkClick = {
+                            Toast.makeText(
+                                context,
+                                "Brak internetu. Sprawdź połączenie sieciowe.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        onLocationClick = { requestLocationFromHome() }
                     )
                 }
-            })
+            )
         },
         bottomBar = {
             NavigationBar {
@@ -260,81 +302,43 @@ fun MainScreen(
                         label = { Text(stringResource(tab.labelRes)) }
                     )
                 }
-                // wskazówka by wykorzystać `hierarchy` (dla zagnieżdżonych grafów w przyszłości)
                 @Suppress("UNUSED_EXPRESSION")
                 backStackEntry?.destination?.hierarchy
             }
         },
         floatingActionButton = {
             if (showAddPlaceFab) {
-                ExtendedFloatingActionButton(
-                    onClick = onOpenAddPlace,
-                    modifier = Modifier.height(48.dp),
-                    icon = {
+                if (showAddPlaceFabLabel) {
+                    ExtendedFloatingActionButton(
+                        onClick = ::openAddPlaceFromFab,
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        text = {
+                            Text(
+                                text = stringResource(R.string.add_place),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    )
+                } else {
+                    FloatingActionButton(
+                        onClick = ::openAddPlaceFromFab
+                    ) {
                         Icon(
                             imageVector = Icons.Filled.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = stringResource(R.string.add_place),
-                            style = MaterialTheme.typography.labelLarge
+                            contentDescription = stringResource(R.string.add_place)
                         )
                     }
-                )
+                }
             }
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            AnimatedVisibility(
-                visible = networkStatus == NetworkStatus.UNAVAILABLE,
-                enter = expandVertically(),
-                exit = shrinkVertically()
-            ) {
-                NoInternetBanner()
-            }
-            if (showNotificationRationale) {
-                PermissionRationaleBanner(
-                    rationale = PermissionRationale(
-                        title = stringResource(R.string.notification_permission_title),
-                        message = stringResource(R.string.notification_permission_message),
-                        primaryActionLabel = stringResource(R.string.enable),
-                        colors = PermissionRationaleColors(
-                            container = NotificationBannerContainer,
-                            content = NotificationBannerContent,
-                            primaryActionContainer = NotificationBannerButtonContainer,
-                            primaryActionContent = NotificationBannerButtonContent
-                        )
-                    ),
-                    onPrimaryAction = {
-                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    },
-                    onDismiss = { notificationRationaleDismissed = true },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            if (showLocationRationale) {
-                PermissionRationaleBanner(
-                    rationale = PermissionRationale(
-                        title = stringResource(R.string.location_permission_title),
-                        message = stringResource(R.string.location_permission_message),
-                        primaryActionLabel = stringResource(R.string.allow),
-                        colors = PermissionRationaleColors(
-                            container = LocationBannerContainer,
-                            content = LocationBannerContent,
-                            primaryActionContainer = LocationBannerButtonContainer,
-                            primaryActionContent = LocationBannerButtonContent
-                        )
-                    ),
-                    onPrimaryAction = {
-                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                    },
-                    onDismiss = { locationRationaleDismissed = true },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
             NavHost(
                 navController = navController,
                 startDestination = Route.Home.path,
@@ -343,16 +347,12 @@ fun MainScreen(
                 composable(Route.Home.path) {
                     HomeScreen(
                         onOpenPlaceDetails = onOpenPlaceDetails,
-                        onOpenMap = {
-                            navController.navigate(Route.Map.path) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
+                        onOpenMap = ::openMapFromHome,
+                        onRequestLocation = ::requestLocationFromHome,
+                        onDismissIntro = ::markHomeIntroUsed,
+                        showIntro = showHomeIntro,
                         locationPermissionGranted = locationPermissionGranted,
+                        locationRefreshSignal = locationRefreshSignal,
                         sharedTransitionScope = sharedTransitionScope,
                         animatedContentScope = animatedContentScope
                     )
@@ -392,6 +392,13 @@ fun MainScreen(
             }
         }
     }
+
+    notificationPromptReason?.let { reason ->
+        NotificationSoftPromptDialog(
+            reason = reason,
+            onDismiss = { notificationPromptReason = null }
+        )
+    }
 }
 
 private enum class BottomTab(
@@ -406,87 +413,43 @@ private enum class BottomTab(
     Profile(Route.Profile, Icons.Filled.Person, R.string.nav_profile);
 }
 
-private data class PermissionRationale(
-    val title: String,
-    val message: String,
-    val primaryActionLabel: String,
-    val colors: PermissionRationaleColors? = null
-)
-
-private data class PermissionRationaleColors(
-    val container: Color,
-    val content: Color,
-    val primaryActionContainer: Color,
-    val primaryActionContent: Color
-)
-
-@Suppress("FunctionNaming")
-@Composable
-private fun PermissionRationaleBanner(
-    rationale: PermissionRationale,
-    onPrimaryAction: () -> Unit,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val colors = rationale.colors ?: PermissionRationaleColors(
-        container = MaterialTheme.colorScheme.secondaryContainer,
-        content = MaterialTheme.colorScheme.onSecondaryContainer,
-        primaryActionContainer = MaterialTheme.colorScheme.primary,
-        primaryActionContent = MaterialTheme.colorScheme.onPrimary
-    )
-    Surface(
-        modifier = modifier.semantics {
-            liveRegion = LiveRegionMode.Polite
-        },
-        color = colors.container,
-        tonalElevation = 2.dp
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = rationale.title,
-                style = MaterialTheme.typography.titleSmall,
-                color = colors.content,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = rationale.message,
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.content
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(
-                    onClick = onDismiss,
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = colors.content
-                    )
-                ) {
-                    Text(stringResource(R.string.later))
-                }
-                Spacer(Modifier.width(8.dp))
-                Button(
-                    onClick = onPrimaryAction,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colors.primaryActionContainer,
-                        contentColor = colors.primaryActionContent
-                    )
-                ) {
-                    Text(rationale.primaryActionLabel)
-                }
-            }
-        }
-    }
-}
-
 private fun hasRuntimePermission(context: Context, permission: String): Boolean =
     ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
-private fun hasNotificationPermission(context: Context): Boolean =
-    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-        hasRuntimePermission(context, Manifest.permission.POST_NOTIFICATIONS)
+private fun Context.checkLocationSettings(
+    onResolutionRequired: (IntentSenderRequest) -> Unit,
+    onFallbackToSettings: () -> Unit
+) {
+    if (isLocationServiceEnabled(this)) return
+
+    val locationRequest = LocationRequest.Builder(
+        Priority.PRIORITY_HIGH_ACCURACY,
+        LOCATION_REQUEST_INTERVAL_MS
+    )
+        .setMinUpdateIntervalMillis(LOCATION_REQUEST_MIN_INTERVAL_MS)
+        .build()
+    val settingsRequest = LocationSettingsRequest.Builder()
+        .addLocationRequest(locationRequest)
+        .setAlwaysShow(true)
+        .build()
+
+    LocationServices.getSettingsClient(this)
+        .checkLocationSettings(settingsRequest)
+        .addOnFailureListener { exception ->
+            if (exception is ResolvableApiException) {
+                try {
+                    onResolutionRequired(
+                        IntentSenderRequest.Builder(exception.resolution).build()
+                    )
+                } catch (_: IntentSender.SendIntentException) {
+                    onFallbackToSettings()
+                }
+            } else {
+                onFallbackToSettings()
+            }
+        }
+}
+
+private fun Context.openLocationSettings() {
+    startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+}

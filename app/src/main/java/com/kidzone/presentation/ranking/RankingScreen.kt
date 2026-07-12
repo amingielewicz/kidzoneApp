@@ -5,7 +5,6 @@ package com.kidzone.presentation.ranking
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,13 +24,9 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -48,9 +43,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -68,19 +63,17 @@ import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.EmptyState
 import com.kidzone.presentation.common.KidZoneCard
-import com.kidzone.presentation.common.KidZoneRadii
+import com.kidzone.presentation.common.RatingIcon
 import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.chronologicalOrder
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.R
+import com.kidzone.presentation.common.KidZoneRankingColors
 
-private const val PODIUM_FIRST_CONTAINER = 0xFFFFF8E1
-private const val PODIUM_FIRST_BORDER = 0xFFFFD54F
-private const val PODIUM_THIRD_CONTAINER = 0xFFF1D2B6
-private const val PODIUM_THIRD_BORDER = 0xFFB66A35
-private const val PODIUM_SECOND_BORDER = 0xFFB0BEC5
 private const val RANKING_SWIPE_THRESHOLD_PX = 80f
+private const val PLACEHOLDER_AVATAR_BLUE = 0xFF42A5F5
+private const val PLACEHOLDER_AVATAR_ICON_BLUE = 0xFFE3F2FD
 
 /**
  * Ranking miejsc i użytkowników.
@@ -257,8 +250,8 @@ private fun TopUsersList(
         item {
             Text(
                 text = stringResource(R.string.ranking_badges_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
                 modifier = Modifier.padding(bottom = 4.dp)
             )
         }
@@ -294,22 +287,6 @@ private fun TopPlaceCard(
     )
     val openDetailsLabel = stringResource(R.string.map_open_place_details_label)
 
-    val highlight = when (position) {
-        1 -> PodiumHighlight(
-            containerColor = Color(PODIUM_FIRST_CONTAINER),
-            borderColor = Color(PODIUM_FIRST_BORDER)
-        )
-        2 -> PodiumHighlight(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            borderColor = Color(PODIUM_SECOND_BORDER)
-        )
-        3 -> PodiumHighlight(
-            containerColor = Color(PODIUM_THIRD_CONTAINER),
-            borderColor = Color(PODIUM_THIRD_BORDER)
-        )
-        else -> null
-    }
-
     val cardModifier = Modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
@@ -321,30 +298,13 @@ private fun TopPlaceCard(
                 onClick = onClick
             )
 
-    if (highlight == null) {
-        KidZoneCard(modifier = cardModifier) {
-            TopPlaceCardContent(
-                position = position,
-                place = place,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedContentScope = animatedContentScope
-            )
-        }
-    } else {
-        Card(
-            modifier = cardModifier,
-            shape = RoundedCornerShape(KidZoneRadii.Card),
-            colors = CardDefaults.cardColors(containerColor = highlight.containerColor),
-            border = BorderStroke(1.dp, highlight.borderColor),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            TopPlaceCardContent(
-                position = position,
-                place = place,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedContentScope = animatedContentScope
-            )
-        }
+    KidZoneCard(modifier = cardModifier) {
+        TopPlaceCardContent(
+            position = position,
+            place = place,
+            sharedTransitionScope = sharedTransitionScope,
+            animatedContentScope = animatedContentScope
+        )
     }
 }
 
@@ -395,12 +355,7 @@ private fun TopPlaceCardContent(
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.Star,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    RatingIcon(contentDescription = null, size = 18.dp)
                     Spacer(Modifier.width(2.dp))
                     Text(
                         text = "%.1f".format(place.averageRating),
@@ -438,42 +393,14 @@ private fun TopUserCard(
         badgesLabel
     )
 
-    val highlight = when (position) {
-        1 -> PodiumHighlight(
-            containerColor = Color(PODIUM_FIRST_CONTAINER),
-            borderColor = Color(PODIUM_FIRST_BORDER)
-        )
-        2 -> PodiumHighlight(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            borderColor = Color(PODIUM_SECOND_BORDER)
-        )
-        3 -> PodiumHighlight(
-            containerColor = Color(PODIUM_THIRD_CONTAINER),
-            borderColor = Color(PODIUM_THIRD_BORDER)
-        )
-        else -> null
-    }
-
     val cardModifier = Modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
                 contentDescription = desc
             }
 
-    if (highlight == null) {
-        KidZoneCard(modifier = cardModifier) {
-            TopUserCardContent(position = position, user = user, badges = badges)
-        }
-    } else {
-        Card(
-            modifier = cardModifier,
-            shape = RoundedCornerShape(KidZoneRadii.Card),
-            colors = CardDefaults.cardColors(containerColor = highlight.containerColor),
-            border = BorderStroke(1.dp, highlight.borderColor),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            TopUserCardContent(position = position, user = user, badges = badges)
-        }
+    KidZoneCard(modifier = cardModifier) {
+        TopUserCardContent(position = position, user = user, badges = badges)
     }
 }
 
@@ -499,6 +426,7 @@ private fun TopUserCardContent(
                     Text(
                         text = stringResource(R.string.user_activity_summary, user.placesAddedCount, user.reviewsCount),
                         style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -512,26 +440,23 @@ private fun TopUserCardContent(
         }
 }
 
-private data class PodiumHighlight(
-    val containerColor: Color,
-    val borderColor: Color
-)
-
 @Composable
 private fun UserAvatar(user: User) {
     val avatarSize = 44.dp
+
     if (user.avatarUrl.isNullOrBlank()) {
         Box(
             modifier = Modifier
                 .size(avatarSize)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
+                .background(Color(PLACEHOLDER_AVATAR_BLUE)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Filled.Person,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                tint = Color(PLACEHOLDER_AVATAR_ICON_BLUE),
+                modifier = Modifier.size(26.dp)
             )
         }
     } else {
@@ -549,9 +474,9 @@ private fun UserAvatar(user: User) {
 @Composable
 private fun PositionMedal(position: Int) {
     val (background, contentColor) = when (position) {
-        1 -> Color(0xFFFFD54F) to Color(0xFF3E2723)
-        2 -> Color(0xFFB0BEC5) to Color(0xFF263238)
-        3 -> Color(0xFFD7A86E) to Color(0xFF3E2723)
+        1 -> KidZoneRankingColors.Gold to KidZoneRankingColors.GoldContent
+        2 -> KidZoneRankingColors.Silver to KidZoneRankingColors.SilverContent
+        3 -> KidZoneRankingColors.Bronze to KidZoneRankingColors.BronzeContent
         else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
     }
     Box(

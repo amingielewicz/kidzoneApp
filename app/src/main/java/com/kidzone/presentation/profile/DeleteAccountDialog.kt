@@ -1,25 +1,25 @@
 package com.kidzone.presentation.profile
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,19 +28,32 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.kidzone.R
 import com.kidzone.presentation.auth.rememberGoogleSignInLauncher
+import com.kidzone.presentation.common.ModalDangerColor
+import com.kidzone.presentation.common.ModalDialogShape
+import com.kidzone.presentation.common.ModalPasswordVisibilityButton
+import com.kidzone.presentation.common.ModalPrimaryButton
+import com.kidzone.presentation.common.ModalTextButton
+import com.kidzone.presentation.common.RequiredFieldLabel
 import com.kidzone.utils.UiText
 
 /**
  * Dialog potwierdzenia usunięcia konta.
  */
-@Suppress("LongParameterList", "LongMethod", "FunctionNaming")
+@Suppress(
+    "LongParameterList",
+    "LongMethod",
+    "FunctionNaming",
+)
 @Composable
 fun DeleteAccountDialog(
     placesCount: Int,
@@ -52,103 +65,157 @@ fun DeleteAccountDialog(
     onConfirm: (currentPassword: String) -> Unit = {},
     onConfirmGoogle: (idToken: String) -> Unit = {},
 ) {
-    var password by rememberSaveable { mutableStateOf("") }
-    var showPassword by rememberSaveable { mutableStateOf(false) }
-    val isFormValid = if (isGoogleUser) true else password.isNotBlank()
+    var password by rememberSaveable {
+        mutableStateOf("")
+    }
+
+    var showPassword by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    val isFormValid =
+        isGoogleUser || password.isNotBlank()
 
     val googleSignInLauncher = if (isGoogleUser) {
         rememberGoogleSignInLauncher(
-            onTokenReceived = { idToken -> onConfirmGoogle(idToken) },
-            onError = { /* Handled by errorMessage from VM */ },
+            onTokenReceived = { idToken ->
+                onConfirmGoogle(idToken)
+            },
+            onError = {
+                // Błąd jest obsługiwany przez ViewModel.
+            },
         )
     } else {
         null
     }
 
     AlertDialog(
-        onDismissRequest = { if (!isInProgress) onDismiss() },
+        onDismissRequest = {
+            if (!isInProgress) {
+                onDismiss()
+            }
+        },
+        shape = ModalDialogShape,
         icon = {
-            Icon(
-                imageVector = Icons.Filled.Warning,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
+            DeleteAccountWarningIcon()
+        },
+        title = {
+            Text(
+                text = stringResource(
+                    R.string.delete_account,
+                ),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
             )
         },
-        title = { Text(stringResource(R.string.delete_account)) },
         text = {
-            Column {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Text(
-                    text = stringResource(R.string.delete_account_subtitle),
+                    text = stringResource(
+                        R.string.delete_account_subtitle,
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                Spacer(Modifier.height(8.dp))
-                BulletLine(text = stringResource(R.string.delete_account_bullet_1))
-                BulletLine(
-                    text = stringResource(R.string.delete_account_bullet_2, reviewsCount),
+
+                Spacer(
+                    modifier = Modifier.height(12.dp),
                 )
+
                 BulletLine(
-                    text = stringResource(R.string.delete_account_bullet_3, placesCount),
+                    text = stringResource(
+                        R.string.delete_account_bullet_1,
+                    ),
                 )
-                Spacer(Modifier.height(4.dp))
+
+                Spacer(
+                    modifier = Modifier.height(8.dp),
+                )
+
+                BulletLine(
+                    text = stringResource(
+                        R.string.delete_account_bullet_2,
+                        reviewsCount,
+                    ),
+                    boldPrefix = stringResource(
+                        R.string.delete_account_reviews_prefix,
+                    ),
+                )
+
+                Spacer(
+                    modifier = Modifier.height(8.dp),
+                )
+
+                BulletLine(
+                    text = stringResource(
+                        R.string.delete_account_bullet_3,
+                        placesCount,
+                    ),
+                    boldPrefix = stringResource(
+                        R.string.delete_account_places_prefix,
+                    ),
+                )
+
+                Spacer(
+                    modifier = Modifier.height(12.dp),
+                )
+
                 Text(
-                    text = stringResource(R.string.delete_account_gdpr_info),
-                    style = MaterialTheme.typography.labelSmall,
+                    text = stringResource(
+                        R.string.delete_account_gdpr_info,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(
+                        horizontal = 4.dp,
+                    ),
                 )
-                Spacer(Modifier.height(12.dp))
+
+                Spacer(
+                    modifier = Modifier.height(12.dp),
+                )
 
                 if (isGoogleUser) {
-                    Text(
-                        text = stringResource(R.string.delete_account_confirm_google),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                    )
+                    GoogleAccountConfirmation()
                 } else {
-                    Text(
-                        text = stringResource(R.string.delete_account_confirm_password),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text(stringResource(R.string.current_password)) },
-                        singleLine = true,
-                        enabled = !isInProgress,
-                        visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        trailingIcon = {
-                            IconButton(
-                                onClick = { showPassword = !showPassword },
-                                enabled = !isInProgress,
-                            ) {
-                                Icon(
-                                    imageVector = if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                    contentDescription = if (showPassword) {
-                                        stringResource(R.string.hide_password)
-                                    } else {
-                                        stringResource(R.string.show_password)
-                                    },
-                                )
-                            }
+                    PasswordAccountConfirmation(
+                        password = password,
+                        onPasswordChange = {
+                            password = it
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        showPassword = showPassword,
+                        onShowPasswordChange = {
+                            showPassword = it
+                        },
+                        enabled = !isInProgress,
                     )
                 }
 
                 if (errorMessage != null) {
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(
+                        modifier = Modifier.height(8.dp),
+                    )
+
                     Text(
                         text = errorMessage.asString(),
-                        color = MaterialTheme.colorScheme.error,
+                        color = ModalDangerColor,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
         },
         confirmButton = {
-            TextButton(
+            ModalPrimaryButton(
+                text = if (isGoogleUser) {
+                    stringResource(
+                        R.string.confirm_google_button,
+                    )
+                } else {
+                    stringResource(
+                        R.string.delete_account,
+                    )
+                },
                 onClick = {
                     if (isGoogleUser) {
                         googleSignInLauncher?.invoke()
@@ -156,40 +223,176 @@ fun DeleteAccountDialog(
                         onConfirm(password)
                     }
                 },
-                enabled = isFormValid && !isInProgress,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error,
-                ),
-            ) {
-                if (isInProgress) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                } else {
-                    Text(
-                        if (isGoogleUser) stringResource(R.string.confirm_google_button)
-                        else stringResource(R.string.delete_account),
-                    )
-                }
-            }
+                enabled = isFormValid,
+                isLoading = isInProgress,
+                containerColor = ModalDangerColor,
+                disabledContainerColor =
+                    ModalDangerColor.copy(
+                        alpha = 0.35f,
+                    ),
+            )
         },
         dismissButton = {
-            TextButton(
+            ModalTextButton(
+                text = stringResource(R.string.cancel),
                 onClick = onDismiss,
                 enabled = !isInProgress,
-            ) {
-                Text(stringResource(R.string.cancel))
-            }
+            )
         },
     )
 }
 
+@Suppress("FunctionNaming")
 @Composable
-private fun BulletLine(text: String) {
-    Row {
-        Text(text = "•  ", style = MaterialTheme.typography.bodyMedium)
-        Text(text = text, style = MaterialTheme.typography.bodyMedium)
+private fun DeleteAccountWarningIcon() {
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .background(
+                color = ModalDangerColor.copy(
+                    alpha = 0.12f,
+                ),
+                shape = CircleShape,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.WarningAmber,
+            contentDescription = null,
+            tint = ModalDangerColor,
+            modifier = Modifier.size(26.dp),
+        )
     }
 }
+
+
+@Suppress("FunctionNaming")
+@Composable
+private fun GoogleAccountConfirmation() {
+    HorizontalDivider(
+        color = MaterialTheme.colorScheme.outlineVariant
+            .copy(alpha = 0.6f),
+    )
+
+    Spacer(
+        modifier = Modifier.height(12.dp),
+    )
+
+    Text(
+        text = stringResource(
+            R.string.delete_account_confirm_google,
+        ),
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.Medium,
+    )
+}
+
+@Suppress("LongParameterList", "FunctionNaming")
+@Composable
+private fun PasswordAccountConfirmation(
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    showPassword: Boolean,
+    onShowPasswordChange: (Boolean) -> Unit,
+    enabled: Boolean,
+) {
+    Text(
+        text = stringResource(
+            R.string.delete_account_confirm_password,
+        ),
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.Medium,
+    )
+
+    Spacer(
+        modifier = Modifier.height(8.dp),
+    )
+
+    OutlinedTextField(
+        value = password,
+        onValueChange = onPasswordChange,
+        label = {
+            RequiredFieldLabel(
+                label = stringResource(
+                    R.string.current_password,
+                ),
+            )
+        },
+        singleLine = true,
+        enabled = enabled,
+        visualTransformation = if (showPassword) {
+            VisualTransformation.None
+        } else {
+            PasswordVisualTransformation()
+        },
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Password,
+        ),
+        trailingIcon = {
+            ModalPasswordVisibilityButton(
+                visible = showPassword,
+                onVisibleChange = onShowPasswordChange,
+                showPasswordContentDescription =
+                    stringResource(
+                        R.string.show_password,
+                    ),
+                hidePasswordContentDescription =
+                    stringResource(
+                        R.string.hide_password,
+                    ),
+                enabled = enabled,
+            )
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun BulletLine(
+    text: String,
+    boldPrefix: String? = null,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            text = "•",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(
+                top = 1.dp,
+            ),
+        )
+
+        Spacer(
+            modifier = Modifier.width(8.dp),
+        )
+
+        Text(
+            text = buildAnnotatedString {
+                if (
+                    !boldPrefix.isNullOrBlank() &&
+                    text.startsWith(boldPrefix)
+                ) {
+                    withStyle(
+                        style = SpanStyle(
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                    ) {
+                        append(boldPrefix)
+                    }
+
+                    append(
+                        text.removePrefix(boldPrefix),
+                    )
+                } else {
+                    append(text)
+                }
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+

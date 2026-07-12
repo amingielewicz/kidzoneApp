@@ -1,6 +1,15 @@
+@file:Suppress("FunctionNaming", "LongMethod", "LongParameterList")
+
 package com.kidzone.presentation.place.list
 
 import android.Manifest
+import android.content.Intent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
+import android.location.LocationManager
+import android.provider.Settings
+import androidx.compose.ui.platform.LocalContext
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContentScope
@@ -27,24 +36,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -68,9 +70,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -79,60 +78,57 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.core.content.ContextCompat
+import com.kidzone.R
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
-import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.EmptyState
 import com.kidzone.presentation.common.EmptyStateAction
-import com.kidzone.presentation.common.GpsDisabledBanner
 import com.kidzone.presentation.common.KidZoneCard
+import com.kidzone.presentation.common.KidZoneCategoryFilterBar
+import com.kidzone.presentation.common.KidZoneFilterChip
 import com.kidzone.presentation.common.KidZoneSpacing
+import com.kidzone.presentation.common.KidZoneSortMenu
 import com.kidzone.presentation.common.NewPlaceBadge
+import com.kidzone.presentation.common.RatingIcon
+import com.kidzone.presentation.common.SortMenuIcon
+import com.kidzone.presentation.common.SortMenuOption
 import com.kidzone.presentation.common.isNewWithoutReviews
-import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.hasLocationPermission
-import com.kidzone.R
 import kotlinx.coroutines.launch
 
-/**
- * Dawne 4 "quick" udogodnienia. Usunięte z UI listy – teraz wszystkie
- * udogodnienia są dostępne wyłącznie z bottom sheeta filtrów.
- * Stała zachowana, bo [PlaceListViewModel] nadal ich używa do logiki
- * (zachowanie kompatybilności wstecznej – brak wpływu na UX).
- */
+private const val VERY_CLOSE_DISTANCE_LABEL = "Tuż obok"
+private const val VERY_CLOSE_DISTANCE_KM = 0.05
+private const val METER_DISTANCE_THRESHOLD_KM = 1.0
+private const val METERS_PER_KILOMETER = 1000
+private const val DISTANCE_ROUNDING_OFFSET_METERS = 25
+private const val DISTANCE_ROUNDING_STEP_METERS = 50
+private const val INTEGER_DISTANCE_THRESHOLD_KM = 100.0
+
 @Suppress("unused")
 private val QUICK_AMENITIES = setOf(
     Amenity.CHANGING_TABLE,
     Amenity.TOILET,
-    Amenity.STROLLER_ACCESS,
+    Amenity.WHEELCHAIR_ACCESSIBLE,
     Amenity.PARKING
 )
 
-/**
- * Lista miejsc - LazyColumn kart z filtrami + sortowaniem + twardym
- * cap-em [PlaceListViewModel] do 100 najistotniejszych pozycji.
- *
- * Subskrybuje Firestore przez [PlaceListViewModel] - snapshot listener
- * w repo automatycznie aktualizuje listę po dodaniu nowego miejsca z
- * [com.kidzone.presentation.place.add.AddPlaceScreen], bez potrzeby
- * pull-to-refresh.
- *
- * Filtry:
- *  - kategoria (single-select chipy w pierwszym rzędzie)
- *  - 4 uniwersalne udogodnienia (multi-select chipy w drugim rzędzie)
- *  - pełna lista udogodnień (multi-select w bottom sheecie pod "Filtry · N")
- *
- * Sortowanie - 5 trybów (zob. [PlaceListViewModel.SortOrder]) wybierane
- * przez "chip" z dropdownem na pasku filtrów. Domyślny: "Najbliższe"
- * (wymaga lokalizacji - jeżeli brak, banner zachęca do włączenia).
- */
+private val ListContentPadding = PaddingValues(
+    start = 16.dp,
+    top = 12.dp,
+    end = 16.dp,
+    bottom = 144.dp
+)
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun PlaceListScreen(
@@ -142,13 +138,12 @@ fun PlaceListScreen(
     animatedContentScope: AnimatedContentScope? = null
 ) {
     val state by viewModel.uiState.collectAsState()
-
-    // Auto-refresh po przywróceniu internetu
     val networkStatus by com.kidzone.presentation.common.rememberNetworkStatus()
     var previousNetworkStatus by remember { mutableStateOf(networkStatus) }
+
     LaunchedEffect(networkStatus) {
-        if (previousNetworkStatus == com.kidzone.presentation.common.NetworkStatus.UNAVAILABLE
-            && networkStatus == com.kidzone.presentation.common.NetworkStatus.AVAILABLE
+        if (previousNetworkStatus == com.kidzone.presentation.common.NetworkStatus.UNAVAILABLE &&
+            networkStatus == com.kidzone.presentation.common.NetworkStatus.AVAILABLE
         ) {
             viewModel.refresh()
         }
@@ -158,50 +153,63 @@ fun PlaceListScreen(
     var showFilterSheet by rememberSaveable { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
-
     val context = LocalContext.current
-
-    // Stan przewijania listy — inicjalizowany z pozycji zapisanej w ViewModel
-    // TYLKO gdy user wraca z PlaceDetails. Przy powrocie z innej zakładki
-    // (lub pierwszym wejściu) zaczynamy od góry.
+    val lifecycleOwner = LocalLifecycleOwner.current
     val returningFromDetails = remember { viewModel.consumeReturnFromDetails() }
     val lazyListState = rememberLazyListState()
 
-    // Przy wejściu na zakładkę Lista z innej zakładki (NIE z PlaceDetails)
-    // odświeżamy lokalizację i scrollujemy na górę. Dane i tak są real-time
-    // przez snapshot listener, ale lokalizacja mogła się zmienić.
-    // Przy powrocie z PlaceDetails — przywracamy zapisaną pozycję scrollu.
+    DisposableEffect(context) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == LocationManager.PROVIDERS_CHANGED_ACTION) {
+                    viewModel.refreshLocation()
+                }
+            }
+        }
+
+        val filter = IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION)
+
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+
+        onDispose {
+            context.unregisterReceiver(receiver)
+        }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshLocation()
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     LaunchedEffect(returningFromDetails) {
         if (returningFromDetails) {
-            // Przywróć scroll do miejsca, gdzie user kliknął na item
-            lazyListState.scrollToItem(
-                viewModel.savedScrollIndex,
-                viewModel.savedScrollOffset
-            )
+            lazyListState.scrollToItem(viewModel.savedScrollIndex, viewModel.savedScrollOffset)
         } else {
-            // Powrót z innej zakładki lub pierwsze wejście — scroll na górze
             lazyListState.scrollToItem(0)
             viewModel.refreshLocation()
         }
     }
 
-    // Po zmianie kategorii/sortowania automatycznie przewijamy listę na górę.
-    // Bez tego user widziałby "tę samą pozycję pod palcem", ale w nowym
-    // porządku - co jest mylące (nie wiadomo, czy to jeszcze ten sam wynik
-    // czy nowy item w środku rankingu).
-    //
-    // Używamy rememberSaveable, żeby uniknąć scrollowania na górę po
-    // nawigacji powrotnej z PlaceDetails (LaunchedEffect odpalałby się
-    // ponownie z tym samym kluczem przy re-compose).
-    //
-    // Uwaga: nie używamy animateScrollToItem(). Na Compose 2024.09.x potrafi
-    // zderzyć się z LazyColumn + shared transition/lookahead przy nagłej
-    // zmianie listy i skończyć crashem "Placement happened before lookahead".
     var lastAppliedCategory by rememberSaveable {
         mutableStateOf(state.selectedCategory?.name.orEmpty())
     }
     var lastAppliedSortOrder by rememberSaveable { mutableStateOf(state.sortOrder.name) }
     var lastAppliedSearchQuery by rememberSaveable { mutableStateOf(state.searchQuery) }
+
     LaunchedEffect(state.selectedCategory) {
         val categoryName = state.selectedCategory?.name.orEmpty()
         if (categoryName != lastAppliedCategory) {
@@ -222,8 +230,6 @@ fun PlaceListScreen(
         }
     }
 
-    // Launcher requestu uprawnienia. Po nadaniu odświeżamy lokalizację -
-    // sortowanie "Najbliższe" zaczyna działać bez restartu ekranu.
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
@@ -232,18 +238,12 @@ fun PlaceListScreen(
         }
     }
 
-    // Po wejściu na ekran - jeśli user już ma permission, ale fixu jeszcze
-    // nie pobraliśmy (np. ekran się zrekonstruował po deep-linku), próbujemy
-    // ponownie. To no-op gdy lokalizacja już jest w state.
     LaunchedEffect(Unit) {
         if (hasLocationPermission(context) && state.userLocation == null) {
             viewModel.refreshLocation()
         }
     }
 
-    // Gdy user wraca z ustawień Androida (gdzie ręcznie dał lokalizację),
-    // odświeżamy fix - banner sam zniknie.
-    val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME && hasLocationPermission(context)) {
@@ -253,17 +253,7 @@ fun PlaceListScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
     }
 
-    // Liczba aktywnych filtrów udogodnień w sheecie.
-    val advancedAmenitiesCount = state.selectedAmenities.size
-    val gpsEnabled = rememberLocationServiceEnabled()
-
     Column(modifier = Modifier.fillMaxSize()) {
-        // Banner informujący o wyłączonej lokalizacji - na samej górze
-        if (!gpsEnabled && hasLocationPermission(context)) {
-            GpsDisabledBanner()
-        }
-
-        // Wyszukiwarka po nazwie miejsca
         SearchBar(
             query = state.searchQuery,
             onQueryChange = viewModel::onSearchQueryChange,
@@ -272,29 +262,42 @@ fun PlaceListScreen(
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         )
 
-        Surface(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-            color = MaterialTheme.colorScheme.surface,
-            shape = MaterialTheme.shapes.medium,
-            tonalElevation = 4.dp,
-            shadowElevation = 4.dp
+                .padding(horizontal = 12.dp, vertical = 4.dp)
         ) {
-            Column(modifier = Modifier.padding(vertical = 6.dp)) {
-                CategoryFilterBar(
-                    selectedCategory = state.selectedCategory,
-                    onCategorySelected = viewModel::onCategorySelect
-                )
+            CategoryFilterBar(
+                selectedCategory = state.selectedCategory,
+                onCategorySelected = viewModel::onCategorySelect
+            )
 
-                FilterAndSortBar(
-                    advancedFiltersCount = advancedAmenitiesCount,
-                    sortOrder = state.sortOrder,
-                    currentUserSignedIn = state.currentUserId != null,
-                    onOpenFilterSheet = { showFilterSheet = true },
-                    onSortOrderChange = viewModel::onSortOrderChange
-                )
-            }
+            FilterAndSortBar(
+                advancedFiltersCount = state.selectedAmenities.size,
+                sortOrder = state.sortOrder,
+                currentUserSignedIn = state.currentUserId != null,
+                onOpenFilterSheet = { showFilterSheet = true },
+                onSortOrderChange = viewModel::onSortOrderChange
+            )
+        }
+
+        if (state.nearestUnavailable) {
+            EnableLocationForSortingBanner(
+                onAllowClick = {
+                    if (!hasLocationPermission(context)) {
+                        locationPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            )
+                        )
+                    } else {
+                        context.startActivity(
+                            Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                        )
+                    }
+                }
+            )
         }
 
         PullToRefreshBox(
@@ -302,127 +305,82 @@ fun PlaceListScreen(
             onRefresh = { viewModel.refresh() },
             modifier = Modifier.fillMaxSize()
         ) {
-        when {
-            state.isLoading && state.places.isEmpty() -> {
-                // Smart Loading: don't show skeleton immediately to avoid flickering on fast cache hits
-                var showSkeleton by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) {
-                    kotlinx.coroutines.delay(150)
-                    showSkeleton = true
-                }
-                if (showSkeleton) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        userScrollEnabled = false
-                    ) {
-                        items(10) {
-                            PlaceRowSkeleton()
-                        }
-                    }
-                }
-            }
-
-            state.errorMessage != null && state.places.isEmpty() -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = state.errorMessage!!.asString(),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-
-            state.places.isEmpty() -> {
-                val canClearFilters = state.searchQuery.isNotBlank() ||
-                    state.selectedCategory != null ||
-                    state.selectedAmenities.isNotEmpty()
-                EmptyState(
-                    icon = Icons.Filled.Search,
-                    title = emptyTitleFor(state),
-                    message = emptyMessageFor(state),
-                    action = if (canClearFilters) {
-                        EmptyStateAction(
-                            label = stringResource(R.string.clear_filters),
-                            onClick = {
-                                viewModel.onSearchQueryChange("")
-                                viewModel.onCategorySelect(null)
-                                viewModel.onAmenitiesCleared()
-                            }
-                        )
-                    } else {
-                        null
+            when {
+                state.isLoading && state.places.isEmpty() -> LoadingList()
+                state.errorMessage != null && state.places.isEmpty() -> ListError(state.errorMessage!!.asString())
+                state.places.isEmpty() -> EmptyListState(
+                    state = state,
+                    onClear = {
+                        viewModel.onSearchQueryChange("")
+                        viewModel.onCategorySelect(null)
+                        viewModel.onAmenitiesCleared()
                     }
                 )
-            }
 
-            else -> {
-                LazyColumn(
-                    state = lazyListState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(items = state.places, key = { "list_${it.id}" }) { place ->
-                        PlaceCard(
-                            place = place,
-                            distanceKm = state.userLocation?.let { (lat, lng) ->
-                                haversineKm(lat, lng, place.latitude, place.longitude)
-                            },
-                            showDistance = state.sortOrder ==
-                                PlaceListViewModel.SortOrder.NEAREST &&
-                                state.userLocation != null,
-                            onClick = {
-                                // Zapisz pozycję scrollu i ustaw flagę przed nawigacją
-                                // do szczegółów — po powrocie lista wróci w to samo miejsce.
-                                viewModel.saveScrollPosition(
-                                    firstVisibleItemIndex = lazyListState.firstVisibleItemIndex,
-                                    firstVisibleItemScrollOffset = lazyListState.firstVisibleItemScrollOffset
-                                )
-                                viewModel.markNavigatingToDetails()
-                                onOpenPlaceDetails(place.id, "list")
-                            },
-                            sharedTransitionScope = sharedTransitionScope,
-                            animatedContentScope = animatedContentScope,
-                            animationSource = "list"
-                        )
+                else -> {
+                    val shouldLoadMore by remember {
+                        derivedStateOf {
+                            val lastVisible = lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                            val totalItems = lazyListState.layoutInfo.totalItemsCount
+                            lastVisible >= totalItems - 3 && state.hasMore && !state.isLoadingMore
+                        }
                     }
-                    if (state.isLoadingMore) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+
+                    LaunchedEffect(shouldLoadMore) {
+                        if (shouldLoadMore) {
+                            viewModel.loadMore()
+                        }
+                    }
+
+                    LazyColumn(
+                        state = lazyListState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = ListContentPadding,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(items = state.places, key = { "list_${it.id}" }) { place ->
+                            PlaceCard(
+                                place = place,
+                                distanceKm = state.userLocation?.let { (lat, lng) ->
+                                    haversineKm(lat, lng, place.latitude, place.longitude)
+                                },
+                                showDistance = state.sortOrder == PlaceListViewModel.SortOrder.NEAREST &&
+                                    state.userLocation != null,
+                                staleLocationAgeMinutes = state.staleLocationAgeMinutes.takeIf {
+                                    state.isUsingStaleLocation
+                                },
+                                onClick = {
+                                    viewModel.saveScrollPosition(
+                                        firstVisibleItemIndex = lazyListState.firstVisibleItemIndex,
+                                        firstVisibleItemScrollOffset = lazyListState.firstVisibleItemScrollOffset
+                                    )
+                                    viewModel.markNavigatingToDetails()
+                                    onOpenPlaceDetails(place.id, "list")
+                                },
+                                sharedTransitionScope = sharedTransitionScope,
+                                animatedContentScope = animatedContentScope,
+                                animationSource = "list"
+                            )
+                        }
+
+                        if (state.isLoadingMore) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                }
                             }
                         }
                     }
                 }
-
-                // Infinite scroll: doładuj następną stronę gdy user dojdzie
-                // blisko końca listy (ostatnie 3 elementy).
-                val shouldLoadMore = remember {
-                    derivedStateOf {
-                        val lastVisible = lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                        val totalItems = lazyListState.layoutInfo.totalItemsCount
-                        lastVisible >= totalItems - 3 && state.hasMore && !state.isLoadingMore
-                    }
-                }
-                LaunchedEffect(shouldLoadMore.value) {
-                    if (shouldLoadMore.value) {
-                        viewModel.loadMore()
-                    }
-                }
             }
-        }
         }
     }
 
@@ -446,9 +404,65 @@ fun PlaceListScreen(
 }
 
 @Composable
-private fun emptyMessageFor(
-    state: PlaceListViewModel.UiState
-): String = when {
+private fun LoadingList() {
+    var showSkeleton by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(150)
+        showSkeleton = true
+    }
+    if (showSkeleton) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = ListContentPadding,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            userScrollEnabled = false
+        ) {
+            items(10) { PlaceRowSkeleton() }
+        }
+    }
+}
+
+@Composable
+private fun ListError(message: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = message,
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun EmptyListState(
+    state: PlaceListViewModel.UiState,
+    onClear: () -> Unit
+) {
+    val canClearFilters = state.searchQuery.isNotBlank() ||
+        state.selectedCategory != null ||
+        state.selectedAmenities.isNotEmpty()
+    EmptyState(
+        icon = Icons.Filled.Search,
+        title = emptyTitleFor(state),
+        message = emptyMessageFor(state),
+        action = if (canClearFilters) {
+            EmptyStateAction(
+                label = stringResource(R.string.clear_filters),
+                onClick = onClear
+            )
+        } else {
+            null
+        }
+    )
+}
+
+@Composable
+private fun emptyMessageFor(state: PlaceListViewModel.UiState): String = when {
     state.sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME && state.currentUserId == null ->
         stringResource(R.string.empty_added_by_me_logged_out)
     state.sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME ->
@@ -472,11 +486,6 @@ private fun emptyTitleFor(state: PlaceListViewModel.UiState): String = when {
     else -> stringResource(R.string.empty_title_default)
 }
 
-/**
- * Pole wyszukiwania po nazwie miejsca. Debouncing jest naturalny
- * (MutableStateFlow w VM pomija duplikaty), więc nie potrzebujemy
- * dodatkowego delay — lista filtruje się natychmiast.
- */
 @Composable
 private fun SearchBar(
     query: String,
@@ -522,7 +531,7 @@ private fun SearchBar(
             }
         },
         singleLine = true,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(12.dp),
         modifier = modifier.height(52.dp)
     )
 }
@@ -533,46 +542,12 @@ private fun CategoryFilterBar(
     selectedCategory: PlaceCategory?,
     onCategorySelected: (PlaceCategory?) -> Unit
 ) {
-    // Kolejność jak w enum PlaceCategory (świadomie nie alfabetycznie -
-    // logiczne grupowanie: place zabaw -> sale -> kawiarnia/restauracja ->
-    // park -> atrakcje -> inne). "Wszystkie" zostaje pierwsze jako reset.
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        FilterChip(
-            selected = selectedCategory == null,
-            onClick = { onCategorySelected(null) },
-            label = { Text(stringResource(R.string.category_all)) }
-        )
-        PlaceCategory.entries.forEach { category ->
-            val style = category.style
-            FilterChip(
-                selected = selectedCategory == category,
-                onClick = { onCategorySelected(category) },
-                leadingIcon = {
-                    Icon(
-                        imageVector = style.icon,
-                        contentDescription = null,
-                        tint = style.color
-                    )
-                },
-                label = { Text(stringResource(category.labelRes)) }
-            )
-        }
-    }
+    KidZoneCategoryFilterBar(
+        selectedCategory = selectedCategory,
+        onCategorySelected = onCategorySelected
+    )
 }
 
-/**
- * Rząd z przyciskiem filtrów (ikona Tune) + chipem sortowania.
- *
- * Quick-amenity chipy usunięte – wszystkie udogodnienia dostępne wyłącznie
- * z bottom sheeta (po kliknięciu ikony Tune). Dzięki temu ekran listy jest
- * czystszy i mniej przytłaczający na mniejszych ekranach.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FilterAndSortBar(
@@ -591,7 +566,6 @@ private fun FilterAndSortBar(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 1. Button "Filtry" (ikona Tune z badge liczbą aktywnych filtrów)
         BadgedBox(
             modifier = Modifier.semantics {
                 contentDescription = context.getString(R.string.filters)
@@ -625,7 +599,6 @@ private fun FilterAndSortBar(
             }
         }
 
-        // 2. Sortowanie
         SortChip(
             current = sortOrder,
             currentUserSignedIn = currentUserSignedIn,
@@ -634,100 +607,86 @@ private fun FilterAndSortBar(
     }
 }
 
-/**
- * Chip "Sortuj: <label>" z dropdownem 5 trybów. Implementacja przez
- * `AssistChip` (a nie FilterChip), bo wartość nie jest binarna - wybór
- * jednego z wielu, a kontrolka i tak otwiera natywny menu.
- *
- * `currentUserSignedIn` reguluje, czy "Dodane przez Ciebie" jest enabled
- * w menu - dla wylogowanego usera ten wybór nie ma sensu (zwróciłby
- * pustą listę), ale zostawiamy go widocznego, żeby user widział co go
- * czeka po zalogowaniu.
- */
 @Composable
 private fun SortChip(
     current: PlaceListViewModel.SortOrder,
     currentUserSignedIn: Boolean,
     onChange: (PlaceListViewModel.SortOrder) -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        AssistChip(
-            onClick = { expanded = true },
-            label = { Text(stringResource(R.string.sort_prefix, stringResource(current.labelRes))) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Sort,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-            },
-            trailingIcon = {
-                Icon(
-                    imageVector = Icons.Filled.ArrowDropDown,
-                    contentDescription = null
-                )
-            },
-            shape = RoundedCornerShape(50),
-            colors = AssistChipDefaults.assistChipColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
+    val options = PlaceListViewModel.SortOrder.entries
+        .filter { it != PlaceListViewModel.SortOrder.ADDED_BY_ME || currentUserSignedIn }
+        .map { order ->
+            SortMenuOption(
+                value = order,
+                label = stringResource(order.labelRes),
+                icon = order.sortMenuIcon
             )
-        )
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            PlaceListViewModel.SortOrder.entries.forEach { option ->
-                val enabled = !(option == PlaceListViewModel.SortOrder.ADDED_BY_ME &&
-                    !currentUserSignedIn)
-                DropdownMenuItem(
-                    text = { Text(stringResource(option.labelRes)) },
-                    enabled = enabled,
-                    onClick = {
-                        onChange(option)
-                        expanded = false
-                    }
-                )
-            }
         }
-    }
+
+    KidZoneSortMenu(
+        current = current,
+        currentLabel = stringResource(current.labelRes),
+        options = options,
+        onChange = onChange
+    )
 }
 
-/**
- * Banner pokazywany pod paskiem filtrów, gdy user wybrał "Najbliższe", a
- * lokalizacji nie mamy. Tłumaczy dlaczego sortowanie nie działa i daje
- * przycisk requesta uprawnienia.
- */
+private val PlaceListViewModel.SortOrder.sortMenuIcon: SortMenuIcon
+    get() = when (this) {
+        PlaceListViewModel.SortOrder.NEAREST -> SortMenuIcon.NEAREST
+        PlaceListViewModel.SortOrder.RECENTLY_ADDED -> SortMenuIcon.RECENT
+        PlaceListViewModel.SortOrder.ADDED_BY_ME -> SortMenuIcon.USER
+        PlaceListViewModel.SortOrder.BEST_RATED -> SortMenuIcon.BEST_RATED
+        PlaceListViewModel.SortOrder.WORST_RATED -> SortMenuIcon.WORST_RATED
+    }
+
 @Composable
 private fun EnableLocationForSortingBanner(onAllowClick: () -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 4.dp),
-        color = MaterialTheme.colorScheme.tertiaryContainer,
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f),
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         shape = MaterialTheme.shapes.medium,
-        tonalElevation = 1.dp
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = Icons.Filled.MyLocation,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                modifier = Modifier.size(20.dp)
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
             )
-            Spacer(Modifier.width(8.dp))
+
+            Spacer(Modifier.width(10.dp))
+
             Text(
                 text = stringResource(R.string.location_sorting_rationale),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                modifier = Modifier.weight(1f)
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
+
             Spacer(Modifier.width(8.dp))
-            TextButton(onClick = onAllowClick) {
-                Text(stringResource(R.string.allow))
+
+            TextButton(
+                onClick = onAllowClick,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.allow),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }
@@ -739,18 +698,20 @@ private fun PlaceCard(
     place: Place,
     distanceKm: Double?,
     showDistance: Boolean,
+    staleLocationAgeMinutes: Int?,
     onClick: () -> Unit,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedContentScope: AnimatedContentScope? = null,
-    animationSource: String? = "list"
+    animationSource: String = "list"
 ) {
     val categoryLabel = stringResource(place.category.labelRes)
     val distanceLabel = if (showDistance && distanceKm != null) {
-        ", ${stringResource(R.string.distance_away, formatDistance(distanceKm))}"
+        ", ${stringResource(R.string.distance_away, formatDistance(distanceKm, staleLocationAgeMinutes))}"
     } else {
         ""
     }
-    val addressLabel = place.address.takeIf { it.isNotBlank() }?.let {
+    val displayAddress = formatDisplayAddress(place.address)
+    val addressLabel = displayAddress.takeIf { it.isNotBlank() }?.let {
         ", ${stringResource(R.string.address_prefix, it)}"
     }.orEmpty()
     val ratingLabel = place.ratingAccessibilityLabel()
@@ -771,7 +732,7 @@ private fun PlaceCard(
             Row(verticalAlignment = Alignment.Top) {
                 CategoryIcon(
                     category = place.category,
-                    animationKey = "list_place_icon_${place.id}",
+                    animationKey = "${animationSource}_place_icon_${place.id}",
                     sharedTransitionScope = sharedTransitionScope,
                     animatedContentScope = animatedContentScope,
                     size = 32.dp,
@@ -783,79 +744,52 @@ private fun PlaceCard(
                         text = place.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(KidZoneSpacing.GapTiny))
-                    CategoryBadge(category = place.category)
+                    Spacer(Modifier.height(6.dp))
+                    SoftCategoryTag(category = place.category)
                 }
-                when {
-                    place.reviewsCount > 0 -> {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Star,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(15.dp)
-                                )
-                                Spacer(Modifier.width(3.dp))
-                                Text(
-                                    text = "%.1f".format(place.averageRating),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    }
-                    place.isNewWithoutReviews() -> {
-                        NewPlaceBadge()
-                    }
-                }
+                PlaceListStatus(place = place)
             }
-            if (place.address.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
+
+            val showDistanceLabel = showDistance && distanceKm != null
+
+            if (displayAddress.isNotBlank() || showDistanceLabel) {
+                Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.LocationOn,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = place.address,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        modifier = Modifier.weight(1f)
-                    )
-                    // Odległość pokazujemy tylko gdy aktywne sortowanie po
-                    // odległości - inaczej byłoby "głośno" przy sortach
-                    // niezwiązanych z lokalizacją.
-                    if (showDistance && distanceKm != null) {
-                        Spacer(Modifier.width(8.dp))
+                    if (displayAddress.isNotBlank()) {
                         Text(
-                            text = formatDistance(distanceKm),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium
+                            text = displayAddress,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                            fontWeight = FontWeight.Normal,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
+
+                    if (showDistanceLabel) {
+                        Spacer(Modifier.width(8.dp))
+                        ListDistanceLabel(
+                            distanceKm = distanceKm,
+                            staleLocationAgeMinutes = staleLocationAgeMinutes
                         )
                     }
                 }
             }
+
             if (place.description.isNotBlank()) {
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text = place.description,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -864,14 +798,120 @@ private fun PlaceCard(
 }
 
 @Composable
-private fun formatDistance(km: Double): String = when {
-    km < 1.0 -> {
-        val meters = (km * 1000).toInt()
-        val rounded = ((meters + 25) / 50) * 50
-        stringResource(R.string.distance_m, rounded)
+private fun SoftCategoryTag(category: PlaceCategory) {
+    val style = category.style
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = style.color.copy(alpha = 0.10f),
+        contentColor = style.color
+    ) {
+        Text(
+            text = stringResource(category.labelRes),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        )
     }
-    km < 100.0 -> stringResource(R.string.distance_km, km)
-    else -> stringResource(R.string.distance_km_integer, km.toInt())
+}
+
+@Composable
+private fun PlaceListStatus(place: Place) {
+    when {
+        place.reviewsCount > 0 -> RatingBadge(place = place)
+        place.isNewWithoutReviews() -> NewPlaceBadge()
+        else -> NoReviewsLabel()
+    }
+}
+
+@Composable
+private fun RatingBadge(place: Place) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        RatingIcon(
+            size = 15.dp
+        )
+
+        Spacer(Modifier.width(3.dp))
+
+        Text(
+            text = "%.1f".format(place.averageRating),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@Composable
+private fun NoReviewsLabel() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = Icons.Filled.Star,
+            contentDescription = stringResource(R.string.rating),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(15.dp)
+        )
+        Spacer(Modifier.width(3.dp))
+        Text(
+            text = stringResource(R.string.map_no_reviews),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+private fun formatDisplayAddress(address: String): String = 
+    com.kidzone.utils.AddressUtils.formatDisplayAddress(address)
+
+@Composable
+private fun formatDistance(
+    km: Double,
+    staleLocationAgeMinutes: Int? = null
+): String {
+    val distance = when {
+        km < VERY_CLOSE_DISTANCE_KM -> VERY_CLOSE_DISTANCE_LABEL
+        km < METER_DISTANCE_THRESHOLD_KM -> {
+            val meters = (km * METERS_PER_KILOMETER).toInt()
+            val rounded = (
+                (meters + DISTANCE_ROUNDING_OFFSET_METERS) /
+                    DISTANCE_ROUNDING_STEP_METERS
+                ) * DISTANCE_ROUNDING_STEP_METERS
+            if (rounded == 0) VERY_CLOSE_DISTANCE_LABEL else stringResource(R.string.distance_m, rounded)
+        }
+        km < INTEGER_DISTANCE_THRESHOLD_KM -> stringResource(R.string.distance_km, km)
+        else -> stringResource(R.string.distance_km_integer, km.toInt())
+    }
+
+    return staleLocationAgeMinutes?.let { "$distance (${staleAgeLabel(it)})" } ?: distance
+}
+
+private fun staleAgeLabel(ageMinutes: Int): String = when {
+    ageMinutes <= 1 -> "1 min temu"
+    else -> "$ageMinutes min temu"
+}
+
+@Composable
+private fun ListDistanceLabel(
+    distanceKm: Double,
+    staleLocationAgeMinutes: Int?
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = Icons.Filled.LocationOn,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.secondary,
+            modifier = Modifier.size(14.dp)
+        )
+        Spacer(Modifier.width(2.dp))
+        Text(
+            text = formatDistance(distanceKm, staleLocationAgeMinutes),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.secondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            fontWeight = FontWeight.Medium
+        )
+    }
 }
 
 @Composable
@@ -881,7 +921,6 @@ private fun Place.ratingAccessibilityLabel(): String = when {
     else -> stringResource(R.string.map_no_reviews)
 }
 
-/** Odległość w km między dwoma punktami (formuła haversine). */
 private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
     val r = 6371.0
     val dLat = Math.toRadians(lat2 - lat1)

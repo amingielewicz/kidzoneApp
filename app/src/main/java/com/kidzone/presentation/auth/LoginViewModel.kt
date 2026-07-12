@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private const val LOGIN_CONNECTION_ERROR = "Błąd połączenia. Sprawdź internet i spróbuj ponownie."
+
 /**
  * ViewModel ekranu logowania.
  */
@@ -112,6 +114,14 @@ class LoginViewModel @Inject constructor(
         _uiState.update { it.copy(message = UiText.DynamicString(text), isMessageError = isError) }
     }
 
+    fun showConnectionError() {
+        showInlineMessage(LOGIN_CONNECTION_ERROR)
+    }
+
+    fun consumeMessage() {
+        _uiState.update { it.copy(message = null) }
+    }
+
     fun forgotPassword() {
         val email = _uiState.value.email.trim()
         if (email.isBlank()) {
@@ -145,6 +155,7 @@ class LoginViewModel @Inject constructor(
 
     private fun mapError(throwable: Throwable): UiText = when (throwable) {
         is AuthException.AccountBanned -> UiText.DynamicString(throwable.banMessage)
+        is AuthException.Network -> UiText.DynamicString(LOGIN_CONNECTION_ERROR)
         is AuthException -> UiText.StringResource(throwable.messageRes)
         else -> UiText.StringResource(R.string.error_unknown)
     }

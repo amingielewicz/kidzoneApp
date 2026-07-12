@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,7 +20,6 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -40,6 +38,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.ExperimentalFoundationApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.annotation.StringRes
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.PlaceCategory
@@ -69,7 +73,7 @@ private val SHEET_SECTIONS: List<AmenitySection> = listOf(
         amenities = listOf(
             Amenity.CHANGING_TABLE,
             Amenity.TOILET,
-            Amenity.STROLLER_ACCESS,
+            Amenity.WHEELCHAIR_ACCESSIBLE,
             Amenity.PARKING,
             Amenity.WIDE_DOORS,
             Amenity.FAMILY_PARKING,
@@ -82,13 +86,13 @@ private val SHEET_SECTIONS: List<AmenitySection> = listOf(
     AmenitySection(
         titleRes = R.string.amenity_section_playground,
         amenities = listOf(
-            Amenity.FENCING,
+            Amenity.FENCED,
             Amenity.SOFT_SURFACE,
-            Amenity.SHADED_BENCHES,
+            Amenity.SHADE,
             Amenity.TODDLER_ZONE,
-            Amenity.CAR_FREE_AREA,
-            Amenity.SOFT_PROTECTION,
-            Amenity.GOOD_LIGHTING
+            Amenity.LOW_TRAFFIC,
+            Amenity.SOFT_SAFETY,
+            Amenity.EVENING_LIGHTING
         ),
         matchingCategories = setOf(PlaceCategory.PLAYGROUND)
     ),
@@ -101,7 +105,7 @@ private val SHEET_SECTIONS: List<AmenitySection> = listOf(
             Amenity.TOY_SANITIZATION,
             Amenity.PARENT_ZONE,
             Amenity.LOCKERS,
-            Amenity.SOFT_PROTECTION
+            Amenity.SOFT_SAFETY
         ),
         matchingCategories = setOf(PlaceCategory.PLAY_ROOM)
     ),
@@ -128,7 +132,7 @@ private val SHEET_SECTIONS: List<AmenitySection> = listOf(
             Amenity.SAFE_PATHS,
             Amenity.DRINKING_WATER,
             Amenity.BREASTFEEDING_AREA,
-            Amenity.GOOD_LIGHTING
+            Amenity.EVENING_LIGHTING
         ),
         matchingCategories = setOf(PlaceCategory.PARK)
     ),
@@ -196,43 +200,15 @@ fun AmenityFilterSheet(
                     .weight(1f, fill = false)
                     .verticalScroll(rememberScrollState())
             ) {
-                val visibleSections = remember(selectedCategory) {
-                    if (selectedCategory == null) {
-                        SHEET_SECTIONS
-                    } else {
-                        SHEET_SECTIONS.filter { section ->
-                            section.matchingCategories.isEmpty() ||
-                                selectedCategory in section.matchingCategories
-                        }
-                    }
-                }
-
-                val sectionsWithFilteredAmenities = remember(selectedCategory, visibleSections) {
-                    if (selectedCategory == null) {
-                        visibleSections
-                    } else {
-                        visibleSections.map { section ->
-                            section.copy(
-                                amenities = section.amenities.filter { amenity ->
-                                    selectedCategory in amenity.applicableCategories
-                                }
-                            )
-                        }.filter { it.amenities.isNotEmpty() }
-                    }
-                }
-
                 val expandedMap = remember(selectedCategory) {
                     mutableStateMapOf<Int, Boolean>().apply {
-                        sectionsWithFilteredAmenities.forEach { section ->
-                            put(
-                                section.titleRes,
-                                section.shouldAutoExpand(selectedCategory)
-                            )
+                        SHEET_SECTIONS.forEach { section ->
+                            put(section.titleRes, false)
                         }
                     }
                 }
 
-                sectionsWithFilteredAmenities.forEach { section ->
+                SHEET_SECTIONS.forEach { section ->
                     SectionItem(
                         section = section,
                         expanded = expandedMap[section.titleRes] ?: false,
@@ -262,13 +238,14 @@ fun AmenityFilterSheet(
     }
 }
 
-private fun AmenitySection.shouldAutoExpand(selectedCategory: PlaceCategory?): Boolean {
-    if (selectedCategory == null) return false
-    if (matchingCategories.isEmpty()) return false
-    return selectedCategory in matchingCategories
-}
+private const val SECTION_EXPAND_SCROLL_DELAY = 250L
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Suppress("LongMethod", "FunctionNaming")
+@OptIn(
+    ExperimentalLayoutApi::class,
+    ExperimentalMaterial3Api::class,
+    ExperimentalFoundationApi::class
+)
 @Composable
 private fun SectionItem(
     section: AmenitySection,
@@ -280,77 +257,88 @@ private fun SectionItem(
     val selectedInSection = section.amenities.count { it in selectedAmenities }
     val rotation by animateFloatAsState(if (expanded) 180f else 0f, label = "chevronRotation")
     val title = stringResource(section.titleRes)
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 48.dp)
-                .clickable(
-                    onClickLabel = if (expanded) {
-                        stringResource(R.string.collapse_section, title)
-                    } else {
-                        stringResource(R.string.expand_section, title)
-                    },
-                    role = Role.Button,
-                    onClick = onToggleExpand
-                )
-                .padding(vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f)
-            )
-            if (selectedInSection > 0) {
-                Box(
-                    modifier = Modifier.padding(end = 8.dp)
-                ) {
-                    Text(
-                        text = "$selectedInSection / ${section.amenities.size}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            } else {
-                Text(
-                    text = "${section.amenities.size}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(end = 8.dp)
-                )
-            }
-            Icon(
-                imageVector = Icons.Filled.ExpandMore,
-                contentDescription = null,
-                modifier = Modifier.rotate(rotation)
-            )
-        }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .bringIntoViewRequester(bringIntoViewRequester)
+    ) {
 
-        AnimatedVisibility(visible = expanded) {
-            val context = androidx.compose.ui.platform.LocalContext.current
-            val sortedAmenities = remember(section, context) {
-                section.amenities.sortedBy { context.getString(it.labelRes).lowercase() }
-            }
-            FlowRow(
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    .heightIn(min = 48.dp)
+                    .clickable(
+                        onClickLabel = if (expanded) {
+                            stringResource(R.string.collapse_section, title)
+                        } else {
+                            stringResource(R.string.expand_section, title)
+                        },
+                        role = Role.Button,
+                        onClick = {
+                            val willExpand = !expanded
+                            onToggleExpand()
+
+                            if (willExpand) {
+                                scope.launch {
+                                    delay(SECTION_EXPAND_SCROLL_DELAY)
+                                    bringIntoViewRequester.bringIntoView()
+                                }
+                            }
+                        }
+                    )
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                sortedAmenities.forEach { amenity ->
-                    FilterChip(
-                        selected = amenity in selectedAmenities,
-                        onClick = { onAmenityToggled(amenity) },
-                        label = { Text(stringResource(amenity.labelRes)) }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                if (selectedInSection > 0) {
+                    Box(
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = "$selectedInSection / ${section.amenities.size}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "${section.amenities.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(end = 8.dp)
                     )
                 }
+                Icon(
+                    imageVector = Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    modifier = Modifier.rotate(rotation)
+                )
             }
-        }
 
-        HorizontalDivider()
+            AnimatedVisibility(visible = expanded) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val sortedAmenities = remember(section, context) {
+                    section.amenities.sortedBy { context.getString(it.labelRes).lowercase() }
+                }
+                com.kidzone.presentation.common.AmenitiesFlowGrid(
+                    amenities = sortedAmenities,
+                    selectedAmenities = selectedAmenities,
+                    onToggle = onAmenityToggled,
+                    modifier = Modifier.padding(bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                )
+            }
+
+            HorizontalDivider()
+        }
     }
 }

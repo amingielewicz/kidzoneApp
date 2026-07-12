@@ -41,12 +41,15 @@
     <string name="error_user_not_found">Konto z podanym e-mailem nie istnieje</string>
     <string name="error_invalid_credentials">Nieprawidłowy e-mail lub hasło</string>
     <string name="error_email_already_in_use">Konto z tym adresem e-mail już istnieje</string>
+    <string name="email_same_as_current">Nowy adres e-mail musi być inny niż aktualny</string>
     <string name="error_username_taken">Ta nazwa użytkownika jest już zajęta. Wybierz inną.</string>
     <string name="error_weak_password">Hasło nie spełnia wymagań bezpieczeństwa</string>
     <string name="error_email_not_verified">Potwierdź swój adres e-mail. Sprawdź skrzynkę pocztową.</string>
     <string name="error_network">Błąd połączenia z serwerem. Spróbuj ponownie.</string>
     <string name="error_unknown">Wystąpił nieoczekiwany błąd. Spróbuj ponownie.</string>
     <string name="error_no_internet">Brak połączenia z internetem. Sprawdź sieć i spróbuj ponownie.</string>
+    <string name="add_place_offline_save_action">Zapisz po odzyskaniu internetu</string>
+    <string name="add_place_offline_hint_short">Brak internetu</string>
     <string name="error_server_temporary">Nie udało się połączyć z serwerem. Spróbuj ponownie za chwilę.</string>
     <string name="error_permission_denied">Nie masz uprawnień do tych danych. Zaloguj się ponownie.</string>
     <string name="error_config_update">Dane wymagają aktualizacji konfiguracji. Spróbuj ponownie później.</string>
@@ -86,6 +89,9 @@
 
     <!-- Home (zakładka Start) -->
     <string name="home_welcome">Cześć!</string>
+    <string name="home_intro_title">Witaj w kidZone!</string>
+    <string name="home_find_nearby">Znajdź atrakcje w pobliżu</string>
+    <string name="home_find_nearby_description">Witaj w kidZone! Znajdź atrakcje w pobliżu.</string>
     <string name="home_recent_nearby_places">Ostatnio dodane w okolicy</string>
     <string name="home_top_places">TOP blisko Ciebie</string>
     <string name="home_nearby_places">Blisko Ciebie</string>
@@ -98,6 +104,7 @@
     <string name="home_no_nearby_places">Nie znaleźliśmy miejsc w pobliżu</string>
     <string name="home_enable_location">Włącz lokalizację</string>
     <string name="home_location_rationale">Pokażemy Ci miejsca przyjazne dzieciom w pobliżu, gdy zezwolisz na dostęp do lokalizacji.</string>
+    <string name="home_manual_city_hint">Nie chcesz używać GPS? Kliknij tutaj, aby wybrać miasto ręcznie</string>
 
     <!-- Map -->
     <string name="map_my_location">Moja lokalizacja</string>
@@ -126,7 +133,7 @@
     <string name="rating">Ocena</string>
     <string name="reviews">Opinie</string>
     <string name="clear_filters">Wyczyść filtry</string>
-    <string name="search_placeholder">Szukaj miejsca po nazwie\u2026</string>
+    <string name="search_placeholder">Szukaj miejsca\u2026</string>
     <string name="clear_search">Wyczyść wyszukiwanie</string>
     <string name="filters">Filtry</string>
     <string name="active_filters_count">Aktywne filtry: %1$d</string>
@@ -166,7 +173,9 @@
     <string name="error_fetch_more">Nie udało się doładować kolejnych miejsc</string>
     <string name="location_sorting_rationale">Włącz lokalizację, by sortować miejsca po odległości.</string>
     <string name="no_internet_banner">Brak połączenia z internetem. Oczekiwanie na sieć…</string>
-    <string name="gps_disabled_banner">Lokalizacja wyłączona. Włącz GPS w ustawieniach.</string>
+    <string name="gps_disabled_banner">Nie widzimy, gdzie jesteś. Włącz lokalizację, aby zobaczyć miejsca w Twojej okolicy.</string>
+    <string name="gps_disabled_title">Włącz GPS</string>
+    <string name="location_status_unavailable">Nie widzimy, gdzie jesteś. Włącz lokalizację, aby zobaczyć miejsca w Twojej okolicy.</string>
     <string name="gps_acquiring_banner">Ustalanie lokalizacji…</string>
 
     <!-- Profile / settings -->
@@ -290,14 +299,20 @@
     <string name="amenity_quiet_areas">Strefy ciszy</string>
 
     <!-- Widget -->
-    <string name="widget_description" translatable="false">Pokazuje 3 najbliższe miejsca przyjazne dzieciom</string>
-    <string name="widget_name" translatable="false">Miejsca w pobliżu</string>
+    <string name="widget_description">Pokazuje 3 najbliższe miejsca przyjazne dzieciom</string>
+    <string name="widget_name">Miejsca w pobliżu</string>
     <string name="place_added_success">Dodano nowe miejsce</string>
     <string name="notification_permission_title">Włącz powiadomienia</string>
-    <string name="notification_permission_message">Damy znać o nowych odznakach, odpowiedziach i ważnych zmianach w Twoich miejscach.</string>
+    <string name="notification_permission_message">Bądź na bieżąco z nowościami w kidZone!</string>
     <string name="enable">Włącz</string>
+    <string name="enable_notifications">Włącz powiadomienia</string>
+    <string name="notification_prompt_first_place">Super, że dodałeś miejsce! Włącz powiadomienia, aby widzieć, kiedy inni dodadzą do niego zdjęcia lub opinię.</string>
+    <string name="notification_prompt_first_badge">Gratulacje, masz pierwszą odznakę! Włącz powiadomienia, aby nie przegapić kolejnych osiągnięć w kidZone.</string>
+    <string name="notification_prompt_top10">Jesteś w TOP 10! Włącz powiadomienia, aby wiedzieć, kiedy wskoczysz na podium albo utrzymasz miejsce w rankingu.</string>
+    <string name="notification_prompt_podium">Wskoczyłeś na podium! Włącz powiadomienia, aby śledzić swoje miejsce w rankingu.</string>
     <string name="location_permission_title">Udostępnij lokalizację</string>
     <string name="location_permission_message">Pokażemy miejsca blisko Ciebie, odległości na Start i wygodniej wycentrujemy mapę.</string>
+    <string name="location_permission_action">Zezwól na lokalizację</string>
     <string name="later">Później</string>
     <string name="amenity_filters_title">Filtry udogodnień</string>
     <string name="clear_with_count">Wyczyść (%1$d)</string>
@@ -411,7 +426,7 @@
     <string name="photo_index">Zdjęcie %1$d</string>
     <string name="review_photo_index">Zdjęcie opinii %1$d</string>
     <string name="location_permission_denied">Brak uprawnienia do lokalizacji</string>
-    <string name="camera_access_denied">Brak dostępu do aparatu</string>
+    <string name="camera_access_denied">Brak dostępu do aparatu. Nadaj uprawnienie w ustawieniach.</string>
     <string name="camera_unavailable">Nie udało się uruchomić aparatu</string>
     <string name="edit_place_title">Edytuj miejsce</string>
     <string name="place_name_label">Nazwa miejsca</string>
@@ -550,6 +565,8 @@
     <string name="delete_account_gdpr_info">Treści tworzone przez Ciebie stanowią wartość dla społeczności i pozostaną dostępne w formie zanonimizowanej (zgodnie z RODO).</string>
     <string name="delete_account_confirm_google">Zaloguj się ponownie przez Google, aby potwierdzić usunięcie konta:</string>
     <string name="delete_account_confirm_password">Wpisz aktualne hasło, aby potwierdzić:</string>
+    <string name="delete_account_reviews_prefix">Twoje opinie</string>
+    <string name="delete_account_places_prefix">Twoje miejsca</string>
     <string name="confirm_google_button">Potwierdź przez Google</string>
     <string name="change_email_title">Zmiana adresu e-mail</string>
     <string name="current_email_label">Aktualny adres: %1$s</string>

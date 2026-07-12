@@ -18,4 +18,10 @@ interface LocationProvider {
      * @return (latitude, longitude) pair, or null if unavailable/timed out.
      */
     suspend fun getCurrentLocation(): Pair<Double, Double>?
+
+    /** Last location successfully fetched by the app. */
+    fun getLastKnownLocation(): Pair<Double, Double>?
+
+    /** Age of last location in minutes. */
+    fun getLastKnownLocationAgeMinutes(): Int?
 }

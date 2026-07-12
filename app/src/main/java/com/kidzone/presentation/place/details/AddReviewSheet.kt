@@ -1,3 +1,5 @@
+@file:Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod", "LongParameterList")
+
 package com.kidzone.presentation.place.details
 
 import android.Manifest
@@ -7,7 +9,6 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,16 +25,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarOutline
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -55,16 +52,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
-import coil.compose.AsyncImage
 import com.kidzone.R
+import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.common.createCameraImageUri
 import kotlinx.coroutines.launch
 import java.security.MessageDigest
@@ -75,7 +70,7 @@ import java.security.MessageDigest
 private const val COMMENT_MAX_LENGTH = 1000
 
 /** Maksymalna liczba zdjęć na opinię. */
-private const val MAX_REVIEW_PHOTOS = 3
+private const val MAX_REVIEW_PHOTOS = 5
 
 /**
  * Oblicza MD5 hash zawartości URI.
@@ -129,6 +124,7 @@ fun AddReviewSheet(
     errorMessage: String?,
     onDismiss: () -> Unit,
     onSubmit: (rating: Int, comment: String, photoUris: List<Uri>, retainedPhotoUrls: List<String>) -> Unit,
+    isOffline: Boolean = false,
     initialRating: Int = 0,
     initialComment: String = "",
     initialPhotoUrls: List<String> = emptyList(),
@@ -178,13 +174,15 @@ fun AddReviewSheet(
         }
     }
 
+    val availableReviewPhotoSlots = (
+        MAX_REVIEW_PHOTOS - (existingPhotoUrls.size + photoUris.size)
+    ).coerceAtLeast(0)
+
     val duplicatePhotoError = stringResource(R.string.duplicate_photo_error)
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(MAX_REVIEW_PHOTOS)
-    ) { uris ->
+    fun addPickedReviewPhotos(uris: List<Uri>) {
         if (uris.isNotEmpty()) {
             val available = MAX_REVIEW_PHOTOS - (existingPhotoUrls.size + photoUris.size)
-            if (available <= 0) return@rememberLauncherForActivityResult
+            if (available <= 0) return
 
             val accepted = mutableListOf<Uri>()
             var duplicatesFound = 0
@@ -206,6 +204,18 @@ fun AddReviewSheet(
                 }
             }
         }
+    }
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(
+            availableReviewPhotoSlots.coerceAtLeast(2)
+        )
+    ) { uris ->
+        addPickedReviewPhotos(uris)
+    }
+    val singlePhotoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) addPickedReviewPhotos(listOf(uri))
     }
 
     var cameraUriString by rememberSaveable { mutableStateOf<String?>(null) }
@@ -250,6 +260,7 @@ fun AddReviewSheet(
     }
 
     val cameraAccessDenied = stringResource(R.string.camera_access_denied)
+
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -342,7 +353,7 @@ fun AddReviewSheet(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     itemsIndexed(existingPhotoUrls) { index, url ->
-                        PhotoThumbnail(
+                        com.kidzone.presentation.common.KidZonePhotoThumbnail(
                             model = url,
                             onRemove = {
                                 val removedUrl = existingPhotoUrls[index]
@@ -359,7 +370,7 @@ fun AddReviewSheet(
                         )
                     }
                     itemsIndexed(photoUris) { index, uri ->
-                        PhotoThumbnail(
+                        com.kidzone.presentation.common.KidZonePhotoThumbnail(
                             model = uri,
                             onRemove = {
                                 val removedUri = photoUris[index]
@@ -382,9 +393,14 @@ fun AddReviewSheet(
                 ) {
                     OutlinedButton(
                         onClick = {
-                            photoPickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            val request = PickVisualMediaRequest(
+                                ActivityResultContracts.PickVisualMedia.ImageOnly
                             )
+                            when {
+                                availableReviewPhotoSlots <= 0 -> Unit
+                                availableReviewPhotoSlots == 1 -> singlePhotoPickerLauncher.launch(request)
+                                else -> photoPickerLauncher.launch(request)
+                            }
                         },
                         enabled = !isSubmitting && hashesReady,
                         modifier = Modifier.weight(1f)
@@ -395,13 +411,21 @@ fun AddReviewSheet(
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.gallery_limit, totalPhotoCount, MAX_REVIEW_PHOTOS))
+                        Text(
+                            stringResource(
+                                R.string.gallery_limit,
+                                totalPhotoCount,
+                                MAX_REVIEW_PHOTOS
+                            )
+                        )
                     }
                     OutlinedButton(
                         onClick = {
                             val hasPerm = ContextCompat.checkSelfPermission(
-                                context, Manifest.permission.CAMERA
+                                context,
+                                Manifest.permission.CAMERA
                             ) == PackageManager.PERMISSION_GRANTED
+
                             if (hasPerm) {
                                 launchCamera()
                             } else {
@@ -424,23 +448,15 @@ fun AddReviewSheet(
 
             Spacer(Modifier.height(20.dp))
 
-            Button(
+            OfflineAwareSubmitButton(
+                label = submitLabel,
                 onClick = { onSubmit(rating, comment, photoUris, existingPhotoUrls) },
+                isOffline = isOffline,
                 enabled = rating in 1..5 && !isSubmitting,
+                isLoading = isSubmitting,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
-            ) {
-                if (isSubmitting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Text(submitLabel)
-                }
-            }
+            )
             Spacer(Modifier.height(8.dp))
             }
             SnackbarHost(
@@ -451,45 +467,6 @@ fun AddReviewSheet(
     }
 }
 
-@Composable
-private fun PhotoThumbnail(
-    model: Any,
-    onRemove: () -> Unit
-) {
-    Box(modifier = Modifier.size(width = 68.dp, height = 72.dp)) {
-        AsyncImage(
-            model = model,
-            contentDescription = stringResource(R.string.photo_thumbnail_description),
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .size(64.dp)
-                .clip(RoundedCornerShape(6.dp)),
-            contentScale = ContentScale.Crop
-        )
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .zIndex(1f)
-                .size(14.dp)
-                .clip(CircleShape)
-                .background(
-                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.95f)
-                )
-                .clickable(
-                    role = Role.Button,
-                    onClick = onRemove
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Filled.Close,
-                contentDescription = stringResource(R.string.delete),
-                tint = MaterialTheme.colorScheme.onError,
-                modifier = Modifier.size(8.dp)
-            )
-        }
-    }
-}
 
 @Composable
 private fun StarRatingInput(
@@ -505,7 +482,7 @@ private fun StarRatingInput(
         (1..5).forEach { star ->
             val isFilled = star <= rating
             Icon(
-                imageVector = if (isFilled) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                imageVector = if (isFilled) Icons.Filled.Star else Icons.Filled.StarBorder,
                 contentDescription = stringResource(R.string.rate_star_label, star),
                 tint = if (isFilled) {
                     MaterialTheme.colorScheme.secondary

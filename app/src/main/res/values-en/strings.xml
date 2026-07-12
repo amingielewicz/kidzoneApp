@@ -53,6 +53,8 @@
     <string name="error_quota_exceeded">Service is temporarily overloaded. Please try again in a moment.</string>
     <string name="error_upload_failed">Failed to upload photo. Please try again.</string>
     <string name="error_storage_permission">You do not have permission for this file. Please sign in again.</string>
+    <string name="add_place_offline_save_action">Save when online</string>
+    <string name="add_place_offline_hint_short">No internet connection</string>
     <string name="error_storage_quota">Failed to upload photo because the service is temporarily overloaded. Please try again later.</string>
     <string name="error_storage_retry_limit">Failed to upload photo due to unstable connection. Please try again.</string>
     <string name="error_already_reported">You have already reported this content.</string>
@@ -86,6 +88,9 @@
 
     <!-- Home -->
     <string name="home_welcome">Hi!</string>
+    <string name="home_intro_title">Welcome to kidZone!</string>
+    <string name="home_find_nearby">Find attractions nearby</string>
+    <string name="home_find_nearby_description">Welcome to kidZone! Find attractions nearby.</string>
     <string name="home_recent_nearby_places">Recently added nearby</string>
     <string name="home_top_places">TOP near you</string>
     <string name="home_nearby_places">Near you</string>
@@ -98,6 +103,7 @@
     <string name="home_no_nearby_places">No places found nearby</string>
     <string name="home_enable_location">Enable location</string>
     <string name="home_location_rationale">We\'ll show you kid-friendly places nearby when you allow location access.</string>
+    <string name="home_manual_city_hint">Don’t want to use GPS? Tap here to choose a city manually</string>
 
     <!-- Map -->
     <string name="map_my_location">My location</string>
@@ -126,7 +132,7 @@
     <string name="rating">Rating</string>
     <string name="reviews">Reviews</string>
     <string name="clear_filters">Clear filters</string>
-    <string name="search_placeholder">Search place by name\u2026</string>
+    <string name="search_placeholder">Search place\u2026</string>
     <string name="clear_search">Clear search</string>
     <string name="filters">Filters</string>
     <string name="active_filters_count">Active filters: %1$d</string>
@@ -166,7 +172,8 @@
     <string name="error_fetch_more">Could not load more places</string>
     <string name="location_sorting_rationale">Enable location to sort places by distance.</string>
     <string name="no_internet_banner">No internet connection. Waiting for network…</string>
-    <string name="gps_disabled_banner">Location is turned off. Enable GPS in settings.</string>
+    <string name="gps_disabled_banner">We can\'t see where you are. Turn on location to see places in your area.</string>
+    <string name="location_status_unavailable">We can\'t see where you are. Turn on location to see places in your area.</string>
     <string name="gps_acquiring_banner">Acquiring location…</string>
 
     <!-- Profile / settings -->
@@ -294,10 +301,16 @@
     <string name="widget_name">Nearby places</string>
     <string name="place_added_success">New place added</string>
     <string name="notification_permission_title">Enable notifications</string>
-    <string name="notification_permission_message">We\'ll notify you about new badges, replies, and important changes in your places.</string>
+    <string name="notification_permission_message">Stay up to date with what\'s new in kidZone!</string>
     <string name="enable">Enable</string>
+    <string name="enable_notifications">Enable notifications</string>
+    <string name="notification_prompt_first_place">Nice, you added a place! Enable notifications to see when others add photos or reviews to it.</string>
+    <string name="notification_prompt_first_badge">Congrats, you earned your first badge! Enable notifications so you don\'t miss your next kidZone achievements.</string>
+    <string name="notification_prompt_top10">You\'re in the TOP 10! Enable notifications to know when you reach the podium or keep your ranking position.</string>
+    <string name="notification_prompt_podium">You reached the podium! Enable notifications to follow your ranking position.</string>
     <string name="location_permission_title">Share location</string>
     <string name="location_permission_message">We\'ll show you places near you, distances on Home, and center the map more conveniently.</string>
+    <string name="location_permission_action">Allow location</string>
     <string name="later">Later</string>
     <string name="amenity_filters_title">Amenity filters</string>
     <string name="clear_with_count">Clear (%1$d)</string>
@@ -409,7 +422,7 @@
     <string name="photo_index">Photo %1$d</string>
     <string name="review_photo_index">Review photo %1$d</string>
     <string name="location_permission_denied">Location permission denied</string>
-    <string name="camera_access_denied">Camera access denied</string>
+    <string name="camera_access_denied"><string name="camera_access_denied">Camera access denied. Grant permission in settings.</string></string>
     <string name="camera_unavailable">Could not start the camera</string>
     <string name="edit_place_title">Edit place</string>
     <string name="place_name_label">Place name</string>
@@ -548,10 +561,13 @@
     <string name="delete_account_gdpr_info">The content created by you provides value to the community and will remain available in anonymized form (in accordance with GDPR).</string>
     <string name="delete_account_confirm_google">Sign in again with Google to confirm account deletion:</string>
     <string name="delete_account_confirm_password">Enter your current password to confirm:</string>
+    <string name="delete_account_reviews_prefix">Your reviews</string>
+    <string name="delete_account_places_prefix">Your places</string>
     <string name="confirm_google_button">Confirm via Google</string>
     <string name="change_email_title">Change email address</string>
     <string name="current_email_label">Current address: %1$s</string>
     <string name="new_email_label">New email address</string>
+    <string name="email_same_as_current">The new email address must be different from the current one</string>
     <string name="email_already_set">This is your current address</string>
     <string name="email_verification_hint">We will send a verification link to the new address</string>
     <string name="send_link">Send link</string>

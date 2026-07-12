@@ -1,3 +1,5 @@
+@file:Suppress("MagicNumber")
+
 package com.kidzone.ui.theme
 
 import android.os.Build
@@ -37,7 +39,19 @@ private val LightColors = lightColorScheme(
     background = BrandWhite,
     onBackground = OnSurfaceLight,
     surface = SurfaceLight,
-    onSurface = OnSurfaceLight
+    onSurface = OnSurfaceLight,
+    surfaceVariant = Color(0xFFF0F4F8),
+    onSurfaceVariant = Color(0xFF4B5563),
+    outline = Color(0xFF9CA3AF),
+    outlineVariant = Color(0xFFE5E7EB),
+
+    // Neutralne surfaces dla menu, dropdownów, kart i sheetów.
+    // Jawne wartości eliminują domyślne różowo/fioletowe tony Material3.
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFF8F9FA),
+    surfaceContainer = Color(0xFFF8F9FA),
+    surfaceContainerHigh = Color(0xFFF0F4F8),
+    surfaceContainerHighest = Color(0xFFE5E7EB)
 )
 
 private val DarkColors = darkColorScheme(

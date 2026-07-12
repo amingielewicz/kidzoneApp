@@ -1,5 +1,6 @@
 package com.kidzone.presentation.place.list
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.R
@@ -39,6 +40,8 @@ private val LIST_MORE_ERROR_FALLBACK = UiText.StringResource(R.string.error_fetc
 private const val FLOW_SUBSCRIPTION_TIMEOUT_MS = 5000L
 private const val EARTH_RADIUS_KM = 6371.0
 private const val SEARCH_CONTAINS_RANK_OFFSET = 100
+private const val HAS_REVIEWS_SORT_WEIGHT = 0
+private const val NO_REVIEWS_SORT_WEIGHT = 1
 
 /**
  * ViewModel listy miejsc.
@@ -73,7 +76,11 @@ class PlaceListViewModel @Inject constructor(
         val hasMore: Boolean = false,
         val isLoadingMore: Boolean = false,
         val totalCount: Int = 0,
-        val searchQuery: String = ""
+        val searchQuery: String = "",
+        val isUsingStaleLocation: Boolean = false,
+        val staleLocationAgeMinutes: Int? = null,
+        val hasLocationPermission: Boolean = false,
+        val isLocationServiceEnabled: Boolean = false,
     )
 
     private val selectedCategory = MutableStateFlow<PlaceCategory?>(null)
@@ -86,6 +93,10 @@ class PlaceListViewModel @Inject constructor(
     private val _lastResult = MutableStateFlow<PagedResult<Place>?>(null)
     private val _errorMessage = MutableStateFlow<UiText?>(null)
     private val _userLocation = MutableStateFlow<Pair<Double, Double>?>(null)
+    private val _isUsingStaleLocation = MutableStateFlow(false)
+    private val _staleLocationAgeMinutes = MutableStateFlow<Int?>(null)
+    private val _hasLocationPermission = MutableStateFlow(false)
+    private val _isLocationServiceEnabled = MutableStateFlow(false)
 
     // Flag helping to restore scroll position when returning from details
     private var isReturningFromDetails = false
@@ -105,28 +116,40 @@ class PlaceListViewModel @Inject constructor(
         _isRefreshing,
         _isLoadingMore,
         _lastResult,
-        _errorMessage
+        _errorMessage,
+        _isUsingStaleLocation,
+        _staleLocationAgeMinutes,
+        _hasLocationPermission,
+        _isLocationServiceEnabled
     ) { args ->
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val category = args[0] as PlaceCategory?
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val amenities = args[1] as Set<Amenity>
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val order = args[2] as SortOrder
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val query = args[3] as String
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val location = args[4] as Pair<Double, Double>?
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val user = args[5] as User?
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val refreshing = args[6] as Boolean
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val loadingMore = args[7] as Boolean
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val paged = args[8] as PagedResult<Place>?
-        @Suppress("MagicNumber")
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
         val error = args[9] as UiText?
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
+        val isUsingStaleLocation = args[10] as Boolean
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
+        val staleLocationAgeMinutes = args[11] as Int?
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
+        val hasLocationPermission = args[12] as Boolean
+        @Suppress("MagicNumber", "UNCHECKED_CAST")
+        val isLocationServiceEnabled = args[13] as Boolean
 
         val places = paged?.items.orEmpty()
         val filtered = filterAndSort(
@@ -134,21 +157,27 @@ class PlaceListViewModel @Inject constructor(
             FilterParams(location, user?.id, order, query, category, amenities)
         )
 
+
         UiState(
             places = filtered,
             selectedCategory = category,
             selectedAmenities = amenities,
             sortOrder = order,
             userLocation = location,
+            hasLocationPermission = hasLocationPermission,
+            isLocationServiceEnabled = isLocationServiceEnabled,
             currentUserId = user?.id,
-            nearestUnavailable = order == SortOrder.NEAREST && location == null,
+            nearestUnavailable = order == SortOrder.NEAREST &&
+                    (!hasLocationPermission || !isLocationServiceEnabled),
             isLoading = paged == null && error == null,
             isRefreshing = refreshing,
             errorMessage = error,
             hasMore = query.isBlank() && (paged?.hasMore ?: false),
             isLoadingMore = loadingMore,
             totalCount = paged?.items?.size ?: 0,
-            searchQuery = query
+            searchQuery = query,
+            isUsingStaleLocation = isUsingStaleLocation,
+            staleLocationAgeMinutes = staleLocationAgeMinutes
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SUBSCRIPTION_TIMEOUT_MS), UiState())
 
@@ -167,8 +196,65 @@ class PlaceListViewModel @Inject constructor(
     }
 
     fun refreshLocation() {
+        val hasPermission = locationProvider.hasPermission()
+        val isServiceEnabled = locationProvider.isServiceEnabled()
+
+        Log.d(
+            "PlaceListLocation",
+            "refreshLocation: hasPermission=$hasPermission, isServiceEnabled=$isServiceEnabled"
+        )
+
+        _hasLocationPermission.value = hasPermission
+        _isLocationServiceEnabled.value = isServiceEnabled
+
+        if (!hasPermission || !isServiceEnabled) {
+            val staleLocation: Pair<Double, Double>? = locationProvider.getLastKnownLocation()
+
+            Log.d(
+                "PlaceListLocation",
+                "using stale: staleLocation=$staleLocation, age=${locationProvider.getLastKnownLocationAgeMinutes()}"
+            )
+
+            _userLocation.value = staleLocation
+            _isUsingStaleLocation.value = staleLocation != null
+            _staleLocationAgeMinutes.value = if (staleLocation != null) {
+                locationProvider.getLastKnownLocationAgeMinutes()
+            } else {
+                null
+            }
+
+            return
+        }
+
         viewModelScope.launch {
-            _userLocation.value = locationProvider.getCurrentLocation()
+            val location: Pair<Double, Double>? = locationProvider.getCurrentLocation()
+
+            Log.d(
+                "PlaceListLocation",
+                "current location result=$location"
+            )
+
+            if (location != null) {
+                _userLocation.value = location
+                _isUsingStaleLocation.value = false
+                _staleLocationAgeMinutes.value = null
+            } else {
+                val staleLocation: Pair<Double, Double>? = locationProvider.getLastKnownLocation()
+
+                Log.d(
+                    "PlaceListLocation",
+                    "current null, fallback stale=$staleLocation, " +
+                        "age=${locationProvider.getLastKnownLocationAgeMinutes()}"
+                )
+
+                _userLocation.value = staleLocation
+                _isUsingStaleLocation.value = staleLocation != null
+                _staleLocationAgeMinutes.value = if (staleLocation != null) {
+                    locationProvider.getLastKnownLocationAgeMinutes()
+                } else {
+                    null
+                }
+            }
         }
     }
 
@@ -294,7 +380,9 @@ class PlaceListViewModel @Inject constructor(
             SortOrder.ADDED_BY_ME -> compareByDescending<Place> { it.createdAtMillis }
             SortOrder.BEST_RATED -> compareByDescending<Place> { it.averageRating }
                 .thenByDescending { it.reviewsCount }
-            SortOrder.WORST_RATED -> compareBy<Place> { it.reviewsCount == 0 }
+            SortOrder.WORST_RATED -> compareBy<Place> {
+                if (it.reviewsCount == 0) NO_REVIEWS_SORT_WEIGHT else HAS_REVIEWS_SORT_WEIGHT
+            }
                 .thenBy { it.averageRating }
                 .thenByDescending { it.reviewsCount }
             SortOrder.NEAREST -> if (params.location != null) {

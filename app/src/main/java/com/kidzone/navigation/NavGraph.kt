@@ -23,7 +23,6 @@ import com.kidzone.presentation.place.details.PlaceDetailsScreen
 import com.kidzone.presentation.place.myplaces.MyPlacesScreen
 import com.kidzone.presentation.review.myreviews.MyReviewsScreen
 import com.kidzone.presentation.splash.SplashScreen
-import com.kidzone.data.remote.RemoteConfigService
 
 /**
  * Klucze sygnalizujące "po dodaniu miejsca skacz na Map i wycentruj kamerę".
@@ -230,8 +229,17 @@ fun KidZoneNavGraph(
                         }
                     },
                     onOpenAddPlace = { navController.navigate(Route.AddPlace.create()) },
-                    onOpenMyPlaces = { navController.navigate(Route.MyPlaces.path) },
-                    onOpenMyReviews = { navController.navigate(Route.MyReviews.path) },
+                    onOpenMyPlaces = {
+                        navController.navigate(Route.MyPlaces.path) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    onOpenMyReviews = {
+                        navController.navigate(Route.MyReviews.path) {
+                            launchSingleTop = true
+                        }
+                    },
                     onSignOut = {
                         navController.navigate(Route.Login.path) {
                             popUpTo(Route.Main.path) { inclusive = true }
@@ -240,6 +248,32 @@ fun KidZoneNavGraph(
                     onLocaleChanged = onLocaleChanged,
                     sharedTransitionScope = this@SharedTransitionLayout,
                     animatedContentScope = this@composable
+                )
+            }
+
+            composable(Route.MyPlaces.path) {
+                MyPlacesScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenPlaceDetails = { placeId, source ->
+                        navController.navigate(Route.PlaceDetails.create(placeId, source)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    sharedTransitionScope = this@SharedTransitionLayout,
+                    animatedContentScope = this@composable,
+                )
+            }
+
+            composable(Route.MyReviews.path) {
+                MyReviewsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenPlaceDetails = { placeId, source ->
+                        navController.navigate(Route.PlaceDetails.create(placeId, source)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    sharedTransitionScope = this@SharedTransitionLayout,
+                    animatedContentScope = this@composable,
                 )
             }
 
@@ -279,7 +313,12 @@ fun KidZoneNavGraph(
                             navController.popBackStack()
                         }
                     },
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onOpenExistingPlace = { placeId ->
+                        navController.navigate(Route.PlaceDetails.create(placeId)) {
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
 
@@ -320,32 +359,6 @@ fun KidZoneNavGraph(
                     sharedTransitionScope = this@SharedTransitionLayout,
                     animatedContentScope = this@composable,
                     animationSource = source
-                )
-            }
-
-            composable(Route.MyPlaces.path) {
-                MyPlacesScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenPlaceDetails = { placeId, source ->
-                        navController.navigate(Route.PlaceDetails.create(placeId, source)) {
-                            launchSingleTop = true
-                        }
-                    },
-                    sharedTransitionScope = this@SharedTransitionLayout,
-                    animatedContentScope = this@composable
-                )
-            }
-
-            composable(Route.MyReviews.path) {
-                MyReviewsScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenPlaceDetails = { placeId, source ->
-                        navController.navigate(Route.PlaceDetails.create(placeId, source)) {
-                            launchSingleTop = true
-                        }
-                    },
-                    sharedTransitionScope = this@SharedTransitionLayout,
-                    animatedContentScope = this@composable
                 )
             }
         }

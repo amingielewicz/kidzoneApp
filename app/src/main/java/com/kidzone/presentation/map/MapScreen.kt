@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.GpsOff
@@ -37,11 +38,8 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
@@ -50,7 +48,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -113,11 +110,12 @@ import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.model.GeoBounds
 import com.kidzone.presentation.common.CategoryIcon
-import com.kidzone.presentation.common.GpsDisabledBanner
+import com.kidzone.presentation.common.KidZoneCategoryFilterBar
+import com.kidzone.presentation.common.RatingIcon
+import com.kidzone.presentation.common.KidZoneFilterChip
 import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.rememberNetworkStatus
-import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.fetchCurrentLocation
 import com.kidzone.presentation.place.add.hasLocationPermission
 import com.kidzone.presentation.place.add.isLocationServiceEnabled
@@ -133,13 +131,6 @@ private const val SPIDERFY_RADIUS_DEGREES = 0.00012
 private const val SPIDERFY_RADIUS_STEP_DEGREES = 0.000015
 private const val SPIDERFY_MAX_EXTRA = 8
 private val MAP_TOP_OVERLAY_SPACING = 8.dp
-@Suppress("MagicNumber")
-private val LocationPermissionBannerContainer = Color(0xFFF3E5F5)
-@Suppress("MagicNumber")
-private val LocationPermissionBannerContent = Color(0xFF4A148C)
-@Suppress("MagicNumber")
-private val LocationPermissionButtonContainer = Color(0xFF8E24AA)
-private val LocationPermissionButtonContent = Color.White
 
 @SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class)
@@ -268,8 +259,8 @@ fun MapScreen(
                 mapToolbarEnabled = false,
                 compassEnabled = true
             ),
-            // Logo Google nisko na krawędzi (6dp)
-            contentPadding = PaddingValues(bottom = 6.dp),
+            // Logo Google
+            contentPadding = PaddingValues(start = 16.dp, bottom = 16.dp),
             onMapLoaded = { mapLoaded = true },
             onMapClick = {
                 userTouchedMap = true
@@ -308,82 +299,87 @@ fun MapScreen(
                 }
             }
         }
-
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(MAP_TOP_OVERLAY_SPACING)
         ) {
-            if (!locationPermissionGranted) {
-                LocationPermissionBanner(
-                    onAllowClick = {
-                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                    },
-                    onOpenSettingsClick = {
-                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = Uri.fromParts("package", context.packageName, null)
-                        }
-                        context.startActivity(intent)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            if (locationPermissionGranted && !gpsEnabled) {
-                GpsDisabledBanner(modifier = Modifier.fillMaxWidth())
-            }
             FiltersOverlay(
                 selectedCategory = state.selectedCategory,
                 topRatedOnly = state.topRatedOnly,
                 addedByMeOnly = state.addedByMeOnly,
+                isLocationAvailable = locationPermissionGranted && gpsEnabled,
                 showAddedByMeChip = true, // Simplified check
                 onCategorySelected = viewModel::onCategorySelect,
                 onToggleTopRated = viewModel::toggleTopRated,
                 onToggleAddedByMe = viewModel::toggleAddedByMe,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp)
+                onLocationStatusClick = {
+                    when {
+                        !locationPermissionGranted -> {
+                            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                        }
+
+                        !gpsEnabled -> {
+                            context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                        }
+                    }
+                }
             )
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
+                    .padding(start = 12.dp, end = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Button(
-                    onClick = { showPlacesList = true },
-                    modifier = Modifier.padding(start = 4.dp)
+                    onClick = { showPlacesList = true }
                 ) {
                     val countLabel = if (state.isPlaceCountCapped) {
                         stringResource(R.string.map_place_count_capped, state.places.size)
                     } else {
                         state.places.size.toString()
                     }
+
                     Text(stringResource(R.string.map_list_button, countLabel))
                 }
+
+                MapMyLocationButton(
+                    isLocationAvailable = locationPermissionGranted && gpsEnabled,
+                    onClick = {
+                        when {
+                            !locationPermissionGranted -> {
+                                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                            }
+
+                            !gpsEnabled -> {
+                                context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                            }
+
+                            else -> {
+                                userTouchedMap = false
+                                scope.launch { recenterOnUser(context, cameraPositionState) }
+                            }
+                        }
+                    }
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(end = 16.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Column(
-                    modifier = Modifier.padding(end = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     horizontalAlignment = Alignment.End
                 ) {
-                    MapMyLocationButton(
-                        isLocationAvailable = locationPermissionGranted && gpsEnabled,
-                        onClick = {
-                            when {
-                                !locationPermissionGranted -> {
-                                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                                }
-                                !gpsEnabled -> {
-                                    context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-                                }
-                                else -> {
-                                    userTouchedMap = false
-                                    scope.launch { recenterOnUser(context, cameraPositionState) }
-                                }
-                            }
-                        }
-                    )
+                    Spacer(Modifier.height(90.dp))
+
                     MapIconButton(
                         icon = Icons.Filled.Add,
                         contentDescription = stringResource(R.string.map_zoom_in),
@@ -393,6 +389,7 @@ fun MapScreen(
                             }
                         }
                     )
+
                     MapIconButton(
                         icon = Icons.Filled.Remove,
                         contentDescription = stringResource(R.string.map_zoom_out),
@@ -655,57 +652,64 @@ private fun ReportSettledViewport(
 }
 
 @Composable
-private fun LocationPermissionBanner(
-    onAllowClick: () -> Unit,
-    onOpenSettingsClick: () -> Unit,
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList", "MagicNumber")
+private fun FiltersOverlay(
+    selectedCategory: PlaceCategory?,
+    topRatedOnly: Boolean,
+    addedByMeOnly: Boolean,
+    isLocationAvailable: Boolean,
+    showAddedByMeChip: Boolean,
+    onCategorySelected: (PlaceCategory?) -> Unit,
+    onToggleTopRated: () -> Unit,
+    onToggleAddedByMe: () -> Unit,
+    onLocationStatusClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier.semantics {
-            liveRegion = LiveRegionMode.Polite
-        },
-        color = LocationPermissionBannerContainer,
-        tonalElevation = 2.dp
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
     ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.MyLocation,
-                    contentDescription = "Lokalizacja",
-                    tint = LocationPermissionBannerContent,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = stringResource(R.string.map_location_banner_text),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = LocationPermissionBannerContent,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TextButton(
-                    onClick = onOpenSettingsClick,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = LocationPermissionBannerContent
-                    )
+        Column(modifier = Modifier.padding(vertical = 6.dp)) {
+            if (!isLocationAvailable) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(stringResource(R.string.settings))
+                    LocationStatusChip(onClick = onLocationStatusClick)
                 }
-                Button(
-                    onClick = onAllowClick,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = LocationPermissionButtonContainer,
-                        contentColor = LocationPermissionButtonContent
+            }
+
+            KidZoneCategoryFilterBar(
+                selectedCategory = selectedCategory,
+                onCategorySelected = onCategorySelected
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                KidZoneFilterChip(
+                    selected = topRatedOnly,
+                    onClick = onToggleTopRated,
+                    label = stringResource(R.string.filter_top_rated),
+                    icon = Icons.Filled.Star
+                )
+                if (showAddedByMeChip) {
+                    KidZoneFilterChip(
+                        selected = addedByMeOnly,
+                        onClick = { onToggleAddedByMe() },
+                        label = stringResource(R.string.filter_added_by_me),
+                        icon = Icons.Filled.Person
                     )
-                ) {
-                    Text(stringResource(R.string.allow))
                 }
             }
         }
@@ -713,112 +717,26 @@ private fun LocationPermissionBanner(
 }
 
 @Composable
-private fun FiltersOverlay(
-    selectedCategory: PlaceCategory?,
-    topRatedOnly: Boolean,
-    addedByMeOnly: Boolean,
-    showAddedByMeChip: Boolean,
-    onCategorySelected: (PlaceCategory?) -> Unit,
-    onToggleTopRated: () -> Unit,
-    onToggleAddedByMe: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val orderedCategories = PlaceCategory.entries
-    val selectedChipColors = FilterChipDefaults.filterChipColors(
-        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer
-    )
-
+@Suppress("FunctionNaming")
+private fun LocationStatusChip(onClick: () -> Unit) {
     Surface(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.medium,
-        tonalElevation = 4.dp,
-        shadowElevation = 4.dp
+        modifier = Modifier
+            .size(36.dp)
+            .clickable(
+                role = Role.Button,
+                onClick = onClick
+            ),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        tonalElevation = 1.dp
     ) {
-        Column(modifier = Modifier.padding(vertical = 6.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                FilterChip(
-                    selected = selectedCategory == null,
-                    onClick = { onCategorySelected(null) },
-                    colors = selectedChipColors,
-                    label = { Text(stringResource(R.string.category_all)) }
-                )
-                orderedCategories.forEach { category ->
-                    val style = category.style
-                    val isSelected = selectedCategory == category
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { onCategorySelected(category) },
-                        colors = selectedChipColors,
-                        leadingIcon = {
-                            Icon(
-                                imageVector = style.icon,
-                                contentDescription = null,
-                                tint = if (isSelected) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
-                                } else {
-                                    style.color
-                                }
-                            )
-                        },
-                        label = { Text(stringResource(category.labelRes)) }
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                FilterChip(
-                    selected = topRatedOnly,
-                    onClick = onToggleTopRated,
-                    colors = selectedChipColors,
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = null,
-                            tint = if (topRatedOnly) {
-                                MaterialTheme.colorScheme.onSecondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
-                    },
-                    label = { Text(stringResource(R.string.filter_top_rated)) }
-                )
-                if (showAddedByMeChip) {
-                    FilterChip(
-                        selected = addedByMeOnly,
-                        onClick = { onToggleAddedByMe() },
-                        colors = selectedChipColors,
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Filled.Person,
-                                contentDescription = null,
-                                tint = if (addedByMeOnly) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                            )
-                        },
-                        label = { Text(stringResource(R.string.filter_added_by_me)) }
-                    )
-                }
-            }
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = Icons.Filled.GpsOff,
+                contentDescription = stringResource(R.string.location_status_unavailable),
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }
@@ -873,11 +791,9 @@ private fun PlacePreviewContent(
             }
             if (place.reviewsCount > 0) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.Star,
-                        contentDescription = "Ocena",
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(18.dp)
+                    RatingIcon(
+                        contentDescription = stringResource(R.string.rating),
+                        size = 18.dp
                     )
                     Spacer(Modifier.width(2.dp))
                     Text(

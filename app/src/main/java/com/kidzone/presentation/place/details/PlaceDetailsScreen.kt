@@ -1,3 +1,5 @@
+@file:Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod", "LongParameterList")
+
 package com.kidzone.presentation.place.details
 
 import android.content.Intent
@@ -10,7 +12,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,8 +26,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
@@ -39,13 +38,11 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -80,22 +77,101 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
-import com.kidzone.domain.model.Amenity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.model.User
 import com.kidzone.presentation.common.CategoryIcon
+import com.kidzone.presentation.common.KidZoneActionDialog
+import com.kidzone.presentation.common.KidZoneDropdownMenuItem
+import com.kidzone.presentation.common.KidZoneSortMenu
 import com.kidzone.presentation.common.NewPlaceBadge
+import com.kidzone.presentation.common.NetworkStatus
+import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.common.RankBadge
+import com.kidzone.presentation.common.SortMenuIcon
+import com.kidzone.presentation.common.SortMenuOption
 import com.kidzone.presentation.common.createCameraImageUri
 import com.kidzone.presentation.common.isNewWithoutReviews
+import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.common.shimmerEffect
-import com.kidzone.presentation.common.style
+import com.kidzone.presentation.common.RatingIcon
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+private const val VERY_CLOSE_DISTANCE_LABEL = "Tuż obok"
+
+private val PLACE_DETAILS_SECTION_SPACING = 12.dp
+private val PLACE_DETAILS_CONTENT_PADDING = 16.dp
+private val PLACE_DETAILS_CARD_PADDING = 14.dp
+private val PLACE_DETAILS_SMALL_SPACING = 6.dp
+private val PLACE_DETAILS_TINY_SPACING = 2.dp
+
+private val PLACE_DETAILS_CARD_ELEVATION = 1.dp
+private val PLACE_DETAILS_MAIN_CARD_ELEVATION = 2.dp
+private val PLACE_DETAILS_EMPTY_STATE_PADDING = 24.dp
+private val PLACE_DETAILS_PROGRESS_SIZE = 24.dp
+
+private val PLACE_DETAILS_ICON_SIZE = 18.dp
+private val PLACE_DETAILS_AVERAGE_RATING_ICON_SIZE = 20.dp
+private val PLACE_DETAILS_CATEGORY_ICON_SIZE = 36.dp
+private val PLACE_DETAILS_CATEGORY_INNER_ICON_SIZE = 22.dp
+private val PLACE_DETAILS_BADGE_HORIZONTAL_PADDING = 4.dp
+private val PLACE_DETAILS_CHIP_HORIZONTAL_PADDING = 8.dp
+private val PLACE_DETAILS_CHIP_CONTENT_SPACING = 4.dp
+private val PLACE_DETAILS_REVIEW_ACTION_BUTTON_SIZE = 30.dp
+private val PLACE_DETAILS_REVIEW_ACTION_ICON_SIZE = 16.dp
+private val PLACE_DETAILS_REVIEW_STAR_SIZE = 15.dp
+private val PLACE_DETAILS_REVIEW_OWN_ICON_SIZE = 14.dp
+private const val PLACE_DETAILS_REVIEW_OWN_ALPHA = 0.7f
+private const val PLACE_DETAILS_REVIEW_ACTION_ALPHA = 0.55f
+private val PLACE_DETAILS_REVIEW_CARD_ELEVATION = 0.dp
+
+private const val PLACE_DETAILS_MY_REVIEW_BACKGROUND_ALPHA = 0.06f
+private const val PLACE_DETAILS_DISABLED_STAR_ALPHA = 0.3f
+private val PLACE_DETAILS_DISTRIBUTION_STAR_COLUMN_WIDTH = 12.dp
+private val PLACE_DETAILS_DISTRIBUTION_COUNT_COLUMN_WIDTH = 28.dp
+private val PLACE_DETAILS_DISTRIBUTION_BAR_HEIGHT = 6.dp
+private val PLACE_DETAILS_DISTRIBUTION_BAR_RADIUS = 3.dp
+private val PLACE_DETAILS_DISTRIBUTION_ICON_SIZE = 12.dp
+
+private val PLACE_DETAILS_DIALOG_PROGRESS_STROKE_WIDTH = 2.dp
+private val PLACE_DETAILS_DIALOG_OPTION_VERTICAL_PADDING = 6.dp
+
+private val PLACE_DETAILS_PLACE_PHOTO_SIZE = 120.dp
+private val PLACE_DETAILS_REVIEW_PHOTO_SIZE = 64.dp
+private val PLACE_DETAILS_PHOTO_CORNER_RADIUS = 8.dp
+
+private val PLACE_DETAILS_SKELETON_LARGE_WIDTH = 200.dp
+private val PLACE_DETAILS_SKELETON_MEDIUM_WIDTH = 120.dp
+private val PLACE_DETAILS_SKELETON_SMALL_WIDTH = 100.dp
+private val PLACE_DETAILS_SKELETON_TINY_WIDTH = 80.dp
+private val PLACE_DETAILS_SKELETON_CHIP_WIDTH = 70.dp
+private val PLACE_DETAILS_SKELETON_TITLE_HEIGHT = 24.dp
+private val PLACE_DETAILS_SKELETON_TEXT_HEIGHT = 16.dp
+private val PLACE_DETAILS_SKELETON_RATING_HEIGHT = 20.dp
+private val PLACE_DETAILS_SKELETON_DESCRIPTION_HEIGHT = 80.dp
+private val PLACE_DETAILS_SKELETON_CHIP_HEIGHT = 32.dp
+private val PLACE_DETAILS_SKELETON_PHOTO_SIZE = 100.dp
+private val PLACE_DETAILS_SKELETON_CHIP_RADIUS = 16.dp
+
+private val PLACE_DETAILS_DIVIDER_THICKNESS = 1.dp
+private const val PLACE_DETAILS_DIVIDER_ALPHA = 0.5f
+
+private const val COORDINATE_FORMAT = "%.5f, %.5f"
+private const val AVERAGE_RATING_FORMAT = "%.1f"
+private const val DATE_FORMAT = "dd.MM.yyyy"
+private const val PLACE_DETAILS_MAX_PHOTOS = 5
+
+private const val VERY_CLOSE_DISTANCE_KM = 0.05
+private const val METER_DISTANCE_THRESHOLD_KM = 1.0
+private const val INTEGER_DISTANCE_THRESHOLD_KM = 100.0
+private const val METERS_PER_KILOMETER = 1000
+private const val DISTANCE_ROUNDING_OFFSET_METERS = 25
+private const val DISTANCE_ROUNDING_STEP_METERS = 50
+private const val EARTH_RADIUS_KM = 6371.0
 
 /**
  * Szczegóły miejsca.
@@ -134,18 +210,37 @@ fun PlaceDetailsScreen(
     var fullscreenPhotoIndex by remember { mutableStateOf(0) }
     var fullscreenPhotosAreMine by remember { mutableStateOf(false) }
     var fullscreenPhotoUploadedBy by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var fullscreenReview by remember { mutableStateOf<Review?>(null) }
     var showReportPhotoDialog by remember { mutableStateOf(false) }
     var photoUrlToReport by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val networkStatus by rememberNetworkStatus()
+    val isOffline = networkStatus == NetworkStatus.UNAVAILABLE
 
-    val placePhotoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
+    val availablePlacePhotoSlots = (
+        PLACE_DETAILS_MAX_PHOTOS - (state.place?.photoUrls?.size ?: 0)
+    ).coerceAtLeast(0)
+
+    fun addPickedPlacePhotos(uris: List<Uri>) {
+        val availableSlots = PLACE_DETAILS_MAX_PHOTOS - (state.place?.photoUrls?.size ?: 0)
+        uris.take(availableSlots.coerceAtLeast(0)).forEach { uri ->
             viewModel.addPhotoToPlace(uri)
         }
+    }
+
+    val placePhotoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(
+            availablePlacePhotoSlots.coerceAtLeast(2)
+        )
+    ) { uris ->
+        addPickedPlacePhotos(uris)
+    }
+    val singlePlacePhotoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) addPickedPlacePhotos(listOf(uri))
     }
 
     var placeCameraUriString by rememberSaveable { mutableStateOf<String?>(null) }
@@ -263,32 +358,27 @@ fun PlaceDetailsScreen(
                             onDismissRequest = { showOverflow = false }
                         ) {
                             if (isOwner) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.edit)) },
-                                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                                KidZoneDropdownMenuItem(
+                                    text = stringResource(R.string.edit),
+                                    leadingIcon = Icons.Filled.Edit,
                                     onClick = {
                                         showOverflow = false
                                         state.place?.let { onEditPlace(it.id) }
                                     }
                                 )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.delete)) },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Filled.Delete,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.error
-                                        )
-                                    },
+                                KidZoneDropdownMenuItem(
+                                    text = stringResource(R.string.delete),
+                                    leadingIcon = Icons.Filled.Delete,
+                                    iconTint = MaterialTheme.colorScheme.error,
                                     onClick = {
                                         showOverflow = false
                                         showDeleteDialog = true
                                     }
                                 )
                             }
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.share)) },
-                                leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
+                            KidZoneDropdownMenuItem(
+                                text = stringResource(R.string.share),
+                                leadingIcon = Icons.Filled.Share,
                                 onClick = {
                                     showOverflow = false
                                     state.place?.let { place ->
@@ -313,32 +403,27 @@ fun PlaceDetailsScreen(
                                 }
                             )
                             if (!isOwner) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.suggest_edit)) },
-                                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                                KidZoneDropdownMenuItem(
+                                    text = stringResource(R.string.suggest_edit),
+                                    leadingIcon = Icons.Filled.Edit,
                                     onClick = {
                                         showOverflow = false
                                         showSuggestEditSheet = true
                                     }
                                 )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.correct_location)) },
-                                    leadingIcon = { Icon(Icons.Filled.LocationOn, contentDescription = null) },
+                                KidZoneDropdownMenuItem(
+                                    text = stringResource(R.string.correct_location),
+                                    leadingIcon = Icons.Filled.LocationOn,
                                     onClick = {
                                         showOverflow = false
                                         showLocationCorrectionDialog = true
                                     }
                                 )
                                 if (!state.isPlaceReported) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.report)) },
-                                        leadingIcon = {
-                                            Icon(
-                                                Icons.Filled.Flag,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.error
-                                            )
-                                        },
+                                    KidZoneDropdownMenuItem(
+                                        text = stringResource(R.string.report),
+                                        leadingIcon = Icons.Filled.Flag,
+                                        iconTint = MaterialTheme.colorScheme.error,
                                         onClick = {
                                             showOverflow = false
                                             showReportDialog = true
@@ -378,7 +463,7 @@ fun PlaceDetailsScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(24.dp),
+                            .padding(PLACE_DETAILS_EMPTY_STATE_PADDING),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -387,7 +472,7 @@ fun PlaceDetailsScreen(
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodyMedium
                         )
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
                         TextButton(onClick = viewModel::retry) {
                             Text(stringResource(R.string.retry))
                         }
@@ -398,54 +483,66 @@ fun PlaceDetailsScreen(
                         isRefreshing = state.isLoading,
                         onRefresh = viewModel::refresh
                     ) {
-                    PlaceDetailsContent(
-                        place = state.place!!,
-                        author = state.author,
-                        reviews = state.reviews,
-                        currentUserId = currentUser?.id,
-                        topRank = state.topRank,
-                        sortOrder = state.sortOrder,
-                        reportedReviewIds = state.reportedReviewIds,
-                        onSortOrderChange = viewModel::setSortOrder,
-                        onAddReview = viewModel::openAddReviewSheet,
-                        onEditReview = viewModel::openEditReviewSheet,
-                        onDeleteReview = { review -> viewModel.deleteReview(review.id) },
-                        onReportReview = { review ->
-                            reviewToReport = review
-                            showReportReviewDialog = true
-                        },
-                        onOpenPhotoViewer = { photos, index, areMine ->
-                            fullscreenPhotos = photos
-                            fullscreenPhotoIndex = index
-                            fullscreenPhotosAreMine = areMine
-                            fullscreenPhotoUploadedBy = state.place?.photoUploadedBy.orEmpty()
-                        },
-                        onAddPlacePhoto = if (currentUser != null) {
-                            {
-                                placePhotoPickerLauncher.launch(
-                                    androidx.activity.result.PickVisualMediaRequest(
+                        PlaceDetailsContent(
+                            place = state.place!!,
+                            author = state.author,
+                            reviews = state.reviews,
+                            currentUserId = currentUser?.id,
+                            topRank = state.topRank,
+                            userLocation = state.userLocation,
+                            staleLocationAgeMinutes = state.staleLocationAgeMinutes.takeIf {
+                                state.isUsingStaleLocation
+                            },
+                            sortOrder = state.sortOrder,
+                            reportedReviewIds = state.reportedReviewIds,
+                            onSortOrderChange = viewModel::setSortOrder,
+                            onAddReview = viewModel::openAddReviewSheet,
+                            onEditReview = viewModel::openEditReviewSheet,
+                            onDeleteReview = { review -> viewModel.deleteReview(review.id) },
+                            onReportReview = { review ->
+                                reviewToReport = review
+                                showReportReviewDialog = true
+                            },
+                            onOpenPhotoViewer = { photos, index, areMine, review ->
+                                fullscreenPhotos = photos
+                                fullscreenPhotoIndex = index
+                                fullscreenPhotosAreMine = areMine
+                                fullscreenReview = review
+                                fullscreenPhotoUploadedBy = state.place?.photoUploadedBy.orEmpty()
+                            },
+                            onAddPlacePhoto = if (currentUser != null) {
+                                {
+                                    val request = androidx.activity.result.PickVisualMediaRequest(
                                         androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
                                     )
-                                )
-                            }
-                        } else null,
-                        onAddPlaceCamera = if (currentUser != null) {
-                            {
-                                val hasPerm = androidx.core.content.ContextCompat.checkSelfPermission(
-                                    context, android.Manifest.permission.CAMERA
-                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                                if (hasPerm) {
-                                    launchPlaceCamera()
-                                } else {
-                                    placeCameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                                    when {
+                                        availablePlacePhotoSlots <= 0 -> Unit
+                                        availablePlacePhotoSlots == 1 -> singlePlacePhotoPickerLauncher.launch(
+                                            request
+                                        )
+                                        else -> placePhotoPickerLauncher.launch(
+                                            request
+                                        )
+                                    }
                                 }
-                            }
-                        } else null,
-                        isUploadingPlacePhoto = state.isUploadingPlacePhoto,
-                        sharedTransitionScope = sharedTransitionScope,
-                        animatedContentScope = animatedContentScope,
-                        animationSource = animationSource
-                    )
+                            } else null,
+                            onAddPlaceCamera = if (currentUser != null) {
+                                {
+                                    val hasPerm = androidx.core.content.ContextCompat.checkSelfPermission(
+                                        context, android.Manifest.permission.CAMERA
+                                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                    if (hasPerm) {
+                                        launchPlaceCamera()
+                                    } else {
+                                        placeCameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                                    }
+                                }
+                            } else null,
+                            isUploadingPlacePhoto = state.isUploadingPlacePhoto,
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedContentScope = animatedContentScope,
+                            animationSource = animationSource
+                        )
                     }
                 }
             }
@@ -467,6 +564,7 @@ fun PlaceDetailsScreen(
     val thankYouReport = stringResource(R.string.thank_you_report)
     if (showReportDialog) {
         ReportPlaceDialog(
+            isOffline = isOffline,
             onSubmit = { reason, comment ->
                 viewModel.reportPlace(reason, comment)
                 showReportDialog = false
@@ -482,6 +580,7 @@ fun PlaceDetailsScreen(
         val thankYouSuggestEdit = stringResource(R.string.thank_you_suggest_edit)
         SuggestEditSheet(
             place = state.place!!,
+            isOffline = isOffline,
             onSubmit = { name, description, category, amenities ->
                 viewModel.submitSuggestedEdit(name, description, category, amenities)
                 showSuggestEditSheet = false
@@ -496,6 +595,7 @@ fun PlaceDetailsScreen(
     if (showLocationCorrectionDialog && state.place != null) {
         val thankYouLocationCorrection = stringResource(R.string.thank_you_location_correction)
         LocationCorrectionDialog(
+            isOffline = isOffline,
             onSubmit = { lat, lng, address ->
                 viewModel.submitLocationCorrection(lat, lng, address)
                 showLocationCorrectionDialog = false
@@ -517,6 +617,7 @@ fun PlaceDetailsScreen(
             onSubmit = { rating, comment, photoUris, retainedUrls ->
                 viewModel.submitReview(rating, comment, photoUris, retainedUrls)
             },
+            isOffline = isOffline,
             initialRating = editing?.rating ?: 0,
             initialComment = editing?.comment.orEmpty(),
             initialPhotoUrls = editing?.photoUrls.orEmpty(),
@@ -528,6 +629,7 @@ fun PlaceDetailsScreen(
         val thankYouReportReview = stringResource(R.string.thank_you_report_review)
         ReportReviewDialog(
             authorName = reviewToReport!!.authorName,
+            isOffline = isOffline,
             onSubmit = { reason, comment ->
                 viewModel.reportReview(reviewToReport!!.id, reason, comment)
                 showReportReviewDialog = false
@@ -548,7 +650,10 @@ fun PlaceDetailsScreen(
         com.kidzone.presentation.common.FullscreenPhotoViewer(
             photoUrls = fullscreenPhotos,
             initialIndex = fullscreenPhotoIndex,
-            onDismiss = { fullscreenPhotos = emptyList() },
+            onDismiss = {
+                fullscreenPhotos = emptyList()
+                fullscreenReview = null
+            },
             onReportPhoto = if (fullscreenPhotosAreMine) null else { url ->
                 if (!state.reportedPhotoUrls.contains(url)) {
                     photoUrlToReport = url
@@ -562,11 +667,21 @@ fun PlaceDetailsScreen(
                 notMine && notReported
             },
             onDeletePhoto = { url ->
-                viewModel.deletePhotoFromPlace(url)
+                val review = fullscreenReview
+                if (review != null) {
+                    viewModel.deletePhotoFromReview(review, url)
+                } else {
+                    viewModel.deletePhotoFromPlace(url)
+                }
             },
             canDeletePhoto = { url ->
-                val uploaderId = fullscreenPhotoUploadedBy[url]
-                myUserId != null && uploaderId == myUserId
+                val review = fullscreenReview
+                if (review != null) {
+                    myUserId != null && review.userId == myUserId && url in review.photoUrls
+                } else {
+                    val uploaderId = fullscreenPhotoUploadedBy[url]
+                    myUserId != null && uploaderId == myUserId
+                }
             }
         )
     }
@@ -574,6 +689,7 @@ fun PlaceDetailsScreen(
     if (showReportPhotoDialog && photoUrlToReport != null) {
         val thankYouReportPhoto = stringResource(R.string.thank_you_report_photo)
         ReportPhotoDialog(
+            isOffline = isOffline,
             onSubmit = { reason, comment ->
                 viewModel.reportPhoto(photoUrlToReport!!, reason, comment)
                 showReportPhotoDialog = false
@@ -598,6 +714,8 @@ private fun PlaceDetailsContent(
     reviews: List<Review>,
     currentUserId: String?,
     topRank: Int?,
+    userLocation: Pair<Double, Double>?,
+    staleLocationAgeMinutes: Int?,
     sortOrder: PlaceDetailsViewModel.ReviewSortOrder,
     reportedReviewIds: Set<String> = emptySet(),
     onSortOrderChange: (PlaceDetailsViewModel.ReviewSortOrder) -> Unit,
@@ -605,7 +723,12 @@ private fun PlaceDetailsContent(
     onEditReview: (Review) -> Unit,
     onDeleteReview: (Review) -> Unit,
     onReportReview: (Review) -> Unit,
-    onOpenPhotoViewer: (photos: List<String>, startIndex: Int, areMine: Boolean) -> Unit = { _, _, _ -> },
+    onOpenPhotoViewer: (
+        photos: List<String>,
+        startIndex: Int,
+        areMine: Boolean,
+        review: Review?
+    ) -> Unit = { _, _, _, _ -> },
     onAddPlacePhoto: (() -> Unit)? = null,
     onAddPlaceCamera: (() -> Unit)? = null,
     isUploadingPlacePhoto: Boolean = false,
@@ -623,8 +746,11 @@ private fun PlaceDetailsContent(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(
+            horizontal = PLACE_DETAILS_CONTENT_PADDING,
+            vertical = PLACE_DETAILS_SECTION_SPACING
+        ),
+        verticalArrangement = Arrangement.spacedBy(PLACE_DETAILS_SECTION_SPACING)
     ) {
         item {
             PlaceMainCard(
@@ -632,6 +758,10 @@ private fun PlaceDetailsContent(
                 author = author,
                 currentUserId = currentUserId,
                 topRank = topRank,
+                distanceKm = userLocation?.let { (lat, lng) ->
+                    haversineKm(lat, lng, place.latitude, place.longitude)
+                },
+                staleLocationAgeMinutes = staleLocationAgeMinutes,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedContentScope = animatedContentScope,
                 animationSource = animationSource
@@ -643,7 +773,7 @@ private fun PlaceDetailsContent(
                 PlacePhotoGallery(
                     photoUrls = place.photoUrls,
                     onPhotoClick = { index ->
-                        onOpenPhotoViewer(place.photoUrls, index, false)
+                        onOpenPhotoViewer(place.photoUrls, index, false, null)
                     }
                 )
             }
@@ -656,8 +786,8 @@ private fun PlaceDetailsContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        Spacer(Modifier.width(8.dp))
+                        CircularProgressIndicator(modifier = Modifier.size(PLACE_DETAILS_PROGRESS_SIZE))
+                        Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                         Text(
                             text = stringResource(R.string.uploading_photo),
                             style = MaterialTheme.typography.bodySmall
@@ -666,7 +796,7 @@ private fun PlaceDetailsContent(
                 } else {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING)
                     ) {
                         OutlinedButton(
                             onClick = onAddPlacePhoto,
@@ -675,9 +805,9 @@ private fun PlaceDetailsContent(
                             Icon(
                                 imageVector = Icons.Filled.AddAPhoto,
                                 contentDescription = null,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
                             )
-                            Spacer(Modifier.width(6.6.dp))
+                            Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
                             Text(stringResource(R.string.gallery_with_count, place.photoUrls.size))
                         }
                         if (onAddPlaceCamera != null) {
@@ -688,9 +818,9 @@ private fun PlaceDetailsContent(
                                 Icon(
                                     imageVector = Icons.Filled.CameraAlt,
                                     contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
                                 )
-                                Spacer(Modifier.width(6.6.dp))
+                                Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
                                 Text(stringResource(R.string.camera))
                             }
                         }
@@ -702,21 +832,9 @@ private fun PlaceDetailsContent(
         if (place.amenities.isNotEmpty()) {
             item {
                 SectionCard(title = stringResource(R.string.amenities_with_count, place.amenities.size)) {
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Amenity.entries
-                            .filter { it in place.amenities }
-                            .forEach { amenity ->
-                                AssistChip(
-                                    onClick = { /* read-only */ },
-                                    enabled = false,
-                                    label = { Text(stringResource(amenity.labelRes)) }
-                                )
-                            }
-                    }
+                    com.kidzone.presentation.common.AmenitiesFlowGrid(
+                        amenities = place.amenities.toList()
+                    )
                 }
             }
         }
@@ -745,7 +863,7 @@ private fun PlaceDetailsContent(
                 } else {
                     if (reviews.size >= 3) {
                         ReviewDistributionChart(reviews = reviews)
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
                     }
                     if (reviews.size >= 2) {
                         ReviewSortDropdown(
@@ -774,14 +892,18 @@ private fun PlaceDetailsContent(
                 onPhotoClick = if (review.photoUrls.isNotEmpty()) {
                     { index ->
                         val isMyReview = currentUserId != null && review.userId == currentUserId
-                        onOpenPhotoViewer(review.photoUrls, index, isMyReview)
+                        onOpenPhotoViewer(
+                            review.photoUrls,
+                            index,
+                            isMyReview,
+                            review.takeIf { isMyReview }
+                        )
                     }
                 } else null
             )
         }
     }
 }
-
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun PlaceMainCard(
@@ -789,6 +911,8 @@ private fun PlaceMainCard(
     author: User?,
     currentUserId: String?,
     topRank: Int?,
+    distanceKm: Double?,
+    staleLocationAgeMinutes: Int?,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedContentScope: AnimatedContentScope? = null,
     animationSource: String? = null
@@ -799,19 +923,21 @@ private fun PlaceMainCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = PLACE_DETAILS_REVIEW_CARD_ELEVATION)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.padding(PLACE_DETAILS_CARD_PADDING)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 CategoryIcon(
                     category = place.category,
                     animationKey = "${keyPrefix}place_icon_${place.id}",
                     sharedTransitionScope = sharedTransitionScope,
                     animatedContentScope = animatedContentScope,
-                    size = 36.dp,
-                    iconSize = 22.dp
+                    size = PLACE_DETAILS_CATEGORY_ICON_SIZE,
+                    iconSize = PLACE_DETAILS_CATEGORY_INNER_ICON_SIZE
                 )
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(PLACE_DETAILS_SECTION_SPACING))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = place.name,
@@ -827,113 +953,91 @@ private fun PlaceMainCard(
                     )
                 }
                 if (topRank != null) {
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                     RankBadge(
                         rank = topRank,
                         label = stringResource(R.string.top_100_label),
-                        modifier = Modifier.padding(horizontal = 4.dp)
+                        modifier = Modifier.padding(horizontal = PLACE_DETAILS_BADGE_HORIZONTAL_PADDING)
                     )
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.Star,
-                        contentDescription = stringResource(R.string.rating),
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    if (place.reviewsCount > 0) {
-                        Text(
-                            text = "%.1f".format(place.averageRating),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        val reviewsCountText = pluralStringResource(
-                            R.plurals.reviews_count,
-                            place.reviewsCount,
-                            place.reviewsCount
-                        )
-                        Text(
-                            text = stringResource(R.string.reviews_count_short, reviewsCountText),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
-                        Text(
-                            text = stringResource(R.string.no_ratings),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                if (place.isNewWithoutReviews()) {
-                    Spacer(Modifier.weight(1f))
-                    NewPlaceBadge()
-                }
-            }
+            Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
+
+            PlaceDetailsRatingStatus(place = place)
 
             if (place.description.isNotBlank()) {
-                SoftDivider()
+                MainCardDivider()
                 Text(
                     text = place.description,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
 
-            SoftDivider()
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            MainCardDivider()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Icon(
                     imageVector = Icons.Filled.LocationOn,
                     contentDescription = stringResource(R.string.map_location_banner_text),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
                 )
-                Spacer(Modifier.width(6.6.dp))
+                Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = place.address.ifBlank { stringResource(R.string.address_unavailable) },
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "%.5f, %.5f".format(place.latitude, place.longitude),
+                        text = COORDINATE_FORMAT.format(place.latitude, place.longitude),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Spacer(Modifier.width(8.dp))
-                FilledTonalIconButton(
-                    onClick = {
-                        val uri = Uri.parse(
-                            "https://www.google.com/maps/dir/?api=1" +
-                                "&destination=${place.latitude},${place.longitude}" +
-                                "&travelmode=driving"
-                        )
-                        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
+
+                Column(horizontalAlignment = Alignment.End) {
+                    FilledTonalIconButton(
+                        onClick = {
+                            val uri = Uri.parse(
+                                "https://www.google.com/maps/dir/?api=1" +
+                                        "&destination=${place.latitude},${place.longitude}" +
+                                        "&travelmode=driving"
+                            )
+                            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            runCatching { context.startActivity(intent) }
                         }
-                        runCatching { context.startActivity(intent) }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Navigation,
+                            contentDescription = stringResource(R.string.navigate)
+                        )
                     }
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Navigation,
-                        contentDescription = stringResource(R.string.navigate)
-                    )
+
+                    distanceKm?.let { distance ->
+                        Spacer(Modifier.height(PLACE_DETAILS_TINY_SPACING))
+                        Text(
+                            text = formatDistance(distance, staleLocationAgeMinutes),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary,
+                            textAlign = TextAlign.End,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(PLACE_DETAILS_SMALL_SPACING))
             OutlinedButton(
                 onClick = {
                     val uri = Uri.parse(
                         "https://www.google.com/maps/search/?api=1" +
-                            "&query=${place.latitude},${place.longitude}"
+                                "&query=${place.latitude},${place.longitude}"
                     )
                     val intent = Intent(Intent.ACTION_VIEW, uri).apply {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -945,21 +1049,27 @@ private fun PlaceMainCard(
                 Icon(
                     imageVector = Icons.Filled.LocationOn,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
                 )
-                Spacer(Modifier.width(6.6.dp))
+                Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
                 Text(stringResource(R.string.view_on_google_maps))
             }
 
-            SoftDivider()
+            Spacer(Modifier.height(PLACE_DETAILS_SMALL_SPACING))
+            androidx.compose.material3.HorizontalDivider(
+                thickness = PLACE_DETAILS_DIVIDER_THICKNESS,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = PLACE_DETAILS_DIVIDER_ALPHA)
+            )
+            Spacer(Modifier.height(PLACE_DETAILS_SMALL_SPACING))
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.Person,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
                 )
-                Spacer(Modifier.width(6.6.dp))
+                Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
                 val datePart = place.createdAtMillis
                     .takeIf { it > 0L }
                     ?.let { formatDate(it) }
@@ -990,19 +1100,123 @@ private fun PlaceMainCard(
 }
 
 @Composable
-private fun SoftDivider() {
-    Spacer(Modifier.height(12.dp))
-    androidx.compose.material3.HorizontalDivider(
-        thickness = 1.dp,
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+private fun PlaceDetailsRatingStatus(place: Place) {
+    when {
+        place.reviewsCount > 0 -> {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RatingIcon(size = PLACE_DETAILS_ICON_SIZE)
+                Spacer(Modifier.width(PLACE_DETAILS_CHIP_CONTENT_SPACING))
+                Text(
+                    text = AVERAGE_RATING_FORMAT.format(place.averageRating),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
+                val reviewsCountText = pluralStringResource(
+                    R.plurals.reviews_count,
+                    place.reviewsCount,
+                    place.reviewsCount
+                )
+                Text(
+                    text = stringResource(R.string.reviews_count_short, reviewsCountText),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        place.isNewWithoutReviews() -> {
+            NewPlaceBadge()
+        }
+
+        else -> {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = stringResource(R.string.rating),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
+                )
+                Spacer(Modifier.width(PLACE_DETAILS_CHIP_CONTENT_SPACING))
+                Text(
+                    text = stringResource(R.string.map_no_reviews),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun formatDistance(
+    km: Double,
+    staleLocationAgeMinutes: Int? = null
+): String {
+    val distance = when {
+        km < VERY_CLOSE_DISTANCE_KM -> VERY_CLOSE_DISTANCE_LABEL
+        km < METER_DISTANCE_THRESHOLD_KM -> {
+            val meters = (km * METERS_PER_KILOMETER).toInt()
+            val rounded = (
+                (meters + DISTANCE_ROUNDING_OFFSET_METERS) /
+                    DISTANCE_ROUNDING_STEP_METERS
+                ) * DISTANCE_ROUNDING_STEP_METERS
+            if (rounded == 0) VERY_CLOSE_DISTANCE_LABEL else stringResource(R.string.distance_m, rounded)
+        }
+        km < INTEGER_DISTANCE_THRESHOLD_KM -> stringResource(R.string.distance_km, km)
+        else -> stringResource(R.string.distance_km_integer, km.toInt())
+    }
+
+    return staleLocationAgeMinutes?.let { "$distance (${staleAgeLabel(it)})" } ?: distance
+}
+
+private fun staleAgeLabel(ageMinutes: Int): String = when {
+    ageMinutes <= 1 -> "1 min temu"
+    else -> "$ageMinutes min temu"
+}
+
+private fun haversineKm(
+    fromLat: Double,
+    fromLng: Double,
+    toLat: Double,
+    toLng: Double
+): Double {
+    val radiusKm = EARTH_RADIUS_KM
+    val dLat = Math.toRadians(toLat - fromLat)
+    val dLng = Math.toRadians(toLng - fromLng)
+
+    val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
+            kotlin.math.cos(Math.toRadians(fromLat)) *
+            kotlin.math.cos(Math.toRadians(toLat)) *
+            kotlin.math.sin(dLng / 2) *
+            kotlin.math.sin(dLng / 2)
+
+    val c = 2 * kotlin.math.atan2(
+        kotlin.math.sqrt(a),
+        kotlin.math.sqrt(1 - a)
     )
-    Spacer(Modifier.height(12.dp))
+
+    return radiusKm * c
+}
+
+
+@Composable
+private fun MainCardDivider() {
+    Spacer(Modifier.height(PLACE_DETAILS_SMALL_SPACING))
+    androidx.compose.material3.HorizontalDivider(
+        thickness = PLACE_DETAILS_DIVIDER_THICKNESS,
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = PLACE_DETAILS_DIVIDER_ALPHA)
+    )
+    Spacer(Modifier.height(PLACE_DETAILS_SMALL_SPACING))
 }
 
 private fun formatDate(millis: Long): String {
-    val formatter = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+    val formatter = SimpleDateFormat(DATE_FORMAT, Locale.getDefault())
     return formatter.format(Date(millis))
 }
+
+
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -1017,55 +1231,55 @@ private fun PlaceDetailsSkeleton(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(PLACE_DETAILS_CONTENT_PADDING),
+        verticalArrangement = Arrangement.spacedBy(PLACE_DETAILS_CONTENT_PADDING)
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = PLACE_DETAILS_MAIN_CARD_ELEVATION)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(PLACE_DETAILS_CARD_PADDING)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CategoryIcon(
                         category = com.kidzone.domain.model.PlaceCategory.OTHER,
                         animationKey = if (placeId.isNotBlank()) "${keyPrefix}place_icon_$placeId" else null,
                         sharedTransitionScope = sharedTransitionScope,
                         animatedContentScope = animatedContentScope,
-                        size = 36.dp,
-                        iconSize = 22.dp
+                        size = PLACE_DETAILS_CATEGORY_ICON_SIZE,
+                        iconSize = PLACE_DETAILS_CATEGORY_INNER_ICON_SIZE
                     )
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(PLACE_DETAILS_SECTION_SPACING))
                     Column(modifier = Modifier.weight(1f)) {
                         Box(
                             modifier = Modifier
-                                .width(200.dp)
-                                .height(24.dp)
+                                .width(PLACE_DETAILS_SKELETON_LARGE_WIDTH)
+                                .height(PLACE_DETAILS_SKELETON_TITLE_HEIGHT)
                                 .clip(MaterialTheme.shapes.small)
                                 .shimmerEffect()
                         )
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                         Box(
                             modifier = Modifier
-                                .width(120.dp)
-                                .height(16.dp)
+                                .width(PLACE_DETAILS_SKELETON_MEDIUM_WIDTH)
+                                .height(PLACE_DETAILS_SKELETON_TEXT_HEIGHT)
                                 .clip(MaterialTheme.shapes.small)
                                 .shimmerEffect()
                         )
                     }
                 }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_SKELETON_TEXT_HEIGHT))
                 Box(
                     modifier = Modifier
-                        .width(100.dp)
-                        .height(20.dp)
+                        .width(PLACE_DETAILS_SKELETON_SMALL_WIDTH)
+                        .height(PLACE_DETAILS_SKELETON_RATING_HEIGHT)
                         .clip(MaterialTheme.shapes.small)
                         .shimmerEffect()
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_SKELETON_TEXT_HEIGHT))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(80.dp)
+                        .height(PLACE_DETAILS_SKELETON_DESCRIPTION_HEIGHT)
                         .clip(MaterialTheme.shapes.small)
                         .shimmerEffect()
                 )
@@ -1074,23 +1288,23 @@ private fun PlaceDetailsSkeleton(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = PLACE_DETAILS_CARD_ELEVATION)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(PLACE_DETAILS_CARD_PADDING)) {
                 Box(
                     modifier = Modifier
-                        .width(80.dp)
-                        .height(16.dp)
+                        .width(PLACE_DETAILS_SKELETON_TINY_WIDTH)
+                        .height(PLACE_DETAILS_SKELETON_TEXT_HEIGHT)
                         .clip(MaterialTheme.shapes.small)
                         .shimmerEffect()
                 )
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
+                Row(horizontalArrangement = Arrangement.spacedBy(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING)) {
                     repeat(3) {
                         Box(
                             modifier = Modifier
-                                .size(100.dp)
-                                .clip(RoundedCornerShape(8.dp))
+                                .size(PLACE_DETAILS_SKELETON_PHOTO_SIZE)
+                                .clip(RoundedCornerShape(PLACE_DETAILS_PHOTO_CORNER_RADIUS))
                                 .shimmerEffect()
                         )
                     }
@@ -1100,24 +1314,24 @@ private fun PlaceDetailsSkeleton(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = PLACE_DETAILS_CARD_ELEVATION)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(PLACE_DETAILS_CARD_PADDING)) {
                 Box(
                     modifier = Modifier
-                        .width(120.dp)
-                        .height(16.dp)
+                        .width(PLACE_DETAILS_SKELETON_MEDIUM_WIDTH)
+                        .height(PLACE_DETAILS_SKELETON_TEXT_HEIGHT)
                         .clip(MaterialTheme.shapes.small)
                         .shimmerEffect()
                 )
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
+                Row(horizontalArrangement = Arrangement.spacedBy(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING)) {
                     repeat(3) {
                         Box(
                             modifier = Modifier
-                                .width(70.dp)
-                                .height(32.dp)
-                                .clip(RoundedCornerShape(16.dp))
+                                .width(PLACE_DETAILS_SKELETON_CHIP_WIDTH)
+                                .height(PLACE_DETAILS_SKELETON_CHIP_HEIGHT)
+                                .clip(RoundedCornerShape(PLACE_DETAILS_SKELETON_CHIP_RADIUS))
                                 .shimmerEffect()
                         )
                     }
@@ -1135,9 +1349,9 @@ private fun SectionCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = PLACE_DETAILS_CARD_ELEVATION)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(PLACE_DETAILS_CARD_PADDING)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = title,
@@ -1147,7 +1361,7 @@ private fun SectionCard(
                 )
                 trailing?.invoke()
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
             content()
         }
     }
@@ -1164,26 +1378,62 @@ private fun ReviewCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        border = if (isMine) {
-            androidx.compose.foundation.BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-            )
-        } else null
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = review.authorName.ifBlank { stringResource(R.string.anonymous) },
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = PLACE_DETAILS_REVIEW_CARD_ELEVATION
+        ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isMine) {
+                MaterialTheme.colorScheme.primary.copy(
+                    alpha = PLACE_DETAILS_MY_REVIEW_BACKGROUND_ALPHA
                 )
-                if (isMine) {
-                    Spacer(Modifier.width(6.dp))
-                    MyReviewBadge()
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(PLACE_DETAILS_CARD_PADDING)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = review.authorName.ifBlank {
+                            stringResource(R.string.anonymous)
+                        },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    if (isMine) {
+                        Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
+
+                        Icon(
+                            imageVector = Icons.Filled.Person,
+                            contentDescription = stringResource(R.string.your_review),
+                            tint = MaterialTheme.colorScheme.primary.copy(
+                                alpha = PLACE_DETAILS_REVIEW_OWN_ALPHA
+                            ),
+                            modifier = Modifier.size(PLACE_DETAILS_REVIEW_OWN_ICON_SIZE)
+                        )
+
+                        Spacer(Modifier.width(PLACE_DETAILS_CHIP_CONTENT_SPACING))
+
+                        Text(
+                            text = stringResource(R.string.your_review),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
-                Spacer(Modifier.weight(1f))
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     repeat(5) { index ->
                         Icon(
@@ -1194,73 +1444,116 @@ private fun ReviewCard(
                                 stringResource(R.string.star_not_selected, index + 1)
                             },
                             tint = if (index < review.rating) {
-                                MaterialTheme.colorScheme.secondary
+                                MaterialTheme.colorScheme.tertiary
                             } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                    alpha = PLACE_DETAILS_DISABLED_STAR_ALPHA
+                                )
                             },
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(PLACE_DETAILS_REVIEW_STAR_SIZE)
                         )
-                    }
-                    if (onEdit != null) {
-                        Spacer(Modifier.width(4.dp))
-                        IconButton(
-                            onClick = onEdit,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Edit,
-                                contentDescription = stringResource(R.string.edit_your_review),
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                    if (onDelete != null) {
-                        IconButton(
-                            onClick = onDelete,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Delete,
-                                contentDescription = stringResource(R.string.delete_your_review),
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                    if (onReport != null) {
-                        Spacer(Modifier.width(4.dp))
-                        IconButton(
-                            onClick = onReport,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Flag,
-                                contentDescription = stringResource(R.string.report_review),
-                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
                     }
                 }
             }
+
             ReviewTimestampRow(
                 createdAtMillis = review.createdAtMillis,
                 updatedAtMillis = review.updatedAtMillis
             )
+
             if (review.comment.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
+
                 Text(
                     text = review.comment,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
+
             if (review.photoUrls.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
+
                 ReviewPhotoRow(
                     photoUrls = review.photoUrls,
                     onPhotoClick = { index -> onPhotoClick?.invoke(index) }
                 )
+            }
+
+            if (onEdit != null || onDelete != null || onReport != null) {
+                Spacer(Modifier.height(PLACE_DETAILS_SMALL_SPACING))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (onEdit != null) {
+                        IconButton(
+                            onClick = onEdit,
+                            modifier = Modifier.size(
+                                PLACE_DETAILS_REVIEW_ACTION_BUTTON_SIZE
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Edit,
+                                contentDescription = stringResource(
+                                    R.string.edit_your_review
+                                ),
+                                tint = MaterialTheme.colorScheme.primary.copy(
+                                    alpha = PLACE_DETAILS_REVIEW_ACTION_ALPHA
+                                ),
+                                modifier = Modifier.size(
+                                    PLACE_DETAILS_REVIEW_ACTION_ICON_SIZE
+                                )
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.weight(1f))
+
+                    if (onDelete != null) {
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier.size(
+                                PLACE_DETAILS_REVIEW_ACTION_BUTTON_SIZE
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Delete,
+                                contentDescription = stringResource(
+                                    R.string.delete_your_review
+                                ),
+                                tint = MaterialTheme.colorScheme.error.copy(
+                                    alpha = PLACE_DETAILS_REVIEW_ACTION_ALPHA
+                                ),
+                                modifier = Modifier.size(
+                                    PLACE_DETAILS_REVIEW_ACTION_ICON_SIZE
+                                )
+                            )
+                        }
+                    }
+
+                    if (onReport != null) {
+                        IconButton(
+                            onClick = onReport,
+                            modifier = Modifier.size(
+                                PLACE_DETAILS_REVIEW_ACTION_BUTTON_SIZE
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Flag,
+                                contentDescription = stringResource(
+                                    R.string.report_review
+                                ),
+                                tint = MaterialTheme.colorScheme.error.copy(
+                                    alpha = PLACE_DETAILS_REVIEW_ACTION_ALPHA
+                                ),
+                                modifier = Modifier.size(
+                                    PLACE_DETAILS_REVIEW_ACTION_ICON_SIZE
+                                )
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -1281,7 +1574,7 @@ private fun ReviewTimestampRow(
             )
         }
         if (updatedAtMillis > createdAtMillis && updatedAtMillis > 0L) {
-            Spacer(Modifier.width(6.6.dp))
+            Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
             Text(
                 text = stringResource(R.string.edited_with_date, formatDate(updatedAtMillis)),
                 style = MaterialTheme.typography.labelSmall,
@@ -1303,16 +1596,16 @@ private fun ReviewDistributionChart(reviews: List<Review>) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "%.1f".format(avg),
+                text = AVERAGE_RATING_FORMAT.format(avg),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
             Icon(
                 imageVector = Icons.Filled.Star,
                 contentDescription = stringResource(R.string.average_rating),
-                tint = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.size(20.dp)
+                tint = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.size(PLACE_DETAILS_AVERAGE_RATING_ICON_SIZE)
             )
             Spacer(Modifier.weight(1f))
             val reviewsCountText = pluralStringResource(R.plurals.reviews_count, total, total)
@@ -1322,7 +1615,7 @@ private fun ReviewDistributionChart(reviews: List<Review>) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
         (5 downTo 1).forEach { star ->
             val count = counts.getValue(star)
             DistributionRow(
@@ -1343,38 +1636,38 @@ private fun DistributionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp),
+            .padding(vertical = PLACE_DETAILS_TINY_SPACING),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = "$star",
             style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.width(12.dp),
+            modifier = Modifier.width(PLACE_DETAILS_DISTRIBUTION_STAR_COLUMN_WIDTH),
             textAlign = TextAlign.End
         )
-        Spacer(Modifier.width(2.dp))
+        Spacer(Modifier.width(PLACE_DETAILS_TINY_SPACING))
         Icon(
             imageVector = Icons.Filled.Star,
             contentDescription = stringResource(R.string.star_count_label, star),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            modifier = Modifier.size(12.dp)
+            tint = MaterialTheme.colorScheme.tertiary,
+            modifier = Modifier.size(PLACE_DETAILS_DISTRIBUTION_ICON_SIZE)
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
         LinearProgressIndicator(
             progress = { fraction },
             modifier = Modifier
                 .weight(1f)
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp)),
-            color = MaterialTheme.colorScheme.secondary,
+                .height(PLACE_DETAILS_DISTRIBUTION_BAR_HEIGHT)
+                .clip(RoundedCornerShape(PLACE_DETAILS_DISTRIBUTION_BAR_RADIUS)),
+            color = MaterialTheme.colorScheme.tertiary,
             trackColor = MaterialTheme.colorScheme.surfaceVariant
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
         Text(
             text = count.toString(),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(28.dp),
+            modifier = Modifier.width(PLACE_DETAILS_DISTRIBUTION_COUNT_COLUMN_WIDTH),
             textAlign = TextAlign.End
         )
     }
@@ -1385,53 +1678,27 @@ private fun ReviewSortDropdown(
     current: PlaceDetailsViewModel.ReviewSortOrder,
     onChange: (PlaceDetailsViewModel.ReviewSortOrder) -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        TextButton(onClick = { expanded = true }) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.Sort,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
+    KidZoneSortMenu(
+        current = current,
+        currentLabel = current.getLabel(),
+        options = PlaceDetailsViewModel.ReviewSortOrder.entries.map { order ->
+            SortMenuOption(
+                value = order,
+                label = order.getLabel(),
+                icon = order.sortMenuIcon
             )
-            Spacer(Modifier.width(6.dp))
-            Text(text = current.getLabel())
-            Icon(
-                imageVector = Icons.Filled.ArrowDropDown,
-                contentDescription = null
-            )
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            PlaceDetailsViewModel.ReviewSortOrder.entries.forEach { order ->
-                DropdownMenuItem(
-                    text = { Text(order.getLabel()) },
-                    onClick = {
-                        onChange(order)
-                        expanded = false
-                    }
-                )
-            }
-        }
-    }
+        },
+        onChange = onChange
+    )
 }
 
-@Composable
-private fun MyReviewBadge() {
-    androidx.compose.material3.Surface(
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-    ) {
-        Text(
-            text = stringResource(R.string.your_review),
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Medium
-        )
+private val PlaceDetailsViewModel.ReviewSortOrder.sortMenuIcon: SortMenuIcon
+    get() = when (this) {
+        PlaceDetailsViewModel.ReviewSortOrder.NEWEST -> SortMenuIcon.RECENT
+        PlaceDetailsViewModel.ReviewSortOrder.OLDEST -> SortMenuIcon.RECENT
+        PlaceDetailsViewModel.ReviewSortOrder.HIGHEST -> SortMenuIcon.BEST_RATED
+        PlaceDetailsViewModel.ReviewSortOrder.LOWEST -> SortMenuIcon.WORST_RATED
     }
-}
 
 @Composable
 private fun DeleteConfirmationDialog(
@@ -1466,8 +1733,8 @@ private fun DeleteConfirmationDialog(
             ) {
                 if (isDeleting) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(PLACE_DETAILS_REVIEW_ACTION_ICON_SIZE),
+                        strokeWidth = PLACE_DETAILS_DIALOG_PROGRESS_STROKE_WIDTH,
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
@@ -1489,7 +1756,8 @@ private fun DeleteConfirmationDialog(
 @Composable
 private fun ReportPlaceDialog(
     onSubmit: (reason: String, comment: String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    isOffline: Boolean
 ) {
     val reasons = listOf(
         "NOT_EXISTS" to stringResource(R.string.report_reason_not_exists),
@@ -1501,71 +1769,63 @@ private fun ReportPlaceDialog(
     var selectedReason by remember { mutableStateOf(reasons.first().first) }
     var comment by remember { mutableStateOf("") }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Filled.Flag,
-                contentDescription = stringResource(R.string.report),
-                tint = MaterialTheme.colorScheme.error
-            )
-        },
-        title = { Text(stringResource(R.string.report)) },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = stringResource(R.string.report_choose_reason),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(12.dp))
-                reasons.forEach { (code, label) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { selectedReason = code }
-                            .padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        androidx.compose.material3.RadioButton(
-                            selected = selectedReason == code,
-                            onClick = { selectedReason = code }
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                androidx.compose.material3.OutlinedTextField(
-                    value = comment,
-                    onValueChange = { comment = it },
-                    label = { Text(stringResource(R.string.report_comment_label)) },
-                    maxLines = 3,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
+    KidZoneActionDialog(
+        title = stringResource(R.string.report),
+        icon = Icons.Filled.Flag,
+        iconTint = MaterialTheme.colorScheme.error,
+        onDismiss = onDismiss,
         confirmButton = {
-            Button(onClick = { onSubmit(selectedReason, comment.trim()) }) {
-                Text(stringResource(R.string.report_submit))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
+            OfflineAwareSubmitButton(
+                label = stringResource(R.string.report_submit),
+                onClick = { onSubmit(selectedReason, comment.trim()) },
+                isOffline = isOffline
+            )
         }
-    )
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.report_choose_reason),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
+            reasons.forEach { (code, label) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { selectedReason = code }
+                        .padding(vertical = PLACE_DETAILS_DIALOG_OPTION_VERTICAL_PADDING),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    androidx.compose.material3.RadioButton(
+                        selected = selectedReason == code,
+                        onClick = { selectedReason = code }
+                    )
+                    Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+            Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
+            androidx.compose.material3.OutlinedTextField(
+                value = comment,
+                onValueChange = { comment = it },
+                label = { Text(stringResource(R.string.report_comment_label)) },
+                maxLines = 3,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
 }
 
 @Composable
 private fun ReportReviewDialog(
     authorName: String,
     onSubmit: (reason: String, comment: String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    isOffline: Boolean
 ) {
     val reasons = listOf(
         "SPAM" to stringResource(R.string.report_reason_spam),
@@ -1598,33 +1858,33 @@ private fun ReportReviewDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
                 Text(
                     text = stringResource(R.string.report_choose_reason),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                 reasons.forEach { (code, label) ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { selectedReason = code }
-                            .padding(vertical = 6.dp),
+                            .padding(vertical = PLACE_DETAILS_DIALOG_OPTION_VERTICAL_PADDING),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         androidx.compose.material3.RadioButton(
                             selected = selectedReason == code,
                             onClick = { selectedReason = code }
                         )
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                         Text(
                             text = label,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                 androidx.compose.material3.OutlinedTextField(
                     value = comment,
                     onValueChange = { comment = it },
@@ -1635,9 +1895,11 @@ private fun ReportReviewDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onSubmit(selectedReason, comment.trim()) }) {
-                Text(stringResource(R.string.report_submit))
-            }
+            OfflineAwareSubmitButton(
+                label = stringResource(R.string.report_submit),
+                onClick = { onSubmit(selectedReason, comment.trim()) },
+                isOffline = isOffline
+            )
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
@@ -1654,17 +1916,17 @@ private fun PlacePhotoGallery(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = PLACE_DETAILS_CARD_ELEVATION)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(PLACE_DETAILS_CARD_PADDING)) {
             Text(
                 text = stringResource(R.string.photos_with_count, photoUrls.size),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
             androidx.compose.foundation.lazy.LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING)
             ) {
                 items(photoUrls.size) { index ->
                     val contentDesc = stringResource(R.string.photo_index, index + 1)
@@ -1672,8 +1934,12 @@ private fun PlacePhotoGallery(
                         model = photoUrls[index],
                         contentDescription = contentDesc,
                         modifier = Modifier
-                            .size(120.dp)
-                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                            .size(PLACE_DETAILS_PLACE_PHOTO_SIZE)
+                            .clip(
+                                androidx.compose.foundation.shape.RoundedCornerShape(
+                                    PLACE_DETAILS_PHOTO_CORNER_RADIUS
+                                )
+                            )
                             .clickable { onPhotoClick(index) },
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop
                     )
@@ -1689,7 +1955,7 @@ private fun ReviewPhotoRow(
     onPhotoClick: (index: Int) -> Unit = {}
 ) {
     androidx.compose.foundation.lazy.LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(PLACE_DETAILS_SMALL_SPACING)
     ) {
         items(photoUrls.size) { index ->
             val contentDesc = stringResource(R.string.review_photo_index, index + 1)
@@ -1697,8 +1963,8 @@ private fun ReviewPhotoRow(
                 model = photoUrls[index],
                 contentDescription = contentDesc,
                 modifier = Modifier
-                    .size(72.dp)
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                    .size(PLACE_DETAILS_REVIEW_PHOTO_SIZE)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(PLACE_DETAILS_PHOTO_CORNER_RADIUS))
                     .clickable { onPhotoClick(index) },
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop
             )
@@ -1709,7 +1975,8 @@ private fun ReviewPhotoRow(
 @Composable
 private fun ReportPhotoDialog(
     onSubmit: (reason: String, comment: String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    isOffline: Boolean
 ) {
     val reasons = listOf(
         "INAPPROPRIATE" to stringResource(R.string.report_reason_inappropriate),
@@ -1738,27 +2005,27 @@ private fun ReportPhotoDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
                 reasons.forEach { (code, label) ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { selectedReason = code }
-                            .padding(vertical = 6.dp),
+                            .padding(vertical = PLACE_DETAILS_DIALOG_OPTION_VERTICAL_PADDING),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         androidx.compose.material3.RadioButton(
                             selected = selectedReason == code,
                             onClick = { selectedReason = code }
                         )
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                         Text(
                             text = label,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
                 androidx.compose.material3.OutlinedTextField(
                     value = comment,
                     onValueChange = { comment = it },
@@ -1769,9 +2036,11 @@ private fun ReportPhotoDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onSubmit(selectedReason, comment.trim()) }) {
-                Text(stringResource(R.string.report_submit))
-            }
+            OfflineAwareSubmitButton(
+                label = stringResource(R.string.report_submit),
+                onClick = { onSubmit(selectedReason, comment.trim()) },
+                isOffline = isOffline
+            )
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {

@@ -72,6 +72,10 @@ class PlaceListViewModelTest {
         locationProvider = mockk(relaxed = true)
 
         every { authRepository.currentUser } returns currentUserFlow
+        every { locationProvider.hasPermission() } returns false
+        every { locationProvider.isServiceEnabled() } returns false
+        every { locationProvider.getLastKnownLocation() } returns null
+        every { locationProvider.getLastKnownLocationAgeMinutes() } returns null
         coEvery {
             placeRepository.getPlacesPage(any(), any(), any(), any())
         } returns OpResult.success(PagedResult(samplePlaces, null))

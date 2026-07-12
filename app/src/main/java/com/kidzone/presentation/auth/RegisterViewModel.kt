@@ -65,6 +65,14 @@ class RegisterViewModel @Inject constructor(
         _uiState.update { it.copy(password = value, errorMessage = null) }
     }
 
+    fun showConnectionError() {
+        _uiState.update { it.copy(errorMessage = UiText.StringResource(R.string.error_network)) }
+    }
+
+    fun consumeErrorMessage() {
+        _uiState.update { it.copy(errorMessage = null) }
+    }
+
     fun register() {
         val state = _uiState.value
         val name = state.name.trim()
@@ -113,6 +121,7 @@ class RegisterViewModel @Inject constructor(
     }
 
     private fun mapError(throwable: Throwable): UiText = when (throwable) {
+        is AuthException.Network -> UiText.StringResource(R.string.error_network)
         is AuthException -> UiText.StringResource(throwable.messageRes)
         else -> UiText.StringResource(R.string.error_unknown)
     }

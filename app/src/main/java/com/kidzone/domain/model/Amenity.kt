@@ -13,10 +13,11 @@ import com.kidzone.domain.model.PlaceCategory.RESTAURANT
 /**
  * Udogodnienia oferowane przez miejsce.
  *
- * Każde udogodnienie deklaruje, dla których [PlaceCategory] jest sensowne –
- * UI w [com.kidzone.presentation.place.add.AddPlaceScreen] filtruje listę
- * po aktualnie wybranej kategorii. Wartości enuma trzymają się stabilnie
- * (nie zmieniaj nazw), bo trafiają do Firestore jako `name`.
+ * Każde udogodnienie deklaruje, dla których [PlaceCategory] jest sensowne.
+ * UI w [com.kidzone.presentation.place.add.AddPlaceScreen] pokazuje listę
+ * zależną od kategorii i używa kolejności z [categoryPriorityMap]. Wartości
+ * enuma trzymają się stabilnie (nie zmieniaj nazw), bo trafiają do Firestore
+ * jako `name`.
  */
 enum class Amenity(
     @StringRes val labelRes: Int,
@@ -31,7 +32,7 @@ enum class Amenity(
         R.string.amenity_toilet,
         setOf(PLAYGROUND, RESTAURANT, PLAY_ROOM, CAFE, PARK, ATTRACTION, OTHER)
     ),
-    STROLLER_ACCESS(
+    WHEELCHAIR_ACCESSIBLE(
         R.string.amenity_stroller_access,
         setOf(PLAYGROUND, RESTAURANT, PLAY_ROOM, CAFE, PARK, ATTRACTION, OTHER)
     ),
@@ -41,11 +42,11 @@ enum class Amenity(
     ),
 
     // === Plac zabaw ===
-    FENCING(R.string.amenity_fencing, setOf(PLAYGROUND)),
+    FENCED(R.string.amenity_fencing, setOf(PLAYGROUND)),
     SOFT_SURFACE(R.string.amenity_soft_surface, setOf(PLAYGROUND)),
-    SHADED_BENCHES(R.string.amenity_shaded_benches, setOf(PLAYGROUND, PARK)),
+    SHADE(R.string.amenity_shaded_benches, setOf(PLAYGROUND, PARK)),
     TODDLER_ZONE(R.string.amenity_toddler_zone, setOf(PLAYGROUND, PLAY_ROOM)),
-    CAR_FREE_AREA(R.string.amenity_car_free_area, setOf(PLAYGROUND, PARK)),
+    LOW_TRAFFIC(R.string.amenity_car_free_area, setOf(PLAYGROUND, PARK)),
 
     // === Restauracja / Kawiarnia (food places) ===
     KIDS_MENU(R.string.amenity_kids_menu, setOf(RESTAURANT, CAFE, ATTRACTION)),
@@ -62,7 +63,7 @@ enum class Amenity(
     TOY_SANITIZATION(R.string.amenity_toy_sanitization, setOf(PLAY_ROOM)),
     PARENT_ZONE(R.string.amenity_parent_zone, setOf(PLAY_ROOM, ATTRACTION)),
     LOCKERS(R.string.amenity_lockers, setOf(PLAY_ROOM, ATTRACTION)),
-    SOFT_PROTECTION(R.string.amenity_soft_protection, setOf(PLAY_ROOM, PLAYGROUND)),
+    SOFT_SAFETY(R.string.amenity_soft_protection, setOf(PLAY_ROOM, PLAYGROUND)),
 
     // === Kawiarnia (specyficzne) ===
     QUIET_FEEDING(R.string.amenity_quiet_feeding, setOf(CAFE, RESTAURANT)),
@@ -75,7 +76,7 @@ enum class Amenity(
     SAFE_PATHS(R.string.amenity_safe_paths, setOf(PARK)),
     DRINKING_WATER(R.string.amenity_drinking_water, setOf(PARK, ATTRACTION)),
     BREASTFEEDING_AREA(R.string.amenity_breastfeeding_area, setOf(PARK, ATTRACTION, CAFE)),
-    GOOD_LIGHTING(R.string.amenity_good_lighting, setOf(PARK, PLAYGROUND)),
+    EVENING_LIGHTING(R.string.amenity_good_lighting, setOf(PARK, PLAYGROUND)),
 
     // === Atrakcja ===
     STROLLER_RENTAL(R.string.amenity_stroller_rental, setOf(ATTRACTION)),
@@ -107,12 +108,137 @@ enum class Amenity(
     );
 
     companion object {
+        /**
+         * Mapa kategorii -> priorytetowa lista udogodnień.
+         * Kolejność jest UX-owa: bezpieczeństwo, opieka nad dzieckiem, wygoda,
+         * dodatki. Dzięki temu rodzic najpierw widzi rzeczy krytyczne.
+         */
+        val categoryPriorityMap: Map<PlaceCategory, List<Amenity>> = mapOf(
+            PLAYGROUND to listOf(
+                FENCED,
+                SOFT_SURFACE,
+                TODDLER_ZONE,
+                LOW_TRAFFIC,
+                TOILET,
+                CHANGING_TABLE,
+                WHEELCHAIR_ACCESSIBLE,
+                SHADE,
+                EVENING_LIGHTING,
+                SOFT_SAFETY
+            ),
+            RESTAURANT to listOf(
+                CHANGING_TABLE,
+                HIGH_CHAIR,
+                KIDS_MENU,
+                KIDS_TABLEWARE,
+                KIDS_CORNER_VISIBLE,
+                TOILET,
+                WHEELCHAIR_ACCESSIBLE,
+                FAST_SERVICE,
+                QUIET_FEEDING,
+                MICROWAVE,
+                NO_LOUD_MUSIC,
+                KIDS_ENTERTAINMENT,
+                PARKING,
+                FAMILY_PARKING,
+                WIDE_DOORS,
+                WIFI,
+                KID_FRIENDLY_SIGNS
+            ),
+            CAFE to listOf(
+                CHANGING_TABLE,
+                HIGH_CHAIR,
+                QUIET_FEEDING,
+                TOILET,
+                WHEELCHAIR_ACCESSIBLE,
+                KIDS_MENU,
+                KIDS_TABLEWARE,
+                MICROWAVE,
+                NO_LOUD_MUSIC,
+                KIDS_ENTERTAINMENT,
+                KIDS_CORNER_VISIBLE,
+                SENSORY_TOYS,
+                BREASTFEEDING_AREA,
+                PARKING,
+                FAMILY_PARKING,
+                WIDE_DOORS,
+                WIFI,
+                QUIET_AREAS,
+                KID_FRIENDLY_SIGNS
+            ),
+            PLAY_ROOM to listOf(
+                AGE_ZONES,
+                SOFT_SAFETY,
+                MONITORING,
+                TOY_SANITIZATION,
+                TOILET,
+                CHANGING_TABLE,
+                WHEELCHAIR_ACCESSIBLE,
+                TODDLER_ZONE,
+                ANIMATOR,
+                PARENT_ZONE,
+                LOCKERS,
+                SENSORY_TOYS,
+                PARKING,
+                FAMILY_PARKING,
+                WIDE_DOORS,
+                WIFI
+            ),
+            PARK to listOf(
+                SAFE_PATHS,
+                LOW_TRAFFIC,
+                TOILET,
+                WHEELCHAIR_ACCESSIBLE,
+                CHANGING_TABLE,
+                EVENING_LIGHTING,
+                SHADE,
+                PICNIC_AREA,
+                DRINKING_WATER,
+                BREASTFEEDING_AREA,
+                PARKING,
+                KID_FRIENDLY_SIGNS
+            ),
+            ATTRACTION to listOf(
+                TOILET,
+                CHANGING_TABLE,
+                WHEELCHAIR_ACCESSIBLE,
+                PARENT_CHILD_ROOM,
+                LOST_CHILD_POINT,
+                REST_AREAS,
+                DRINKING_WATER,
+                FAMILY_FAST_TRACK,
+                STROLLER_RENTAL,
+                KIDS_MENU,
+                BREASTFEEDING_AREA,
+                PARENT_ZONE,
+                LOCKERS,
+                PARKING,
+                FAMILY_PARKING,
+                WIDE_DOORS,
+                WIFI,
+                QUIET_AREAS,
+                KID_FRIENDLY_SIGNS
+            ),
+            OTHER to listOf(
+                TOILET,
+                CHANGING_TABLE,
+                WHEELCHAIR_ACCESSIBLE,
+                MICROWAVE,
+                PARKING,
+                FAMILY_PARKING,
+                WIDE_DOORS,
+                WIFI,
+                QUIET_AREAS
+            )
+        )
+
         /** Mapowanie nazw z Firestore na enum (case-insensitive); null gdy nieznane. */
         fun fromKey(key: String?): Amenity? =
             entries.firstOrNull { it.name.equals(key, ignoreCase = true) }
 
-        /** Lista udogodnień, które warto pokazać dla danej [category]. */
+        /** Lista udogodnień, które warto pokazać dla danej [category], w kolejności UX. */
         fun forCategory(category: PlaceCategory): List<Amenity> =
-            entries.filter { category in it.applicableCategories }
+            categoryPriorityMap[category].orEmpty()
+                .filter { category in it.applicableCategories }
     }
 }

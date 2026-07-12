@@ -12,10 +12,21 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import com.kidzone.R
+
+private val TermsLinkRegex = Regex("""(https?://\S+|mailto:\S+|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})""")
+private val LinkTrailingPunctuation = setOf('.', ',', ';', ':', ')', ']')
 
 /**
  * Dialog z regulaminem kidZone.
@@ -37,15 +48,15 @@ fun TermsOfServiceDialog(onDismiss: () -> Unit) {
                     .verticalScroll(rememberScrollState())
             ) {
                 SectionTitle2(stringResource(R.string.tos_section_1_title))
-                Text(stringResource(R.string.tos_section_1_body))
+                TermsText(stringResource(R.string.tos_section_1_body))
                 Spacer(Modifier.height(12.dp))
 
                 SectionTitle2(stringResource(R.string.tos_section_2_title))
-                Text(stringResource(R.string.tos_section_2_body))
+                TermsText(stringResource(R.string.tos_section_2_body))
                 Spacer(Modifier.height(12.dp))
 
                 SectionTitle2(stringResource(R.string.tos_section_3_title))
-                Text(stringResource(R.string.tos_section_3_intro))
+                TermsText(stringResource(R.string.tos_section_3_intro))
                 Spacer(Modifier.height(4.dp))
                 BulletPoint2(stringResource(R.string.tos_section_3_bullet_1))
                 BulletPoint2(stringResource(R.string.tos_section_3_bullet_2))
@@ -56,12 +67,12 @@ fun TermsOfServiceDialog(onDismiss: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
 
                 SectionTitle2(stringResource(R.string.tos_section_4_title))
-                Text(
+                TermsText(
                     text = stringResource(R.string.tos_section_4_body),
                     color = MaterialTheme.colorScheme.error
                 )
                 Spacer(Modifier.height(8.dp))
-                Text(stringResource(R.string.tos_section_4_intro))
+                TermsText(stringResource(R.string.tos_section_4_intro))
                 Spacer(Modifier.height(4.dp))
                 BulletPoint2(stringResource(R.string.tos_section_4_bullet_1))
                 BulletPoint2(stringResource(R.string.tos_section_4_bullet_2))
@@ -71,25 +82,38 @@ fun TermsOfServiceDialog(onDismiss: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
 
                 SectionTitle2(stringResource(R.string.tos_section_5_title))
-                Text(stringResource(R.string.tos_section_5_body))
+                TermsText(stringResource(R.string.tos_section_5_body))
                 Spacer(Modifier.height(12.dp))
 
                 SectionTitle2(stringResource(R.string.tos_section_6_title))
-                Text(stringResource(R.string.tos_section_6_body))
+                TermsText(stringResource(R.string.tos_section_6_body))
                 Spacer(Modifier.height(12.dp))
 
                 SectionTitle2(stringResource(R.string.tos_section_7_title))
-                Text(stringResource(R.string.tos_section_7_body))
+                TermsText(stringResource(R.string.tos_section_7_body))
                 Spacer(Modifier.height(12.dp))
 
                 SectionTitle2(stringResource(R.string.tos_section_8_title))
-                Text(stringResource(R.string.tos_section_8_body))
+                TermsText(stringResource(R.string.tos_section_8_body))
                 Spacer(Modifier.height(12.dp))
 
                 SectionTitle2(stringResource(R.string.tos_section_9_title))
-                Text(stringResource(R.string.tos_section_9_body))
+                TermsText(stringResource(R.string.tos_section_9_body))
             }
         }
+    )
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun TermsText(
+    text: String,
+    color: Color = MaterialTheme.colorScheme.onSurface
+) {
+    val linkColor = MaterialTheme.colorScheme.primary
+    Text(
+        text = text.linkified(linkColor),
+        color = color
     )
 }
 
@@ -106,5 +130,56 @@ private fun SectionTitle2(text: String) {
 
 @Composable
 private fun BulletPoint2(text: String) {
-    Text(text = "  \u2022  $text", style = MaterialTheme.typography.bodySmall)
+    val linkColor = MaterialTheme.colorScheme.primary
+    Text(
+        text = "  \u2022  $text".linkified(linkColor),
+        style = MaterialTheme.typography.bodySmall
+    )
+}
+
+private fun String.linkified(linkColor: Color): AnnotatedString {
+    val matches = TermsLinkRegex.findAll(this).toList()
+    if (matches.isEmpty()) return AnnotatedString(this)
+
+    return buildAnnotatedString {
+        var cursor = 0
+        matches.forEach { match ->
+            val rawMatch = match.value
+            val linkText = rawMatch.trimEnd { it in LinkTrailingPunctuation }
+            val trailingText = rawMatch.substring(linkText.length)
+            val start = match.range.first
+
+            append(this@linkified.substring(cursor, start))
+            appendLink(linkText, linkColor)
+            append(trailingText)
+
+            cursor = match.range.last + 1
+        }
+        append(this@linkified.substring(cursor))
+    }
+}
+
+private fun AnnotatedString.Builder.appendLink(
+    linkText: String,
+    linkColor: Color
+) {
+    val url = when {
+        linkText.startsWith("mailto:") -> linkText
+        "@" in linkText && !linkText.startsWith("http") -> "mailto:$linkText"
+        else -> linkText
+    }
+    withLink(
+        LinkAnnotation.Url(
+            url = url,
+            styles = TextLinkStyles(
+                style = SpanStyle(
+                    color = linkColor,
+                    fontWeight = FontWeight.Medium,
+                    textDecoration = TextDecoration.Underline
+                )
+            )
+        )
+    ) {
+        append(linkText)
+    }
 }

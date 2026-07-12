@@ -3,7 +3,6 @@ package com.kidzone.presentation.review.myreviews
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,11 +23,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RateReview
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -44,13 +40,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
@@ -60,7 +53,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.EmptyState as KidZoneEmptyState
-import com.kidzone.presentation.common.style
+import com.kidzone.presentation.common.CategoryBadge
+import com.kidzone.presentation.common.KidZoneCard
+import com.kidzone.presentation.common.KidZoneSpacing
+import com.kidzone.presentation.common.RatingIcon
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -121,8 +117,11 @@ fun MyReviewsScreen(
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            contentPadding = PaddingValues(
+                                horizontal = KidZoneSpacing.Screen,
+                                vertical = KidZoneSpacing.CardCompact,
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(KidZoneSpacing.Gap),
                         ) {
                             items(items = s.items, key = { it.review.id }) { item ->
                                 MyReviewCard(
@@ -159,6 +158,7 @@ private fun EmptyState() {
     )
 }
 
+@Suppress("LongMethod", "FunctionNaming")
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun MyReviewCard(
@@ -166,90 +166,123 @@ private fun MyReviewCard(
     onClick: () -> Unit,
     onDelete: () -> Unit,
     sharedTransitionScope: SharedTransitionScope? = null,
-    animatedContentScope: AnimatedVisibilityScope? = null
+    animatedContentScope: AnimatedVisibilityScope? = null,
 ) {
     var menuExpanded by rememberSaveable { mutableStateOf(false) }
 
-    Card(
+    val category = item.placeCategory
+        ?: com.kidzone.domain.model.PlaceCategory.OTHER
+
+    KidZoneCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(
-                onClickLabel = stringResource(R.string.map_open_place_details_label),
+                onClickLabel = stringResource(
+                    R.string.map_open_place_details_label,
+                ),
                 role = Role.Button,
-                onClick = onClick
+                onClick = onClick,
             ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(
+            modifier = Modifier.padding(KidZoneSpacing.Card),
+        ) {
+            Row(
+                verticalAlignment = Alignment.Top,
+            ) {
                 CategoryIcon(
-                    category = item.placeCategory ?: com.kidzone.domain.model.PlaceCategory.OTHER,
+                    category = category,
                     animationKey = "my_reviews_place_icon_${item.review.placeId}",
                     sharedTransitionScope = sharedTransitionScope,
                     animatedContentScope = animatedContentScope,
                     size = 28.dp,
-                    iconSize = 18.dp
+                    iconSize = 18.dp,
                 )
 
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
+                Spacer(Modifier.width(KidZoneSpacing.Gap))
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                ) {
                     Text(
-                        text = item.placeName ?: stringResource(R.string.place_unavailable),
-                        style = MaterialTheme.typography.titleSmall,
+                        text = item.placeName
+                            ?: stringResource(R.string.place_unavailable),
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        fontStyle = if (item.placeName == null) FontStyle.Italic else FontStyle.Normal,
+                        fontStyle = if (item.placeName == null) {
+                            FontStyle.Italic
+                        } else {
+                            FontStyle.Normal
+                        },
                         color = if (item.placeName == null) {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         } else {
                             MaterialTheme.colorScheme.onSurface
-                        }
+                        },
+                        maxLines = 2,
                     )
-                    StarRow(rating = item.review.rating)
+
+                    Spacer(Modifier.height(KidZoneSpacing.GapTiny))
+
+                    CategoryBadge(category = category)
                 }
 
                 Box {
-                    IconButton(onClick = { menuExpanded = true }) {
+                    IconButton(
+                        onClick = { menuExpanded = true },
+                    ) {
                         Icon(
                             imageVector = Icons.Filled.MoreVert,
-                            contentDescription = stringResource(R.string.more_options)
+                            contentDescription = stringResource(
+                                R.string.more_options,
+                            ),
                         )
                     }
+
                     DropdownMenu(
                         expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false }
+                        onDismissRequest = { menuExpanded = false },
                     ) {
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.delete)) },
+                            text = {
+                                Text(stringResource(R.string.delete))
+                            },
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Filled.Delete,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error
+                                    tint = MaterialTheme.colorScheme.error,
                                 )
                             },
                             onClick = {
                                 menuExpanded = false
                                 onDelete()
-                            }
+                            },
                         )
                     }
                 }
             }
 
+            Spacer(Modifier.height(KidZoneSpacing.GapSmall))
+
+            StarRow(rating = item.review.rating)
+
             if (item.review.comment.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(KidZoneSpacing.GapSmall))
+
                 Text(
                     text = item.review.comment,
                     style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 3
+                    maxLines = 3,
                 )
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(KidZoneSpacing.GapSmall))
+
             Text(
                 text = formatReviewDate(item.review),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -257,17 +290,14 @@ private fun MyReviewCard(
 
 @Composable
 private fun StarRow(rating: Int) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        repeat(5) { index ->
-            Icon(
-                imageVector = Icons.Filled.Star,
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        repeat(rating.coerceIn(0, 5)) {
+            RatingIcon(
+                size = 18.dp,
                 contentDescription = null,
-                tint = if (index < rating) {
-                    MaterialTheme.colorScheme.secondary
-                } else {
-                    MaterialTheme.colorScheme.outlineVariant
-                },
-                modifier = Modifier.size(18.dp)
             )
         }
     }
