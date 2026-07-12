@@ -83,6 +83,7 @@ import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.model.User
 import com.kidzone.presentation.common.CategoryIcon
+import com.kidzone.presentation.common.FullscreenPhotoAction
 import com.kidzone.presentation.common.KidZoneActionDialog
 import com.kidzone.presentation.common.KidZoneDropdownMenuItem
 import com.kidzone.presentation.common.KidZoneSortMenu
@@ -692,6 +693,20 @@ fun PlaceDetailsScreen(
                     val uploaderId = fullscreenPhotoUploadedBy[url]
                     myUserId != null && uploaderId == myUserId
                 }
+            },
+            photoAction = { url ->
+                val review = fullscreenReview
+                val canDelete = if (review != null) {
+                    myUserId != null && review.userId == myUserId && url in review.photoUrls
+                } else {
+                    val uploaderId = fullscreenPhotoUploadedBy[url]
+                    myUserId != null && uploaderId == myUserId
+                }
+                when {
+                    canDelete -> FullscreenPhotoAction.DELETE
+                    url !in state.reportedPhotoUrls -> FullscreenPhotoAction.REPORT
+                    else -> FullscreenPhotoAction.NONE
+                }
             }
         )
     }
@@ -900,11 +915,10 @@ private fun PlaceDetailsContent(
                 } else null,
                 onPhotoClick = if (review.photoUrls.isNotEmpty()) {
                     { index ->
-                        val isMyReview = currentUserId != null && review.userId == currentUserId
                         onOpenPhotoViewer(
                             review.photoUrls,
                             index,
-                            review.takeIf { isMyReview }
+                            review
                         )
                     }
                 } else null
