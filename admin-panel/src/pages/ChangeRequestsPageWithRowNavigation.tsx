@@ -19,104 +19,115 @@ export function ChangeRequestsPageWithRowNavigation() {
     const root = rootRef.current;
     if (!root) return;
 
+    let enhancing = false;
+
     const enhanceTable = () => {
-      const table = root.querySelector<HTMLTableElement>('table');
-      const headerRow = table?.querySelector<HTMLTableRowElement>('thead tr');
-      if (!table || !headerRow) return;
+      if (enhancing) return;
+      enhancing = true;
 
-      const placeIdHeader = headerRow.children.item(2) as HTMLTableCellElement | null;
-      if (placeIdHeader) {
-        placeIdHeader.style.width = '1%';
-        placeIdHeader.style.whiteSpace = 'nowrap';
-      }
+      try {
+        const table = root.querySelector<HTMLTableElement>('table');
+        const headerRow = table?.querySelector<HTMLTableRowElement>('thead tr');
+        if (!table || !headerRow) return;
 
-      if (!headerRow.querySelector('[data-firebase-column="true"]')) {
-        const headerCell = document.createElement('th');
-        headerCell.setAttribute('data-firebase-column', 'true');
-        headerCell.setAttribute('scope', 'col');
-        headerCell.className = 'MuiTableCell-root MuiTableCell-head MuiTableCell-sizeSmall';
-        headerCell.textContent = 'Firebase';
-        headerCell.style.width = '72px';
-        headerCell.style.textAlign = 'center';
-        headerCell.style.whiteSpace = 'nowrap';
-        headerRow.appendChild(headerCell);
-      }
-
-      root.querySelectorAll<HTMLTableRowElement>('tbody .MuiTableRow-root').forEach((row) => {
-        const detailsButton = row.querySelector<HTMLButtonElement>(
-          'button[aria-label^="Pokaż szczegóły propozycji zmian "]',
-        );
-
-        if (!detailsButton) {
-          const emptyCell = row.querySelector<HTMLTableCellElement>('td[colspan]');
-          if (emptyCell) emptyCell.colSpan = 7;
-          return;
+        const placeIdHeader = headerRow.children.item(2) as HTMLTableCellElement | null;
+        if (placeIdHeader) {
+          placeIdHeader.style.width = '1%';
+          placeIdHeader.style.whiteSpace = 'nowrap';
         }
 
-        const requestId = detailsButton
-          .getAttribute('aria-label')
-          ?.replace('Pokaż szczegóły propozycji zmian ', '');
-        if (!requestId) return;
-
-        const copyButton = row.querySelector<HTMLButtonElement>(
-          'button[aria-label^="Kopiuj ID miejsca "]',
-        );
-        const placeId = copyButton
-          ?.getAttribute('aria-label')
-          ?.replace('Kopiuj ID miejsca ', '');
-
-        if (placeId && copyButton) {
-          const placeIdCell = copyButton.closest<HTMLTableCellElement>('td');
-          const placeIdText = placeIdCell?.querySelector<HTMLElement>('.MuiTypography-root');
-          const placeIdContainer = copyButton.parentElement;
-
-          if (placeIdText) {
-            placeIdText.textContent = placeId;
-            placeIdText.style.whiteSpace = 'nowrap';
-          }
-          if (placeIdContainer) {
-            placeIdContainer.style.width = 'max-content';
-            placeIdContainer.style.flexWrap = 'nowrap';
-          }
-          if (placeIdCell) {
-            placeIdCell.style.width = '1%';
-            placeIdCell.style.minWidth = 'max-content';
-            placeIdCell.style.whiteSpace = 'nowrap';
-          }
+        if (!headerRow.querySelector('[data-firebase-column="true"]')) {
+          const headerCell = document.createElement('th');
+          headerCell.setAttribute('data-firebase-column', 'true');
+          headerCell.setAttribute('scope', 'col');
+          headerCell.className = 'MuiTableCell-root MuiTableCell-head MuiTableCell-sizeSmall';
+          headerCell.textContent = 'Firebase';
+          headerCell.style.width = '72px';
+          headerCell.style.textAlign = 'center';
+          headerCell.style.whiteSpace = 'nowrap';
+          headerRow.appendChild(headerCell);
         }
 
-        if (row.querySelector('[data-firebase-cell="true"]')) return;
+        root.querySelectorAll<HTMLTableRowElement>('tbody .MuiTableRow-root').forEach((row) => {
+          const detailsButton = row.querySelector<HTMLButtonElement>(
+            'button[aria-label^="Pokaż szczegóły propozycji zmian "]',
+          );
 
-        const projectId = db.app.options.projectId || 'playground-705e7162';
-        const firebaseUrl =
-          `https://console.firebase.google.com/project/${projectId}` +
-          `/firestore/data/place_change_requests/${requestId}`;
+          if (!detailsButton) {
+            const emptyCell = row.querySelector<HTMLTableCellElement>('td[colspan]');
+            if (emptyCell && emptyCell.colSpan !== 7) emptyCell.colSpan = 7;
+            return;
+          }
 
-        const firebaseCell = document.createElement('td');
-        firebaseCell.setAttribute('data-firebase-cell', 'true');
-        firebaseCell.className = 'MuiTableCell-root MuiTableCell-body MuiTableCell-sizeSmall';
-        firebaseCell.style.width = '72px';
-        firebaseCell.style.textAlign = 'center';
+          const requestId = detailsButton
+            .getAttribute('aria-label')
+            ?.replace('Pokaż szczegóły propozycji zmian ', '');
+          if (!requestId) return;
 
-        const link = document.createElement('a');
-        link.href = firebaseUrl;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.title = 'Otwórz w Firebase Console';
-        link.setAttribute('aria-label', `Otwórz propozycję ${requestId} w Firebase Console`);
-        link.style.display = 'inline-flex';
-        link.style.alignItems = 'center';
-        link.style.justifyContent = 'center';
-        link.style.width = '36px';
-        link.style.height = '36px';
-        link.style.borderRadius = '50%';
-        link.style.cursor = 'pointer';
-        link.style.textDecoration = 'none';
-        link.innerHTML = FIREBASE_ICON_SVG;
+          const copyButton = row.querySelector<HTMLButtonElement>(
+            'button[aria-label^="Kopiuj ID miejsca "]',
+          );
+          const placeId = copyButton
+            ?.getAttribute('aria-label')
+            ?.replace('Kopiuj ID miejsca ', '');
 
-        firebaseCell.appendChild(link);
-        row.appendChild(firebaseCell);
-      });
+          if (placeId && copyButton) {
+            const placeIdCell = copyButton.closest<HTMLTableCellElement>('td');
+            const placeIdText = placeIdCell?.querySelector<HTMLElement>('.MuiTypography-root');
+            const placeIdContainer = copyButton.parentElement;
+
+            if (placeIdText) {
+              if (placeIdText.textContent !== placeId) {
+                placeIdText.textContent = placeId;
+              }
+              placeIdText.style.whiteSpace = 'nowrap';
+            }
+            if (placeIdContainer) {
+              placeIdContainer.style.width = 'max-content';
+              placeIdContainer.style.flexWrap = 'nowrap';
+            }
+            if (placeIdCell) {
+              placeIdCell.style.width = '1%';
+              placeIdCell.style.minWidth = 'max-content';
+              placeIdCell.style.whiteSpace = 'nowrap';
+            }
+          }
+
+          if (row.querySelector('[data-firebase-cell="true"]')) return;
+
+          const projectId = db.app.options.projectId || 'playground-705e7162';
+          const firebaseUrl =
+            `https://console.firebase.google.com/project/${projectId}` +
+            `/firestore/data/place_change_requests/${requestId}`;
+
+          const firebaseCell = document.createElement('td');
+          firebaseCell.setAttribute('data-firebase-cell', 'true');
+          firebaseCell.className = 'MuiTableCell-root MuiTableCell-body MuiTableCell-sizeSmall';
+          firebaseCell.style.width = '72px';
+          firebaseCell.style.textAlign = 'center';
+
+          const link = document.createElement('a');
+          link.href = firebaseUrl;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.title = 'Otwórz w Firebase Console';
+          link.setAttribute('aria-label', `Otwórz propozycję ${requestId} w Firebase Console`);
+          link.style.display = 'inline-flex';
+          link.style.alignItems = 'center';
+          link.style.justifyContent = 'center';
+          link.style.width = '36px';
+          link.style.height = '36px';
+          link.style.borderRadius = '50%';
+          link.style.cursor = 'pointer';
+          link.style.textDecoration = 'none';
+          link.innerHTML = FIREBASE_ICON_SVG;
+
+          firebaseCell.appendChild(link);
+          row.appendChild(firebaseCell);
+        });
+      } finally {
+        enhancing = false;
+      }
     };
 
     enhanceTable();
