@@ -17,11 +17,13 @@
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) th {
   text-align: center;
+  font-weight: 700;
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) th .MuiTableSortLabel-root {
   width: 100%;
   justify-content: center;
+  font-weight: 700;
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-date-column="true"],
