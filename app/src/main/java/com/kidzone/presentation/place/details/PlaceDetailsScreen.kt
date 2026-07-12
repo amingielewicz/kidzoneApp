@@ -43,7 +43,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -84,6 +83,7 @@ import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.model.User
 import com.kidzone.presentation.common.CategoryIcon
+import com.kidzone.presentation.common.KidZoneDropdownMenuItem
 import com.kidzone.presentation.common.KidZoneSortMenu
 import com.kidzone.presentation.common.NewPlaceBadge
 import com.kidzone.presentation.common.NetworkStatus
@@ -357,32 +357,27 @@ fun PlaceDetailsScreen(
                             onDismissRequest = { showOverflow = false }
                         ) {
                             if (isOwner) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.edit)) },
-                                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                                KidZoneDropdownMenuItem(
+                                    text = stringResource(R.string.edit),
+                                    leadingIcon = Icons.Filled.Edit,
                                     onClick = {
                                         showOverflow = false
                                         state.place?.let { onEditPlace(it.id) }
                                     }
                                 )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.delete)) },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Filled.Delete,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.error
-                                        )
-                                    },
+                                KidZoneDropdownMenuItem(
+                                    text = stringResource(R.string.delete),
+                                    leadingIcon = Icons.Filled.Delete,
+                                    iconTint = MaterialTheme.colorScheme.error,
                                     onClick = {
                                         showOverflow = false
                                         showDeleteDialog = true
                                     }
                                 )
                             }
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.share)) },
-                                leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
+                            KidZoneDropdownMenuItem(
+                                text = stringResource(R.string.share),
+                                leadingIcon = Icons.Filled.Share,
                                 onClick = {
                                     showOverflow = false
                                     state.place?.let { place ->
@@ -407,32 +402,27 @@ fun PlaceDetailsScreen(
                                 }
                             )
                             if (!isOwner) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.suggest_edit)) },
-                                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                                KidZoneDropdownMenuItem(
+                                    text = stringResource(R.string.suggest_edit),
+                                    leadingIcon = Icons.Filled.Edit,
                                     onClick = {
                                         showOverflow = false
                                         showSuggestEditSheet = true
                                     }
                                 )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.correct_location)) },
-                                    leadingIcon = { Icon(Icons.Filled.LocationOn, contentDescription = null) },
+                                KidZoneDropdownMenuItem(
+                                    text = stringResource(R.string.correct_location),
+                                    leadingIcon = Icons.Filled.LocationOn,
                                     onClick = {
                                         showOverflow = false
                                         showLocationCorrectionDialog = true
                                     }
                                 )
                                 if (!state.isPlaceReported) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.report)) },
-                                        leadingIcon = {
-                                            Icon(
-                                                Icons.Filled.Flag,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.error
-                                            )
-                                        },
+                                    KidZoneDropdownMenuItem(
+                                        text = stringResource(R.string.report),
+                                        leadingIcon = Icons.Filled.Flag,
+                                        iconTint = MaterialTheme.colorScheme.error,
                                         onClick = {
                                             showOverflow = false
                                             showReportDialog = true
