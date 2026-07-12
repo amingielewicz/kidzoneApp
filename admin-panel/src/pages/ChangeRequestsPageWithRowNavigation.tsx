@@ -103,15 +103,17 @@ function formatDateCell(cell: HTMLTableCellElement): void {
 
   const value = cell.textContent?.trim() || '';
   const match = value.match(/^(\d{2}\.\d{2}\.\d{4}),\s*(\d{2}:\d{2})$/);
-  if (!match) return;
+  const dateValue = match?.[1];
+  const timeValue = match?.[2];
+  if (!dateValue || !timeValue) return;
 
   const date = document.createElement('span');
   date.setAttribute('data-date-part', 'true');
-  date.textContent = match[1];
+  date.textContent = dateValue;
 
   const time = document.createElement('span');
   time.setAttribute('data-time-part', 'true');
-  time.textContent = match[2];
+  time.textContent = timeValue;
 
   cell.replaceChildren(date, time);
   cell.setAttribute('data-date-formatted', 'true');
