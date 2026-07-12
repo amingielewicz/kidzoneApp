@@ -20,6 +20,7 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import ReportIcon from '@mui/icons-material/Report';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import PlaceIcon from '@mui/icons-material/Place';
 import PeopleIcon from '@mui/icons-material/People';
@@ -60,6 +61,7 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [newReportsCount, setNewReportsCount] = useState(0);
+  const [pendingChangeRequestsCount, setPendingChangeRequestsCount] = useState(0);
   const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -68,32 +70,49 @@ export function Layout({ children }: LayoutProps) {
   useEffect(() => {
     let active = true;
 
-    async function fetchNewReportsCount() {
+    async function fetchHeaderNotifications() {
       try {
         const reportQueries = ['place_reports', 'review_reports', 'photo_reports'].map((name) =>
           query(collection(db, name), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc')),
         );
-        const snapshots = await Promise.all(reportQueries.map((reportQuery) => getDocs(reportQuery)));
+        const changeRequestsQuery = query(
+          collection(db, 'place_change_requests'),
+          where('status', '==', 'pending'),
+        );
+
+        const [...snapshots] = await Promise.all([
+          ...reportQueries.map((reportQuery) => getDocs(reportQuery)),
+          getDocs(changeRequestsQuery),
+        ]);
+
+        const changeRequestsSnapshot = snapshots.pop();
         const clearedAt = getDashboardReportsClearedAt();
-        const count = snapshots.reduce(
+        const reportsCount = snapshots.reduce(
           (sum, snapshot) =>
             sum + snapshot.docs.filter((document) => (document.data().createdAtMillis || 0) > clearedAt).length,
           0,
         );
-        if (active) setNewReportsCount(count);
+
+        if (active) {
+          setNewReportsCount(reportsCount);
+          setPendingChangeRequestsCount(changeRequestsSnapshot?.size ?? 0);
+        }
       } catch (error) {
-        console.error('Failed to fetch header report count:', error);
-        if (active) setNewReportsCount(0);
+        console.error('Failed to fetch header notification counts:', error);
+        if (active) {
+          setNewReportsCount(0);
+          setPendingChangeRequestsCount(0);
+        }
       }
     }
 
-    void fetchNewReportsCount();
-    window.addEventListener(REPORTS_CLEARED_EVENT, fetchNewReportsCount);
-    const intervalId = window.setInterval(fetchNewReportsCount, 60_000);
+    void fetchHeaderNotifications();
+    window.addEventListener(REPORTS_CLEARED_EVENT, fetchHeaderNotifications);
+    const intervalId = window.setInterval(fetchHeaderNotifications, 60_000);
 
     return () => {
       active = false;
-      window.removeEventListener(REPORTS_CLEARED_EVENT, fetchNewReportsCount);
+      window.removeEventListener(REPORTS_CLEARED_EVENT, fetchHeaderNotifications);
       window.clearInterval(intervalId);
     };
   }, [location.pathname]);
@@ -191,16 +210,33 @@ export function Layout({ children }: LayoutProps) {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             kidZone Admin Panel
           </Typography>
-          <IconButton
-            color="inherit"
-            aria-label={`Nowe zgłoszenia: ${newReportsCount}`}
-            onClick={() => navigate('/')}
-            sx={{ mr: 1 }}
-          >
-            <Badge badgeContent={newReportsCount} color="error" max={99}>
-              <ReportIcon />
-            </Badge>
-          </IconButton>
+
+          {newReportsCount > 0 && (
+            <IconButton
+              color="inherit"
+              aria-label={`Nowe zgłoszenia: ${newReportsCount}`}
+              onClick={() => navigate('/reports')}
+              sx={{ mr: 1 }}
+            >
+              <Badge badgeContent={newReportsCount} color="error" max={99}>
+                <ReportIcon />
+              </Badge>
+            </IconButton>
+          )}
+
+          {pendingChangeRequestsCount > 0 && (
+            <IconButton
+              color="inherit"
+              aria-label={`Oczekujące propozycje zmian: ${pendingChangeRequestsCount}`}
+              onClick={() => navigate('/change-requests')}
+              sx={{ mr: 1 }}
+            >
+              <Badge badgeContent={pendingChangeRequestsCount} color="error" max={99}>
+                <NotificationsIcon />
+              </Badge>
+            </IconButton>
+          )}
+
           <IconButton
             color="inherit"
             aria-label="Otwórz menu profilu administratora"
