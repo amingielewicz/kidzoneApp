@@ -1,3 +1,5 @@
+import Mailer from "nodemailer/lib/mailer";
+
 export type HttpRequestHeaders = {
   authorization?: string | string[];
 };
@@ -31,11 +33,7 @@ function decorateAdminEmailHtml(html: string): string {
 }
 
 function installAdminEmailDecorator(): void {
-  // Nodemailer tworzy wszystkie transportery na wspólnym prototypie Mail.
-  // Dekorator działa wyłącznie dla wiadomości zawierających link Firebase.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Mailer = require("nodemailer/lib/mailer") as {prototype: MailerPrototype};
-  const prototype = Mailer.prototype;
+  const prototype = Mailer.prototype as MailerPrototype;
   if (prototype[EMAIL_DECORATOR_FLAG]) return;
 
   const originalSendMail = prototype.sendMail;
