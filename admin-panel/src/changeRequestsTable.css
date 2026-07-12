@@ -111,10 +111,11 @@
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-description-cell="true"] {
   overflow: hidden;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   text-align: left;
   font-size: 0.78rem;
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-description-text="true"] {
@@ -124,6 +125,7 @@
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-description-ellipsis="true"] {
   color: #d32f2f;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .MuiTableContainer-root:has([data-change-requests-table="true"]) [data-status-cell="true"],
