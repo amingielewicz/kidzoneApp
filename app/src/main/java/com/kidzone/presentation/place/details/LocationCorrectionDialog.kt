@@ -34,8 +34,6 @@ import com.kidzone.presentation.common.KidZoneActionDialog
 import com.kidzone.presentation.common.LocationActionIcon
 import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
-import com.kidzone.presentation.place.add.LOCATION_SERVICE_DISABLED_MESSAGE
-import com.kidzone.presentation.place.add.LOCATION_TIMEOUT_USER_MESSAGE
 import com.kidzone.presentation.place.add.fetchCurrentLocation
 import com.kidzone.presentation.place.add.hasLocationPermission
 import com.kidzone.presentation.place.add.isLocationServiceEnabled
@@ -130,7 +128,7 @@ fun LocationCorrectionDialog(
                     if (isFetching) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.size(8.dp))
-                        Text("Pobieranie lokalizacji...")
+                        Text(stringResource(R.string.add_place_fetching_location))
                     } else {
                         LocationActionIcon(isReady = isReady)
                         Spacer(Modifier.size(8.dp))
@@ -168,15 +166,18 @@ private suspend fun fetchLocationInternal(
     onResult: (lat: Double?, lng: Double?, address: String?, error: String?) -> Unit
 ) {
     if (!isLocationServiceEnabled(context)) {
-        onResult(null, null, null, LOCATION_SERVICE_DISABLED_MESSAGE)
+        onResult(null, null, null, context.getString(R.string.error_location_service_disabled))
         return
     }
     try {
         val coords = fetchCurrentLocation(context)
-        if (coords == null) { onResult(null, null, null, LOCATION_TIMEOUT_USER_MESSAGE); return }
+        if (coords == null) {
+            onResult(null, null, null, context.getString(R.string.error_location_timeout))
+            return
+        }
         val addr = runCatching { reverseGeocode(context, coords.first, coords.second) }.getOrNull()
         onResult(coords.first, coords.second, addr, null)
     } catch (e: Exception) {
-        onResult(null, null, null, LOCATION_TIMEOUT_USER_MESSAGE)
+        onResult(null, null, null, context.getString(R.string.error_location_timeout))
     }
 }

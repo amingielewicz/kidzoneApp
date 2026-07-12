@@ -243,8 +243,8 @@ class FirestorePlaceRepository @Inject constructor(
         reason: String,
         comment: String
     ): OpResult<Unit> = try {
-        require(placeId.isNotBlank()) { "placeId nie może być puste" }
-        require(reporterId.isNotBlank()) { "reporterId nie może być puste" }
+        require(placeId.isNotBlank()) { "placeId cannot be blank" }
+        require(reporterId.isNotBlank()) { "reporterId cannot be blank" }
 
         val existing = firestore.collection(FirestoreCollections.PLACE_REPORTS)
             .whereEqualTo("reporterId", reporterId)
@@ -252,7 +252,7 @@ class FirestorePlaceRepository @Inject constructor(
             .get()
             .await()
         if (existing.documents.isNotEmpty()) {
-            throw AlreadyReportedException("Już zgłosiłeś to miejsce")
+            throw AlreadyReportedException("You have already reported this place")
         }
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
@@ -271,7 +271,7 @@ class FirestorePlaceRepository @Inject constructor(
             true
         }
         if (completed == null) {
-            OpResult.failure(TimeoutException("Przekroczono czas oczekiwania na zapis zgłoszenia"))
+            OpResult.failure(TimeoutException("Timed out while saving the report"))
         } else {
             OpResult.success(Unit)
         }
@@ -285,9 +285,9 @@ class FirestorePlaceRepository @Inject constructor(
         changes: Map<String, Any>,
         type: String
     ): OpResult<Unit> = try {
-        require(placeId.isNotBlank()) { "placeId nie może być puste" }
-        require(requesterId.isNotBlank()) { "requesterId nie może być puste" }
-        require(changes.isNotEmpty()) { "changes nie może być puste" }
+        require(placeId.isNotBlank()) { "placeId cannot be blank" }
+        require(requesterId.isNotBlank()) { "requesterId cannot be blank" }
+        require(changes.isNotEmpty()) { "changes cannot be empty" }
 
         val sanitizedChanges = changes.toMutableMap()
         val amenityValues = (sanitizedChanges["amenities"] as? Iterable<*>)
@@ -308,7 +308,7 @@ class FirestorePlaceRepository @Inject constructor(
             }
         }
         if (type == "EDIT") {
-            require(comment.isNotBlank()) { "comment nie może być pusty" }
+        require(comment.isNotBlank()) { "comment cannot be blank" }
         }
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
@@ -329,7 +329,7 @@ class FirestorePlaceRepository @Inject constructor(
             true
         }
         if (completed == null) {
-            OpResult.failure(TimeoutException("Przekroczono czas oczekiwania na zapis propozycji zmiany"))
+            OpResult.failure(TimeoutException("Timed out while saving the edit suggestion"))
         } else {
             OpResult.success(Unit)
         }
@@ -343,8 +343,8 @@ class FirestorePlaceRepository @Inject constructor(
         reason: String,
         comment: String
     ): OpResult<Unit> = try {
-        require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
-        require(reporterId.isNotBlank()) { "reporterId nie może być puste" }
+        require(photoUrl.isNotBlank()) { "photoUrl cannot be blank" }
+        require(reporterId.isNotBlank()) { "reporterId cannot be blank" }
 
         val existing = firestore.collection(FirestoreCollections.PHOTO_REPORTS)
             .whereEqualTo("reporterId", reporterId)
@@ -352,7 +352,7 @@ class FirestorePlaceRepository @Inject constructor(
             .get()
             .await()
         if (existing.documents.isNotEmpty()) {
-            throw AlreadyReportedException("Już zgłosiłeś to zdjęcie")
+            throw AlreadyReportedException("You have already reported this photo")
         }
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
@@ -371,7 +371,7 @@ class FirestorePlaceRepository @Inject constructor(
             true
         }
         if (completed == null) {
-            OpResult.failure(TimeoutException("Przekroczono czas oczekiwania na zapis zgłoszenia"))
+            OpResult.failure(TimeoutException("Timed out while saving the report"))
         } else {
             OpResult.success(Unit)
         }
@@ -384,9 +384,9 @@ class FirestorePlaceRepository @Inject constructor(
         photoUrl: String,
         uploadedByUserId: String
     ): OpResult<Unit> = try {
-        require(placeId.isNotBlank()) { "placeId nie może być puste" }
-        require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
-        require(uploadedByUserId.isNotBlank()) { "uploadedByUserId nie może być puste" }
+        require(placeId.isNotBlank()) { "placeId cannot be blank" }
+        require(photoUrl.isNotBlank()) { "photoUrl cannot be blank" }
+        require(uploadedByUserId.isNotBlank()) { "uploadedByUserId cannot be blank" }
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             placesCollection().document(placeId).set(
@@ -399,7 +399,7 @@ class FirestorePlaceRepository @Inject constructor(
             true
         }
         if (completed == null) {
-            OpResult.failure(TimeoutException("Przekroczono czas oczekiwania na zapis zdjęcia"))
+            OpResult.failure(TimeoutException("Timed out while saving the photo"))
         } else {
             OpResult.success(Unit)
         }
@@ -411,8 +411,8 @@ class FirestorePlaceRepository @Inject constructor(
         placeId: String,
         photoUrl: String
     ): OpResult<Unit> = try {
-        require(placeId.isNotBlank()) { "placeId nie może być puste" }
-        require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
+        require(placeId.isNotBlank()) { "placeId cannot be blank" }
+        require(photoUrl.isNotBlank()) { "photoUrl cannot be blank" }
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             val place = placesCollection().document(placeId).get().await()
@@ -430,7 +430,7 @@ class FirestorePlaceRepository @Inject constructor(
         if (completed == true) {
             OpResult.success(Unit)
         } else {
-            OpResult.failure(TimeoutException("Przekroczono czas oczekiwania na usunięcie zdjęcia"))
+            OpResult.failure(TimeoutException("Timed out while deleting the photo"))
         }
     } catch (e: Exception) {
         OpResult.failure(e)

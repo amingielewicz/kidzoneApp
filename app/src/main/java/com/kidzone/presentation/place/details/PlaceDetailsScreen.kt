@@ -103,8 +103,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private const val VERY_CLOSE_DISTANCE_LABEL = "Tuż obok"
-
 private val PLACE_DETAILS_SECTION_SPACING = 12.dp
 private val PLACE_DETAILS_CONTENT_PADDING = 16.dp
 private val PLACE_DETAILS_CARD_PADDING = 14.dp
@@ -1176,15 +1174,16 @@ private fun formatDistance(
     km: Double,
     staleLocationAgeMinutes: Int? = null
 ): String {
+    val veryCloseDistance = stringResource(R.string.very_close_distance)
     val distance = when {
-        km < VERY_CLOSE_DISTANCE_KM -> VERY_CLOSE_DISTANCE_LABEL
+        km < VERY_CLOSE_DISTANCE_KM -> veryCloseDistance
         km < METER_DISTANCE_THRESHOLD_KM -> {
             val meters = (km * METERS_PER_KILOMETER).toInt()
             val rounded = (
                 (meters + DISTANCE_ROUNDING_OFFSET_METERS) /
                     DISTANCE_ROUNDING_STEP_METERS
                 ) * DISTANCE_ROUNDING_STEP_METERS
-            if (rounded == 0) VERY_CLOSE_DISTANCE_LABEL else stringResource(R.string.distance_m, rounded)
+            if (rounded == 0) veryCloseDistance else stringResource(R.string.distance_m, rounded)
         }
         km < INTEGER_DISTANCE_THRESHOLD_KM -> stringResource(R.string.distance_km, km)
         else -> stringResource(R.string.distance_km_integer, km.toInt())
@@ -1193,9 +1192,10 @@ private fun formatDistance(
     return staleLocationAgeMinutes?.let { "$distance (${staleAgeLabel(it)})" } ?: distance
 }
 
+@Composable
 private fun staleAgeLabel(ageMinutes: Int): String = when {
-    ageMinutes <= 1 -> "1 min temu"
-    else -> "$ageMinutes min temu"
+    ageMinutes <= 1 -> stringResource(R.string.stale_age_one_minute)
+    else -> stringResource(R.string.stale_age_minutes, ageMinutes)
 }
 
 private fun haversineKm(

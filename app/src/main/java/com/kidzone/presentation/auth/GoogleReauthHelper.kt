@@ -44,7 +44,7 @@ fun rememberGoogleSignInLauncher(
                 is GoogleSignInResult.Success -> onTokenReceived(result.idToken)
                 is GoogleSignInResult.Cancelled -> { /* user cancelled */ }
                 is GoogleSignInResult.Error -> onError(result.message)
-                else -> onError("Nieoczekiwany wynik logowania Google")
+                else -> onError("Unexpected Google sign-in result")
             }
         }
     }
@@ -52,7 +52,7 @@ fun rememberGoogleSignInLauncher(
     return {
         val currentActivity = activity
         if (currentActivity == null) {
-            onError("Nie udało się uruchomić logowania Google (brak Activity)")
+            onError("Could not start Google sign-in (missing Activity)")
         } else {
             scope.launch {
                 when (val result = launchGoogleSignIn(currentActivity, webClientId)) {
