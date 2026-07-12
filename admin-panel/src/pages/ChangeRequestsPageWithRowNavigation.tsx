@@ -13,11 +13,66 @@ const FIREBASE_ICON_SVG = `
   </svg>
 `;
 
-function getRequestDescription(data: Record<string, unknown>): string {
+const AMENITY_LABELS: Record<string, string> = {
+  CHANGING_TABLE: 'Przewijak',
+  TOILET: 'Czysta toaleta',
+  STROLLER_ACCESS: 'Dostęp dla wózka',
+  PARKING: 'Parking',
+  FENCING: 'Ogrodzenie',
+  SOFT_SURFACE: 'Miękka nawierzchnia',
+  SHADED_BENCHES: 'Ławki w cieniu',
+  TODDLER_ZONE: 'Strefa 0–3',
+  CAR_FREE_AREA: 'Brak ruchu samochodowego',
+  KIDS_MENU: 'Menu dziecięce',
+  HIGH_CHAIR: 'Krzesełka do karmienia',
+  KIDS_TABLEWARE: 'Naczynia dziecięce',
+  FAST_SERVICE: 'Szybka obsługa',
+  KIDS_ENTERTAINMENT: 'Kredki, zabawki',
+  KIDS_CORNER_VISIBLE: 'Kącik widoczny od stolika',
+  AGE_ZONES: 'Podział na strefy wiekowe',
+  ANIMATOR: 'Animator',
+  MONITORING: 'Monitoring',
+  TOY_SANITIZATION: 'Dezynfekcja zabawek',
+  PARENT_ZONE: 'Strefa dla rodziców',
+  LOCKERS: 'Szafki na rzeczy',
+  WIFI: 'WiFi',
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  PLAYGROUND: 'Plac zabaw',
+  PLAY_ROOM: 'Sala zabaw',
+  CAFE: 'Kawiarnia rodzinna',
+  RESTAURANT: 'Restauracja',
+  PARK: 'Park',
+  ATTRACTION: 'Atrakcja',
+  OTHER: 'Inne',
+};
+
+function formatProposedValue(key: string, value: unknown): string {
+  if (key === 'amenities' && Array.isArray(value)) {
+    return value.map((item) => AMENITY_LABELS[String(item)] || String(item)).join(', ');
+  }
+
+  if (key === 'category') {
+    return CATEGORY_LABELS[String(value)] || String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(String).join(', ');
+  }
+
+  return String(value ?? '').trim();
+}
+
+function getProposedChangesDescription(data: Record<string, unknown>): string {
   const changes = data.changes as Record<string, unknown> | undefined;
-  const value = data.comment ?? data.description ?? changes?.description;
-  const description = typeof value === 'string' ? value.trim() : '';
-  return description || '—';
+  if (!changes) return '—';
+
+  const values = Object.entries(changes)
+    .map(([key, value]) => formatProposedValue(key, value))
+    .filter((value) => value.length > 0);
+
+  return values.join(', ') || '—';
 }
 
 export function ChangeRequestsPageWithRowNavigation() {
@@ -141,7 +196,7 @@ export function ChangeRequestsPageWithRowNavigation() {
             void getDoc(doc(db, 'place_change_requests', requestId))
               .then((snapshot) => {
                 descriptionCell.textContent = snapshot.exists()
-                  ? getRequestDescription(snapshot.data() as Record<string, unknown>)
+                  ? getProposedChangesDescription(snapshot.data() as Record<string, unknown>)
                   : '—';
               })
               .catch(() => {
