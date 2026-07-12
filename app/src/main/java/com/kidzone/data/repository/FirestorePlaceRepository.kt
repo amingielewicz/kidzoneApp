@@ -249,7 +249,7 @@ class FirestorePlaceRepository @Inject constructor(
             .get()
             .await()
         if (existing.documents.isNotEmpty()) {
-            return OpResult.failure(AlreadyReportedException("Już zgłosiłeś to miejsce"))
+            throw AlreadyReportedException("Już zgłosiłeś to miejsce")
         }
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
@@ -326,7 +326,7 @@ class FirestorePlaceRepository @Inject constructor(
             .get()
             .await()
         if (existing.documents.isNotEmpty()) {
-            return OpResult.failure(AlreadyReportedException("Już zgłosiłeś to zdjęcie"))
+            throw AlreadyReportedException("Już zgłosiłeś to zdjęcie")
         }
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
