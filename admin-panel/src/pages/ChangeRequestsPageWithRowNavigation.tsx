@@ -5,6 +5,8 @@ import { doc, getDoc } from 'firebase/firestore';
 import { ChangeRequestsPage } from './ChangeRequestsPage';
 import { db } from '../services/firebase';
 
+const DESCRIPTION_MAX_LENGTH = 72;
+
 const FIREBASE_ICON_SVG = `
   <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
     <path fill="#FFCA28" d="M5.8 17.8 8.2 2.5c.1-.5.8-.6 1-.1l2.4 4.5-5.8 10.9Z"/>
@@ -75,6 +77,27 @@ function getProposedChangesDescription(data: Record<string, unknown>): string {
   return values.join(', ') || '—';
 }
 
+function setDescriptionContent(cell: HTMLTableCellElement, value: string): void {
+  cell.replaceChildren();
+  cell.title = value;
+
+  const text = document.createElement('span');
+  text.setAttribute('data-description-text', 'true');
+
+  if (value.length <= DESCRIPTION_MAX_LENGTH) {
+    text.textContent = value;
+    cell.appendChild(text);
+    return;
+  }
+
+  text.textContent = value.slice(0, DESCRIPTION_MAX_LENGTH).trimEnd();
+  const ellipsis = document.createElement('span');
+  ellipsis.setAttribute('data-description-ellipsis', 'true');
+  ellipsis.textContent = '...';
+
+  cell.append(text, ellipsis);
+}
+
 export function ChangeRequestsPageWithRowNavigation() {
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -93,17 +116,13 @@ export function ChangeRequestsPageWithRowNavigation() {
         const headerRow = table?.querySelector<HTMLTableRowElement>('thead tr');
         if (!table || !headerRow) return;
 
+        table.setAttribute('data-change-requests-table', 'true');
+
         const placeIdHeader = headerRow.children.item(2) as HTMLTableCellElement | null;
-        if (placeIdHeader) {
-          placeIdHeader.style.width = '1%';
-          placeIdHeader.style.whiteSpace = 'nowrap';
-        }
+        placeIdHeader?.setAttribute('data-place-id-column', 'true');
 
         const changesHeader = headerRow.children.item(3) as HTMLTableCellElement | null;
-        if (changesHeader) {
-          changesHeader.style.width = '1%';
-          changesHeader.style.whiteSpace = 'nowrap';
-        }
+        changesHeader?.setAttribute('data-changes-column', 'true');
 
         if (!headerRow.querySelector('[data-description-column="true"]')) {
           const descriptionHeader = document.createElement('th');
@@ -111,20 +130,16 @@ export function ChangeRequestsPageWithRowNavigation() {
           descriptionHeader.setAttribute('scope', 'col');
           descriptionHeader.className = 'MuiTableCell-root MuiTableCell-head MuiTableCell-sizeSmall';
           descriptionHeader.textContent = 'Opis';
-          descriptionHeader.style.minWidth = '180px';
           headerRow.insertBefore(descriptionHeader, headerRow.children.item(4));
         }
 
         if (!headerRow.querySelector('[data-firebase-column="true"]')) {
-          const headerCell = document.createElement('th');
-          headerCell.setAttribute('data-firebase-column', 'true');
-          headerCell.setAttribute('scope', 'col');
-          headerCell.className = 'MuiTableCell-root MuiTableCell-head MuiTableCell-sizeSmall';
-          headerCell.textContent = 'Firebase';
-          headerCell.style.width = '72px';
-          headerCell.style.textAlign = 'center';
-          headerCell.style.whiteSpace = 'nowrap';
-          headerRow.appendChild(headerCell);
+          const firebaseHeader = document.createElement('th');
+          firebaseHeader.setAttribute('data-firebase-column', 'true');
+          firebaseHeader.setAttribute('scope', 'col');
+          firebaseHeader.className = 'MuiTableCell-root MuiTableCell-head MuiTableCell-sizeSmall';
+          firebaseHeader.textContent = 'Firebase';
+          headerRow.appendChild(firebaseHeader);
         }
 
         root.querySelectorAll<HTMLTableRowElement>('tbody .MuiTableRow-root').forEach((row) => {
@@ -153,54 +168,32 @@ export function ChangeRequestsPageWithRowNavigation() {
           if (placeId && copyButton) {
             const placeIdCell = copyButton.closest<HTMLTableCellElement>('td');
             const placeIdText = placeIdCell?.querySelector<HTMLElement>('.MuiTypography-root');
-            const placeIdContainer = copyButton.parentElement;
-
-            if (placeIdText) {
-              if (placeIdText.textContent !== placeId) {
-                placeIdText.textContent = placeId;
-              }
-              placeIdText.style.whiteSpace = 'nowrap';
+            if (placeIdText && placeIdText.textContent !== placeId) {
+              placeIdText.textContent = placeId;
             }
-            if (placeIdContainer) {
-              placeIdContainer.style.width = 'max-content';
-              placeIdContainer.style.flexWrap = 'nowrap';
-            }
-            if (placeIdCell) {
-              placeIdCell.style.width = '1%';
-              placeIdCell.style.minWidth = 'max-content';
-              placeIdCell.style.whiteSpace = 'nowrap';
-            }
+            placeIdCell?.setAttribute('data-place-id-cell', 'true');
           }
 
           const changesCell = row.children.item(3) as HTMLTableCellElement | null;
-          if (changesCell) {
-            changesCell.style.width = '1%';
-            changesCell.style.whiteSpace = 'nowrap';
-            const chips = changesCell.querySelectorAll<HTMLElement>('.MuiChip-root');
-            chips.forEach((chip) => {
-              chip.style.marginBottom = '0';
-            });
-          }
+          changesCell?.setAttribute('data-changes-cell', 'true');
 
-          if (!row.querySelector('[data-description-cell="true"]')) {
-            const descriptionCell = document.createElement('td');
+          let descriptionCell = row.querySelector<HTMLTableCellElement>('[data-description-cell="true"]');
+          if (!descriptionCell) {
+            descriptionCell = document.createElement('td');
             descriptionCell.setAttribute('data-description-cell', 'true');
             descriptionCell.className = 'MuiTableCell-root MuiTableCell-body MuiTableCell-sizeSmall';
-            descriptionCell.style.minWidth = '180px';
-            descriptionCell.style.maxWidth = '360px';
-            descriptionCell.style.whiteSpace = 'normal';
-            descriptionCell.style.overflowWrap = 'anywhere';
-            descriptionCell.textContent = 'Ładowanie…';
+            setDescriptionContent(descriptionCell, 'Ładowanie…');
             row.insertBefore(descriptionCell, row.children.item(4));
 
             void getDoc(doc(db, 'place_change_requests', requestId))
               .then((snapshot) => {
-                descriptionCell.textContent = snapshot.exists()
+                const value = snapshot.exists()
                   ? getProposedChangesDescription(snapshot.data() as Record<string, unknown>)
                   : '—';
+                setDescriptionContent(descriptionCell!, value);
               })
               .catch(() => {
-                descriptionCell.textContent = '—';
+                setDescriptionContent(descriptionCell!, '—');
               });
           }
 
@@ -214,8 +207,6 @@ export function ChangeRequestsPageWithRowNavigation() {
           const firebaseCell = document.createElement('td');
           firebaseCell.setAttribute('data-firebase-cell', 'true');
           firebaseCell.className = 'MuiTableCell-root MuiTableCell-body MuiTableCell-sizeSmall';
-          firebaseCell.style.width = '72px';
-          firebaseCell.style.textAlign = 'center';
 
           const link = document.createElement('a');
           link.href = firebaseUrl;
@@ -223,14 +214,6 @@ export function ChangeRequestsPageWithRowNavigation() {
           link.rel = 'noopener noreferrer';
           link.title = 'Otwórz w Firebase Console';
           link.setAttribute('aria-label', `Otwórz propozycję ${requestId} w Firebase Console`);
-          link.style.display = 'inline-flex';
-          link.style.alignItems = 'center';
-          link.style.justifyContent = 'center';
-          link.style.width = '36px';
-          link.style.height = '36px';
-          link.style.borderRadius = '50%';
-          link.style.cursor = 'pointer';
-          link.style.textDecoration = 'none';
           link.innerHTML = FIREBASE_ICON_SVG;
 
           firebaseCell.appendChild(link);
