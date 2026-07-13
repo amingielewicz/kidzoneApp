@@ -1,93 +1,115 @@
 # Firebase App Check
 
+Ostatnia aktualizacja: 2026-07-13
+
 ## Cel
 
-App Check ogranicza dostęp do Firebase z niezaufanych klientów. W KidZone używamy:
+App Check ogranicza dostęp do Firebase z niezaufanych klientów. W kidZone:
 
-- `DebugAppCheckProviderFactory` dla buildów debug,
-- `PlayIntegrityAppCheckProviderFactory` dla buildów release.
+- debug build używa `DebugAppCheckProviderFactory`,
+- release build używa `PlayIntegrityAppCheckProviderFactory`.
 
-Konfiguracja kodowa znajduje się w `KidZoneApplication.initAppCheck()`.
+Konfiguracja aplikacji znajduje się w `KidZoneApplication.initAppCheck()`.
 
 ## Debug provider
 
-Debug provider jest wymagany do pracy lokalnej i testów na emulatorze, szczególnie jeśli w Firebase Console zostanie włączony App Check enforcement.
+Debug provider służy wyłącznie do developmentu, testów i emulatorów.
 
-Kroki:
+1. Uruchom debug build.
+2. Odszukaj debug token w Logcat.
+3. Dodaj go w Firebase Console do właściwej aplikacji Android.
+4. Nadaj tokenowi nazwę identyfikującą urządzenie i właściciela.
+5. Usuń nieużywane tokeny.
 
-1. Uruchom aplikację w wariancie debug.
-2. Otwórz Logcat i wyszukaj:
+Debug token:
 
-```text
-DebugAppCheckProvider
-```
-
-3. Skopiuj debug token wypisany przez Firebase SDK.
-4. W Firebase Console przejdź do:
-
-```text
-Project settings -> App Check -> Apps -> Android app -> Manage debug tokens
-```
-
-5. Dodaj token z czytelną nazwą, np.:
-
-```text
-Adam emulator Pixel API 35
-```
-
-Nie commituj debug tokenów do repozytorium.
+- nie trafia do repo,
+- nie jest kopiowany do dokumentacji ani issue,
+- nie jest używany w release,
+- powinien być rotowany po ujawnieniu.
 
 ## Release provider
 
-Release build używa Play Integrity. Przed włączeniem enforcement w produkcji upewnij się, że:
+Przed testem release sprawdź:
 
-- aplikacja ma poprawny package name w Firebase,
-- podpis release jest zgodny z konfiguracją Google Play / Firebase,
-- SHA certyfikatów jest zarejestrowany tam, gdzie wymaga tego konfiguracja projektu,
-- build release komunikuje się z Firestore, Storage i Cloud Functions bez błędów App Check.
+- poprawny package name,
+- właściwy projekt Firebase,
+- SHA-1 i SHA-256 wymaganych certyfikatów,
+- zgodność podpisu lokalnego i Google Play App Signing,
+- działanie Firestore, Storage i Cloud Functions,
+- brak debug providera i debug tokenów.
 
-## Enforcement
+Play Integrity nie zwalnia z Firestore Rules, Storage Rules, auth checks ani rate limitingu.
 
-Nie włączaj enforcement dla wszystkich usług naraz bez smoke testu.
+## Monitoring przed enforcement
 
-Zalecana kolejność:
+Przed blokowaniem ruchu:
 
-1. Zarejestruj debug tokeny dla urządzeń deweloperskich.
-2. Uruchom debug build i sprawdź logowanie, listę miejsc, mapę, dodawanie miejsca i upload zdjęć.
-3. Włącz enforcement najpierw dla jednej usługi o najmniejszym ryzyku.
-4. Zweryfikuj Crashlytics i logi Firebase.
-5. Dopiero potem rozszerz enforcement na kolejne usługi.
+- obserwuj udział poprawnych, niepoprawnych i niezweryfikowanych requestów,
+- zweryfikuj debug, internal testing i release candidate,
+- sprawdź wszystkie aktywne wersje aplikacji,
+- upewnij się, że backend i funkcje nie są błędnie blokowane,
+- przygotuj rollback enforcement.
 
-### Minimalny smoke test enforcement
+## Kolejność rollout
 
-W Firebase Console przejdz do:
+1. Skonfiguruj debug tokeny.
+2. Zweryfikuj debug build.
+3. Zweryfikuj signed release build lub build z Internal Testing.
+4. Włącz monitoring bez enforcement, jeśli usługa to wspiera.
+5. Włącz enforcement dla jednej usługi.
+6. Wykonaj smoke i sprawdź logi.
+7. Obserwuj błędy oraz metryki.
+8. Dopiero potem rozszerz enforcement.
 
-```text
-Build -> App Check -> Apps -> Android app
-```
+Nie włączamy enforcement dla wszystkich usług jednocześnie.
 
-Przed zmiana trybu enforcement:
+## Minimalny smoke
 
-1. Upewnij sie, ze debug token aktualnego urzadzenia jest dodany.
-2. Uruchom aplikacje i zaloguj testowego uzytkownika.
-3. Otworz Start, Liste, Mape, Ranking i Profil.
-4. Dodaj testowe miejsce bez zdjec, potem dodaj jedno zdjecie.
-5. Dodaj opinie z jednym zdjeciem.
+Sprawdź:
 
-Po wlaczeniu enforcement dla pojedynczej uslugi powtorz smoke test:
+- logowanie i rejestrację,
+- Start, Listę, Mapę, Ranking i Profil,
+- odczyt danych z Firestore,
+- dodanie miejsca i opinii,
+- upload zdjęcia do Storage,
+- funkcje callable/HTTP używane przez aplikację,
+- account deletion, jeśli zależy od funkcji backendowej,
+- zachowanie po restarcie i ponownym zalogowaniu.
 
-- Firestore: logowanie, profil, lista miejsc, dodanie miejsca, opinia.
-- Storage: upload zdjec miejsca i opinii.
-- Cloud Functions: funkcje wywolywane przez aplikacje, jesli sa objete App Check.
+PASS oznacza:
 
-PASS oznacza brak `PERMISSION_DENIED`, `App attestation failed` i brak nowych bledow
-blokujacych flow w Crashlytics.
+- brak `App attestation failed`,
+- brak nowych `PERMISSION_DENIED` wynikających z App Check,
+- brak blokady prawidłowego release builda,
+- brak nowych krytycznych błędów w Crashlytics i logach backendu.
 
-## Checklist
+## Scenariusze negatywne
 
-- [ ] Debug token dodany w Firebase Console.
-- [ ] Debug build nie pokazuje `App attestation failed`.
-- [ ] Release build używa Play Integrity.
-- [ ] Firestore działa po włączeniu enforcement.
-- [ ] Storage upload działa po włączeniu enforcement.
-- [ ] Cloud Functions działają po włączeniu enforcement, jeśli są objęte App Check.
+- debug build bez zarejestrowanego tokenu,
+- stary lub usunięty debug token,
+- release build podpisany innym certyfikatem,
+- aplikacja spoza Google Play, jeśli dystrybucja jej nie zakłada,
+- brak internetu podczas pobierania tokenu,
+- chwilowy błąd Play Integrity,
+- wyłączony enforcement po incydencie.
+
+Aplikacja powinna pokazywać kontrolowany błąd i możliwość retry, a nie techniczny wyjątek.
+
+## Bezpieczeństwo
+
+- tokenów App Check nie logujemy,
+- nie traktujemy App Check jako uwierzytelnienia użytkownika,
+- funkcje nadal sprawdzają auth i role,
+- Rules nadal sprawdzają ownership i pola,
+- błędy App Check nie zawierają danych użytkownika w telemetryce.
+
+## Release gate
+
+- [ ] debug provider nie działa w release,
+- [ ] Play Integrity jest aktywne,
+- [ ] certyfikaty są poprawne,
+- [ ] signed build przeszedł smoke,
+- [ ] enforcement jest włączony tylko dla zweryfikowanych usług,
+- [ ] monitoring i rollback są przygotowane,
+- [ ] Data Safety i dokumentacja bezpieczeństwa odpowiadają konfiguracji.
