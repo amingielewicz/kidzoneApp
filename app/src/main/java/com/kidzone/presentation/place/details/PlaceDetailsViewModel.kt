@@ -838,7 +838,8 @@ class PlaceDetailsViewModel @Inject constructor(
         name: String,
         description: String,
         category: String,
-        amenities: Set<String>
+        amenities: Set<String>,
+        comment: String
     ) {
         val place = _uiState.value.place ?: return
         val user = currentUser.value ?: return
@@ -856,7 +857,8 @@ class PlaceDetailsViewModel @Inject constructor(
                 placeId = place.id,
                 requesterId = user.id,
                 changes = changes,
-                type = "EDIT"
+                type = "EDIT",
+                comment = comment.trim()
             )
         }
     }

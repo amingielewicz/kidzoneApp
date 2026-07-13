@@ -48,7 +48,6 @@ class FirestorePlaceRepository @Inject constructor(
         private const val KM_PER_DEGREE = 111.0
         private const val MIN_LONGITUDE_COSINE = 0.1
         private const val ROOM_CURSOR_PREFIX = "room:"
-        private const val CHANGE_REQUEST_COMMENT_PREFIX = "__KIDZONE_COMMENT__:"
         private const val CHANGE_REQUEST_COMMENT_MAX_LENGTH = 500
     }
 
@@ -243,8 +242,8 @@ class FirestorePlaceRepository @Inject constructor(
         reason: String,
         comment: String
     ): OpResult<Unit> = try {
-        require(placeId.isNotBlank()) { "placeId cannot be blank" }
-        require(reporterId.isNotBlank()) { "reporterId cannot be blank" }
+        require(placeId.isNotBlank()) { "placeId nie może być puste" }
+        require(reporterId.isNotBlank()) { "reporterId nie może być puste" }
 
         val existing = firestore.collection(FirestoreCollections.PLACE_REPORTS)
             .whereEqualTo("reporterId", reporterId)
@@ -252,7 +251,7 @@ class FirestorePlaceRepository @Inject constructor(
             .get()
             .await()
         if (existing.documents.isNotEmpty()) {
-            throw AlreadyReportedException("You have already reported this place")
+            throw AlreadyReportedException("Już zgłosiłeś to miejsce")
         }
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
@@ -271,7 +270,7 @@ class FirestorePlaceRepository @Inject constructor(
             true
         }
         if (completed == null) {
-            OpResult.failure(TimeoutException("Timed out while saving the report"))
+            OpResult.failure(TimeoutException("Przekroczono czas oczekiwania na zapis zgłoszenia"))
         } else {
             OpResult.success(Unit)
         }
@@ -283,32 +282,18 @@ class FirestorePlaceRepository @Inject constructor(
         placeId: String,
         requesterId: String,
         changes: Map<String, Any>,
-        type: String
+        type: String,
+        comment: String
     ): OpResult<Unit> = try {
-        require(placeId.isNotBlank()) { "placeId cannot be blank" }
-        require(requesterId.isNotBlank()) { "requesterId cannot be blank" }
-        require(changes.isNotEmpty()) { "changes cannot be empty" }
-
-        val sanitizedChanges = changes.toMutableMap()
-        val amenityValues = (sanitizedChanges["amenities"] as? Iterable<*>)
-            ?.filterIsInstance<String>()
-            .orEmpty()
-        val commentEntry = amenityValues.firstOrNull {
-            it.startsWith(CHANGE_REQUEST_COMMENT_PREFIX)
-        }
-        val comment = commentEntry
-            ?.removePrefix(CHANGE_REQUEST_COMMENT_PREFIX)
-            .orEmpty()
+        require(placeId.isNotBlank()) { "placeId nie może być puste" }
+        require(requesterId.isNotBlank()) { "requesterId nie może być puste" }
+        require(changes.isNotEmpty()) { "changes nie może być puste" }
+        val sanitizedComment = comment
             .trim()
             .take(CHANGE_REQUEST_COMMENT_MAX_LENGTH)
 
-        if (commentEntry != null) {
-            sanitizedChanges["amenities"] = amenityValues.filterNot {
-                it.startsWith(CHANGE_REQUEST_COMMENT_PREFIX)
-            }
-        }
         if (type == "EDIT") {
-        require(comment.isNotBlank()) { "comment cannot be blank" }
+            require(sanitizedComment.isNotBlank()) { "comment nie może być pusty" }
         }
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
@@ -318,8 +303,8 @@ class FirestorePlaceRepository @Inject constructor(
                         "placeId" to placeId,
                         "requesterId" to requesterId,
                         "reporterId" to requesterId,
-                        "changes" to sanitizedChanges,
-                        "comment" to comment,
+                        "changes" to changes,
+                        "comment" to sanitizedComment,
                         "type" to type,
                         "createdAtMillis" to System.currentTimeMillis(),
                         "status" to "pending"
@@ -329,7 +314,7 @@ class FirestorePlaceRepository @Inject constructor(
             true
         }
         if (completed == null) {
-            OpResult.failure(TimeoutException("Timed out while saving the edit suggestion"))
+            OpResult.failure(TimeoutException("Przekroczono czas oczekiwania na zapis propozycji zmiany"))
         } else {
             OpResult.success(Unit)
         }
@@ -343,8 +328,8 @@ class FirestorePlaceRepository @Inject constructor(
         reason: String,
         comment: String
     ): OpResult<Unit> = try {
-        require(photoUrl.isNotBlank()) { "photoUrl cannot be blank" }
-        require(reporterId.isNotBlank()) { "reporterId cannot be blank" }
+        require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
+        require(reporterId.isNotBlank()) { "reporterId nie może być puste" }
 
         val existing = firestore.collection(FirestoreCollections.PHOTO_REPORTS)
             .whereEqualTo("reporterId", reporterId)
@@ -352,7 +337,7 @@ class FirestorePlaceRepository @Inject constructor(
             .get()
             .await()
         if (existing.documents.isNotEmpty()) {
-            throw AlreadyReportedException("You have already reported this photo")
+            throw AlreadyReportedException("Już zgłosiłeś to zdjęcie")
         }
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
@@ -371,7 +356,7 @@ class FirestorePlaceRepository @Inject constructor(
             true
         }
         if (completed == null) {
-            OpResult.failure(TimeoutException("Timed out while saving the report"))
+            OpResult.failure(TimeoutException("Przekroczono czas oczekiwania na zapis zgłoszenia"))
         } else {
             OpResult.success(Unit)
         }
@@ -384,9 +369,9 @@ class FirestorePlaceRepository @Inject constructor(
         photoUrl: String,
         uploadedByUserId: String
     ): OpResult<Unit> = try {
-        require(placeId.isNotBlank()) { "placeId cannot be blank" }
-        require(photoUrl.isNotBlank()) { "photoUrl cannot be blank" }
-        require(uploadedByUserId.isNotBlank()) { "uploadedByUserId cannot be blank" }
+        require(placeId.isNotBlank()) { "placeId nie może być puste" }
+        require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
+        require(uploadedByUserId.isNotBlank()) { "uploadedByUserId nie może być puste" }
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             placesCollection().document(placeId).set(
@@ -399,7 +384,7 @@ class FirestorePlaceRepository @Inject constructor(
             true
         }
         if (completed == null) {
-            OpResult.failure(TimeoutException("Timed out while saving the photo"))
+            OpResult.failure(TimeoutException("Przekroczono czas oczekiwania na zapis zdjęcia"))
         } else {
             OpResult.success(Unit)
         }
@@ -411,8 +396,8 @@ class FirestorePlaceRepository @Inject constructor(
         placeId: String,
         photoUrl: String
     ): OpResult<Unit> = try {
-        require(placeId.isNotBlank()) { "placeId cannot be blank" }
-        require(photoUrl.isNotBlank()) { "photoUrl cannot be blank" }
+        require(placeId.isNotBlank()) { "placeId nie może być puste" }
+        require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             val place = placesCollection().document(placeId).get().await()
@@ -430,7 +415,7 @@ class FirestorePlaceRepository @Inject constructor(
         if (completed == true) {
             OpResult.success(Unit)
         } else {
-            OpResult.failure(TimeoutException("Timed out while deleting the photo"))
+            OpResult.failure(TimeoutException("Przekroczono czas oczekiwania na usunięcie zdjęcia"))
         }
     } catch (e: Exception) {
         OpResult.failure(e)
