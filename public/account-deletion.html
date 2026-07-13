@@ -22,61 +22,63 @@
 <body>
   <div class="container">
     <h1>Usuwanie konta i danych</h1>
-    <p class="date">Ostatnia aktualizacja: 28 czerwca 2026</p>
+    <p class="date">Ostatnia aktualizacja: 13 lipca 2026</p>
 
-    <p>Ta strona opisuje, jak usunąć konto użytkownika w aplikacji <strong>kidZone</strong>
-    oraz jak zażądać usunięcia danych osobowych. Strona jest publiczna i nie wymaga logowania.</p>
+    <p>Ta publiczna strona umożliwia użytkownikowi aplikacji <strong>kidZone</strong> rozpoczęcie procesu usunięcia konta i powiązanych danych bez ponownego instalowania Aplikacji.</p>
 
     <div class="notice">
-      <p><strong>Najszybsza ścieżka:</strong> otwórz aplikację kidZone, przejdź do
-      <strong>Profil → Konto i bezpieczeństwo → Usuń konto</strong> i wykonaj kroki widoczne na ekranie.</p>
+      <p><strong>Najszybsza ścieżka:</strong> w Aplikacji przejdź do <strong>Profil → Konto i bezpieczeństwo → Usuń konto</strong>.</p>
     </div>
 
-    <h2>1. Usunięcie konta w aplikacji</h2>
+    <h2>1. Usunięcie konta w Aplikacji</h2>
     <ol>
-      <li>Zaloguj się do aplikacji kidZone.</li>
-      <li>Przejdź do zakładki <strong>Profil</strong>.</li>
-      <li>W sekcji <strong>Konto i bezpieczeństwo</strong> wybierz <strong>Usuń konto</strong>.</li>
-      <li>Potwierdź operację. Firebase może wymagać ponownego uwierzytelnienia hasłem lub przez konto Google.</li>
+      <li>Zaloguj się do kidZone.</li>
+      <li>Otwórz zakładkę <strong>Profil</strong>.</li>
+      <li>Przejdź do <strong>Konto i bezpieczeństwo</strong>.</li>
+      <li>Wybierz <strong>Usuń konto</strong> i potwierdź operację.</li>
+      <li>Ze względów bezpieczeństwa Firebase może wymagać ponownego uwierzytelnienia hasłem lub kontem Google.</li>
     </ol>
 
-    <h2>2. Żądanie usunięcia danych e-mailem</h2>
-    <p>Jeżeli nie możesz zalogować się do aplikacji albo usunięcie konta w aplikacji nie działa,
-    wyślij wiadomość na adres:
-    <a href="mailto:bonoboczemunie+privacy@gmail.com">bonoboczemunie+privacy@gmail.com</a>.</p>
-    <p>W wiadomości podaj adres e-mail konta kidZone i, jeśli znasz, nazwę użytkownika. Możemy poprosić
-    o dodatkowe informacje, aby potwierdzić, że zgłoszenie dotyczy Twojego konta.</p>
+    <h2>2. Żądanie poza Aplikacją</h2>
+    <p>Jeżeli nie możesz się zalogować albo funkcja w Aplikacji nie działa, wyślij żądanie na adres <a href="mailto:bonoboczemunie+privacy@gmail.com?subject=kidZone%20-%20żądanie%20usunięcia%20konta">bonoboczemunie+privacy@gmail.com</a>.</p>
+    <p>Podaj adres e-mail przypisany do konta i, jeżeli go znasz, nick. Możemy poprosić o dodatkowe informacje konieczne do potwierdzenia, że żądanie składa właściciel konta.</p>
+    <p>Po skutecznej weryfikacji żądanie złożone e-mailem prowadzi do usunięcia konta Firebase Authentication i powiązanych danych na takich samych zasadach jak usunięcie wykonane w Aplikacji.</p>
 
-    <h2>3. Co usuwamy lub anonimizujemy</h2>
+    <h2>3. Co usuwamy</h2>
     <ul>
-      <li><strong>Konto logowania:</strong> konto Firebase Authentication jest usuwane, jeśli usunięcie zostało wykonane z aplikacji.</li>
-      <li><strong>Dane prywatne:</strong> e-mail, imię, nazwisko, prywatne ustawienia i tokeny powiadomień są usuwane albo anonimizowane.</li>
-      <li><strong>Avatar i zdjęcia prywatne:</strong> usuwamy je, gdy są powiązane bezpośrednio z kontem użytkownika.</li>
-      <li><strong>Treści publiczne:</strong> dodane miejsca, opinie, oceny i zdjęcia miejsc mogą zostać usunięte albo pozostawione w formie zanonimizowanej, jeżeli są częścią publicznej bazy miejsc i nie zawierają danych osobowych.</li>
-      <li><strong>Zgłoszenia i logi bezpieczeństwa:</strong> mogą być przechowywane przez czas potrzebny do obsługi zgłoszeń, bezpieczeństwa aplikacji lub spełnienia obowiązków prawnych.</li>
+      <li><strong>Konto logowania:</strong> konto Firebase Authentication.</li>
+      <li><strong>Dane prywatne:</strong> adres e-mail, imię, nazwisko, prywatne ustawienia i dane profilu.</li>
+      <li><strong>Identyfikatory i powiadomienia:</strong> powiązanie UID, tokeny FCM i prywatne preferencje powiadomień.</li>
+      <li><strong>Avatar i prywatne pliki:</strong> pliki bezpośrednio powiązane z kontem, jeżeli nie są częścią treści publicznej.</li>
+      <li><strong>Powiązania autora:</strong> dane pozwalające przypisać zachowane treści publiczne do usuniętego konta.</li>
     </ul>
 
-    <h2>4. Termin realizacji</h2>
-    <p>Żądania realizujemy bez zbędnej zwłoki, standardowo w ciągu 30 dni od potwierdzenia właściciela konta.
-    Jeżeli sprawa jest złożona, poinformujemy Cię o statusie i powodzie wydłużenia terminu.</p>
-
-    <h2>5. Zdjęcia dzieci i osób trzecich</h2>
-    <p>Jeżeli chcesz usunąć zdjęcie przedstawiające dziecko lub osobę trzecią, napisz na adres kontaktowy
-    i dołącz link, nazwę miejsca albo opis pozwalający odnaleźć materiał. Takie zgłoszenia traktujemy priorytetowo.</p>
-
-    <h2>6. Powiązane dokumenty</h2>
+    <h2>4. Co może pozostać</h2>
     <ul>
-      <li><a href="/privacy-policy.html">Polityka prywatności</a></li>
-      <li><a href="/terms-of-service.html">Regulamin użytkowania</a></li>
+      <li>Dodane miejsca, opinie, oceny i zdjęcia miejsc mogą pozostać jako część publicznej bazy wyłącznie w formie zanonimizowanej i bez powiązania z kontem.</li>
+      <li>Treści zawierające dane osobowe, naruszające prywatność lub prawa osób trzecich powinny zostać usunięte, a nie jedynie zanonimizowane.</li>
+      <li>Zgłoszenia moderacyjne i logi bezpieczeństwa mogą być przechowywane przez okres konieczny do obsługi sprawy, zapobiegania nadużyciom, ochrony roszczeń lub realizacji obowiązku prawnego.</li>
+      <li>Dane zbiorcze i anonimowe, których nie można powiązać z użytkownikiem, mogą pozostać w statystykach.</li>
     </ul>
 
-    <h2>7. Kontakt</h2>
-    <p>Administrator danych: <strong>Adam Mingielewicz</strong><br>
-    Kontakt: <a href="mailto:bonoboczemunie+privacy@gmail.com">bonoboczemunie+privacy@gmail.com</a></p>
+    <h2>5. Termin realizacji</h2>
+    <p>Żądanie realizujemy bez zbędnej zwłoki, standardowo w ciągu 30 dni od potwierdzenia właściciela konta. Jeżeli sprawa jest złożona, użytkownik otrzyma informację o statusie i przyczynie wydłużenia terminu.</p>
 
-    <div class="footer">
-      kidZone &copy; 2026 - Mapa miejsc przyjaznych dzieciom
-    </div>
+    <h2>6. Zdjęcia dzieci i osób trzecich</h2>
+    <p>Żądanie usunięcia zdjęcia przedstawiającego dziecko lub osobę trzecią należy przesłać na adres kontaktowy wraz z linkiem, nazwą miejsca lub opisem umożliwiającym odnalezienie materiału. Takie zgłoszenia są traktowane priorytetowo.</p>
+
+    <h2>7. Powiązane dokumenty</h2>
+    <ul>
+      <li><a href="/privacy-policy.html">Polityka Prywatności</a></li>
+      <li><a href="/terms-of-service.html">Regulamin Użytkowania</a></li>
+    </ul>
+
+    <h2>8. Kontakt</h2>
+    <p>Administrator danych: <strong>Adam Mingielewicz</strong>, osoba fizyczna nieprowadząca działalności gospodarczej.<br>
+    Adres do korespondencji: <strong>ul. Zbaraska 23/9, 93-225 Łódź, Polska</strong><br>
+    E-mail: <a href="mailto:bonoboczemunie+privacy@gmail.com">bonoboczemunie+privacy@gmail.com</a></p>
+
+    <div class="footer">kidZone &copy; 2026 - Mapa miejsc przyjaznych dzieciom</div>
   </div>
 </body>
 </html>
