@@ -1,15 +1,16 @@
 # Product Decisions
 
+Ostatnia aktualizacja: 2026-07-14
+
 ## Cel
 
-Dokument zbiera decyzje produktowe KidZone i ich uzasadnienie. Ma ograniczać powtarzanie tych samych dyskusji po kilku miesiącach.
+Rejestr decyzji produktowych kidZone wraz z kontekstem, uzasadnieniem i konsekwencjami. Dokument ogranicza powracanie do już rozstrzygniętych dyskusji.
 
 ## Format decyzji
 
-Każda decyzja powinna mieć:
-
 ```text
 Data:
+Status: proposed / accepted / superseded
 Decyzja:
 Kontekst:
 Alternatywy:
@@ -18,90 +19,157 @@ Konsekwencje:
 Powiązane issue / PR:
 ```
 
-## Decyzja: mapa i lista jako równorzędne wejścia
+## Mapa i lista są równorzędne
 
 Data: 2026-06
 
-Decyzja:
-Mapa nie jest jedynym sposobem odkrywania miejsc. Lista pozostaje równorzędnym sposobem dostępu do danych.
+Status: accepted
 
-Kontekst:
-Mapa jest wygodna, ale bywa problematyczna bez lokalizacji, przy słabym internecie i dla dostępności.
+Decyzja: mapa nie jest jedynym sposobem odkrywania miejsc. Lista pozostaje pełnym fallbackiem i równorzędnym wejściem.
 
 Uzasadnienie:
-Lista poprawia dostępność, stabilność UX i daje fallback przy problemach z mapą.
+
+- działa bez zgody na lokalizację,
+- poprawia dostępność,
+- jest stabilniejsza przy słabym internecie,
+- umożliwia wykonanie tych samych zadań z TalkBack.
 
 Konsekwencje:
-Każde miejsce widoczne na mapie powinno być możliwe do znalezienia także przez listę.
 
-## Decyzja: kategorie jako badge / ikony
+- miejsce dostępne na mapie powinno być możliwe do znalezienia na liście,
+- odmowa lokalizacji nie blokuje aplikacji,
+- zmiany mapy muszą uwzględniać fallback listowy.
+
+## Kategorie używają wspólnego badge
 
 Data: 2026-06
 
-Decyzja:
-Kategorie miejsc pokazujemy jako badge albo ikonę, nie jako ciężkie belki wizualne.
+Status: accepted
 
-Kontekst:
-Ciężkie belki dominują kartę i pogarszają czytelność.
-
-Uzasadnienie:
-Badge jest lżejszy, bardziej skalowalny i lepiej pasuje do kart miejsc.
+Decyzja: kategorie są prezentowane przez wspólny badge lub ikonę zamiast ciężkich belek.
 
 Konsekwencje:
-Design system powinien zawierać spójny komponent badge kategorii.
 
-## Decyzja: release przez GO / NO-GO checklist
+- jeden komponent i jedna semantyka kategorii,
+- spójność Startu, Listy, Mapy, Rankingu i szczegółów,
+- kolor nie jest jedynym nośnikiem kategorii.
+
+## Publiczny release wymaga GO / NO-GO
 
 Data: 2026-06
 
-Decyzja:
-Publiczny release wymaga przejścia checklisty GO / NO-GO.
+Status: accepted
 
-Kontekst:
-KidZone używa Firebase, Google Maps, lokalizacji, profili i danych społecznościowych.
-
-Uzasadnienie:
-Checklist zmniejsza ryzyko regresji, problemów privacy i błędów release.
+Decyzja: release produkcyjny wymaga zakończonej checklisty GO / NO-GO.
 
 Konsekwencje:
-Release bez checklisty jest blokowany.
 
-## Decyzja: ranking oparty o gotowe pola
+- signed AAB, smoke i monitoring są obowiązkowe,
+- runtime permissions, account deletion, Data Safety, Rules i App Check są bramami,
+- brak dowodów oznacza NO-GO.
+
+## Ranking korzysta z pól agregowanych
 
 Data: 2026-06
 
-Decyzja:
-Ranking miejsc powinien korzystać z gotowych pól, takich jak `ratingAverage` i `reviewsCount`.
+Status: accepted
 
-Kontekst:
-Liczenie rankingu przez pobieranie wszystkich opinii jest kosztowne i słabo skaluje się przy większej bazie.
-
-Uzasadnienie:
-Gotowe pola zmniejszają liczbę odczytów i upraszczają ekran rankingu.
+Decyzja: ranking używa pól takich jak `ratingAverage`, `reviewsCount` i kontrolowany `rankScore`.
 
 Konsekwencje:
-Dodanie lub zmiana opinii musi aktualizować pola rankingowe.
 
-## Decyzja: onboarding krótki i pomijalny
+- klient nie pobiera wszystkich opinii,
+- agregaty są aktualizowane po stronie zaufanej,
+- wymagane są testy spójności i mechanizm naprawy,
+- klient nie może samodzielnie zmieniać pól rankingowych.
+
+## Onboarding jest krótki i pomijalny
 
 Data: 2026-06
 
-Decyzja:
-Onboarding ma wyjaśniać główne funkcje, ale nie może blokować wejścia do aplikacji.
+Status: accepted
 
-Kontekst:
-Użytkownicy często chcą szybko sprawdzić mapę lub listę miejsc.
-
-Uzasadnienie:
-Krótki onboarding pomaga nowym użytkownikom, ale nie przeszkadza wracającym.
+Decyzja: onboarding wyjaśnia główne funkcje, ale nie blokuje wejścia do aplikacji.
 
 Konsekwencje:
-Onboarding powinien być możliwy do pominięcia.
 
-## Checklist dodawania decyzji
+- użytkownik może go pominąć,
+- zgody są proszone dopiero w kontekście funkcji,
+- powrót do aplikacji nie wymusza ponownego onboardingu.
 
-- [ ] Decyzja ma kontekst.
-- [ ] Decyzja ma uzasadnienie.
-- [ ] Wskazano konsekwencje.
-- [ ] Podlinkowano issue albo PR, jeśli istnieje.
-- [ ] Decyzja jest zrozumiała dla nowej osoby w projekcie.
+## Uprawnienia są opcjonalne
+
+Data: 2026-07
+
+Status: accepted
+
+Decyzja: lokalizacja, kamera i powiadomienia nie są wymagane do podstawowego korzystania z kidZone.
+
+Konsekwencje:
+
+- wszystkie punkty wejścia mają wspólną obsługę odmowy,
+- trwała odmowa prowadzi do ustawień aplikacji,
+- brak zgody nie tworzy martwej akcji,
+- Photo Picker działa bez `READ_MEDIA_IMAGES` i `READ_EXTERNAL_STORAGE`,
+- aplikacja nie deklaruje `ACCESS_BACKGROUND_LOCATION`.
+
+## Dane publiczne i prywatne są rozdzielone
+
+Data: 2026-07
+
+Status: accepted as target architecture
+
+Decyzja: publiczny profil i prywatne dane użytkownika są przechowywane osobno.
+
+Docelowo:
+
+```text
+users/{uid}
+users/{uid}/private/profile
+users/{uid}/private/messaging
+users/{uid}/private/preferences
+```
+
+Konsekwencje:
+
+- e-mail i tokeny FCM nie są publiczne,
+- migracja wymaga kompatybilności ze starszym buildem,
+- account deletion obejmuje wszystkie prywatne subdokumenty.
+
+## Usunięcie konta jest bramą release
+
+Data: 2026-07
+
+Status: accepted
+
+Decyzja: publiczny release nie może otrzymać GO bez pełnego testu account deletion.
+
+Konsekwencje:
+
+- test obejmuje Auth, Firestore, Storage, FCM, Room, cache i widget,
+- częściowy cleanup nie jest pełnym sukcesem,
+- publiczna strona usuwania konta i Play Console muszą być aktualne.
+
+## Zapisy offline nie udają sukcesu
+
+Data: 2026-07
+
+Status: accepted
+
+Decyzja: dopóki kolejka replay nie gwarantuje synchronizacji, zapis offline nie jest prezentowany jako zakończony sukces.
+
+Konsekwencje:
+
+- użytkownik widzi stan oczekujący albo kontrolowany błąd,
+- retry jest idempotentne,
+- brak internetu nie tworzy duplikatów danych.
+
+## Checklista nowej decyzji
+
+- [ ] ma datę i status,
+- [ ] opisuje kontekst i alternatywy,
+- [ ] zawiera mierzalne konsekwencje,
+- [ ] uwzględnia UX, accessibility, privacy, security i koszty,
+- [ ] wskazuje potrzebne testy i migracje,
+- [ ] ma powiązane issue lub PR, jeśli istnieje,
+- [ ] decyzja zastąpiona wskazuje następcę.
