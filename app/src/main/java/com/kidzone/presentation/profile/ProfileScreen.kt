@@ -78,12 +78,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.LinkAnnotation
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withLink
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -98,7 +92,6 @@ import com.kidzone.presentation.common.KidZoneCard
 import com.kidzone.presentation.common.ModalDialogShape
 import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.OfflineAwareSubmitButton
-import com.kidzone.presentation.common.ModalPrimaryButton
 import com.kidzone.presentation.common.ModalTextButton
 import com.kidzone.presentation.common.NotificationPromptReason
 import com.kidzone.presentation.common.NotificationSoftPromptDialog
@@ -122,6 +115,8 @@ import java.util.concurrent.TimeUnit
 
 private const val CONTACT_SUBJECT_MAX_LENGTH = 80
 private const val CONTACT_MESSAGE_MAX_LENGTH = 1000
+private const val CONTACT_SUBJECT_WARNING_LENGTH = 70
+private const val CONTACT_MESSAGE_WARNING_LENGTH = 950
 private const val CONTACT_SUBJECT_MIN_LENGTH = 3
 private const val CONTACT_MESSAGE_MIN_LENGTH = 10
 private const val NOTIFICATION_PROMPT_TOP_LIMIT = 10
@@ -1251,6 +1246,11 @@ private fun ContactSupportDialog(
                                 subject.length,
                                 CONTACT_SUBJECT_MAX_LENGTH,
                             ),
+                            color = if (subject.length >= CONTACT_SUBJECT_WARNING_LENGTH) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                         )
                     },
                 )
@@ -1287,6 +1287,11 @@ private fun ContactSupportDialog(
                                 message.length,
                                 CONTACT_MESSAGE_MAX_LENGTH,
                             ),
+                            color = if (message.length >= CONTACT_MESSAGE_WARNING_LENGTH) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                         )
                     },
                 )
