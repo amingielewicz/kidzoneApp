@@ -8,40 +8,51 @@ import com.kidzone.utils.OpResult
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Operacje na miejscach: pobieranie listy, pojedynczego miejsca,
- * dodawanie/edytowanie/usuwanie oraz wyszukiwanie po lokalizacji / kategorii.
+ * Kontrakt operacji na miejscach.
  *
- * Edytowanie i usuwanie powinno być w UI dostępne tylko dla właściciela
- * (`Place.ownerUserId == currentUserId`); reguły bezpieczeństwa po stronie
- * Firestore powinny tę regułę dodatkowo egzekwować.
+ * Implementacja odpowiada za komunikację z backendem i cache, mapowanie błędów oraz utrzymanie
+ * spójności danych. UI może ograniczać akcje właścicielskie, ale ostateczna autoryzacja musi być
+ * egzekwowana przez backend i reguły bezpieczeństwa.
  */
 interface PlaceRepository {
 
     /**
-     * Wszystkie miejsca, opcjonalnie filtrowane po kategorii i nazwie (prefix).
+     * Obserwuje miejsca, opcjonalnie filtrowane po kategorii i nazwie.
      *
-     * @param category kategoria miejsca
-     * @param query fraza wyszukiwania (prefix po stronie Firestore, contains po stronie Room)
+     * @param category opcjonalna kategoria miejsca.
+     * @param query opcjonalna fraza wyszukiwania.
+     * @return strumień aktualnej listy miejsc, który może być zasilany z cache i backendu.
      */
     fun observePlaces(category: PlaceCategory? = null, query: String? = null): Flow<List<Place>>
 
     /**
-     * Strumień miejsc dodanych przez konkretnego usera (snapshot listener).
+     * Obserwuje miejsca dodane przez wskazanego użytkownika.
      *
-     * Używane przez ekran "Moje miejsca" w profilu. Sortowanie po stronie
-     * klienta (po `createdAtMillis` malejąco) – Firestore wymagałby wtedy
-     * composite indexu (ownerUserId + createdAtMillis), do uniknięcia.
+     * Emituje pustą listę, gdy [ownerUserId] jest pusty.
      *
-     * Emituje pustą listę gdy [ownerUserId] jest pusty.
+     * @param ownerUserId identyfikator właściciela miejsc.
+     * @return strumień miejsc użytkownika posortowanych przez implementację lub warstwę wyższą.
      */
     fun observePlacesByOwner(ownerUserId: String): Flow<List<Place>>
 
+    /**
+     * Pobiera pojedyncze miejsce.
+     *
+     * Implementacja może użyć cache jako fallbacku, ale nie powinna zwracać danych prywatnych ani
+     * ukrytych przez moderację.
+     *
+     * @param placeId identyfikator miejsca.
+     * @return miejsce albo zmapowany błąd, np. brak zasobu lub brak uprawnień.
+     */
     suspend fun getPlace(placeId: String): OpResult<Place>
 
     /**
-     * Miejsca w okolicy zadanej lokalizacji.
+     * Pobiera miejsca w promieniu od zadanej lokalizacji.
      *
-     * @param radiusKm promień w kilometrach
+     * @param latitude szerokość geograficzna środka wyszukiwania.
+     * @param longitude długość geograficzna środka wyszukiwania.
+     * @param radiusKm promień w kilometrach.
+     * @return ograniczona lista miejsc albo zmapowany błąd.
      */
     suspend fun getPlacesNear(
         latitude: Double,
@@ -50,7 +61,11 @@ interface PlaceRepository {
     ): OpResult<List<Place>>
 
     /**
-     * Ograniczona lista miejsc widocznych w aktualnym viewportcie mapy.
+     * Pobiera ograniczoną listę miejsc widocznych w aktualnym viewportcie mapy.
+     *
+     * @param bounds granice geograficzne viewportu.
+     * @param category opcjonalna kategoria.
+     * @param limit maksymalna liczba zwracanych miejsc.
      */
     suspend fun getPlacesInBounds(
         bounds: GeoBounds,
@@ -58,21 +73,22 @@ interface PlaceRepository {
         limit: Int = 200
     ): OpResult<List<Place>>
 
-    /** Top miejsc wg [Place.averageRating]. */
+    /**
+     * Pobiera najlepiej oceniane miejsca.
+     *
+     * @param limit maksymalna liczba wyników.
+     * @return lista miejsc uporządkowana według aktualnej reguły rankingowej.
+     */
     suspend fun getTopPlaces(limit: Int = 10): OpResult<List<Place>>
 
     /**
-     * Paginated place fetch with server-side cursor.
+     * Pobiera stronę miejsc z kursorem serwerowym.
      *
-     * Returns [pageSize] places ordered by [createdAtMillis] descending,
-     * optionally filtered by [category] and/or name prefix [query].
-     *
-     * @param pageSize number of items per page (default 20)
-     * @param cursor opaque cursor from a previous [PagedResult.nextCursor].
-     *   Pass null for the first page.
-     * @param category optional category filter
-     * @param query optional name prefix filter
-     * @return [PagedResult] with items and cursor for next page (null if last)
+     * @param pageSize liczba elementów na stronie.
+     * @param cursor nieprzezroczysty kursor z poprzedniego [PagedResult.nextCursor].
+     * @param category opcjonalna kategoria.
+     * @param query opcjonalny prefiks nazwy.
+     * @return strona danych i kursor następnej strony albo zmapowany błąd.
      */
     suspend fun getPlacesPage(
         pageSize: Int = 20,
@@ -81,20 +97,42 @@ interface PlaceRepository {
         query: String? = null
     ): OpResult<PagedResult<Place>>
 
+    /**
+     * Dodaje nowe miejsce.
+     *
+     * Sukces oznacza potwierdzony zapis po stronie backendu. Operacja powinna być odporna na
+     * wielokrotne wywołanie i nie tworzyć duplikatu po timeoutcie.
+     *
+     * @param place miejsce do zapisania.
+     * @return zapisane miejsce z identyfikatorem i polami serwerowymi albo błąd.
+     */
     suspend fun addPlace(place: Place): OpResult<Place>
 
     /**
-     * Aktualizuje istniejące miejsce. Powinno być wywołane TYLKO wtedy gdy
-     * zalogowany użytkownik jest właścicielem (`Place.ownerUserId`).
-     * Zwraca uaktualnioną encję na sukcesie.
+     * Aktualizuje istniejące miejsce.
+     *
+     * Wywołujący powinien posiadać uprawnienie właściciela, a backend musi je ponownie zweryfikować.
+     *
+     * @param place miejsce zawierające zaktualizowane dane.
+     * @return zaktualizowane miejsce albo błąd autoryzacji, walidacji lub sieci.
      */
     suspend fun updatePlace(place: Place): OpResult<Place>
 
-    /** Usuwa miejsce. Patrz uwagi przy [updatePlace]. */
+    /**
+     * Usuwa miejsce należące do aktualnego użytkownika.
+     *
+     * @param placeId identyfikator miejsca.
+     * @return sukces po zakończeniu usuwania albo zmapowany błąd.
+     */
     suspend fun deletePlace(placeId: String): OpResult<Unit>
 
     /**
-     * Zgłasza miejsce jako spam/naruszenie.
+     * Zgłasza miejsce jako spam lub naruszenie.
+     *
+     * @param placeId identyfikator zgłaszanego miejsca.
+     * @param reporterId identyfikator zgłaszającego.
+     * @param reason powód zgłoszenia.
+     * @param comment opcjonalny komentarz.
      */
     suspend fun reportPlace(
         placeId: String,
@@ -104,7 +142,13 @@ interface PlaceRepository {
     ): OpResult<Unit>
 
     /**
-     * Wysyła propozycję zmiany danych miejsca (przez nie-właściciela).
+     * Wysyła propozycję zmiany danych miejsca przez osobę niebędącą właścicielem.
+     *
+     * @param placeId identyfikator miejsca.
+     * @param requesterId identyfikator autora propozycji.
+     * @param changes mapa dozwolonych pól i nowych wartości.
+     * @param type typ propozycji.
+     * @param comment opcjonalne uzasadnienie.
      */
     suspend fun submitChangeRequest(
         placeId: String,
@@ -117,8 +161,10 @@ interface PlaceRepository {
     /**
      * Zgłasza zdjęcie jako nieodpowiednie.
      *
-     * Zapis do kolekcji `photo_reports` z danymi zgłaszającego,
-     * URL-em zdjęcia, powodem i komentarzem.
+     * @param photoUrl adres zgłaszanego zdjęcia.
+     * @param reporterId identyfikator zgłaszającego.
+     * @param reason powód zgłoszenia.
+     * @param comment opcjonalny komentarz.
      */
     suspend fun reportPhoto(
         photoUrl: String,
@@ -128,29 +174,37 @@ interface PlaceRepository {
     ): OpResult<Unit>
 
     /**
-     * Dodaje URL zdjęcia do listy `photoUrls` na dokumencie miejsca.
-     * Zapisuje też kto dodał zdjęcie w `photoUploadedBy`.
+     * Dodaje URL zdjęcia do miejsca i zapisuje autora uploadu.
+     *
+     * @param placeId identyfikator miejsca.
+     * @param photoUrl URL pliku po udanym uploadzie.
+     * @param uploadedByUserId identyfikator autora zdjęcia.
      */
     suspend fun addPhotoUrl(placeId: String, photoUrl: String, uploadedByUserId: String): OpResult<Unit>
 
     /**
-     * Usuwa URL zdjęcia z listy `photoUrls` na dokumencie miejsca.
-     * Usuwa też wpis z `photoUploadedBy`.
+     * Usuwa URL zdjęcia z miejsca.
      *
-     * Autoryzacja po stronie klienta: wywołujący powinien upewnić się,
-     * że `photoUploadedBy[photoUrl] == currentUserId` przed wywołaniem.
-     * Reguły Firestore pozwalają na update `photoUrls` + `photoUploadedBy`
-     * przez każdego zalogowanego usera.
+     * Uprawnienie autora lub moderatora musi zostać zweryfikowane również po stronie backendu.
+     *
+     * @param placeId identyfikator miejsca.
+     * @param photoUrl URL usuwanego zdjęcia.
      */
     suspend fun removePhotoUrl(placeId: String, photoUrl: String): OpResult<Unit>
 
     /**
-     * Sprawdza czy użytkownik już zgłosił dane miejsce.
+     * Sprawdza, czy użytkownik zgłosił już dane miejsce.
+     *
+     * @param placeId identyfikator miejsca.
+     * @param userId identyfikator zgłaszającego.
      */
     suspend fun hasUserReportedPlace(placeId: String, userId: String): Boolean
 
     /**
-     * Pobiera listę URL-i zdjęć zgłoszonych przez danego użytkownika.
+     * Pobiera URL-e zdjęć zgłoszonych przez użytkownika.
+     *
+     * @param userId identyfikator zgłaszającego.
+     * @return zbiór URL-i; pusty zbiór, gdy brak zgłoszeń.
      */
     suspend fun getReportedPhotos(userId: String): Set<String>
 }
