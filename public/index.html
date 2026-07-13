@@ -10,17 +10,17 @@
   <style>
     :root {
       --brand: #0f74d4;
-      --brand-dark: #0b5ea9;
+      --brand-dark: #0a5ca9;
       --brand-soft: #eaf5ff;
-      --ink: #17324a;
-      --muted: #61788d;
+      --ink: #102a43;
+      --muted: #60758a;
       --surface: #ffffff;
-      --line: #e5edf4;
-      --bg: #f7fbff;
+      --line: #dfe9f2;
+      --bg: #f6faff;
       --support: #102a43;
-      --radius-xl: 32px;
-      --radius-lg: 24px;
-      --shadow: 0 18px 50px rgba(35, 79, 115, .10);
+      --radius-xl: 30px;
+      --radius-lg: 22px;
+      --shadow: 0 18px 48px rgba(31, 73, 110, .10);
     }
 
     * { box-sizing: border-box; }
@@ -40,12 +40,12 @@
       position: sticky;
       top: 0;
       z-index: 20;
-      background: rgba(255,255,255,.92);
+      background: rgba(255,255,255,.94);
       border-bottom: 1px solid rgba(15,116,212,.08);
       backdrop-filter: blur(16px);
     }
     .nav {
-      min-height: 78px;
+      min-height: 82px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -56,36 +56,35 @@
       align-items: center;
       gap: 14px;
       text-decoration: none;
+      font-size: 25px;
       font-weight: 900;
-      font-size: 24px;
-      letter-spacing: -.4px;
+      letter-spacing: -.5px;
     }
     .brand-logo {
-      width: 62px;
-      height: 62px;
+      width: 68px;
+      height: 68px;
       object-fit: contain;
-      filter: drop-shadow(0 10px 20px rgba(15,116,212,.18));
+      filter: drop-shadow(0 10px 22px rgba(15,116,212,.18));
     }
     .nav-links { display: flex; align-items: center; gap: 24px; }
     .nav-links a { text-decoration: none; font-weight: 750; color: #476278; }
     .nav-links a:hover { color: var(--brand); }
 
     .hero {
-      padding: 84px 0 72px;
+      padding: 84px 0 76px;
       background:
-        radial-gradient(circle at 88% 8%, rgba(15,116,212,.13), transparent 30%),
-        radial-gradient(circle at 10% 88%, rgba(255,193,7,.12), transparent 26%),
-        linear-gradient(180deg, #fff 0%, #f4faff 100%);
+        radial-gradient(circle at 88% 10%, rgba(15,116,212,.12), transparent 30%),
+        radial-gradient(circle at 10% 88%, rgba(255,193,7,.10), transparent 24%),
+        linear-gradient(180deg, #fff 0%, #f1f8ff 100%);
     }
     .hero-grid {
       display: grid;
       grid-template-columns: 1.05fr .95fr;
-      gap: 56px;
+      gap: 64px;
       align-items: center;
     }
     .eyebrow {
       display: inline-flex;
-      align-items: center;
       padding: 9px 14px;
       border-radius: 999px;
       background: var(--brand-soft);
@@ -95,16 +94,15 @@
     }
     h1 {
       margin: 22px 0 20px;
-      max-width: 760px;
       font-size: clamp(46px, 7vw, 78px);
       line-height: 1.02;
       letter-spacing: -2.6px;
     }
     .lead {
-      max-width: 720px;
+      max-width: 700px;
       margin: 0 0 30px;
-      font-size: clamp(18px, 2vw, 22px);
       color: var(--muted);
+      font-size: clamp(18px, 2vw, 22px);
     }
     .actions { display: flex; flex-wrap: wrap; gap: 14px; }
     .button {
@@ -119,17 +117,18 @@
       transition: transform .18s ease, box-shadow .18s ease;
     }
     .button:hover { transform: translateY(-2px); }
-    .button-primary { background: var(--brand); color: #fff; box-shadow: 0 12px 28px rgba(15,116,212,.26); }
+    .button-primary { background: var(--brand); color: #fff; box-shadow: 0 12px 28px rgba(15,116,212,.24); }
     .button-secondary { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+    .button-kofi { background: #ff5e5b; color: #fff; white-space: nowrap; box-shadow: 0 12px 28px rgba(255,94,91,.22); }
 
     .logo-stage {
-      min-height: 470px;
-      border-radius: var(--radius-xl);
+      min-height: 440px;
       display: grid;
       place-items: center;
       position: relative;
       overflow: hidden;
-      background: linear-gradient(145deg, #ffffff 0%, #eaf5ff 100%);
+      border-radius: var(--radius-xl);
+      background: linear-gradient(145deg, #ffffff 0%, #e8f4ff 100%);
       border: 1px solid rgba(15,116,212,.10);
       box-shadow: var(--shadow);
     }
@@ -138,15 +137,15 @@
       content: "";
       position: absolute;
       border-radius: 50%;
-      background: rgba(15,116,212,.08);
+      background: rgba(15,116,212,.07);
     }
-    .logo-stage::before { width: 220px; height: 220px; top: -60px; right: -40px; }
-    .logo-stage::after { width: 170px; height: 170px; bottom: -50px; left: -30px; }
+    .logo-stage::before { width: 220px; height: 220px; top: -70px; right: -40px; }
+    .logo-stage::after { width: 180px; height: 180px; bottom: -55px; left: -35px; }
     .hero-logo {
-      width: min(76%, 360px);
-      filter: drop-shadow(0 24px 34px rgba(20,74,112,.18));
+      width: min(80%, 390px);
       position: relative;
       z-index: 1;
+      filter: drop-shadow(0 24px 34px rgba(20,74,112,.18));
     }
 
     section { padding: 82px 0; }
@@ -157,9 +156,9 @@
     }
     .section-heading h2 {
       margin: 0 0 12px;
-      font-size: clamp(32px, 4.4vw, 50px);
+      font-size: clamp(32px, 4.4vw, 48px);
       line-height: 1.12;
-      letter-spacing: -1.3px;
+      letter-spacing: -1.2px;
     }
     .section-heading p { margin: 0; color: var(--muted); font-size: 18px; }
 
@@ -168,50 +167,61 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 22px;
       align-items: stretch;
-      grid-auto-rows: 1fr;
     }
     .feature {
-      height: 100%;
       min-height: 220px;
+      height: 100%;
       padding: 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
       border-radius: var(--radius-lg);
       background: var(--surface);
       border: 1px solid var(--line);
       box-shadow: 0 12px 30px rgba(35,79,115,.06);
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
     }
     .feature-icon {
       width: 52px;
       height: 52px;
-      border-radius: 16px;
+      margin-bottom: 18px;
       display: grid;
       place-items: center;
+      border-radius: 16px;
       background: var(--brand-soft);
       font-size: 28px;
-      margin-bottom: 18px;
     }
     .feature h3 { margin: 0 0 8px; font-size: 21px; }
     .feature p { margin: 0; color: var(--muted); }
 
-    .about-wrap {
+    .info-section {
       background: #fff;
       border-top: 1px solid var(--line);
       border-bottom: 1px solid var(--line);
     }
-    .about-card {
-      max-width: 920px;
-      margin: 0 auto;
-      padding: 42px;
-      border-radius: var(--radius-xl);
-      background: linear-gradient(145deg, #ffffff 0%, #f0f8ff 100%);
-      border: 1px solid var(--line);
-      box-shadow: var(--shadow);
-      text-align: center;
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px;
+      align-items: stretch;
     }
-    .about-card h2 { margin: 0 0 14px; font-size: clamp(32px, 4vw, 46px); }
-    .about-card p { margin: 0 auto; max-width: 760px; color: var(--muted); font-size: 19px; }
+    .info-card {
+      min-height: 250px;
+      height: 100%;
+      padding: 34px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      border-radius: var(--radius-lg);
+      background: linear-gradient(145deg, #ffffff 0%, #f7fbff 100%);
+      border: 1px solid var(--line);
+      box-shadow: 0 12px 30px rgba(35,79,115,.05);
+    }
+    .info-card h2,
+    .info-card h3 { margin: 0 0 12px; }
+    .info-card h2 { font-size: clamp(28px, 3.4vw, 40px); line-height: 1.15; }
+    .info-card h3 { font-size: 24px; }
+    .info-card p { margin: 0; color: var(--muted); font-size: 17px; }
+    .info-card a { color: var(--brand); }
 
     .support { background: var(--support); color: #fff; }
     .support-card {
@@ -224,10 +234,9 @@
       background: linear-gradient(145deg, #173c5d 0%, #0d2236 100%);
       border: 1px solid rgba(255,255,255,.10);
     }
-    .support h2 { margin: 0 0 12px; font-size: clamp(32px, 4vw, 48px); line-height: 1.12; }
-    .support p { margin: 0; color: #d5e5f1; font-size: 18px; max-width: 760px; }
+    .support h2 { margin: 0 0 12px; font-size: clamp(32px, 4vw, 46px); line-height: 1.12; }
+    .support p { margin: 0; max-width: 760px; color: #d5e5f1; font-size: 18px; }
     .support-note { margin-top: 14px !important; font-size: 14px !important; color: #a8bfd1 !important; }
-    .button-kofi { background: #ff5e5b; color: #fff; white-space: nowrap; box-shadow: 0 12px 28px rgba(255,94,91,.24); }
 
     footer { padding: 34px 0; background: #fff; border-top: 1px solid var(--line); }
     .footer-grid { display: flex; justify-content: space-between; align-items: center; gap: 22px; flex-wrap: wrap; }
@@ -238,22 +247,28 @@
     @media (max-width: 900px) {
       .hero-grid, .support-card { grid-template-columns: 1fr; }
       .hero { padding-top: 56px; }
-      .logo-stage { min-height: 390px; }
+      .logo-stage { min-height: 360px; }
       .features { grid-template-columns: repeat(2, minmax(0,1fr)); }
       .support-card { text-align: center; }
       .support-card .button { width: 100%; }
     }
+
+    @media (max-width: 700px) {
+      .info-grid { grid-template-columns: 1fr; }
+      .info-card { min-height: 0; }
+    }
+
     @media (max-width: 640px) {
       .container { width: min(100% - 24px, 1160px); }
-      .nav { min-height: 70px; }
-      .brand-logo { width: 52px; height: 52px; }
+      .nav { min-height: 72px; }
+      .brand-logo { width: 56px; height: 56px; }
       .nav-links a:not(.nav-support) { display: none; }
       h1 { letter-spacing: -1.4px; }
       .actions .button { width: 100%; }
       .features { grid-template-columns: 1fr; }
       .feature { min-height: 0; }
-      .about-card, .support-card { padding: 30px 22px; }
-      .logo-stage { min-height: 320px; }
+      .logo-stage { min-height: 300px; }
+      .support-card { padding: 30px 22px; }
     }
   </style>
 </head>
@@ -266,7 +281,7 @@
       </a>
       <nav class="nav-links" aria-label="Główna nawigacja">
         <a href="#funkcje">Funkcje</a>
-        <a href="#o-projekcie">O projekcie</a>
+        <a href="#o-projekcie">O aplikacji</a>
         <a class="nav-support" href="#wesprzyj">Wesprzyj</a>
       </nav>
     </div>
@@ -293,26 +308,30 @@
     <section id="funkcje">
       <div class="container">
         <div class="section-heading">
-          <h2>Wszystko, czego potrzeba do rodzinnego wyjścia</h2>
-          <p>Sprawdzone miejsca, praktyczne informacje i opinie społeczności w jednej aplikacji.</p>
+          <h2>Najważniejsze funkcje</h2>
+          <p>Wszystko, czego potrzeba, aby szybko znaleźć sprawdzone miejsce dla całej rodziny.</p>
         </div>
         <div class="features">
-          <article class="feature"><div class="feature-icon">🗺️</div><h3>Mapa miejsc</h3><p>Przeglądaj lokalizacje w okolicy i szybko sprawdzaj, co znajduje się najbliżej.</p></article>
+          <article class="feature"><div class="feature-icon">🗺️</div><h3>Mapa miejsc</h3><p>Przeglądaj miejsca w okolicy i sprawdzaj, co znajduje się najbliżej Ciebie.</p></article>
           <article class="feature"><div class="feature-icon">⭐</div><h3>Oceny i opinie</h3><p>Czytaj doświadczenia innych rodziców i dziel się własną opinią.</p></article>
-          <article class="feature"><div class="feature-icon">📷</div><h3>Zdjęcia miejsc</h3><p>Zobacz, jak miejsce wygląda w praktyce, zanim wybierzesz się tam z dzieckiem.</p></article>
-          <article class="feature"><div class="feature-icon">🧸</div><h3>Udogodnienia</h3><p>Sprawdź przewijaki, krzesełka, parking, dostęp dla wózka i inne ważne informacje.</p></article>
-          <article class="feature"><div class="feature-icon">🏆</div><h3>Rankingi i odznaki</h3><p>Odkrywaj najlepiej oceniane miejsca i aktywnie rozwijaj społeczność.</p></article>
-          <article class="feature"><div class="feature-icon">➕</div><h3>Dodawanie miejsc</h3><p>Nie ma miejsca na mapie? Dodaj je i pomóż innym rodzinom je odkryć.</p></article>
+          <article class="feature"><div class="feature-icon">📷</div><h3>Zdjęcia</h3><p>Zobacz, jak miejsce wygląda w praktyce, zanim wybierzesz się tam z dzieckiem.</p></article>
+          <article class="feature"><div class="feature-icon">🧸</div><h3>Udogodnienia</h3><p>Sprawdź przewijaki, parking, krzesełka, strefy zabawy i inne ważne udogodnienia.</p></article>
+          <article class="feature"><div class="feature-icon">🏆</div><h3>Rankingi</h3><p>Odkrywaj najlepiej oceniane miejsca i najbardziej aktywnych użytkowników.</p></article>
+          <article class="feature"><div class="feature-icon">➕</div><h3>Dodawanie miejsc</h3><p>Dodawaj nowe lokalizacje i pomagaj rozwijać bazę przyjaznych miejsc.</p></article>
         </div>
       </div>
     </section>
 
-    <section class="about-wrap" id="o-projekcie">
-      <div class="container">
-        <div class="about-card">
-          <h2>O aplikacji</h2>
-          <p>kidZone to bezpłatna aplikacja dla rodziców, która pomaga odkrywać i oceniać miejsca przyjazne dzieciom. Projekt jest rozwijany niezależnie, a jego celem jest stworzenie wiarygodnej bazy miejsc budowanej wspólnie przez społeczność.</p>
-        </div>
+    <section class="info-section" id="o-projekcie">
+      <div class="container info-grid">
+        <article class="info-card">
+          <h2>O aplikacji kidZone</h2>
+          <p>kidZone to bezpłatna aplikacja dla rodziców, która pomaga odkrywać i oceniać miejsca przyjazne dzieciom. Społeczność tworzy wspólną bazę sprawdzonych miejsc, zdjęć i praktycznych opinii.</p>
+        </article>
+        <article class="info-card">
+          <h3>Kontakt</h3>
+          <p>Masz pytanie, sugestię lub znalazłeś błąd? Napisz na adres <a href="mailto:bonoboczemunie@gmail.com">bonoboczemunie@gmail.com</a>.</p>
+        </article>
       </div>
     </section>
 
@@ -321,8 +340,8 @@
         <div class="support-card">
           <div>
             <h2>Pomóż rozwijać kidZone</h2>
-            <p>Twoje wsparcie pomaga pokryć koszty serwerów, map, przechowywania zdjęć oraz dalszego rozwoju aplikacji.</p>
-            <p class="support-note">Wsparcie jest dobrowolne i nie odblokowuje płatnych funkcji, treści cyfrowych ani konta Premium.</p>
+            <p>Twoje wsparcie pomaga pokrywać koszty serwerów, map, przechowywania zdjęć oraz dalszego rozwoju aplikacji.</p>
+            <p class="support-note">Wsparcie jest dobrowolne i nie odblokowuje żadnych dodatkowych funkcji ani konta Premium.</p>
           </div>
           <a class="button button-kofi" href="https://ko-fi.com/kidzoneapp" rel="noopener noreferrer">☕ Postaw kawę na Ko-fi</a>
         </div>
@@ -334,7 +353,6 @@
     <div class="container footer-grid">
       <div>© 2026 kidZone</div>
       <div class="footer-links">
-        <a href="mailto:bonoboczemunie@gmail.com">Kontakt</a>
         <a href="/privacy-policy">Polityka prywatności</a>
         <a href="/terms-of-service">Regulamin</a>
         <a href="/account-deletion">Usunięcie konta</a>
