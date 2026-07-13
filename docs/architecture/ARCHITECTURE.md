@@ -1,175 +1,134 @@
-<<<<<<< HEAD
-# Architecture Handbook
-
-## Cel
-
-Ten dokument opisuje docelową architekturę aplikacji KidZone i zasady utrzymania jej w ryzach podczas rozwoju.
-=======
 # Architecture Overview
 
+Ostatnia aktualizacja: 2026-07-13
+
 ## Cel
 
-Dokument opisuje wysokopoziomową architekturę KidZone oraz główne zasady projektowania aplikacji.
->>>>>>> 7f3496a (docs: add architecture overview)
+Dokument opisuje wysokopoziomową architekturę kidZone i zasady utrzymania zależności między warstwami.
 
 ## Warstwy
 
 ```text
-<<<<<<< HEAD
-Presentation -> Domain -> Data -> Framework
+Presentation → Domain ← Data → Framework
 ```
 
-### Presentation
-
-- Compose Screens.
-- ViewModels.
-- Navigation.
-- UI state.
-- Obsługa akcji użytkownika.
-
-Presentation nie powinna znać szczegółów Firestore, Room ani Google Maps poza komponentami UI.
-
-### Domain
-
-- Modele domenowe.
-- Interfejsy repository.
-- Use case.
-- Abstrakcje usług, np. lokalizacja, kompresja zdjęć, preferencje.
-
-Domain nie powinien zależeć od Android framework.
-
-### Data
-
-- Implementacje repository.
-- Firestore.
-- Room cache.
-- Remote Config.
-- Storage.
-- Mapowanie DTO / Entity / Domain.
-
-Data odpowiada za pobieranie, cache i synchronizację.
-
-### Framework
-
-- Hilt.
-- Firebase SDK.
-- Google Play Services.
-- Android services.
-
-## Przepływ danych
-
-```text
-Composable
-  -> ViewModel
-  -> UseCase
-  -> Repository
-  -> Room / Firestore / Storage
-```
-
-## Zasady
-
-- Jeden ekran renderuje jeden spójny `UiState`.
-- ViewModel nie wykonuje bezpośrednio zapytań do Firebase SDK.
-- Repository jest jedynym miejscem, które decyduje o cache i źródle danych.
-- Firestore i Room nie powinny przeciekać do warstwy UI.
-- Modele domenowe nie powinny być zależne od DTO backendu.
-
-## Offline i cache
-
-- Ostatnio pobrane miejsca powinny być dostępne lokalnie.
-- Operacje offline powinny mieć status synchronizacji.
-- WorkManager powinien obsługiwać retry tam, gdzie operacja może poczekać.
-
-## Błędy
-
-Każdy flow danych musi mieć obsługę:
-
-- loading,
-- success,
-- empty,
-- error,
-- offline.
-
-## Checklist architektoniczny
-
-- [ ] UI nie zna szczegółów Firestore.
-- [ ] ViewModel korzysta z Use Case / Repository.
-- [ ] Repository obsługuje cache i limity.
-- [ ] Modele domenowe są oddzielone od DTO.
-- [ ] Ekran ma kompletny UiState.
-- [ ] Błędy są obsłużone jawnie.
-=======
-Presentation
-Domain
-Data
-Framework
-```
+Zależności powinny iść do środka, w stronę warstwy Domain.
 
 ## Presentation
 
 Odpowiada za:
 
-- ekrany Compose,
+- ekrany Jetpack Compose,
 - ViewModel,
-- UI state,
-- obsługę akcji użytkownika,
-- prezentację błędów i stanów ładowania.
+- nawigację,
+- `UiState` i zdarzenia jednorazowe,
+- prezentację loading, empty, error, offline i permission states.
 
-Presentation nie powinna zawierać logiki biznesowej.
+Presentation nie wykonuje bezpośrednio operacji na Firestore, Room ani Storage.
 
 ## Domain
 
 Odpowiada za:
 
 - modele domenowe,
-- use case,
+- use case'y,
 - interfejsy repozytoriów,
-- reguły biznesowe niezależne od Firebase i Androida.
+- reguły biznesowe,
+- porty usług platformowych, na przykład lokalizacji, zdjęć i preferencji.
 
-Domain nie zależy od frameworków.
+Domain nie zależy od Android SDK, Firebase ani modeli transportowych.
 
 ## Data
 
 Odpowiada za:
 
 - implementacje repozytoriów,
-- integracje z Firebase,
+- integracje z Firestore i Storage,
 - Room cache,
-- mapowanie DTO na modele domenowe,
-- synchronizację danych.
+- Remote Config,
+- synchronizację,
+- mapowanie DTO, Entity i modeli domenowych.
+
+Data decyduje o źródle danych i strategii cache.
 
 ## Framework
 
-Odpowiada za:
+Obejmuje:
 
-- Firebase SDK,
-- Google Maps,
-- Android Services,
 - Hilt,
+- Firebase SDK,
+- Google Maps i Google Play Services,
 - WorkManager,
-- platformowe API Androida.
+- Android Services i systemowe API,
+- implementacje platformowych portów warstwy Domain.
 
-## Kierunek zależności
+## Przepływ danych
 
 ```text
-Presentation -> Domain <- Data -> Framework
+Composable
+  → ViewModel
+  → Use Case
+  → Repository Interface
+  → Repository Implementation
+  → Room / Firestore / Storage
+  → Mapper
+  → Domain Model
+  → UiState
+  → Composable
 ```
 
-Zależności powinny iść do środka, czyli w stronę Domain.
+## Offline i synchronizacja
+
+- ostatnio pobrane dane mogą być dostępne z Room,
+- repository ukrywa wybór lokalnego i zdalnego źródła,
+- WorkManager obsługuje operacje, które mogą poczekać,
+- operacje offline mają jawny status synchronizacji,
+- retry musi być idempotentne.
+
+## Funkcje platformowe
+
+ViewModel nie powinien zależeć od `Context`. Funkcje Androida są udostępniane przez interfejsy Domain i implementacje Data/Framework.
+
+Dotyczy to między innymi:
+
+- lokalizacji,
+- ustawień aplikacji,
+- Photo Pickera i kamery,
+- powiadomień,
+- aktualizacji aplikacji,
+- preferencji i zasobów tekstowych.
+
+## Obsługa błędów
+
+Błędy techniczne są mapowane przed prezentacją:
+
+```text
+Firebase / Room / Android exception
+  → Error mapper
+  → Domain result
+  → UiState / UiText
+  → UI
+```
+
+UI nie powinno wyświetlać surowych wyjątków.
 
 ## Zasady
 
-- Domain pozostaje niezależny.
-- ViewModel nie zna implementacji Firebase.
-- Composable nie wykonuje zapytań do repozytoriów.
-- Data mapuje modele zewnętrzne na modele domenowe.
-- Framework jest szczegółem implementacyjnym.
+- jeden ekran renderuje spójny `UiState`,
+- Composable nie zawiera logiki biznesowej,
+- ViewModel nie zna implementacji Firebase,
+- Domain nie importuje Androida ani Firebase,
+- DTO i Entity nie przeciekają do UI,
+- repository odpowiada za cache, limity i synchronizację,
+- wspólne zachowania, takie jak obsługa uprawnień, powinny być wydzielone i współdzielone.
 
-## Checklist
+## Checklista
 
-- [ ] Logika biznesowa jest poza UI.
-- [ ] Domain nie importuje Android/Firebase.
-- [ ] ViewModel korzysta z use case albo repozytorium przez interfejs.
-- [ ] DTO nie przeciekają do UI.
-- [ ] Błędy są mapowane na stan UI.
->>>>>>> 7f3496a (docs: add architecture overview)
+- [ ] UI nie zna Firestore, Room ani Storage,
+- [ ] ViewModel korzysta z use case'a lub interfejsu repozytorium,
+- [ ] Domain jest niezależny od frameworków,
+- [ ] modele zewnętrzne są mapowane,
+- [ ] ekran obsługuje wszystkie istotne stany,
+- [ ] retry jest kontrolowane i idempotentne,
+- [ ] funkcje platformowe są dostępne przez porty,
+- [ ] wspólna logika nie jest duplikowana między ekranami.
