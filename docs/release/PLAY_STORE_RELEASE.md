@@ -1,111 +1,152 @@
 # Play Store Release
 
+Ostatnia aktualizacja: 2026-07-13
+
 ## Cel
 
-Dokument opisuje minimalny proces publikacji KidZone w Google Play.
+Dokument opisuje minimalny proces publikacji kidZone w Google Play, od przygotowania builda po kontrolę staged rollout.
+
+## Dokumenty źródłowe
+
+- `docs/release/RELEASE_PROCESS.md`
+- `docs/release/GO_NO_GO_CHECKLIST.md`
+- `docs/qa/google-play-security-checklist.md`
+- `docs/qa/manual-release-test-plan.md`
+- `docs/legal/google-play-data-safety-draft.md`
+- `docs/legal/v1-release-manual-gates.md`
 
 ## Przed publikacją
 
-- [ ] Version code zwiększony.
-- [ ] Version name ustawiony.
-- [ ] Signed release build wygenerowany.
-- [ ] GO / NO-GO checklist wykonana.
-- [ ] Release notes przygotowane.
-- [ ] Crashlytics zweryfikowany.
-- [ ] App Check zweryfikowany.
-- [ ] Firestore Rules sprawdzone.
-- [ ] Storage Rules sprawdzone.
-- [ ] Brak danych wrażliwych w logach release.
+- [ ] `versionCode` zwiększony,
+- [ ] `versionName` ustawiony,
+- [ ] signed AAB wygenerowany,
+- [ ] release notes przygotowane,
+- [ ] GO / NO-GO wykonane,
+- [ ] Crashlytics i App Check zweryfikowane,
+- [ ] Firestore Rules i Storage Rules wdrożone,
+- [ ] brak sekretów i danych wrażliwych w logach,
+- [ ] Data Safety zapisane w Play Console,
+- [ ] publiczne URL-e działają,
+- [ ] usuwanie konta ma wynik PASS,
+- [ ] runtime permissions mają wynik PASS.
+
+## Uprawnienia i prywatność
+
+Finalny manifest powinien deklarować wyłącznie wymagany zakres:
+
+- `ACCESS_FINE_LOCATION` i `ACCESS_COARSE_LOCATION` jako opcjonalne runtime permissions,
+- `CAMERA` jako opcjonalne runtime permission,
+- `POST_NOTIFICATIONS` na Androidzie 13+.
+
+Finalny manifest nie powinien zawierać:
+
+- `ACCESS_BACKGROUND_LOCATION`,
+- `READ_MEDIA_IMAGES`,
+- `READ_EXTERNAL_STORAGE`,
+- `QUERY_ALL_PACKAGES`.
+
+Zdjęcia z galerii są wybierane przez Android Photo Picker. Po trwałej odmowie lokalizacji albo kamery aplikacja powinna kierować do ustawień aplikacji.
 
 ## Internal testing
 
-Internal testing jest pierwszą bramką techniczną.
+Sprawdź:
 
-Sprawdzić:
-
-- [ ] czysta instalacja,
-- [ ] aktualizacja z poprzedniej wersji,
-- [ ] logowanie,
-- [ ] rejestracja,
-- [ ] mapa,
-- [ ] lista,
-- [ ] ranking,
-- [ ] profil,
-- [ ] dodawanie miejsca,
-- [ ] opinie,
+- [ ] czystą instalację,
+- [ ] aktualizację z poprzedniej wersji,
+- [ ] logowanie i rejestrację,
+- [ ] Start, Mapę, Listę i szczegóły miejsca,
+- [ ] ranking i profil,
+- [ ] dodawanie miejsca, opinii oraz zdjęć,
 - [ ] brak internetu,
-- [ ] brak lokalizacji.
+- [ ] działanie bez lokalizacji,
+- [ ] działanie bez kamery,
+- [ ] działanie bez powiadomień,
+- [ ] pierwszą i trwałą odmowę uprawnień,
+- [ ] powrót z ustawień aplikacji.
 
 ## Closed testing
 
-Closed testing służy do walidacji stabilności i UX.
-
 Wymagane:
 
-- [ ] test na kilku urządzeniach,
+- [ ] test na kilku wersjach Androida,
+- [ ] test na kilku producentach urządzeń,
 - [ ] test na słabszym urządzeniu,
 - [ ] test użytkownika nietechnicznego,
-- [ ] sprawdzenie Crashlytics,
-- [ ] sprawdzenie Performance,
-- [ ] sprawdzenie kosztów Firebase / Maps.
-
-## Production rollout
-
-Rekomendowany rollout:
-
-```text
-5% -> 20% -> 50% -> 100%
-```
-
-Przed zwiększeniem rollout:
-
-- [ ] crash rate akceptowalny,
-- [ ] brak blockerów P0/P1,
-- [ ] brak problemów z logowaniem,
-- [ ] brak problemów z mapą i listą,
-- [ ] brak nietypowego wzrostu kosztów.
+- [ ] kontrola Crashlytics i Performance,
+- [ ] kontrola kosztów Firebase i Maps,
+- [ ] potwierdzenie, że Photo Picker nie prosi o szeroki dostęp do galerii.
 
 ## Store listing
 
-Przed publicznym wydaniem sprawdzić:
+Przed publicznym wydaniem sprawdź:
 
-- [ ] nazwa aplikacji,
-- [ ] krótki opis,
-- [ ] pełny opis,
-- [ ] ikona,
+- [ ] nazwę aplikacji,
+- [ ] krótki i pełny opis,
+- [ ] ikonę i feature graphic,
 - [ ] screenshoty,
-- [ ] grafika promocyjna,
-- [ ] kategoria,
-- [ ] polityka prywatności,
-- [ ] deklaracje danych,
-- [ ] content rating.
+- [ ] kategorię Parenting,
+- [ ] grupę docelową: rodzice i opiekunowie,
+- [ ] content rating,
+- [ ] informację o reklamach i zakupach,
+- [ ] Privacy Policy URL,
+- [ ] Account deletion URL,
+- [ ] Data Safety,
+- [ ] deklaracje uprawnień.
 
-## Privacy
+## Production rollout
 
-- [ ] Polityka prywatności jest aktualna.
-- [ ] Deklaracje danych w Google Play są zgodne z aplikacją.
-- [ ] Uprawnienia są uzasadnione.
-- [ ] Lokalizacja jest opisana w komunikatach aplikacji.
-- [ ] Zdjęcia i dane użytkownika mają jasny cel.
+Rekomendowany staged rollout:
+
+```text
+5% → 20% → 50% → 100%
+```
+
+Przed zwiększeniem rollout sprawdź:
+
+- [ ] Android vitals,
+- [ ] crash rate i ANR,
+- [ ] problemy z logowaniem,
+- [ ] działanie mapy i listy,
+- [ ] błędy usuwania konta,
+- [ ] problemy ze zdjęciami i uprawnieniami,
+- [ ] nietypowy wzrost kosztów,
+- [ ] zgłoszenia P0/P1.
 
 ## Po publikacji
 
-Po publikacji sprawdzić:
+Sprawdź:
 
-- [ ] Crashlytics po 1 godzinie,
-- [ ] Crashlytics po 24 godzinach,
-- [ ] Google Play Console vitals,
+- [ ] Crashlytics po pierwszych wdrożeniach,
+- [ ] Android vitals po 24 godzinach,
 - [ ] Firebase usage,
+- [ ] Maps usage,
 - [ ] zgłoszenia użytkowników,
-- [ ] opinie w sklepie.
+- [ ] opinie w sklepie,
+- [ ] poprawność publicznych dokumentów.
 
-## Rollback / halt rollout
+## Halt rollout
 
-Zatrzymać rollout, gdy:
+Zatrzymaj rollout, gdy:
 
-- crash rate rośnie,
-- login nie działa,
-- mapa albo lista nie działa,
+- crash rate lub ANR wyraźnie rośnie,
+- logowanie albo usuwanie konta nie działa,
+- mapa lub lista jest niedostępna,
 - występuje problem privacy/security,
-- koszty Firebase / Maps rosną nietypowo,
+- uprawnienia powodują martwe akcje albo pętle,
+- koszty Firebase lub Maps rosną nietypowo,
 - pojawiają się powtarzalne zgłoszenia P0/P1.
+
+## Wynik
+
+```text
+Release:
+Commit / tag:
+AAB:
+Track:
+Data Safety: PASS / FAIL / BLOCKED
+Account deletion: PASS / FAIL / BLOCKED
+Runtime permissions: PASS / FAIL / BLOCKED
+Security checklist: PASS / FAIL / BLOCKED
+GO / NO-GO:
+Dowody:
+```
