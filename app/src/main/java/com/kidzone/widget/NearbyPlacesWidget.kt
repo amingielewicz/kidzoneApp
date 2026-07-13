@@ -311,7 +311,9 @@ private fun PlaceRatingStatus(place: WidgetPlace) {
     when {
         place.reviewsCount > 0 -> RatingRow(
             text = "%.1f (%d)".format(place.averageRating, place.reviewsCount),
-            fontSize = 12
+            fontSize = 12,
+            starColor = WidgetStarGold,
+            textColor = WidgetTextPrimary
         )
 
         isNewWithoutReviews(
@@ -333,20 +335,27 @@ private fun PlaceRatingStatus(place: WidgetPlace) {
 
         else -> RatingRow(
             text = "Brak ocen",
-            fontSize = 11
+            fontSize = 11,
+            starColor = WidgetTextSecondary,
+            textColor = WidgetTextSecondary
         )
     }
 }
 
 @Composable
-private fun RatingRow(text: String, fontSize: Int) {
+private fun RatingRow(
+    text: String,
+    fontSize: Int,
+    starColor: ColorProvider,
+    textColor: ColorProvider
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = "★",
             style = TextStyle(
                 fontSize = fontSize.sp,
                 fontWeight = FontWeight.Medium,
-                color = WidgetStarGold
+                color = starColor
             ),
             maxLines = 1
         )
@@ -356,7 +365,7 @@ private fun RatingRow(text: String, fontSize: Int) {
             style = TextStyle(
                 fontSize = fontSize.sp,
                 fontWeight = FontWeight.Medium,
-                color = WidgetTextPrimary
+                color = textColor
             ),
             maxLines = 1
         )
