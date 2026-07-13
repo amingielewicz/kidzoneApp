@@ -106,78 +106,90 @@ class PlaceListViewModel @Inject constructor(
     var savedScrollOffset = 0
         private set
 
-    val uiState: StateFlow<UiState> = combine(
+    private val filterInputs = combine(
         selectedCategory,
         selectedAmenities,
         sortOrder,
         searchQuery,
-        _userLocation,
-        authRepository.currentUser,
+        authRepository.currentUser
+    ) { category, amenities, order, query, user ->
+        FilterInputs(
+            category = category,
+            amenities = amenities,
+            order = order,
+            query = query,
+            user = user
+        )
+    }
+
+    private val loadingInputs = combine(
         _isRefreshing,
         _isLoadingMore,
         _lastResult,
-        _errorMessage,
+        _errorMessage
+    ) { refreshing, loadingMore, paged, error ->
+        LoadingInputs(
+            refreshing = refreshing,
+            loadingMore = loadingMore,
+            paged = paged,
+            error = error
+        )
+    }
+
+    private val locationInputs = combine(
+        _userLocation,
         _isUsingStaleLocation,
         _staleLocationAgeMinutes,
         _hasLocationPermission,
         _isLocationServiceEnabled
-    ) { args ->
-        @Suppress("MagicNumber", "UNCHECKED_CAST")
-        val category = args[0] as PlaceCategory?
-        @Suppress("MagicNumber", "UNCHECKED_CAST")
-        val amenities = args[1] as Set<Amenity>
-        @Suppress("MagicNumber", "UNCHECKED_CAST")
-        val order = args[2] as SortOrder
-        @Suppress("MagicNumber", "UNCHECKED_CAST")
-        val query = args[3] as String
-        @Suppress("MagicNumber", "UNCHECKED_CAST")
-        val location = args[4] as Pair<Double, Double>?
-        @Suppress("MagicNumber", "UNCHECKED_CAST")
-        val user = args[5] as User?
-        @Suppress("MagicNumber", "UNCHECKED_CAST")
-        val refreshing = args[6] as Boolean
-        @Suppress("MagicNumber", "UNCHECKED_CAST")
-        val loadingMore = args[7] as Boolean
-        @Suppress("MagicNumber", "UNCHECKED_CAST")
-        val paged = args[8] as PagedResult<Place>?
-        @Suppress("MagicNumber", "UNCHECKED_CAST")
-        val error = args[9] as UiText?
-        @Suppress("MagicNumber", "UNCHECKED_CAST")
-        val isUsingStaleLocation = args[10] as Boolean
-        @Suppress("MagicNumber", "UNCHECKED_CAST")
-        val staleLocationAgeMinutes = args[11] as Int?
-        @Suppress("MagicNumber", "UNCHECKED_CAST")
-        val hasLocationPermission = args[12] as Boolean
-        @Suppress("MagicNumber", "UNCHECKED_CAST")
-        val isLocationServiceEnabled = args[13] as Boolean
+    ) { location, isUsingStaleLocation, staleLocationAgeMinutes, hasLocationPermission, isLocationServiceEnabled ->
+        LocationInputs(
+            location = location,
+            isUsingStaleLocation = isUsingStaleLocation,
+            staleLocationAgeMinutes = staleLocationAgeMinutes,
+            hasLocationPermission = hasLocationPermission,
+            isLocationServiceEnabled = isLocationServiceEnabled
+        )
+    }
 
-        val places = paged?.items.orEmpty()
+    val uiState: StateFlow<UiState> = combine(
+        filterInputs,
+        loadingInputs,
+        locationInputs
+    ) { filter, loading, location ->
+        val places = loading.paged?.items.orEmpty()
         val filtered = filterAndSort(
             places,
-            FilterParams(location, user?.id, order, query, category, amenities)
+            FilterParams(
+                location = location.location,
+                userId = filter.user?.id,
+                order = filter.order,
+                query = filter.query,
+                category = filter.category,
+                amenities = filter.amenities
+            )
         )
-
 
         UiState(
             places = filtered,
-            selectedCategory = category,
-            selectedAmenities = amenities,
-            sortOrder = order,
-            userLocation = location,
-            hasLocationPermission = hasLocationPermission,
-            isLocationServiceEnabled = isLocationServiceEnabled,
-            currentUserId = user?.id,
-            nearestUnavailable = order == SortOrder.NEAREST &&
-                    (!hasLocationPermission || !isLocationServiceEnabled),
-            isLoading = paged == null && error == null,
-            isRefreshing = refreshing,
-            errorMessage = error,
-            hasMore = query.isBlank() && (paged?.hasMore ?: false),
-            isLoadingMore = loadingMore,
-            totalCount = paged?.items?.size ?: 0,
-            searchQuery = query,
-            isUsingStaleLocation = isUsingStaleLocation,
-            staleLocationAgeMinutes = staleLocationAgeMinutes
+            selectedCategory = filter.category,
+            selectedAmenities = filter.amenities,
+            sortOrder = filter.order,
+            userLocation = location.location,
+            hasLocationPermission = location.hasLocationPermission,
+            isLocationServiceEnabled = location.isLocationServiceEnabled,
+            currentUserId = filter.user?.id,
+            nearestUnavailable = filter.order == SortOrder.NEAREST &&
+                (!location.hasLocationPermission || !location.isLocationServiceEnabled),
+            isLoading = loading.paged == null && loading.error == null,
+            isRefreshing = loading.refreshing,
+            errorMessage = loading.error,
+            hasMore = filter.query.isBlank() && (loading.paged?.hasMore ?: false),
+            isLoadingMore = loading.loadingMore,
+            totalCount = loading.paged?.items?.size ?: 0,
+            searchQuery = filter.query,
+            isUsingStaleLocation = location.isUsingStaleLocation,
+            staleLocationAgeMinutes = location.staleLocationAgeMinutes
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SUBSCRIPTION_TIMEOUT_MS), UiState())
 
@@ -425,6 +437,29 @@ class PlaceListViewModel @Inject constructor(
             else -> Int.MAX_VALUE
         }
     }
+
+    private data class FilterInputs(
+        val category: PlaceCategory?,
+        val amenities: Set<Amenity>,
+        val order: SortOrder,
+        val query: String,
+        val user: User?
+    )
+
+    private data class LoadingInputs(
+        val refreshing: Boolean,
+        val loadingMore: Boolean,
+        val paged: PagedResult<Place>?,
+        val error: UiText?
+    )
+
+    private data class LocationInputs(
+        val location: Pair<Double, Double>?,
+        val isUsingStaleLocation: Boolean,
+        val staleLocationAgeMinutes: Int?,
+        val hasLocationPermission: Boolean,
+        val isLocationServiceEnabled: Boolean
+    )
 
     private data class FilterParams(
         val location: Pair<Double, Double>?,
