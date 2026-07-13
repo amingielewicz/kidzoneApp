@@ -34,6 +34,7 @@ import com.kidzone.presentation.common.KidZoneActionDialog
 import com.kidzone.presentation.common.LocationActionIcon
 import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
+import com.kidzone.presentation.common.requestLocationPermissionOrOpenSettings
 import com.kidzone.presentation.place.add.fetchCurrentLocation
 import com.kidzone.presentation.place.add.hasLocationPermission
 import com.kidzone.presentation.place.add.isLocationServiceEnabled
@@ -67,7 +68,8 @@ fun LocationCorrectionDialog(
                 isFetching = true
                 scope.launch {
                     fetchLocationInternal(context) { lat, lng, addr, err ->
-                        latitude = lat; longitude = lng; address = addr; errorMessage = err; isFetching = false
+                        latitude = lat; longitude = lng; address = addr; errorMessage =
+                        err; isFetching = false
                     }
                 }
             } else {
@@ -85,79 +87,115 @@ fun LocationCorrectionDialog(
         confirmButton = {
             OfflineAwareSubmitButton(
                 label = stringResource(R.string.submit_correction),
-                onClick = { if (latitude != null && longitude != null) onSubmit(latitude!!, longitude!!, address) },
+                onClick = {
+                    if (latitude != null && longitude != null) onSubmit(
+                        latitude!!,
+                        longitude!!,
+                        address
+                    )
+                },
                 isOffline = isOffline,
                 enabled = latitude != null && longitude != null
             )
         }
     ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.location_correction_subtitle),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.location_correction_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
-                OutlinedButton(
-                    onClick = {
-                        errorMessage = null
-                        val currentLocationServiceEnabled = isLocationServiceEnabled(context)
-                        locationRefreshSignal++
-                        if (!currentLocationServiceEnabled) {
+            OutlinedButton(
+                onClick = {
+                    errorMessage = null
+                    locationRefreshSignal++
+
+                    when {
+                        !hasLocationPermission(context) -> {
                             isFetching = false
-                            context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-                        } else if (hasLocationPermission(context)) {
+
+                            requestLocationPermissionOrOpenSettings(
+                                context = context,
+                                requestPermission = {
+                                    locationPermissionLauncher.launch(
+                                        Manifest.permission.ACCESS_FINE_LOCATION
+                                    )
+                                }
+                            )
+                        }
+
+                        !isLocationServiceEnabled(context) -> {
+                            isFetching = false
+
+                            context.startActivity(
+                                Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                            )
+                        }
+
+                        else -> {
                             isFetching = true
+
                             scope.launch {
                                 fetchLocationInternal(context) { lat, lng, addr, err ->
-                                    latitude = lat; longitude = lng; address = addr; errorMessage = err; isFetching = false
+                                    latitude = lat
+                                    longitude = lng
+                                    address = addr
+                                    errorMessage = err
+                                    isFetching = false
                                 }
                             }
-                        } else {
-                            isFetching = false
-                            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                         }
-                    },
-                    enabled = !isFetching,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    val isReady = hasLocationPermission(context) && locationServiceEnabled
-                    if (isFetching) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.size(8.dp))
-                        Text(stringResource(R.string.add_place_fetching_location))
-                    } else {
-                        LocationActionIcon(isReady = isReady)
-                        Spacer(Modifier.size(8.dp))
-                        Text(
-                            when {
-                                !hasLocationPermission(context) -> stringResource(R.string.location_permission_action)
-                                !locationServiceEnabled -> stringResource(R.string.gps_disabled_title)
-                                latitude != null -> stringResource(R.string.update_location_action)
-                                else -> stringResource(R.string.fetch_location)
-                            }
-                        )
                     }
-                }
-
-                if (latitude != null && longitude != null) {
+                },
+                enabled = !isFetching,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val isReady = hasLocationPermission(context) && locationServiceEnabled
+                if (isFetching) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.size(8.dp))
+                    Text(stringResource(R.string.add_place_fetching_location))
+                } else {
+                    LocationActionIcon(isReady = isReady)
+                    Spacer(Modifier.size(8.dp))
                     Text(
-                        text = "GPS: %.5f, %.5f".format(latitude, longitude),
+                        when {
+                            !hasLocationPermission(context) -> stringResource(R.string.location_permission_action)
+                            !locationServiceEnabled -> stringResource(R.string.gps_disabled_title)
+                            latitude != null -> stringResource(R.string.update_location_action)
+                            else -> stringResource(R.string.fetch_location)
+                        }
+                    )
+                }
+            }
+
+            if (latitude != null && longitude != null) {
+                Text(
+                    text = "GPS: %.5f, %.5f".format(latitude, longitude),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (!address.isNullOrBlank()) {
+                    Text(
+                        text = address!!,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    if (!address.isNullOrBlank()) {
-                        Text(text = address!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-
-                errorMessage?.let { msg ->
-                    Text(text = msg, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
             }
+
+            errorMessage?.let { msg ->
+                Text(
+                    text = msg,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
     }
 }
 

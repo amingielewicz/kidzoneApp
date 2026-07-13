@@ -1,4 +1,10 @@
-@file:Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod", "LongParameterList", "NestedBlockDepth")
+@file:Suppress(
+    "CyclomaticComplexMethod",
+    "FunctionNaming",
+    "LongMethod",
+    "LongParameterList",
+    "NestedBlockDepth"
+)
 
 package com.kidzone.presentation.place.add
 
@@ -11,15 +17,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
-import androidx.core.content.ContextCompat
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,12 +47,12 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -70,8 +71,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -85,6 +84,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
 import com.kidzone.domain.model.Amenity
@@ -92,12 +92,12 @@ import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.presentation.common.LocationActionIcon
 import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.OfflineAwareSubmitButton
-import com.kidzone.presentation.common.amenityIcon
 import com.kidzone.presentation.common.computePhotoContentHash
 import com.kidzone.presentation.common.computeRemotePhotoContentHash
 import com.kidzone.presentation.common.createCameraImageUri
 import com.kidzone.presentation.common.rememberHapticFeedback
 import com.kidzone.presentation.common.rememberNetworkStatus
+import com.kidzone.presentation.common.requestLocationPermissionOrOpenSettings
 import com.kidzone.presentation.common.selectUniquePhotoUris
 import com.kidzone.presentation.common.style
 import com.kidzone.utils.UiText
@@ -179,9 +179,11 @@ fun AddPlaceScreen(
             !locationPermissionGranted -> viewModel.onLocationError(
                 UiText.StringResource(R.string.location_permission_denied)
             )
+
             !locationServiceEnabled -> locationSettingsLauncher.launch(
                 Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
             )
+
             else -> coroutineScope.launch { fetchAndSetLocation(context, viewModel) }
         }
     }
@@ -205,8 +207,8 @@ fun AddPlaceScreen(
 
     val duplicatePhotoError = stringResource(R.string.duplicate_photo_error)
     val availablePlacePhotoSlots = (
-        MAX_PLACE_PHOTOS - (state.existingPhotoUrls.size + state.photoUris.size)
-    ).coerceAtLeast(0)
+            MAX_PLACE_PHOTOS - (state.existingPhotoUrls.size + state.photoUris.size)
+            ).coerceAtLeast(0)
 
     fun addPickedPlacePhotos(uris: List<Uri>) {
         if (uris.isNotEmpty()) {
@@ -226,6 +228,7 @@ fun AddPlaceScreen(
             }
         }
     }
+
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(
             availablePlacePhotoSlots.coerceAtLeast(2)
@@ -287,10 +290,30 @@ fun AddPlaceScreen(
     fun handleLocationClick() {
         locationPermissionGranted = hasLocationPermission(context)
         locationServiceEnabled = isLocationServiceEnabled(context)
+
         when {
-            !locationPermissionGranted -> locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-            !locationServiceEnabled -> locationSettingsLauncher.launch(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-            else -> coroutineScope.launch { fetchAndSetLocation(context, viewModel) }
+            !locationPermissionGranted -> {
+                requestLocationPermissionOrOpenSettings(
+                    context = context,
+                    requestPermission = {
+                        locationPermissionLauncher.launch(
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        )
+                    }
+                )
+            }
+
+            !locationServiceEnabled -> {
+                locationSettingsLauncher.launch(
+                    Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                )
+            }
+
+            else -> {
+                coroutineScope.launch {
+                    fetchAndSetLocation(context, viewModel)
+                }
+            }
         }
     }
 
@@ -306,9 +329,11 @@ fun AddPlaceScreen(
         !state.isFormValid && state.name.isBlank() &&
                 (state.latitude == null || state.longitude == null) ->
             R.string.add_place_save_hint_name_and_location
+
         !state.isFormValid && state.name.isBlank() -> R.string.add_place_save_hint_name
         !state.isFormValid && (state.latitude == null || state.longitude == null) ->
             R.string.add_place_save_hint_location
+
         else -> null
     }
 
@@ -323,14 +348,19 @@ fun AddPlaceScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back)
+                        )
                     }
                 }
             )
         },
         bottomBar = {
             Surface(
-                modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding(),
                 tonalElevation = 3.dp,
                 color = MaterialTheme.colorScheme.surface
             ) {
@@ -369,7 +399,10 @@ fun AddPlaceScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 12.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(FORM_SECTION_GAP)
         ) {
@@ -410,14 +443,22 @@ fun AddPlaceScreen(
                     isError = nameHasError || nameWarning,
                     enabled = !state.isSaving,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-                    modifier = Modifier.fillMaxWidth().semantics {
-                        if (nameHasError) error(context.getString(R.string.field_required))
-                    }
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics {
+                            if (nameHasError) error(context.getString(R.string.field_required))
+                        }
                 )
 
                 OutlinedTextField(
                     value = state.description,
-                    onValueChange = { viewModel.onDescriptionChange(it.take(PLACE_DESCRIPTION_UI_MAX_LENGTH)) },
+                    onValueChange = {
+                        viewModel.onDescriptionChange(
+                            it.take(
+                                PLACE_DESCRIPTION_UI_MAX_LENGTH
+                            )
+                        )
+                    },
                     label = { Text(stringResource(R.string.place_description_label)) },
                     minLines = 2,
                     maxLines = 5,
@@ -499,7 +540,10 @@ fun AddPlaceScreen(
                         )
                         when {
                             availablePlacePhotoSlots <= 0 -> Unit
-                            availablePlacePhotoSlots == 1 -> singlePhotoPickerLauncher.launch(request)
+                            availablePlacePhotoSlots == 1 -> singlePhotoPickerLauncher.launch(
+                                request
+                            )
+
                             else -> photoPickerLauncher.launch(request)
                         }
                     },
@@ -519,9 +563,10 @@ fun AddPlaceScreen(
                         val removedUrl = state.existingPhotoUrls[index]
                         viewModel.removeExistingPhoto(index)
                         coroutineScope.launch {
-                            val hash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                computeRemotePhotoContentHash(removedUrl)
-                            }
+                            val hash =
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    computeRemotePhotoContentHash(removedUrl)
+                                }
                             if (hash != null) photoHashSet = photoHashSet - hash
                         }
                     },
@@ -569,7 +614,9 @@ private fun CharacterCounterRow(
     }
 
     Box(
-        modifier = Modifier.fillMaxWidth().height(COUNTER_ROW_HEIGHT),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(COUNTER_ROW_HEIGHT),
         contentAlignment = Alignment.CenterStart
     ) {
         when {
@@ -582,8 +629,12 @@ private fun CharacterCounterRow(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+
             else -> {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
                         text = "$count/$max",
                         style = MaterialTheme.typography.labelSmall,
@@ -591,7 +642,12 @@ private fun CharacterCounterRow(
                         maxLines = 1
                     )
                     if (showLimitMessage) {
-                        Text(text = " | ", style = MaterialTheme.typography.labelSmall, color = color, maxLines = 1)
+                        Text(
+                            text = " | ",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = color,
+                            maxLines = 1
+                        )
                         Text(
                             text = stringResource(R.string.add_place_limit_reached_hint),
                             style = MaterialTheme.typography.labelSmall,
@@ -618,10 +674,16 @@ private fun FormSection(
         tonalElevation = 1.dp
     ) {
         Column(
-            modifier = Modifier.padding(SECTION_PADDING).animateContentSize(),
+            modifier = Modifier
+                .padding(SECTION_PADDING)
+                .animateContentSize(),
             verticalArrangement = Arrangement.spacedBy(FORM_VERTICAL_SPACING),
             content = {
-                Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
                 content()
             }
         )
@@ -681,18 +743,30 @@ private fun CategoryDropdown(
             readOnly = true,
             label = { Text(stringResource(R.string.category_label)) },
             leadingIcon = {
-                Icon(imageVector = selectedStyle.icon, contentDescription = null, tint = selectedStyle.color)
+                Icon(
+                    imageVector = selectedStyle.icon,
+                    contentDescription = null,
+                    tint = selectedStyle.color
+                )
             },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             enabled = enabled,
-            modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable)
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             PlaceCategory.entries.forEach { category ->
                 val style = category.style
                 DropdownMenuItem(
                     text = { Text(stringResource(category.labelRes)) },
-                    leadingIcon = { Icon(imageVector = style.icon, contentDescription = null, tint = style.color) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = style.icon,
+                            contentDescription = null,
+                            tint = style.color
+                        )
+                    },
                     onClick = {
                         onSelected(category)
                         expanded = false
@@ -718,7 +792,9 @@ private fun LocationSection(
         OutlinedButton(
             onClick = onClickFetch,
             enabled = enabled && !isFetching,
-            modifier = Modifier.fillMaxWidth().height(44.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp)
         ) {
             if (isFetching) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -785,7 +861,10 @@ private fun AddressReadOnlyCard(address: String, helperText: String? = null) {
                 )
                 Text(
                     text = when {
-                        address.isNotBlank() -> com.kidzone.utils.AddressUtils.formatDisplayAddress(address)
+                        address.isNotBlank() -> com.kidzone.utils.AddressUtils.formatDisplayAddress(
+                            address
+                        )
+
                         helperText != null -> helperText
                         else -> stringResource(R.string.address_auto_placeholder)
                     },
@@ -817,7 +896,10 @@ private fun PhotosSection(
     )
 
     if (existingPhotoUrls.isNotEmpty() || photoUris.isNotEmpty()) {
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
             itemsIndexed(existingPhotoUrls) { index, url ->
                 com.kidzone.presentation.common.KidZonePhotoThumbnail(
                     model = url,
@@ -838,13 +920,20 @@ private fun PhotosSection(
     }
 
     if (canAddMorePhotos) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             OutlinedButton(
                 onClick = onPickFromGallery,
                 enabled = !isSaving && placeHashesReady,
                 modifier = Modifier.weight(1f)
             ) {
-                Icon(Icons.Filled.AddAPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(
+                    Icons.Filled.AddAPhoto,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(R.string.gallery))
             }
@@ -853,7 +942,11 @@ private fun PhotosSection(
                 enabled = !isSaving && placeHashesReady,
                 modifier = Modifier.weight(1f)
             ) {
-                Icon(Icons.Filled.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(
+                    Icons.Filled.CameraAlt,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(R.string.camera))
             }
