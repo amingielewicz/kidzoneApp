@@ -110,7 +110,8 @@ interface PlaceRepository {
         placeId: String,
         requesterId: String,
         changes: Map<String, Any>,
-        type: String = "EDIT"
+        type: String = "EDIT",
+        comment: String = ""
     ): OpResult<Unit>
 
     /**

@@ -592,8 +592,8 @@ fun PlaceDetailsScreen(
         val thankYouSuggestEdit = stringResource(R.string.thank_you_suggest_edit)
         SuggestEditSheet(
             place = state.place!!,
-            onSubmit = { name, description, category, amenities ->
-                viewModel.submitSuggestedEdit(name, description, category, amenities)
+            onSubmit = { name, description, category, amenities, comment ->
+                viewModel.submitSuggestedEdit(name, description, category, amenities, comment)
                 showSuggestEditSheet = false
                 scope.launch {
                     snackbarHostState.showSnackbar(thankYouSuggestEdit)

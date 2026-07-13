@@ -537,6 +537,8 @@
     <string name="gallery_limit">Galeria (%1$d/%2$d)</string>
     <string name="rate_star_label">Oceń na %1$d</string>
     <string name="suggest_edit_subtitle">Zmień dane, które uważasz za nieprawidłowe. Propozycja zostanie wysłana do weryfikacji.</string>
+    <string name="suggest_edit_comment_label">Komentarz</string>
+    <string name="suggest_edit_comment_counter">%1$d/%2$d znaków</string>
     <string name="submit_suggested_edit">Wyślij propozycję zmiany</string>
     <string name="location_correction_subtitle">Pobierz aktualną lokalizację GPS, aby zaproponować poprawną pozycję tego miejsca na mapie.</string>
     <string name="fetch_location">Pobierz lokalizację</string>
