@@ -1,20 +1,27 @@
 package com.kidzone.domain.model
 
 /**
- * Opinia użytkownika o miejscu.
+ * Domenowy model opinii użytkownika o miejscu.
  *
- * Odpowiada tabeli REVIEWS z dokumentu projektu.
+ * Model zawiera wyłącznie dane potrzebne do prezentacji i operacji domenowych. Autoryzacja edycji
+ * oraz usuwania musi być egzekwowana przez backend na podstawie [userId].
  *
- * @property updatedAtMillis czas ostatniej edycji (jeśli była). 0 = nigdy nie
- *   edytowano. UI używa do pokazania plakietki "edytowana DD.MM.YYYY" gdy
- *   `updatedAtMillis > createdAtMillis`.
+ * @property id identyfikator dokumentu opinii.
+ * @property placeId identyfikator ocenianego miejsca.
+ * @property userId identyfikator autora opinii.
+ * @property authorName publiczna nazwa autora utrwalona przy zapisie.
+ * @property rating ocena w zakresie 1–5.
+ * @property comment treść opinii.
+ * @property photoUrls URL-e zdjęć dołączonych do opinii.
+ * @property createdAtMillis czas utworzenia opinii.
+ * @property updatedAtMillis czas ostatniej edycji; `0` oznacza brak edycji.
  */
 data class Review(
     val id: String,
     val placeId: String,
     val userId: String,
     val authorName: String,
-    val rating: Int, // 1..5
+    val rating: Int,
     val comment: String,
     val photoUrls: List<String> = emptyList(),
     val createdAtMillis: Long = 0L,
