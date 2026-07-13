@@ -1,7 +1,0 @@
-<resources>
-    <string name="gps_disabled_title">Enable GPS</string>
-    <string name="contact_support_offline_send_action">Send when online</string>
-    <string name="delete_account_offline_action">Delete when online</string>
-    <string name="suggest_edit_comment_label">Comment</string>
-    <string name="suggest_edit_comment_counter">%1$d/%2$d characters</string>
-</resources>
