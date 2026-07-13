@@ -3,13 +3,12 @@
 package com.kidzone.presentation.place.list
 
 import android.Manifest
-import android.content.Intent
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
 import android.content.IntentFilter
 import android.location.LocationManager
 import android.provider.Settings
-import androidx.compose.ui.platform.LocalContext
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContentScope
@@ -58,6 +57,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -70,6 +70,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -78,12 +79,11 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.DisposableEffect
+import androidx.core.content.ContextCompat
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.core.content.ContextCompat
 import com.kidzone.R
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
@@ -93,14 +93,14 @@ import com.kidzone.presentation.common.EmptyState
 import com.kidzone.presentation.common.EmptyStateAction
 import com.kidzone.presentation.common.KidZoneCard
 import com.kidzone.presentation.common.KidZoneCategoryFilterBar
-import com.kidzone.presentation.common.KidZoneFilterChip
-import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.KidZoneSortMenu
+import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.NewPlaceBadge
 import com.kidzone.presentation.common.RatingIcon
 import com.kidzone.presentation.common.SortMenuIcon
 import com.kidzone.presentation.common.SortMenuOption
 import com.kidzone.presentation.common.isNewWithoutReviews
+import com.kidzone.presentation.common.requestLocationPermissionOrOpenSettings
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.hasLocationPermission
@@ -284,15 +284,22 @@ fun PlaceListScreen(
             EnableLocationForSortingBanner(
                 onAllowClick = {
                     if (!hasLocationPermission(context)) {
-                        locationPermissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION
-                            )
+                        requestLocationPermissionOrOpenSettings(
+                            context = context,
+                            requestPermission = {
+                                locationPermissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                    )
+                                )
+                            }
                         )
                     } else {
                         context.startActivity(
-                            Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                            Intent(
+                                Settings.ACTION_LOCATION_SOURCE_SETTINGS
+                            )
                         )
                     }
                 }
@@ -319,7 +326,8 @@ fun PlaceListScreen(
                 else -> {
                     val shouldLoadMore by remember {
                         derivedStateOf {
-                            val lastVisible = lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                            val lastVisible =
+                                lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
                             val totalItems = lazyListState.layoutInfo.totalItemsCount
                             lastVisible >= totalItems - 3 && state.hasMore && !state.isLoadingMore
                         }
@@ -344,7 +352,7 @@ fun PlaceListScreen(
                                     haversineKm(lat, lng, place.latitude, place.longitude)
                                 },
                                 showDistance = state.sortOrder == PlaceListViewModel.SortOrder.NEAREST &&
-                                    state.userLocation != null,
+                                        state.userLocation != null,
                                 staleLocationAgeMinutes = state.staleLocationAgeMinutes.takeIf {
                                     state.isUsingStaleLocation
                                 },
@@ -443,8 +451,8 @@ private fun EmptyListState(
     onClear: () -> Unit
 ) {
     val canClearFilters = state.searchQuery.isNotBlank() ||
-        state.selectedCategory != null ||
-        state.selectedAmenities.isNotEmpty()
+            state.selectedCategory != null ||
+            state.selectedAmenities.isNotEmpty()
     EmptyState(
         icon = Icons.Filled.Search,
         title = emptyTitleFor(state),
@@ -464,12 +472,16 @@ private fun EmptyListState(
 private fun emptyMessageFor(state: PlaceListViewModel.UiState): String = when {
     state.sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME && state.currentUserId == null ->
         stringResource(R.string.empty_added_by_me_logged_out)
+
     state.sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME ->
         stringResource(R.string.empty_added_by_me_logged_in)
+
     state.searchQuery.isNotBlank() ->
         stringResource(R.string.empty_search_query)
+
     state.selectedCategory != null || state.selectedAmenities.isNotEmpty() ->
         stringResource(R.string.empty_filters)
+
     else -> stringResource(R.string.empty_default)
 }
 
@@ -477,11 +489,14 @@ private fun emptyMessageFor(state: PlaceListViewModel.UiState): String = when {
 private fun emptyTitleFor(state: PlaceListViewModel.UiState): String = when {
     state.sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME && state.currentUserId == null ->
         stringResource(R.string.empty_title_added_by_me_logged_out)
+
     state.sortOrder == PlaceListViewModel.SortOrder.ADDED_BY_ME ->
         stringResource(R.string.empty_title_added_by_me_logged_in)
+
     state.searchQuery.isNotBlank() -> stringResource(R.string.empty_title_search)
     state.selectedCategory != null || state.selectedAmenities.isNotEmpty() ->
         stringResource(R.string.empty_title_filters)
+
     else -> stringResource(R.string.empty_title_default)
 }
 
@@ -705,7 +720,12 @@ private fun PlaceCard(
 ) {
     val categoryLabel = stringResource(place.category.labelRes)
     val distanceLabel = if (showDistance && distanceKm != null) {
-        ", ${stringResource(R.string.distance_away, formatDistance(distanceKm, staleLocationAgeMinutes))}"
+        ", ${
+            stringResource(
+                R.string.distance_away,
+                formatDistance(distanceKm, staleLocationAgeMinutes)
+            )
+        }"
     } else {
         ""
     }
@@ -719,7 +739,8 @@ private fun PlaceCard(
         modifier = Modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
-                contentDescription = "${place.name}, $categoryLabel$distanceLabel$addressLabel, $ratingLabel"
+                contentDescription =
+                    "${place.name}, $categoryLabel$distanceLabel$addressLabel, $ratingLabel"
             }
             .clickable(
                 onClickLabel = stringResource(R.string.map_open_place_details_label),
@@ -859,7 +880,7 @@ private fun NoReviewsLabel() {
     }
 }
 
-private fun formatDisplayAddress(address: String): String = 
+private fun formatDisplayAddress(address: String): String =
     com.kidzone.utils.AddressUtils.formatDisplayAddress(address)
 
 @Composable
@@ -873,11 +894,12 @@ private fun formatDistance(
         km < METER_DISTANCE_THRESHOLD_KM -> {
             val meters = (km * METERS_PER_KILOMETER).toInt()
             val rounded = (
-                (meters + DISTANCE_ROUNDING_OFFSET_METERS) /
-                    DISTANCE_ROUNDING_STEP_METERS
-                ) * DISTANCE_ROUNDING_STEP_METERS
+                    (meters + DISTANCE_ROUNDING_OFFSET_METERS) /
+                            DISTANCE_ROUNDING_STEP_METERS
+                    ) * DISTANCE_ROUNDING_STEP_METERS
             if (rounded == 0) veryCloseDistance else stringResource(R.string.distance_m, rounded)
         }
+
         km < INTEGER_DISTANCE_THRESHOLD_KM -> stringResource(R.string.distance_km, km)
         else -> stringResource(R.string.distance_km_integer, km.toInt())
     }
@@ -917,7 +939,12 @@ private fun ListDistanceLabel(
 
 @Composable
 private fun Place.ratingAccessibilityLabel(): String = when {
-    reviewsCount > 0 -> stringResource(R.string.rating_accessibility_label, averageRating, reviewsCount)
+    reviewsCount > 0 -> stringResource(
+        R.string.rating_accessibility_label,
+        averageRating,
+        reviewsCount
+    )
+
     isNewWithoutReviews() -> stringResource(R.string.new_place_no_reviews)
     else -> stringResource(R.string.map_no_reviews)
 }
@@ -927,8 +954,8 @@ private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double):
     val dLat = Math.toRadians(lat2 - lat1)
     val dLon = Math.toRadians(lon2 - lon1)
     val a = kotlin.math.sin(dLat / 2).let { it * it } +
-        kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
-        kotlin.math.sin(dLon / 2).let { it * it }
+            kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
+            kotlin.math.sin(dLon / 2).let { it * it }
     val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
     return r * c
 }

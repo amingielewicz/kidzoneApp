@@ -77,6 +77,7 @@ import com.kidzone.presentation.common.NotificationSoftPromptDialog
 import com.kidzone.presentation.common.SystemStatusIcons
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.rememberNetworkStatus
+import com.kidzone.presentation.common.requestLocationPermissionOrOpenSettings
 import com.kidzone.presentation.common.shouldShowNotificationPrompt
 import com.kidzone.presentation.home.HomeScreen
 import com.kidzone.presentation.map.MapScreen
@@ -121,7 +122,7 @@ fun MainScreen(
     var showHomeIntro by remember {
         mutableStateOf(
             !prefs.getBoolean(KEY_HOME_INTRO_USED, false) &&
-                !hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                    !hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
         )
     }
     var showAddPlaceFabLabel by remember {
@@ -154,7 +155,8 @@ fun MainScreen(
     val locationSettingsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) {
-        locationPermissionGranted = hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+        locationPermissionGranted =
+            hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
         if (locationPermissionGranted) {
             markHomeIntroUsed()
             locationRefreshSignal += 1
@@ -192,7 +194,14 @@ fun MainScreen(
             )
             locationRefreshSignal += 1
         } else {
-            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            requestLocationPermissionOrOpenSettings(
+                context = context,
+                requestPermission = {
+                    locationPermissionLauncher.launch(
+                        Manifest.permission.ACCESS_FINE_LOCATION
+                    )
+                }
+            )
         }
     }
 
@@ -239,7 +248,11 @@ fun MainScreen(
                 launchSingleTop = true
                 restoreState = true
             }
-            Toast.makeText(context, context.getString(R.string.place_added_success), Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                context,
+                context.getString(R.string.place_added_success),
+                Toast.LENGTH_SHORT
+            ).show()
             if (shouldShowNotificationPrompt(context, NotificationPromptReason.FirstPlace)) {
                 notificationPromptReason = NotificationPromptReason.FirstPlace
             }
@@ -339,7 +352,9 @@ fun MainScreen(
             }
         }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Column(modifier = Modifier
+            .fillMaxSize()
+            .padding(padding)) {
             NavHost(
                 navController = navController,
                 startDestination = Route.Home.path,

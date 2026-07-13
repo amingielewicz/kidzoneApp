@@ -28,7 +28,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.GpsOff
@@ -57,15 +56,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -78,22 +75,18 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.mapNotNull
 import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.GoogleMap as GoogleMapSdk
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.maps.android.clustering.Cluster
+import com.google.maps.android.clustering.ClusterManager
 import com.google.maps.android.clustering.view.ClusterRenderer
 import com.google.maps.android.clustering.view.DefaultClusterRenderer
-import com.google.maps.android.clustering.ClusterManager
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.GoogleMapComposable
@@ -106,22 +99,25 @@ import com.google.maps.android.compose.clustering.Clustering
 import com.google.maps.android.compose.clustering.rememberClusterManager
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.kidzone.R
+import com.kidzone.domain.model.GeoBounds
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
-import com.kidzone.domain.model.GeoBounds
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.KidZoneCategoryFilterBar
-import com.kidzone.presentation.common.RatingIcon
 import com.kidzone.presentation.common.KidZoneFilterChip
 import com.kidzone.presentation.common.NetworkStatus
+import com.kidzone.presentation.common.RatingIcon
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.rememberNetworkStatus
+import com.kidzone.presentation.common.requestLocationPermissionOrOpenSettings
 import com.kidzone.presentation.place.add.fetchCurrentLocation
 import com.kidzone.presentation.place.add.hasLocationPermission
 import com.kidzone.presentation.place.add.isLocationServiceEnabled
-import android.app.Activity
-import android.content.ContextWrapper
-import androidx.core.app.ActivityCompat
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.launch
+import com.google.android.gms.maps.GoogleMap as GoogleMapSdk
 
 private val DEFAULT_CAMERA_TARGET = LatLng(52.2297, 21.0122)
 private const val DEFAULT_CAMERA_ZOOM = 11f
@@ -136,8 +132,13 @@ private const val SPIDERFY_MAX_EXTRA = 8
 private val MAP_TOP_OVERLAY_SPACING = 8.dp
 private const val LOCATION_PERMISSION_PREFS = "location_permission_preferences"
 private const val LOCATION_PERMISSION_REQUESTED_KEY = "fine_location_requested"
+
 @SuppressLint("MissingPermission")
-@OptIn(ExperimentalMaterial3Api::class, MapsComposeExperimentalApi::class, ExperimentalSharedTransitionApi::class)
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    MapsComposeExperimentalApi::class,
+    ExperimentalSharedTransitionApi::class
+)
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
 @Composable
 fun MapScreen(
@@ -373,6 +374,7 @@ fun MapScreen(
                                     }
                                 )
                             }
+
                             !gpsEnabled -> {
                                 context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
                             }
@@ -534,7 +536,7 @@ internal fun buildPlaceClusterItems(places: List<Place>): List<PlaceClusterItem>
 private fun spiderfyPlaceItems(places: List<Place>): List<PlaceClusterItem> {
     val center = LatLng(places.first().latitude, places.first().longitude)
     val radius = SPIDERFY_RADIUS_DEGREES + places.size.coerceAtMost(SPIDERFY_MAX_EXTRA) *
-        SPIDERFY_RADIUS_STEP_DEGREES
+            SPIDERFY_RADIUS_STEP_DEGREES
     return places.mapIndexed { index, place ->
         val angle = (2.0 * kotlin.math.PI * index) / places.size
         PlaceClusterItem(
@@ -854,7 +856,7 @@ private fun PlacePreviewContent(
             onClick = {
                 val uri = Uri.parse(
                     "https://www.google.com/maps/search/?api=1" +
-                        "&query=${place.latitude},${place.longitude}"
+                            "&query=${place.latitude},${place.longitude}"
                 )
                 val intent = Intent(Intent.ACTION_VIEW, uri).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -999,7 +1001,11 @@ private fun MapPlaceListItem(
 @Composable
 private fun mapPlaceRatingLabel(place: Place): String =
     if (place.reviewsCount > 0) {
-        stringResource(R.string.map_place_rating_count_label, place.averageRating, place.reviewsCount)
+        stringResource(
+            R.string.map_place_rating_count_label,
+            place.averageRating,
+            place.reviewsCount
+        )
     } else {
         stringResource(R.string.map_no_reviews)
     }
@@ -1076,54 +1082,3 @@ private suspend fun recenterOnUser(
     )
 }
 
-private fun requestLocationPermissionOrOpenSettings(
-    context: Context,
-    requestPermission: () -> Unit
-) {
-    val preferences = context.getSharedPreferences(
-        LOCATION_PERMISSION_PREFS,
-        Context.MODE_PRIVATE
-    )
-
-    val wasRequestedBefore = preferences.getBoolean(
-        LOCATION_PERMISSION_REQUESTED_KEY,
-        false
-    )
-
-    val activity = context.findActivity()
-
-    val permanentlyDenied = wasRequestedBefore &&
-            activity != null &&
-            !ActivityCompat.shouldShowRequestPermissionRationale(
-                activity,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            )
-
-    if (permanentlyDenied) {
-        openApplicationSettings(context)
-    } else {
-        preferences.edit()
-            .putBoolean(LOCATION_PERMISSION_REQUESTED_KEY, true)
-            .apply()
-
-        requestPermission()
-    }
-}
-
-private fun openApplicationSettings(context: Context) {
-    val intent = Intent(
-        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-        Uri.fromParts("package", context.packageName, null)
-    ).apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-
-    context.startActivity(intent)
-}
-
-private tailrec fun Context.findActivity(): Activity? =
-    when (this) {
-        is Activity -> this
-        is ContextWrapper -> baseContext.findActivity()
-        else -> null
-    }
