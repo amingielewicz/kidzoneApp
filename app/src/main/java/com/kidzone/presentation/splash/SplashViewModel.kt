@@ -14,53 +14,59 @@ import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 /**
- * Minimalny czas wyświetlania splasha (w ms).
+ * Minimalny czas wyświetlania ekranu startowego.
  *
- * Bez tego progu, na ciepłym starcie / z aktywną sesją Firebase, splash
- * "miga" dosłownie na 1 klatkę i nawigacja od razu skacze do Main – co
- * wygląda jak glitch. 800 ms to kompromis: na tyle krótko, że nie irytuje,
- * a na tyle długo, że logo jest widoczne.
+ * Ogranicza krótkie mignięcie splasha przy ciepłym starcie i natychmiast dostępnej sesji Firebase.
  */
 private const val MIN_DISPLAY_MS = 800L
 
 /**
- * Maksymalny czas oczekiwania na pierwszy emit z [AuthRepository.currentUser].
+ * Maksymalny czas oczekiwania na pierwszy stan uwierzytelnienia.
  *
- * W praktyce Firebase Auth emituje natychmiast (ma cached state), ale gdyby
- * z jakiegoś powodu strumień się zawiesił (np. źle zainicjalizowany Firebase,
- * brak Google Play Services na emulatorze), nie chcemy zawieszać użytkownika
- * na splash-screenie – traktujemy to jako "niezalogowany" i wysyłamy do
- * loginu, gdzie zobaczy realny komunikat błędu.
+ * Po przekroczeniu limitu aplikacja przechodzi do stanu wylogowanego zamiast pozostawać na
+ * nieskończonym ekranie ładowania.
  */
 private const val AUTH_CHECK_TIMEOUT_MS = 5_000L
 
 /**
- * Decyduje na podstawie [AuthRepository.currentUser] gdzie wysłać
- * użytkownika po splash screenie.
+ * Ustala docelowy graph nawigacji po uruchomieniu aplikacji.
  *
- * Dba też o:
- *  - [MIN_DISPLAY_MS] – splash ma być widoczny wystarczająco długo,
- *  - [AUTH_CHECK_TIMEOUT_MS] – fallback gdyby Firebase się zawiesił.
+ * ViewModel czeka na pierwszy element z [AuthRepository.currentUser], respektuje minimalny czas
+ * prezentacji splasha i stosuje timeout dla niedostępnego źródła sesji. Nie wykonuje nawigacji
+ * bezpośrednio; warstwa UI obserwuje [state] i reaguje na zmianę.
  */
 @HiltViewModel
 class SplashViewModel @Inject constructor(
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
-    enum class State { Loading, SignedIn, SignedOut }
+    /**
+     * Stan rozstrzygnięcia sesji na ekranie startowym.
+     */
+    enum class State {
+        /** Trwa odczyt sesji lub minimalny czas prezentacji splasha. */
+        Loading,
+
+        /** Użytkownik posiada aktywną sesję. */
+        SignedIn,
+
+        /** Brak aktywnej sesji albo odczyt zakończył się timeoutem. */
+        SignedOut
+    }
 
     private val _state = MutableStateFlow(State.Loading)
+
+    /**
+     * Niezmienny strumień aktualnego stanu ekranu startowego.
+     */
     val state: StateFlow<State> = _state.asStateFlow()
 
     init {
         viewModelScope.launch {
             val started = System.currentTimeMillis()
-            // withTimeoutOrNull zwróci null jeżeli timeout strzeli przed
-            // pierwszym emitem; null traktujemy jak "niezalogowany".
             val user = withTimeoutOrNull(AUTH_CHECK_TIMEOUT_MS) {
                 authRepository.currentUser.first()
             }
-            // Doczekaj do MIN_DISPLAY_MS, żeby splash nie mignął.
             val elapsed = System.currentTimeMillis() - started
             val remaining = MIN_DISPLAY_MS - elapsed
             if (remaining > 0) delay(remaining)
