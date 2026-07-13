@@ -10,6 +10,9 @@
     {
       "target": "app",
       "public": "public",
+      "predeploy": [
+        "node tools/copy-hosting-assets.mjs"
+      ],
       "ignore": [
         "firebase.json",
         "**/.*",
