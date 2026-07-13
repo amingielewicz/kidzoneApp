@@ -378,7 +378,7 @@ class FirestoreReviewRepositoryTest {
             assertTrue(result is OpResult.Failure)
             val error = (result as OpResult.Failure).error
             assertTrue(error is IllegalStateException)
-            assertTrue(error.message!!.contains("Już zgłosiłeś"))
+            assertTrue(error.message!!.contains("already reported"))
         }
     }
 
