@@ -6,6 +6,7 @@ Centralny indeks dokumentacji technicznej, produktowej, QA, bezpieczeństwa i pr
 
 - [Główny README projektu](../README.md)
 - [Architektura systemu](architecture/ARCHITECTURE.md)
+- [Przepływ danych](architecture/DATA_FLOW.md)
 - [Przepływ ekranów Android](android/SCREEN_FLOW.md)
 - [Strategia testów](qa/testing-strategy.md)
 - [Manualny plan testów release](qa/manual-release-test-plan.md)
