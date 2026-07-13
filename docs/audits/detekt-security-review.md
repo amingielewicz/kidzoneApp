@@ -1,69 +1,135 @@
 # Detekt security review
 
-Issue: #167
-Date: 2026-06-20
+Issue: #167  
+Audit date: 2026-06-20  
+Status: historical audit artifact  
+Last documentation review: 2026-07-14
 
-## Summary
+## Purpose
 
-`./gradlew.bat detekt` passes with the current baseline. The baseline is dominated by Compose/UI maintainability findings and does not show a new direct security failure. The items worth tracking from a security and stability perspective are concentrated around offline sync integrity, broad exception handling in auth/upload flows and complex save/edit paths.
+Ten dokument zachowuje wynik audytu Detekt z 20 czerwca 2026. Nie jest bieżącym źródłem prawdy dla architektury, bezpieczeństwa ani zachowania offline.
 
-## Baseline snapshot
+Aktualne dokumenty źródłowe:
 
-| Finding type | Count | Security relevance |
+- `docs/security.md`,
+- `docs/android/OFFLINE_MODE.md`,
+- `docs/architecture/ERROR_HANDLING.md`,
+- `docs/development/PERFORMANCE_SECURITY_TESTING.md`.
+
+## Original summary
+
+W momencie audytu `detekt` przechodził z istniejącym baseline. Większość wpisów dotyczyła utrzymywalności Compose/UI, a istotniejsze ryzyka koncentrowały się wokół integralności synchronizacji offline, szerokiej obsługi wyjątków i złożonych ścieżek zapisu.
+
+## Baseline snapshot from audit date
+
+| Finding type | Count | Security relevance at audit date |
 | --- | ---: | --- |
-| `MagicNumber` | 201 | Low; mostly UI dimensions, thresholds and animation values. |
-| `FunctionNaming` | 144 | Low; mostly Compose naming convention noise. |
-| `LongMethod` | 51 | Medium when present in save/auth/report flows; low for pure UI composition. |
-| `MaxLineLength` | 34 | Low; readability only. |
-| `LongParameterList` | 22 | Low to medium; risk grows in security-sensitive flows because arguments are easy to mix up. |
-| `ReturnCount` | 16 | Low to medium; can hide edge cases in validation and auth flows. |
-| `TooManyFunctions` | 16 | Low; file organization. |
-| `CyclomaticComplexMethod` | 15 | Medium where it covers save/edit/auth flows. |
-| `TooGenericExceptionCaught` | 14 | Medium; can hide different failure classes behind one branch. |
-| `UseCheckOrError` | 9 | Low; mostly Kotlin style, but appears in auth paths. |
-| `SwallowedException` | 8 | Medium when cleanup, uploads or auth mapping silently fail. |
-| `ForbiddenComment` | 6 | Medium in `SyncWorker`; TODO-backed offline writes currently clear operations without applying them. |
-| Other single-digit findings | 21 | Low unless they appear in auth, write or reporting paths. |
+| `MagicNumber` | 201 | niska; głównie UI i animacje |
+| `FunctionNaming` | 144 | niska; konwencje Compose |
+| `LongMethod` | 51 | średnia w auth/save/report flows |
+| `MaxLineLength` | 34 | niska |
+| `LongParameterList` | 22 | niska–średnia |
+| `ReturnCount` | 16 | niska–średnia |
+| `TooManyFunctions` | 16 | niska |
+| `CyclomaticComplexMethod` | 15 | średnia w krytycznych flow |
+| `TooGenericExceptionCaught` | 14 | średnia |
+| `UseCheckOrError` | 9 | niska |
+| `SwallowedException` | 8 | średnia |
+| `ForbiddenComment` | 6 | średnia w obszarze offline sync |
 
-## Findings
+Liczby są historycznym snapshotem i nie powinny być używane jako aktualny wynik bez ponownego uruchomienia Detekt.
 
-### Medium: offline sync worker can discard queued writes
+## Finding 1: offline sync integrity
 
-`SyncWorker` contains TODO-backed processors for add/update/delete place and review operations. Several branches currently return `true`, which removes the queued operation, even though the repository write is not performed yet. That is not an immediate remote security bypass because Firestore rules still apply, but it is a data-integrity risk: a user can believe an offline write was synced when it was silently dropped.
+### Stan podczas audytu
 
-Recommended follow-up: either finish the queued operation processors with typed payload parsing and ownership-aware repository calls, or explicitly disable/enqueue-gate offline writes until the sync contract is implemented.
+`SyncWorker` zawierał nieukończone processory operacji add/update/delete. Audyt wskazywał ryzyko usuwania operacji bez wykonania właściwego zapisu.
 
-### Medium: broad exception handling in auth, upload and repository paths
+### Aktualny status dokumentacyjny
 
-The baseline includes `TooGenericExceptionCaught` and `SwallowedException` in `FirebaseAuthRepository`, `FirestorePlaceRepository`, `FirestoreReviewRepository`, `PhotoUploader`, `PerformanceTraces`, `RemoteConfigService`, `AddPlaceViewModel` and related UI helpers.
+Zapisy offline są obecnie traktowane jako gated. Aplikacja nie powinna informować o sukcesie ani oznaczać operacji jako zsynchronizowanej, dopóki replay nie jest kompletny.
 
-Some broad catches are reasonable at infrastructure boundaries, but auth/account and upload paths should avoid mixing user input errors, permission failures, network errors and unexpected programmer errors into one branch. This matters for supportability and for avoiding accidental leakage of raw backend messages into user-facing errors.
+Wymagania przed włączeniem replay:
 
-Recommended follow-up: keep broad catches only at clear boundaries, map expected Firebase exceptions explicitly and use sanitized user-facing messages.
+- kompletne processory,
+- typed payload parsing,
+- idempotency keys,
+- ownership checks,
+- retry i dead-letter,
+- testy z Firebase Emulator,
+- jawny status pending/failed w UI,
+- cleanup po logout i account deletion.
 
-### Medium: save and review edit flows are complex
+Szczegóły: `docs/android/OFFLINE_MODE.md`.
 
-`AddPlaceViewModel.performSave()` and `PlaceDetailsViewModel.submitEditedReview()` combine validation, image compression, duplicate detection, Storage upload, Firestore write, cleanup and UI state transitions. Detekt flags these as complex/long methods or complex conditions.
+## Finding 2: broad exception handling
 
-The current behavior is covered by unit tests in important paths, and no immediate security issue was found. The risk is regression-prone partial success: uploaded photos, deleted photos, duplicate handling and Firestore writes can diverge if future changes are made in the same large method.
+Obszary wskazane w audycie obejmowały auth, repository, upload, Remote Config, Performance i ViewModele.
 
-Recommended follow-up: extract photo upload/dedup and cleanup into testable collaborators before adding more write behavior.
+Aktualna zasada:
 
-### Low: Compose/UI baseline noise
+- oczekiwane wyjątki są mapowane jawnie,
+- broad catch pozostaje tylko na granicy infrastruktury,
+- surowe komunikaty backendu nie trafiają do UI,
+- telemetryka jest sanitizowana,
+- błąd częściowy nie jest pełnym sukcesem.
 
-Most `MagicNumber`, `FunctionNaming`, `LongMethod` and `LongParameterList` entries are generated by Compose UI patterns or screen-level composition. They are useful maintainability signals, but they should not block security work unless the screen controls auth, account deletion, reporting, permissions or write validation.
+Szczegóły: `docs/architecture/ERROR_HANDLING.md`.
 
-## Immediate conclusion
+## Finding 3: complex save and edit flows
 
-No high-risk Detekt finding requires an urgent code fix in this PR. The safer path is to keep this PR as an audit artifact and create focused follow-up issues for the two larger areas:
+Audyt wskazywał złożoność ścieżek łączących:
 
-- offline sync write integrity: #252,
-- typed exception/error mapping in auth, upload and repository boundaries: #253.
+- walidację,
+- kompresję,
+- wykrywanie duplikatów,
+- upload,
+- Firestore write,
+- cleanup,
+- zmianę UI state.
 
-## Test commands
+Zalecenie pozostaje aktualne: nowe zachowanie powinno być wydzielane do testowalnych współpracowników zamiast dalszego rozbudowywania jednej metody.
+
+## Compose baseline noise
+
+Wpisy takie jak `MagicNumber`, `FunctionNaming` i `LongParameterList` nie mają jednakowego znaczenia. Baseline nie powinien być automatycznie ignorowany, ale priorytet należy nadawać wpisom dotyczącym:
+
+- auth,
+- account deletion,
+- permissions,
+- zapisów i uploadów,
+- Rules,
+- moderacji,
+- offline sync.
+
+## Follow-up references
+
+Historycznie audyt wskazał:
+
+- #252 — offline sync write integrity,
+- #253 — typed exception and error mapping.
+
+Status issue należy sprawdzać bezpośrednio w GitHub. Ten dokument nie potwierdza ich bieżącego stanu.
+
+## Running a new review
 
 ```powershell
-.\gradlew.bat detekt
+$env:MAPS_API_KEY="AIzaSyPlaceholder"; .\gradlew.bat detekt
 ```
 
-Result: PASS.
+Nowy audyt powinien zapisać:
+
+```text
+Date:
+Commit:
+Detekt version:
+Baseline SHA:
+Result:
+New findings:
+Resolved findings:
+Security-relevant changes:
+```
+
+## Interpretation
+
+Ten plik jest zapisem historycznym. Każde twierdzenie o aktualnym stanie kodu wymaga nowego uruchomienia narzędzia na bieżącym commicie.
