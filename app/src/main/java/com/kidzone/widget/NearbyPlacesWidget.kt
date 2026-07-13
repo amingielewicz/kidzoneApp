@@ -39,11 +39,12 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
+import androidx.room.Room
 import com.kidzone.MainActivity
 import com.kidzone.R
-import androidx.room.Room
 import com.kidzone.data.local.KidZoneDatabase
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.presentation.common.isNewWithoutReviews
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -53,7 +54,9 @@ private val WidgetStarGold = ColorProvider(Color(0xFFFFC107))
 private val WidgetTextPrimary = ColorProvider(Color(0xFF1F2933))
 private val WidgetTextSecondary = ColorProvider(Color(0xFF68717D))
 private val WidgetRowBackground = ColorProvider(Color(0x33FFFFFF))
-private const val MAX_WIDGET_PLACES = 10
+private val WidgetNewBackground = ColorProvider(Color(0xFFE3F2FD))
+private val WidgetNewText = ColorProvider(Color(0xFF0D47A1))
+private const val MAX_WIDGET_PLACES = 50
 private const val VERY_CLOSE_DISTANCE_METERS = 50
 private const val METERS_PER_KILOMETER = 1000
 private const val ONE_MINUTE_MILLIS = 60_000L
@@ -61,7 +64,7 @@ private const val ONE_MINUTE_MILLIS = 60_000L
 /**
  * Glance AppWidget showing nearby places from the local Room cache.
  *
- * Layout per row: Place name | Rating (stars) | Distance (km/m)
+ * Layout per row: Place name | Rating status | Distance (km/m)
  *
  * Refresh strategy: periodic every 30 minutes via system AppWidget update
  * mechanism (configured in widget_info.xml). Widget reads last known location
@@ -93,11 +96,12 @@ class NearbyPlacesWidget : GlanceAppWidget() {
         ).fallbackToDestructiveMigration().build()
 
         val allPlaces = db.placeDao().runCatching {
-            // Room suspend functions require coroutine scope, but we're
-            // already in IO context from provideGlance. Use blocking query
-            // as a workaround for widget simplicity.
             val cursor = db.openHelper.readableDatabase.query(
-                "SELECT id, name, category, averageRating, reviewsCount, latitude, longitude FROM places"
+                """
+                SELECT id, name, category, averageRating, reviewsCount,
+                       latitude, longitude, createdAtMillis
+                FROM places
+                """.trimIndent()
             )
             val result = mutableListOf<WidgetPlace>()
             while (cursor.moveToNext()) {
@@ -109,7 +113,8 @@ class NearbyPlacesWidget : GlanceAppWidget() {
                         averageRating = cursor.getDouble(3),
                         reviewsCount = cursor.getInt(4),
                         latitude = cursor.getDouble(5),
-                        longitude = cursor.getDouble(6)
+                        longitude = cursor.getDouble(6),
+                        createdAtMillis = cursor.getLong(7)
                     )
                 )
             }
@@ -119,13 +124,11 @@ class NearbyPlacesWidget : GlanceAppWidget() {
 
         db.close()
 
-        // Get last known location from shared preferences
         val prefs = context.getSharedPreferences(LOCATION_PREFS, Context.MODE_PRIVATE)
         val userLat = prefs.getFloat(KEY_LAST_LAT, 0f).toDouble()
         val userLng = prefs.getFloat(KEY_LAST_LNG, 0f).toDouble()
 
         if (userLat == 0.0 && userLng == 0.0) {
-            // No location available – return top-rated places as fallback
             return WidgetState(
                 places = allPlaces
                     .sortedByDescending { it.averageRating }
@@ -134,12 +137,12 @@ class NearbyPlacesWidget : GlanceAppWidget() {
                 staleLocationAgeMinutes = null
             )
         }
+
         val locationTimestampMillis = prefs.getLong(KEY_LAST_LOCATION_TIME, 0L)
         val staleLocationAgeMinutes = locationTimestampMillis
             .takeIf { it > 0L }
             ?.let { ((System.currentTimeMillis() - it) / ONE_MINUTE_MILLIS).toInt().coerceAtLeast(0) }
 
-        // Calculate distance and sort by nearest
         return WidgetState(
             places = allPlaces
                 .map { place ->
@@ -166,9 +169,7 @@ private data class WidgetState(
     val staleLocationAgeMinutes: Int?
 )
 
-/**
- * Lightweight data class for widget display – only the fields we need.
- */
+/** Lightweight data class for widget display. */
 data class WidgetPlace(
     val id: String,
     val name: String,
@@ -177,6 +178,7 @@ data class WidgetPlace(
     val reviewsCount: Int,
     val latitude: Double,
     val longitude: Double,
+    val createdAtMillis: Long,
     val distanceMeters: Int? = null
 )
 
@@ -297,14 +299,8 @@ private fun PlaceRow(
             horizontalAlignment = Alignment.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = place.ratingText(),
-                style = TextStyle(
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = WidgetStarGold
-                )
-            )
+            PlaceRatingStatus(place = place)
+
             val distanceText = place.distanceText(context)
             if (distanceText.isNotBlank()) {
                 Spacer(modifier = GlanceModifier.height(2.dp))
@@ -321,14 +317,50 @@ private fun PlaceRow(
     }
 }
 
-private fun WidgetPlace.ratingText(): String = if (reviewsCount > 0) {
-    "\u2605 %.1f".format(averageRating)
-} else {
-    "\u2605 —"
+@Composable
+private fun PlaceRatingStatus(place: WidgetPlace) {
+    when {
+        place.reviewsCount > 0 -> Text(
+            text = "★ %.1f (%d)".format(place.averageRating, place.reviewsCount),
+            style = TextStyle(
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = WidgetStarGold
+            ),
+            maxLines = 1
+        )
+
+        isNewWithoutReviews(
+            reviewsCount = place.reviewsCount,
+            createdAtMillis = place.createdAtMillis
+        ) -> Text(
+            text = "Nowe",
+            modifier = GlanceModifier
+                .background(WidgetNewBackground)
+                .cornerRadius(12.dp)
+                .padding(horizontal = 7.dp, vertical = 4.dp),
+            style = TextStyle(
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = WidgetNewText
+            ),
+            maxLines = 1
+        )
+
+        else -> Text(
+            text = "★ Brak ocen",
+            style = TextStyle(
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = WidgetTextSecondary
+            ),
+            maxLines = 1
+        )
+    }
 }
 
 private fun String.withStaleAge(context: Context, staleLocationAgeMinutes: Int?): String {
-    if (this.isBlank()) return this
+    if (isBlank()) return this
     val ageText = staleLocationAgeMinutes?.let {
         if (it <= 1) {
             context.getString(R.string.stale_age_one_minute)
@@ -366,10 +398,7 @@ private val PlaceCategory.widgetIconRes: Int
         PlaceCategory.OTHER -> R.drawable.ic_map_marker_other
     }
 
-/**
- * BroadcastReceiver that triggers widget updates.
- * Declared in AndroidManifest with the widget metadata.
- */
+/** BroadcastReceiver that triggers widget updates. */
 class NearbyPlacesWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = NearbyPlacesWidget()
 }
