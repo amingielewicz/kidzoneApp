@@ -81,8 +81,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.kidzone.R
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.layout.wrapContentWidth
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.kidzone.R
+import coil.decode.SvgDecoder
+import com.kidzone.presentation.common.KidZoneRadii
 import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.SignInProvider
@@ -120,6 +127,9 @@ private const val CONTACT_MESSAGE_WARNING_LENGTH = 950
 private const val CONTACT_SUBJECT_MIN_LENGTH = 3
 private const val CONTACT_MESSAGE_MIN_LENGTH = 10
 private const val NOTIFICATION_PROMPT_TOP_LIMIT = 10
+private const val SUPPI_URL = "https://suppi.pl/kidzone"
+private const val SUPPI_WIDGET_URL =
+    "https://suppi.pl/api/widget/button.svg?fill=6457FD&textColor=ffffff"
 
 /**
  * Profil zalogowanego użytkownika.
@@ -1141,6 +1151,16 @@ private fun SettingsCard(
 
         Spacer(Modifier.height(KidZoneSpacing.GapSmall))
 
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        SuppiSupportButton()
+
+        Spacer(Modifier.height(16.dp))
+
         Text(
             text = stringResource(
                 R.string.app_version,
@@ -1152,6 +1172,43 @@ private fun SettingsCard(
             textAlign = TextAlign.Center,
         )
     }
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun SuppiSupportButton() {
+    val context = LocalContext.current
+
+    AsyncImage(
+        model = ImageRequest.Builder(context)
+            .data(SUPPI_WIDGET_URL)
+            .decoderFactory(SvgDecoder.Factory())
+            .crossfade(true)
+            .build(),
+        contentDescription = stringResource(R.string.suppi_support_description),
+        modifier = Modifier
+            .fillMaxWidth()
+            .wrapContentWidth(Alignment.CenterHorizontally)
+            .width(150.dp)
+            .clip(RoundedCornerShape(KidZoneRadii.Control))
+            .clickable(
+                role = Role.Button,
+                onClickLabel = stringResource(R.string.suppi_support_description),
+            ) {
+                val intent = Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse(SUPPI_URL),
+                ).apply {
+                    addCategory(Intent.CATEGORY_BROWSABLE)
+                }
+
+                try {
+                    context.startActivity(intent)
+                } catch (_: ActivityNotFoundException) {
+                    // Brak aplikacji obsługującej link.
+                }
+            },
+    )
 }
 
 @Composable

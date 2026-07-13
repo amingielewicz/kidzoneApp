@@ -621,4 +621,6 @@
     <string name="delete_review_confirmation">Twoja opinia zostanie trwale usunięta. Średnia ocena miejsca przeliczy się na nowo.</string>
     <string name="added_date">Dodano %1$s</string>
     <string name="edited_date">Edytowano %1$s</string>
+    <string name="suppi_support_description">Przybij piątkę i wesprzyj rozwój kidZone</string>
+
 </resources>

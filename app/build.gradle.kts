@@ -241,6 +241,7 @@ dependencies {
 
     // Image loading
     implementation(libs.coil.compose)
+    implementation(libs.coil.svg)
 
     // ExifInterface (auto-rotate photos before upload)
     implementation(libs.androidx.exifinterface)

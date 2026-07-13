@@ -619,4 +619,5 @@
     <string name="delete_review_confirmation">Your review will be permanently deleted. The average rating of the place will be recalculated.</string>
     <string name="added_date">Added %1$s</string>
     <string name="edited_date">Edited %1$s</string>
+    <string name="suppi_support_description">Give us a high five and support kidZone</string>
 </resources>
