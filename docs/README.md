@@ -1,14 +1,18 @@
 # kidZone documentation
 
+Ostatnia aktualizacja: 2026-07-14
+
 Centralny indeks dokumentacji technicznej, produktowej, QA, bezpieczeństwa i procesu wydawniczego projektu kidZone.
 
 ## Start tutaj
 
 - [Główny README projektu](../README.md)
+- [Zasady współpracy](../CONTRIBUTING.md)
 - [Architektura systemu](architecture/ARCHITECTURE.md)
 - [Przepływ danych](architecture/DATA_FLOW.md)
 - [Przepływ ekranów Android](android/SCREEN_FLOW.md)
 - [Strategia testów](qa/testing-strategy.md)
+- [Plan testów release](testing/TEST_PLAN.md)
 - [Manualny plan testów release](qa/manual-release-test-plan.md)
 - [Proces wydania](release/RELEASE_PROCESS.md)
 - [Publikacja w Google Play](release/PLAY_STORE_RELEASE.md)
@@ -77,6 +81,8 @@ Centralny indeks dokumentacji technicznej, produktowej, QA, bezpieczeństwa i pr
 - [Android permissions device matrix](qa/android-permissions-device-matrix.md)
 - [Google Play security checklist](qa/google-play-security-checklist.md)
 - [Widget privacy checklist](qa/widget-privacy-checklist.md)
+- [Accessibility and TalkBack checklist](qa/accessibility-talkback-checklist.md)
+- [Performance and load checklist](qa/performance-test-checklist.md)
 - [Test strategy](testing/TEST_STRATEGY.md)
 - [Test plan](testing/TEST_PLAN.md)
 - [Smoke tests](testing/SMOKE_TESTS.md)
@@ -118,10 +124,18 @@ Centralny indeks dokumentacji technicznej, produktowej, QA, bezpieczeństwa i pr
 - [Google Play Data Safety draft](legal/google-play-data-safety-draft.md)
 - [v1.0.0 manual release gates](legal/v1-release-manual-gates.md)
 
+## Historical audits
+
+- [Detekt security review — historical snapshot](audits/detekt-security-review.md)
+
+Dokumenty w `docs/audits/` są zapisami stanu z określonego dnia. Nie zastępują aktualnych przewodników ani ponownego uruchomienia narzędzi na bieżącym commicie.
+
 ## Zasady utrzymania dokumentacji
 
 - Aktualizuj dokument razem ze zmianą kodu, której dotyczy.
 - Nie duplikuj instrukcji w kilku plikach. Wstaw odnośnik do dokumentu źródłowego.
 - Dodawaj nowe dokumenty do tego indeksu.
 - Dla procesów release, bezpieczeństwa i zgodności podawaj datę ostatniej aktualizacji.
+- Odróżniaj aktualne zachowanie od planowanego.
+- Audyty historyczne oznaczaj datą, statusem i bieżącym dokumentem źródłowym.
 - Nazwy klas, ścieżki i komendy zapisuj w backtickach.
