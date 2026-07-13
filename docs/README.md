@@ -110,7 +110,9 @@ Centralny indeks dokumentacji technicznej, produktowej, QA, bezpieczeństwa i pr
 - [Abuse and rate limiting](abuse-rate-limiting.md)
 - [App Check](app-check.md)
 - [Android permissions and Google Play compliance](legal/android-permissions-play-compliance.md)
+- [Google Play legal review](legal/google-play-legal-review.md)
 - [Google Play Data Safety draft](legal/google-play-data-safety-draft.md)
+- [v1.0.0 manual release gates](legal/v1-release-manual-gates.md)
 
 ## Zasady utrzymania dokumentacji
 
