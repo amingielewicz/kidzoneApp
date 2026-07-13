@@ -1,76 +1,112 @@
 # Coding Guidelines
 
+Ostatnia aktualizacja: 2026-07-13
+
 ## Cel
 
-Zasady kodowania dla KidZone mają utrzymać projekt czytelny, testowalny i łatwy do rozwijania.
+Zasady kodowania kidZone mają utrzymać projekt czytelny, testowalny, bezpieczny i łatwy do rozwijania.
 
 ## Architektura
 
-Projekt utrzymuje podział:
-
 ```text
-Presentation -> Domain -> Data -> Framework
+Presentation → Domain ← Data → Framework
 ```
 
-Zasady:
-
-- ViewModel nie importuje `android.content.Context`.
-- Logika biznesowa nie siedzi w Composable.
-- Composable powinien być możliwie bezstanowy.
-- Repository jest jednym źródłem prawdy dla danych.
-- Use Case opisuje jedną operację biznesową.
+- ViewModel nie importuje `Context`, `Activity`, `View` ani `NavController`.
+- Logika biznesowa nie trafia do Composable.
+- Domain nie zależy od Androida ani Firebase.
+- Repository ukrywa źródła danych, cache i synchronizację.
+- Use case opisuje jedną operację biznesową.
+- DTO, Entity i wyjątki techniczne nie przeciekają do UI.
 
 ## Kotlin
 
-- Używamy czytelnych nazw, nie skrótów.
+- Używamy pełnych, czytelnych nazw.
 - Preferujemy `val` nad `var`.
-- Unikamy nullable bez potrzeby.
-- Obsługujemy błędy jawnie.
+- Ograniczamy nullable i użycie `!!`.
 - Nie połykamy wyjątków pustym `catch`.
-- Publiczne API powinno mieć KDoc, jeśli nie jest oczywiste.
+- Publiczne API dokumentujemy, gdy kontrakt nie jest oczywisty.
+- Funkcje utrzymujemy małe i z jedną odpowiedzialnością.
+- Używamy typów domenowych zamiast luźnych `String` i `Boolean`, gdy zmniejsza to ryzyko błędu.
+
+## Coroutines i Flow
+
+- Operacje ViewModelu uruchamiamy w `viewModelScope`.
+- Nie używamy `GlobalScope`.
+- Obsługujemy anulowanie, timeout i race conditions.
+- `StateFlow` służy do trwałego stanu, a `SharedFlow` lub inny event stream do zdarzeń jednorazowych.
+- Zapisy i retry projektujemy jako idempotentne.
+- Nie uruchamiamy niekontrolowanych kolektorów bez lifecycle.
 
 ## Compose
 
-- Ciężka logika poza Composable.
-- Listy przez `LazyColumn` / `LazyRow`.
-- Elementy list mają stabilny `key`.
-- Stan ekranu trzymamy w ViewModelu.
-- UI renderuje `UiState`.
-- Efekty uboczne przez `LaunchedEffect`, `DisposableEffect` lub ViewModel.
+- Composable renderuje stan i emituje akcje.
+- Listy używają `LazyColumn` lub `LazyRow` ze stabilnymi `key`.
+- Ciężkie filtrowanie, sortowanie i mapowanie wykonujemy poza UI.
+- Efekty uboczne mają stabilne klucze.
+- Systemowych dialogów nie uruchamiamy z recomposition.
+- Wspólne elementy, takie jak `CategoryBadge`, stany ekranu i komponenty formularzy, są współdzielone.
+- Kolor nie może być jedynym nośnikiem informacji.
 
 ## ViewModel
 
-ViewModel powinien:
+- wystawia niemutowalny `UiState`,
+- przyjmuje intencje użytkownika,
+- korzysta z use case'ów lub interfejsów repozytoriów,
+- mapuje błędy techniczne,
+- chroni przed double submit,
+- nie uruchamia bezpośrednio systemowych ekranów,
+- nie loguje surowych danych użytkownika.
 
-- udostępniać `StateFlow<UiState>`,
-- obsługiwać akcje użytkownika,
-- korzystać z Use Case / Repository,
-- nie znać szczegółów Android framework,
-- nie zawierać kodu UI.
+## Repository i dane
 
-## Repository
+- zapytania mają limity i paginację,
+- mapy i listy nie pobierają całych kolekcji,
+- cache ma jawne zasady odświeżania,
+- operacje offline nie mogą udawać sukcesu,
+- mappery oddzielają DTO, Entity i modele domenowe,
+- zapis z retry nie tworzy duplikatów,
+- błędy częściowe nie są raportowane jako sukces.
 
-Repository powinno:
+## Uprawnienia
 
-- ukrywać szczegóły Firestore / Room,
-- obsługiwać cache,
-- ograniczać liczbę requestów,
-- stosować paginację i limity,
-- zwracać stabilne modele domenowe.
+- używamy wspólnych handlerów dla lokalizacji i kamery,
+- rozróżniamy zwykłą i trwałą odmowę,
+- po trwałej odmowie kierujemy do ustawień aplikacji,
+- po powrocie odświeżamy rzeczywisty stan,
+- nie deklarujemy uprawnień, których aplikacja nie potrzebuje,
+- Photo Picker nie wymaga szerokiego dostępu do galerii.
 
-## Logging
+## Logging i telemetryka
 
-- Nie logujemy danych uwierzytelniających.
-- Nie logujemy e-maili.
-- Nie logujemy surowej lokalizacji użytkownika.
-- Nie logujemy pełnych payloadów formularzy.
-- Release logging musi być ograniczony i bez danych wrażliwych.
+Nie logujemy ani nie przekazujemy do Crashlytics lub Analytics:
+
+- haseł i tokenów,
+- pełnych e-maili,
+- danych prywatnych profilu,
+- dokładnej lokalizacji,
+- treści opinii i formularzy,
+- URI zdjęć,
+- pełnych payloadów.
+
+Logi zawierają bezpieczny kontekst: funkcję, operację, wersję, typ błędu i status.
+
+## Testy
+
+- każda poprawka regresji powinna mieć test,
+- logika limitów, sortowania, retry i uprawnień nie może być testowana wyłącznie manualnie,
+- testy nie używają produkcyjnego Firebase ani prawdziwych sekretów,
+- zmiana Rules wymaga testów emulatorowych,
+- zmiana flow release, privacy lub security wymaga aktualizacji checklisty.
 
 ## PR checklist
 
-- [ ] Kod jest czytelny.
-- [ ] Brak ciężkiej logiki w Composable.
-- [ ] Błędy są obsłużone.
-- [ ] Dodano lub zaktualizowano testy, jeśli trzeba.
-- [ ] Brak danych wrażliwych w logach.
-- [ ] Build przechodzi.
+- [ ] kod jest w odpowiedniej warstwie,
+- [ ] brak ciężkiej logiki w Composable,
+- [ ] błędy i retry są obsłużone,
+- [ ] brak double submit i duplikatów,
+- [ ] testy zostały dodane lub zaktualizowane,
+- [ ] logi nie zawierają PII,
+- [ ] uprawnienia i Data Safety są nadal zgodne,
+- [ ] dokumentacja została zaktualizowana,
+- [ ] wymagane buildy i testy przechodzą.
