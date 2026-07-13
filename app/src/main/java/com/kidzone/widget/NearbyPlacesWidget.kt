@@ -61,15 +61,6 @@ private const val VERY_CLOSE_DISTANCE_METERS = 50
 private const val METERS_PER_KILOMETER = 1000
 private const val ONE_MINUTE_MILLIS = 60_000L
 
-/**
- * Glance AppWidget showing nearby places from the local Room cache.
- *
- * Layout per row: Place name | Rating status | Distance (km/m)
- *
- * Refresh strategy: periodic every 30 minutes via system AppWidget update
- * mechanism (configured in widget_info.xml). Widget reads last known location
- * from SharedPreferences (written by the app when location is fetched).
- */
 class NearbyPlacesWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
@@ -169,7 +160,6 @@ private data class WidgetState(
     val staleLocationAgeMinutes: Int?
 )
 
-/** Lightweight data class for widget display. */
 data class WidgetPlace(
     val id: String,
     val name: String,
@@ -183,7 +173,6 @@ data class WidgetPlace(
 )
 
 @Composable
-@Suppress("FunctionNaming")
 private fun NearbyPlacesContent(
     context: Context,
     places: List<WidgetPlace>,
@@ -320,14 +309,9 @@ private fun PlaceRow(
 @Composable
 private fun PlaceRatingStatus(place: WidgetPlace) {
     when {
-        place.reviewsCount > 0 -> Text(
-            text = "★ %.1f (%d)".format(place.averageRating, place.reviewsCount),
-            style = TextStyle(
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = WidgetStarGold
-            ),
-            maxLines = 1
+        place.reviewsCount > 0 -> RatingRow(
+            text = "%.1f (%d)".format(place.averageRating, place.reviewsCount),
+            fontSize = 12
         )
 
         isNewWithoutReviews(
@@ -347,12 +331,32 @@ private fun PlaceRatingStatus(place: WidgetPlace) {
             maxLines = 1
         )
 
-        else -> Text(
-            text = "★ Brak ocen",
+        else -> RatingRow(
+            text = "Brak ocen",
+            fontSize = 11
+        )
+    }
+}
+
+@Composable
+private fun RatingRow(text: String, fontSize: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = "★",
             style = TextStyle(
-                fontSize = 11.sp,
+                fontSize = fontSize.sp,
                 fontWeight = FontWeight.Medium,
-                color = WidgetTextSecondary
+                color = WidgetStarGold
+            ),
+            maxLines = 1
+        )
+        Spacer(modifier = GlanceModifier.width(4.dp))
+        Text(
+            text = text,
+            style = TextStyle(
+                fontSize = fontSize.sp,
+                fontWeight = FontWeight.Medium,
+                color = WidgetTextPrimary
             ),
             maxLines = 1
         )
@@ -398,7 +402,6 @@ private val PlaceCategory.widgetIconRes: Int
         PlaceCategory.OTHER -> R.drawable.ic_map_marker_other
     }
 
-/** BroadcastReceiver that triggers widget updates. */
 class NearbyPlacesWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = NearbyPlacesWidget()
 }
