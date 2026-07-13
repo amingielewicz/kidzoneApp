@@ -32,6 +32,14 @@
       ],
       "rewrites": [
         {
+          "source": "/api/public-stats",
+          "function": {
+            "functionId": "publicStats",
+            "region": "europe-central2",
+            "pinTag": true
+          }
+        },
+        {
           "source": "/privacy-policy",
           "destination": "/privacy-policy.html"
         },
@@ -92,6 +100,18 @@
       "predeploy": [
         "npm --prefix functions run lint",
         "npm --prefix functions run build"
+      ]
+    },
+    {
+      "source": "public-stats-functions",
+      "codebase": "public-stats",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
       ]
     }
   ]
