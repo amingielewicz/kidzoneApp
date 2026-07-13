@@ -1,15 +1,27 @@
 package com.kidzone.domain.service
 
 /**
- * Abstraction over badge notification persistence (SharedPreferences).
+ * Abstrakcja lokalnego zapisu informacji o odznakach już pokazanych użytkownikowi.
  *
- * Allows ProfileViewModel to track "seen badges" without direct dependency
- * on Android Context / SharedPreferences. Easily mockable in unit tests.
+ * Umożliwia `ProfileViewModel` wykrywanie nowych odznak bez zależności od Android `Context` i
+ * `SharedPreferences`. Dane są lokalnym stanem prezentacyjnym, a nie źródłem prawdy o przyznanych
+ * odznakach.
  */
 interface BadgePreferences {
-    /** Get set of badge names that were already shown to this user. */
+
+    /**
+     * Pobiera nazwy odznak, które zostały już pokazane wskazanemu użytkownikowi.
+     *
+     * @param uid identyfikator użytkownika, rozdzielający stan między kontami na urządzeniu.
+     * @return zapisany zbiór nazw albo pusty zbiór, gdy użytkownik nie widział jeszcze odznak.
+     */
     fun getSeenBadges(uid: String): Set<String>
 
-    /** Persist the current set of badges as "seen" for this user. */
+    /**
+     * Zastępuje lokalny zbiór odznak oznaczonych jako pokazane.
+     *
+     * @param uid identyfikator użytkownika.
+     * @param badges pełny zbiór nazw odznak, który ma zostać zapamiętany.
+     */
     fun setSeenBadges(uid: String, badges: Set<String>)
 }
