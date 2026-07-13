@@ -7,6 +7,21 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
+ * Zamkniety zestaw powodow zgloszenia wysylanych do Firebase Analytics.
+ *
+ * Do Analytics trafia wyłącznie stabilny kod techniczny, nigdy tekst wpisany
+ * przez użytkownika. Szczegółowy opis zgłoszenia może być przechowywany w
+ * Firestore na potrzeby moderacji, ale nie powinien być parametrem Analytics.
+ */
+enum class PlaceReportReason(val analyticsCode: String) {
+    INCORRECT_INFORMATION("incorrect_information"),
+    CLOSED_OR_MISSING("closed_or_missing"),
+    DUPLICATE("duplicate"),
+    INAPPROPRIATE_CONTENT("inappropriate_content"),
+    OTHER("other")
+}
+
+/**
  * Centralna klasa do logowania eventow Firebase Analytics w aplikacji kidZone.
  *
  * Kazdy ekran i interakcja usera przechodzi przez ten helper – dzieki temu:
@@ -68,11 +83,11 @@ class AnalyticsHelper @Inject constructor(
         }
     }
 
-    fun logReportPlace(placeId: String, reason: String) {
-        Timber.d("Analytics: report_place → id=$placeId, reason=$reason")
+    fun logReportPlace(placeId: String, reason: PlaceReportReason) {
+        Timber.d("Analytics: report_place → reason=${reason.analyticsCode}")
         analytics.logEvent("report_place") {
             param("place_id", placeId)
-            param("reason", reason)
+            param("reason", reason.analyticsCode)
         }
     }
 
@@ -146,10 +161,6 @@ class AnalyticsHelper @Inject constructor(
         val loggedValue = if (value == null) "null" else "[set]"
         Timber.d("Analytics: user_property → $key=$loggedValue")
         analytics.setUserProperty(key, value)
-    }
-
-    fun setUserId(uid: String?) {
-        analytics.setUserId(uid)
     }
 
     private companion object {
