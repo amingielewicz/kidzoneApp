@@ -16,7 +16,11 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * ViewModel ekranu logowania.
+ * Zarządza formularzem logowania, resetem hasła i ponowną wysyłką weryfikacji e-mail.
+ *
+ * ViewModel obsługuje logowanie e-mail/hasło i Google, mapuje błędy domenowe na bezpieczne
+ * komunikaty UI oraz rozróżnia brak weryfikacji e-mail od blokady konta. Nie przechowuje haseł poza
+ * bieżącym stanem formularza i nie loguje tokenów ani danych uwierzytelniających.
  */
 @HiltViewModel
 class LoginViewModel @Inject constructor(
@@ -24,7 +28,17 @@ class LoginViewModel @Inject constructor(
 ) : ViewModel() {
 
     /**
-     * Stan UI logowania.
+     * Niezmienny stan ekranu logowania.
+     *
+     * @property email bieżąca wartość pola e-mail.
+     * @property password bieżąca wartość pola hasła.
+     * @property isLoading czy trwa operacja uwierzytelniania lub wysyłki wiadomości.
+     * @property message komunikat przeznaczony do jednorazowego pokazania w UI.
+     * @property isMessageError czy [message] reprezentuje błąd.
+     * @property isSignedIn czy ostatnia próba logowania zakończyła się sukcesem.
+     * @property showResendVerification czy należy pokazać akcję ponownej wysyłki weryfikacji.
+     * @property banMessage komunikat o blokadzie zwrócony przez warstwę domenową.
+     * @property banReason opcjonalny powód blokady.
      */
     data class UiState(
         val email: String = "",
@@ -37,21 +51,32 @@ class LoginViewModel @Inject constructor(
         val banMessage: String? = null,
         val banReason: String? = null
     ) {
+        /** Czy oba wymagane pola formularza są niepuste. */
         val isFormValid: Boolean
             get() = email.isNotBlank() && password.isNotBlank()
     }
 
     private val _uiState = MutableStateFlow(UiState())
+
+    /** Stan obserwowany przez ekran Compose. */
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
+    /** Aktualizuje e-mail i czyści poprzedni komunikat formularza. */
     fun onEmailChange(value: String) {
         _uiState.update { it.copy(email = value, message = null) }
     }
 
+    /** Aktualizuje hasło i czyści poprzedni komunikat formularza. */
     fun onPasswordChange(value: String) {
         _uiState.update { it.copy(password = value, message = null) }
     }
 
+    /**
+     * Próbuje zalogować użytkownika danymi e-mail/hasło.
+     *
+     * Puste pola kończą się lokalnym błędem walidacji. Sukces ustawia [UiState.isSignedIn], a błąd
+     * jest mapowany bez ujawniania surowego komunikatu Firebase.
+     */
     fun signIn() {
         val state = _uiState.value
         if (state.email.isBlank() || state.password.isBlank()) {
@@ -86,6 +111,11 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Loguje użytkownika poświadczeniem Google.
+     *
+     * @param idToken krótkotrwały token ID uzyskany przez Credential Manager; nie może być logowany.
+     */
     fun signInWithGoogle(idToken: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, message = null, banMessage = null) }
@@ -108,10 +138,12 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    /** Pokazuje komunikat przekazany przez warstwę UI lub integrację zewnętrzną. */
     fun showInlineMessage(text: String, isError: Boolean = true) {
         _uiState.update { it.copy(message = UiText.DynamicString(text), isMessageError = isError) }
     }
 
+    /** Pokazuje standardowy komunikat braku połączenia. */
     fun showConnectionError() {
         _uiState.update {
             it.copy(
@@ -121,10 +153,17 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    /** Oznacza aktualny komunikat jako obsłużony. */
     fun consumeMessage() {
         _uiState.update { it.copy(message = null) }
     }
 
+    /**
+     * Wysyła wiadomość resetującą hasło na adres wpisany w formularzu.
+     *
+     * Brak adresu kończy się lokalnym komunikatem. Szczegóły o istnieniu konta nie powinny być
+     * ujawniane użytkownikowi.
+     */
     fun forgotPassword() {
         val email = _uiState.value.email.trim()
         if (email.isBlank()) {
@@ -163,6 +202,11 @@ class LoginViewModel @Inject constructor(
         else -> UiText.StringResource(R.string.error_unknown)
     }
 
+    /**
+     * Ponownie wysyła wiadomość weryfikacyjną dla danych wpisanych w formularzu.
+     *
+     * Metoda wymaga e-maila i hasła, ponieważ repository może wykonać reautoryzację przed wysyłką.
+     */
     fun resendVerificationEmail() {
         val state = _uiState.value
         if (state.email.isBlank() || state.password.isBlank()) return
