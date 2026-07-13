@@ -39,7 +39,16 @@ private const val TOP_RATED_THRESHOLD = 4.0
 private val MAP_ERROR_FALLBACK = UiText.StringResource(R.string.error_fetch_places)
 
 /**
- * ViewModel dla MapScreen.
+ * Zarządza stanem mapy miejsc oraz zapytaniami zależnymi od aktualnego viewportu.
+ *
+ * ViewModel łączy granice mapy, filtry kategorii, filtr najlepiej ocenianych miejsc i filtr
+ * właściciela. Zmiany viewportu są opóźniane przez debounce, podobne granice są deduplikowane, a
+ * wyniki są przechowywane w krótkotrwałym cache LRU, aby ograniczyć liczbę odczytów Firestore i
+ * kosztów Google Maps.
+ *
+ * ViewModel nie pobiera lokalizacji urządzenia i nie zarządza uprawnieniami. Otrzymuje wyłącznie
+ * [GeoBounds] przekazane przez warstwę UI. Nawigacja do szczegółów pozostaje odpowiedzialnością
+ * ekranu obserwującego [uiState].
  */
 @HiltViewModel
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
@@ -49,6 +58,18 @@ class MapViewModel @Inject constructor(
     private val performanceConfigProvider: PerformanceConfigProvider
 ) : ViewModel() {
 
+    /**
+     * Niezmienny stan ekranu mapy.
+     *
+     * @property places miejsca po zastosowaniu filtrów lokalnych.
+     * @property selectedCategory aktywna kategoria albo `null` dla wszystkich kategorii.
+     * @property topRatedOnly czy pokazywane są tylko miejsca z oceną co najmniej 4.0.
+     * @property addedByMeOnly czy lista jest ograniczona do miejsc aktualnego użytkownika.
+     * @property selectedPlaceId identyfikator markera wybranego przez użytkownika.
+     * @property isLoading czy trwa pobieranie danych dla bieżącego viewportu.
+     * @property isPlaceCountCapped czy wynik mógł zostać ograniczony limitem markerów.
+     * @property errorMessage bezpieczny komunikat błędu przeznaczony dla UI.
+     */
     data class UiState(
         val places: List<Place> = emptyList(),
         val selectedCategory: PlaceCategory? = null,
@@ -118,6 +139,12 @@ class MapViewModel @Inject constructor(
 
     private var lastPlaces: List<Place> = emptyList()
 
+    /**
+     * Stan mapy obserwowany przez warstwę Compose.
+     *
+     * Podczas odświeżania zachowuje poprzednią listę markerów, aby uniknąć migania mapy. Błąd
+     * pobierania nie usuwa ostatnich poprawnych danych.
+     */
     val uiState: StateFlow<UiState> = combine(
         placesLoad,
         selectedCategory,
@@ -166,26 +193,40 @@ class MapViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SUBSCRIPTION_TIMEOUT_MS), UiState())
 
+    /** Ustawia kategorię używaną przez zapytanie mapy. */
     fun onCategorySelect(category: PlaceCategory?) {
         selectedCategory.value = category
     }
 
+    /** Włącza lub wyłącza filtr miejsc z oceną co najmniej 4.0. */
     fun toggleTopRated() {
         topRatedOnly.update { !it }
     }
 
+    /** Włącza lub wyłącza filtr miejsc należących do aktualnego użytkownika. */
     fun toggleAddedByMe() {
         addedByMeOnly.update { !it }
     }
 
+    /**
+     * Aktualizuje identyfikator wybranego markera.
+     *
+     * @param placeId identyfikator miejsca albo `null`, aby wyczyścić wybór.
+     */
     fun selectPlace(placeId: String?) {
         selectedPlaceId.value = placeId
     }
 
+    /**
+     * Przekazuje nowe granice widocznego obszaru mapy.
+     *
+     * @param bounds granice viewportu po zakończeniu lub ustabilizowaniu ruchu kamery.
+     */
     fun onViewportChanged(bounds: GeoBounds) {
         viewport.value = bounds
     }
 
+    /** Ponawia pobranie danych dla ostatniego znanego viewportu. */
     fun retry() {
         if (viewport.value != null) retryRequest.update { it + 1 }
     }
