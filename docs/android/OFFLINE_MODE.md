@@ -1,301 +1,261 @@
 # Android offline mode
 
-Related issue: #306
+Powiązane issue: #306
 
-## Goal
+Ostatnia aktualizacja: 2026-07-14
 
-kidZone should stay useful when the network is unavailable or slow. The current implementation
-uses Room as a local read cache for public place and review data, keeps Firebase as the source of
-truth, and prepares an offline write queue for future write replay.
+## Cel
 
-This document describes the current architecture, the production behavior, the known limitations,
-and the manual QA scenarios required before expanding offline-first writes.
+kidZone pozostaje użyteczne przy braku lub niestabilnej sieci. Room pełni rolę lokalnego cache odczytowego dla publicznych miejsc i opinii, Firebase pozostaje źródłem prawdy, a kolejka zapisów offline nie jest jeszcze produkcyjnie aktywna.
 
-## Current production status
+Najważniejsza reguła release:
 
-| Area | Status | Notes |
+```text
+Aplikacja może pokazywać wcześniej zapisane dane offline, ale nie może informować o zapisaniu miejsca lub opinii, dopóki zapis nie został potwierdzony przez backend.
+```
+
+## Aktualny status
+
+| Obszar | Status | Zachowanie |
 | --- | --- | --- |
-| Places read cache | Active | Room stores places fetched from Firestore and powers list/map fallbacks. |
-| Reviews read cache | Active | Room stores reviews from Firestore snapshot listeners. |
-| Nearby widget cache | Active | Widget reads public places from Room and private location from SharedPreferences. |
-| Offline writes | Gated | Repositories currently fail user-facing offline writes instead of promising sync. |
-| Pending operation queue | Present | Room table and WorkManager worker exist, but write replay is intentionally blocked. |
-| Conflict resolution | Partial | Timestamp-based server-wins checks exist for queued updates. |
+| cache miejsc | aktywny | Room zasila Start, Listę, Mapę i szczegóły |
+| cache opinii | aktywny | Room przechowuje opinie pobrane z Firestore |
+| widget | aktywny | korzysta z publicznego cache miejsc i prywatnego stanu lokalizacji |
+| zapisy offline | wyłączone dla użytkownika | zapis kończy się kontrolowanym błędem |
+| `pending_operations` | obecne technicznie | infrastruktura istnieje, replay jest zablokowany |
+| conflict resolution | częściowa | udokumentowany model server-wins dla przyszłego replay |
 
-The important release rule is simple: users may read previously cached data offline, but the app
-must not tell users that a place or review was saved offline unless `SyncWorker` actually replays
-that write to Firestore.
+## Architektura
 
-## Architecture
+```text
+Compose UI / ViewModel
+        ↓
+Repository
+   ↙          ↘
+Room cache   Firebase
+   ↓
+Widget / offline reads
 
-```mermaid
-flowchart TD
-    UI["Compose screens and ViewModels"]
-    Repo["Repository layer"]
-    Room["Room cache: places, reviews, pending_operations"]
-    Firestore["Firebase Firestore"]
-    WorkManager["WorkManager SyncWorker"]
-    Widget["NearbyPlacesWidget"]
-
-    UI --> Repo
-    Repo --> Room
-    Repo --> Firestore
-    Firestore --> Repo
-    Repo --> UI
-    Room --> UI
-    Room --> Widget
-    Repo -. future queued writes .-> Room
-    Room --> WorkManager
-    WorkManager --> Firestore
+pending_operations
+        ↓
+WorkManager SyncWorker
+        ↓
+Firestore replay — dopiero po pełnym wdrożeniu processorów
 ```
 
-## Data model
+## Dane lokalne
 
-Room database: `KidZoneDatabase`
+Baza `KidZoneDatabase` zawiera:
 
-Tables:
+- `places`,
+- `reviews`,
+- `pending_operations`.
 
-- `places`: local cache for public place data.
-- `reviews`: local cache for public review data.
-- `pending_operations`: queued write operations for future offline write replay.
+Odpowiedzialności:
 
-DAO responsibilities:
+- `PlaceDao` — listy, wyszukiwanie, bounds, ranking, właściciel i widget,
+- `ReviewDao` — opinie miejsca i użytkownika,
+- `PendingOperationDao` — statusy pending, in-progress, failed i dead-letter.
 
-- `PlaceDao` provides list, owner, top, search, map bounds and widget queries.
-- `ReviewDao` provides review flows by place and by user.
-- `PendingOperationDao` stores pending, failed, in-progress and dead-letter operations.
+Room jest cache możliwym do odbudowania. Destructive fallback może być akceptowalny tylko wtedy, gdy nie usuwa jedynej kopii danych użytkownika ani nie gubi zaakceptowanych zapisów offline.
 
-Room is configured through `DatabaseModule` as `kidzone_cache.db` with destructive fallback
-migrations. That is acceptable because the database is treated as a rebuildable cache, not as
-the authoritative user data store.
+## Odczyt miejsc
 
-## Read flow
+- `observePlaces()` emituje z Room,
+- `getPlace()` próbuje Firestore i korzysta z cache jako fallback,
+- `getPlacesNear()` używa zapytania zdalnego, a przy błędzie może zwrócić cache,
+- `getTopPlaces()` korzysta z pól agregowanych i cache,
+- `getPlacesInBounds()` używa danych viewportu oraz limitów,
+- `getPlacesPage()` zapisuje pobraną stronę do Room.
 
-### Places
+Cache staje się użyteczny dopiero po wcześniejszym pobraniu danych online.
 
-`FirestorePlaceRepository` reads from Firestore for online fetches and writes successful results
-into Room.
+## Odczyt opinii
 
-Current behavior:
+- UI obserwuje dane lokalne,
+- snapshot listener aktualizuje Room,
+- cache może zasilić szczegóły miejsca i listę opinii użytkownika,
+- treści odrzucone lub zgłoszone jako spam nie powinny trafiać do publicznego cache,
+- brak cache kończy się kontrolowanym empty/error state.
 
-- `observePlaces()` emits from Room.
-- `getPlace()` tries Firestore first and falls back to a cached place by id.
-- `getPlacesNear()` tries Firestore geohash query and falls back to recent cached places.
-- `getTopPlaces()` tries Firestore ranking and falls back to cached top places.
-- `getPlacesInBounds()` prefers cached viewport data when available, then queries Firestore.
-- `getPlacesPage()` queries Firestore for paged lists and stores returned places in Room.
+## Zapisy
 
-This gives the Start, lists, map and details screens a useful cached read path after data has
-been loaded at least once.
+Aktualne zapisy są online-first:
 
-### Reviews
+- dodanie, zmiana i usunięcie miejsca zapisuje Firebase, a następnie Room,
+- opinie zapisują Firebase, a po sukcesie aktualizują cache,
+- timeout lub brak sieci zwraca kontrolowany błąd,
+- nie jest emitowany fałszywy sukces,
+- ponowienie nie może utworzyć duplikatu.
 
-`FirestoreReviewRepository` uses Room as the local stream and Firestore snapshot listeners as the
-remote updater.
+## Kolejka zapisów
 
-Current behavior:
+`SyncManager.enqueue()` i `SyncWorker` stanowią przygotowanie do przyszłego replay, ale nie oznaczają gotowej funkcji offline-first.
 
-- `observeReviewsForPlace()` emits cached reviews for the place and refreshes them from Firestore.
-- `observeReviewsByUser()` emits cached reviews for the user and refreshes them from Firestore.
-- reported spam is filtered before reviews are written to Room.
+Dopóki processory nie są kompletne:
 
-## Write flow
+- operacja nie jest oznaczana jako zsynchronizowana,
+- błędny payload jest odrzucany,
+- retryable failure zachowuje operację,
+- trwały błąd trafia do dead-letter po ustalonym limicie,
+- UI nie obiecuje późniejszej synchronizacji.
 
-Current user-facing write behavior is online-first:
+## Warunki włączenia replay
 
-- adding, updating and deleting places writes to Firestore and then updates Room;
-- adding, updating and deleting reviews writes to Firestore and then updates Room;
-- review writes use a timeout and return a user-facing offline failure if the write cannot finish.
+Przed udostępnieniem zapisów offline wymagane są:
 
-The pending queue exists, but write replay is not considered production-ready yet.
+- pełne processory add/update/delete dla miejsca i opinii,
+- identyfikatory idempotencji,
+- jawny status pending/failed w UI,
+- bezpieczne retry i backoff,
+- obsługa auth i wygasłej sesji,
+- konflikt create/update/delete,
+- testy emulatorowe,
+- cleanup po logout i account deletion,
+- monitoring dead-letter,
+- brak utraty danych po aktualizacji aplikacji.
 
-`SyncManager.enqueue()` stores a serialized operation and schedules `SyncWorker` with a connected
-network constraint. `SyncWorker` then reads pending and retryable failed operations in FIFO order.
+## Konflikty
 
-At the moment the processors for add/update/delete place and review operations are gated. They
-return failure for replayable writes instead of silently marking them as synced. This protects
-data integrity: the app should not lose a queued operation while pretending it was sent.
+Docelowy model dla aktualizacji może korzystać z `updatedAtMillis`:
 
-## Synchronization flow
+1. Worker odczytuje stan serwera.
+2. Nowszy rekord serwera wygrywa nad starszą lokalną zmianą.
+3. Lokalna zmiana może zostać zastosowana tylko przy jawnie spełnionej regule.
+4. Brak dokumentu na serwerze wymaga decyzji zależnej od typu operacji.
+5. Brak połączenia pozostawia operację retryable.
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant Repo as Repository
-    participant Room
-    participant Firestore
-    participant Worker as SyncWorker
+Sam server-wins nie rozwiązuje wszystkich konfliktów. Usunięcia, zdjęcia, agregaty i częściowe zapisy wymagają osobnych reguł.
 
-    User->>Repo: Open list/map/details
-    Repo->>Room: Emit cached data
-    Repo->>Firestore: Fetch fresh data
-    Firestore-->>Repo: Remote snapshot/result
-    Repo->>Room: Upsert cache
-    Room-->>User: UI updates
+## Oczekiwane zachowanie błędów
 
-    User->>Repo: Save place/review
-    Repo->>Firestore: Online write
-    alt Write succeeds
-        Firestore-->>Repo: OK
-        Repo->>Room: Upsert/delete local cache
-    else Offline or timeout
-        Repo-->>User: Controlled failure
-    end
-
-    Room->>Worker: Pending queue exists
-    Worker->>Firestore: Replay only after processors are implemented
-```
-
-## Conflict resolution strategy
-
-The queued update path uses a server-wins rule based on `updatedAtMillis`.
-
-For update operations:
-
-1. `SyncWorker` reads `updatedAtMillis` from the server document.
-2. If the server timestamp is newer, the local queued update is discarded.
-3. If the local timestamp is newer or equal, the worker may apply the local update.
-4. If the server document no longer exists, the local queued update is discarded.
-5. If the conflict check cannot reach Firestore, the operation stays retryable.
-
-Because replay processors are currently gated, this strategy is documented as the target behavior
-for queued updates rather than a complete offline write feature.
-
-## Error handling
-
-| Condition | Expected behavior |
+| Sytuacja | Oczekiwane zachowanie |
 | --- | --- |
-| Offline read with cache | Show cached data and keep the app usable. |
-| Offline read without cache | Show an empty/error state with retry, not a crash. |
-| Firestore timeout during review write | Return a controlled offline failure. |
-| Network error during review write | Return a controlled offline failure. |
-| Server validation or permission error | Return failure without enqueueing a fake offline success. |
-| Auth error | Require sign-in or reauthentication depending on the flow. |
-| Worker systemic failure | Retry with WorkManager backoff. |
-| Max worker retries | Move operation to dead letter. |
+| offline z cache | pokaż cache i status offline |
+| offline bez cache | empty/error state z retry |
+| timeout zapisu | kontrolowany błąd, brak sukcesu |
+| błąd walidacji lub Rules | brak enqueue jako zwykły offline retry |
+| auth error | logowanie lub reauthentication |
+| failure WorkManager | retry z backoffem |
+| limit retry | dead-letter i monitoring |
+| częściowy upload | brak pełnego sukcesu, cleanup lub retry |
 
-## Offline UX
+## UX offline
 
-Expected user-facing behavior:
+- Start, Lista, Mapa i szczegóły mogą wyświetlać cache,
+- dane powinny być oznaczone zachowaniem i statusem, bez technicznego żargonu,
+- rejestracja i zapisy wymagające sieci pokazują czytelny komunikat,
+- formularz zachowuje wpisane dane po błędzie,
+- retry nie tworzy duplikatów,
+- aplikacja nie pozostaje w nieskończonym loadingu,
+- brak sieci nie blokuje nawigacji po dostępnych danych.
 
-- Start, lists, map and details can show previously cached places.
-- Reviews can show previously cached reviews for already opened places or user review lists.
-- The main screen shows the offline status banner when connectivity is unavailable.
-- Registration and writes should show clear failure messages when the action requires network.
-- The app must not show stale private user data after logout or account deletion.
-- The widget must not keep private location state after logout, ban sign-out or account deletion.
+## Prywatność
+
+Po logout, ban sign-out i account deletion:
+
+- prywatny profil nie jest widoczny z cache,
+- tokeny i prywatne preferencje są czyszczone,
+- prywatna lokalizacja widgetu jest usuwana,
+- widget jest odświeżany,
+- pending operations użytkownika nie mogą zostać wykonane po zakończeniu jego sesji,
+- publiczny cache może pozostać tylko wtedy, gdy nie identyfikuje poprzedniego użytkownika.
 
 ## Cache invalidation
 
-Places:
+### Miejsca
 
-- `KidZoneApplication` deletes stale place cache entries on app start.
-- Current TTL: 7 days.
-- Place cache can also be cleared through `PlaceDao.clearAll()` when a flow explicitly requires it.
+- cache jest czyszczony według TTL,
+- aktualna implementacja używa TTL 7 dni,
+- jawny flow może wykonać `clearAll()`,
+- rekordy usunięte lub ukryte powinny zniknąć przy odświeżeniu.
 
-Reviews:
+### Opinie
 
-- Review cache is refreshed by Firestore snapshot listeners.
-- Reviews for a place are replaced when the place review stream refreshes.
-- There is no global TTL for reviews yet.
+- aktualizowane przez snapshot listeners,
+- stream miejsca może zastąpić lokalny zestaw,
+- brak globalnego TTL wymaga świadomego monitorowania stale data,
+- usunięcie konta lub moderacja nie może pozostawić prywatnego powiązania autora.
 
-Widget:
+### Widget
 
-- Widget data comes from public place cache.
-- Last widget location is private state and is cleared on sign-out, ban sign-out and account
-  deletion.
+- publiczne miejsca pochodzą z Room,
+- ostatnia lokalizacja jest prywatna,
+- prywatny stan jest czyszczony po zakończeniu sesji.
 
-## Implementation notes
+## Główne pliki
 
-Primary files:
-
-- `app/src/main/java/com/kidzone/data/local/KidZoneDatabase.kt`
-- `app/src/main/java/com/kidzone/data/local/PlaceDao.kt`
-- `app/src/main/java/com/kidzone/data/local/ReviewDao.kt`
-- `app/src/main/java/com/kidzone/data/local/sync/PendingOperationDao.kt`
-- `app/src/main/java/com/kidzone/data/local/sync/PendingOperationEntity.kt`
-- `app/src/main/java/com/kidzone/data/repository/FirestorePlaceRepository.kt`
-- `app/src/main/java/com/kidzone/data/repository/FirestoreReviewRepository.kt`
-- `app/src/main/java/com/kidzone/sync/SyncManager.kt`
-- `app/src/main/java/com/kidzone/sync/SyncWorker.kt`
-- `app/src/main/java/com/kidzone/widget/NearbyPlacesWidget.kt`
-
-Known follow-up:
-
-- Complete production write replay for queued operations or remove unsupported operation types.
-- Add explicit UI for pending and failed operations if offline writes become user-facing.
-- Add integration tests for worker replay against the Firestore emulator.
-- Decide whether logout/delete should also clear public Room place cache, not only private widget
-  location state.
-
-## Manual QA checklist
-
-Use a debug or release-candidate build with a test Firebase project.
-
-### Read cache
-
-- [ ] Open Start online and confirm places load.
-- [ ] Open place details online and confirm reviews load.
-- [ ] Open map online and move the viewport so nearby places are cached.
-- [ ] Disable network.
-- [ ] Restart the app.
-- [ ] Confirm Start shows cached places or a controlled empty state.
-- [ ] Confirm list/search does not crash without network.
-- [ ] Confirm map shows cached/fallback places or an accessible fallback state.
-- [ ] Confirm place details show cached place data when available.
-- [ ] Confirm reviews show cached data for places opened before going offline.
-
-### Write behavior
-
-- [ ] Disable network.
-- [ ] Try to add a place.
-- [ ] Confirm the app shows a controlled failure and does not claim the place was saved.
-- [ ] Try to add a review.
-- [ ] Confirm the app shows a controlled failure and does not claim the review was saved.
-- [ ] Re-enable network.
-- [ ] Confirm no phantom place/review appears from a previously failed offline write.
-
-### Privacy and logout
-
-- [ ] Cache places by opening Start/map online.
-- [ ] Add the widget and grant location if needed.
-- [ ] Log out.
-- [ ] Confirm private widget location is cleared and widget refreshes.
-- [ ] Confirm no private profile data appears after logout/restart.
-
-### Worker queue
-
-- [ ] If a test build manually seeds `pending_operations`, run with network enabled.
-- [ ] Confirm invalid payloads are discarded.
-- [ ] Confirm gated replay operations stay failed/retryable and are not marked as synced.
-- [ ] Confirm dead-letter behavior after max retries if the operation keeps failing.
-
-## Automated test guidance
-
-For documentation-only changes:
-
-```powershell
-git diff --check
+```text
+app/src/main/java/com/kidzone/data/local/KidZoneDatabase.kt
+app/src/main/java/com/kidzone/data/local/PlaceDao.kt
+app/src/main/java/com/kidzone/data/local/ReviewDao.kt
+app/src/main/java/com/kidzone/data/local/sync/PendingOperationDao.kt
+app/src/main/java/com/kidzone/data/local/sync/PendingOperationEntity.kt
+app/src/main/java/com/kidzone/data/repository/FirestorePlaceRepository.kt
+app/src/main/java/com/kidzone/data/repository/FirestoreReviewRepository.kt
+app/src/main/java/com/kidzone/sync/SyncManager.kt
+app/src/main/java/com/kidzone/sync/SyncWorker.kt
+app/src/main/java/com/kidzone/widget/NearbyPlacesWidget.kt
 ```
 
-For future code changes in offline/cache behavior:
+## Manual QA
+
+### Cache odczytowy
+
+- [ ] otwórz Start, Listę, Mapę i szczegóły online,
+- [ ] otwórz opinie miejsca,
+- [ ] wyłącz sieć i uruchom aplikację ponownie,
+- [ ] potwierdź dostępność wcześniej pobranych danych,
+- [ ] potwierdź kontrolowany stan bez cache,
+- [ ] sprawdź wyszukiwanie, filtry i fallback mapy,
+- [ ] włącz sieć i sprawdź odświeżenie bez restartu.
+
+### Zapisy
+
+- [ ] offline spróbuj dodać miejsce,
+- [ ] aplikacja nie pokazuje sukcesu,
+- [ ] formularz zachowuje dane,
+- [ ] offline spróbuj dodać opinię,
+- [ ] po powrocie sieci nie pojawia się phantom record,
+- [ ] ręczny retry tworzy tylko jeden rekord.
+
+### Prywatność
+
+- [ ] dodaj widget i użyj lokalizacji,
+- [ ] wykonaj logout,
+- [ ] sprawdź widget, restart i cache profilu,
+- [ ] powtórz dla ban sign-out i account deletion,
+- [ ] sprawdź, że queued operation nie wykonuje się po usunięciu konta.
+
+### Worker
+
+- [ ] testowy pending record nie jest fałszywie oznaczany jako synced,
+- [ ] invalid payload jest odrzucany,
+- [ ] retry zachowuje operację,
+- [ ] dead-letter działa po limicie,
+- [ ] logi nie zawierają payloadu ani PII.
+
+## Testy automatyczne
 
 ```powershell
-$env:MAPS_API_KEY="AIzaSyPlaceholder"; .\gradlew.bat testDebugUnitTest
-$env:MAPS_API_KEY="AIzaSyPlaceholder"; .\gradlew.bat detekt
+$env:MAPS_API_KEY="AIzaSyPlaceholder"; .\gradlew.bat testDebugUnitTest detekt
 ```
 
-If Firestore or Storage rules change:
+Dla zmian Rules:
 
 ```powershell
 cd tests/firestore-rules
 npm test
 ```
 
+Przed produkcyjnym replay wymagane są również testy integracyjne `SyncWorker` z Firebase Emulator.
+
 ## Definition of Done
 
-- [ ] This document is updated when offline cache or sync behavior changes.
-- [ ] Read-cache scenarios pass manually on a device or emulator.
-- [ ] Offline write UX does not promise a queued sync unless replay is implemented.
-- [ ] Widget privacy behavior is verified after logout and account deletion.
-- [ ] Any production write replay is covered by unit and emulator tests before release.
+- [ ] cache odczytowy działa bez crasha,
+- [ ] offline bez cache ma kontrolowany stan,
+- [ ] zapisy nie udają sukcesu,
+- [ ] prywatny stan jest czyszczony po zakończeniu sesji,
+- [ ] retry i worker są idempotentne,
+- [ ] replay ma testy emulatorowe przed włączeniem,
+- [ ] dokumentacja odpowiada faktycznej implementacji.
