@@ -26,15 +26,14 @@ import javax.inject.Inject
 private val RANKING_ERROR_FALLBACK = UiText.StringResource(com.kidzone.R.string.error_fetch_list)
 
 /**
- * ViewModel zakładki Ranking.
+ * Zarządza jednorazowym pobieraniem rankingu miejsc i użytkowników.
  *
- * Pobiera *one-shot* dwie listy równolegle:
- *  - top miejsc wg [Place.averageRating] (przez [PlaceRepository.getTopPlaces]),
- *  - top użytkowników wg [User.placesAddedCount] (przez [AuthRepository.getTopUsers]).
+ * Obie listy są pobierane równolegle, filtrowane do aktywnych rekordów i ograniczane wartościami
+ * Remote Config. Ranking nie korzysta ze stałych listenerów, ponieważ nie wymaga aktualizacji w
+ * czasie rzeczywistym, a one-shot ogranicza liczbę odczytów Firestore.
  *
- * Świadomie nie używamy snapshot listenera – ranking nie musi być real-time,
- * a one-shot redukuje zużycie kwoty Firestore. [refresh] pozwala użytkownikowi
- * odświeżyć ręcznie (pull-to-refresh / przycisk).
+ * ViewModel prekomputuje także odznaki rankingowe, aby karta użytkownika i profil używały tej samej
+ * interpretacji pozycji w rankingu.
  */
 @HiltViewModel
 class RankingViewModel @Inject constructor(
@@ -44,14 +43,13 @@ class RankingViewModel @Inject constructor(
 ) : ViewModel() {
 
     /**
-     * @property topPlaces top miejsc wg średniej oceny (malejąco), do limitu z Remote Config
-     * @property topUsers  top użytkowników wg liczby dodanych miejsc, drugorzędnie po liczbie opinii, do limitu z Remote Config
-     * @property userBadges precomputowane odznaki per user (uid -> lista odznak),
-     *   uwzględniają KONTEKST rankingowy (LEADER_*, PLACE_TOP*) - inaczej karta
-     *   usera w rankingu pokazywałaby mniej odznak niż ten sam user widzi na
-     *   swoim profilu, co jest mylące. UI tylko odczytuje, nie liczy.
-     * @property isLoading aktywne podczas pierwszego ładowania i każdego refreshu
-     * @property errorMessage komunikat błędu (jeśli któraś z list nie wczytała się)
+     * Niezmienny stan zakładki rankingu.
+     *
+     * @property topPlaces aktywne miejsca uporządkowane według średniej oceny.
+     * @property topUsers aktywni użytkownicy uporządkowani według liczby dodanych miejsc.
+     * @property userBadges odznaki obliczone dla każdego użytkownika z kontekstem rankingowym.
+     * @property isLoading czy trwa pierwsze ładowanie lub jawne odświeżenie.
+     * @property errorMessage bezpieczny komunikat błędu; częściowy sukces może nadal zawierać dane.
      */
     data class UiState(
         val topPlaces: List<Place> = emptyList(),
@@ -62,24 +60,26 @@ class RankingViewModel @Inject constructor(
     )
 
     private val _uiState = MutableStateFlow(UiState())
+
+    /** Stan obserwowany przez ekran Compose. */
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     init {
         refresh()
     }
 
+    /**
+     * Pobiera ranking miejsc i użytkowników oraz przelicza odznaki.
+     *
+     * @param forceShowLoading gdy `true`, pokazuje pełny stan ładowania także przy istniejących
+     * danych; przy `false` odświeżenie może zachować poprzednią treść na ekranie.
+     */
     fun refresh(forceShowLoading: Boolean = false) {
         viewModelScope.launch {
             if (forceShowLoading || (_uiState.value.topPlaces.isEmpty() && _uiState.value.topUsers.isEmpty())) {
                 _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             }
 
-            // Równoległy fetch obu list – ranking ładuje się tak szybko jak
-            // wolniejsze z dwóch zapytań, a nie jako ich suma.
-            //
-            // Fetch pool > visible limit - bierzemy z zapasem, żeby po
-            // odfiltrowaniu "nieaktywnych" wpisów (zob. niżej) i tak mieć
-            // szansę zapełnić limit aktywnymi userami / miejscami.
             val performanceConfig = performanceConfigProvider.performanceConfig
             val (placesResult, usersResult) = coroutineScope {
                 val placesDeferred = async {
@@ -91,17 +91,6 @@ class RankingViewModel @Inject constructor(
                 placesDeferred.await() to usersDeferred.await()
             }
 
-            // --- Filtry "aktywności" ---
-            // Świadomie ukrywamy świeże / nieaktywne wpisy z rankingu, żeby
-            // top był sensowny merytorycznie:
-            //  - miejsce z 0 opinii lub averageRating == 0.0 nie zasłużyło
-            //    jeszcze na pozycję na liście (każde nowe miejsce startuje
-            //    z 0/0 - inaczej top byłby zalany świeżakami);
-            //  - user bez ani jednego dodanego miejsca i bez ani jednej opinii
-            //    nie ma czego "rankingować" - pojawi się dopiero po
-            //    pierwszej aktywności.
-            //
-            // Po filtrze tnijemy do limitu z Remote Config - to twardy sufit dla UI.
             val places = (placesResult as? OpResult.Success)?.data.orEmpty()
                 .filter { it.reviewsCount > 0 && it.averageRating > 0.0 }
                 .take(performanceConfig.rankingTopLimit)
@@ -109,7 +98,6 @@ class RankingViewModel @Inject constructor(
                 .filter { it.placesAddedCount > 0 || it.reviewsCount > 0 }
                 .take(performanceConfig.rankingTopLimit)
 
-            // Łączymy komunikaty błędów z obu fetchów
             val error = when {
                 placesResult is OpResult.Failure && usersResult is OpResult.Failure ->
                     placesResult.error.toPlacesErrorMessage(RANKING_ERROR_FALLBACK)
@@ -120,24 +108,14 @@ class RankingViewModel @Inject constructor(
                 else -> null
             }
 
-            // Precomputuj odznaki per user z pełnym BadgeContext (rank w
-            // rankingu userów + najlepsza pozycja jakiegokolwiek miejsca
-            // tego usera w rankingu miejsc). Dzięki temu karta usera w
-            // rankingu pokazuje TE SAME odznaki co user widzi na swoim
-            // profilu - żadnego "tu mam 5, tam tylko 3" mylącego.
-            //
-            // Reguły spójne z ProfileViewModel.computeBadgeContext: filtry
-            // aktywności już zaaplikowane w `users` / `places` powyżej,
-            // więc indeks 1-based w tych listach to dokładnie ranga, którą
-            // user widzi w UI.
-            val userBadges: Map<String, List<UserBadge>> = users.mapIndexed { idx, u ->
+            val userBadges: Map<String, List<UserBadge>> = users.mapIndexed { idx, user ->
                 val userRank = (idx + 1).takeIf { it in 1..3 }
                 val bestPlaceRank = places
-                    .mapIndexedNotNull { pIdx, p ->
-                        if (p.ownerUserId == u.id) pIdx + 1 else null
+                    .mapIndexedNotNull { placeIndex, place ->
+                        if (place.ownerUserId == user.id) placeIndex + 1 else null
                     }
                     .minOrNull()
-                u.id to u.computeBadges(BadgeContext(userRank, bestPlaceRank))
+                user.id to user.computeBadges(BadgeContext(userRank, bestPlaceRank))
             }.toMap()
 
             _uiState.value = UiState(
@@ -149,5 +127,4 @@ class RankingViewModel @Inject constructor(
             )
         }
     }
-
 }
