@@ -6,106 +6,133 @@ import com.kidzone.utils.OpResult
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Sposób, w jaki aktualnie zalogowany użytkownik się uwierzytelnił.
+ * Sposób uwierzytelnienia aktualnego użytkownika.
  *
- * Wpływa na to, jakie operacje zarządzania kontem są dla niego dostępne:
- *  - [EMAIL_PASSWORD] – pełen zakres (zmiana hasła, zmiana e-maila, usunięcie
- *    konta z hasłem jako reauth credential),
- *  - [GOOGLE] – zmiana hasła nie ma sensu (Google nim zarządza), zmiana
- *    e-maila wymaga zmiany konta Google. Usunięcie konta wymagałoby reauth
- *    przez ponowny Google Sign-In (nieobsługiwane w MVP),
- *  - [UNKNOWN] – fallback dla nieoczekiwanego providera lub gdy user jest
- *    wylogowany. UI powinno wtedy schować całą sekcję "Konto i bezpieczeństwo".
+ * Wartość określa dostępne operacje zarządzania kontem:
+ * - [EMAIL_PASSWORD] obsługuje zmianę hasła, zmianę e-maila i reautoryzację hasłem,
+ * - [GOOGLE] korzysta z reautoryzacji tokenem Google,
+ * - [UNKNOWN] oznacza brak sesji albo nieobsługiwanego providera.
  */
 enum class SignInProvider { EMAIL_PASSWORD, GOOGLE, UNKNOWN }
 
 /**
- * Operacje uwierzytelniania (e-mail/hasło + Google), obserwacja
- * aktualnie zalogowanego użytkownika oraz odczyt publicznych danych
- * innych użytkowników (np. autora miejsca).
+ * Kontrakt uwierzytelniania i zarządzania kontem użytkownika.
+ *
+ * Obejmuje logowanie e-mail/hasło i Google, obserwację sesji, publiczne dane profilu,
+ * aktualizację konta oraz trwałe usuwanie danych. Implementacja mapuje błędy Firebase do
+ * [OpResult] i nie powinna przekazywać surowych komunikatów backendu do UI.
  */
 interface AuthRepository {
 
     /**
-     * Strumień aktualnie zalogowanego użytkownika lub null gdy wylogowany.
+     * Strumień lekkiego modelu aktualnie zalogowanego użytkownika.
      *
-     * Uwaga: ten strumień wystawia "lekkiego" usera zbudowanego z [FirebaseUser]
-     * (pola: id, name, email, avatarUrl). Pełnego dokumentu z Firestore – w tym
-     * `firstName`, `lastName`, `placesAddedCount`, `reviewsCount` – dostarcza
-     * [observeUser]. Większości ekranów wystarcza ten lekki stream
-     * (potrzebują tylko zalogowanego uid + nick), profil korzysta z [observeUser].
+     * Model zawiera dane dostępne bezpośrednio z providera uwierzytelniania. Pełny dokument
+     * Firestore udostępnia [observeUser].
+     *
+     * @return strumień użytkownika albo `null` po wylogowaniu, banie lub usunięciu konta.
      */
     val currentUser: Flow<User?>
 
     /**
-     * Strumień **pełnego** dokumentu użytkownika z kolekcji `users` (snapshot
-     * listener). Emituje:
-     *  - aktualny stan po pierwszym fetchu,
-     *  - kolejne emisje przy każdej zmianie dokumentu (np. po
-     *    [updateUserProfile] albo gdy inkrementuje się licznik miejsc).
+     * Obserwuje pełny dokument użytkownika z kolekcji `users`.
      *
-     * Emituje `null` gdy [userId] jest pusty albo dokument nie istnieje.
-     * Strumień zamyka się błędem przy błędach Firestore (np. brak uprawnień).
+     * Emituje `null`, gdy [userId] jest pusty albo dokument nie istnieje. Błędy dostępu lub sieci
+     * powinny zostać zmapowane na poziomie implementacji lub warstwy wyższej.
+     *
+     * @param userId identyfikator użytkownika.
+     * @return strumień aktualnego dokumentu profilu.
      */
     fun observeUser(userId: String): Flow<User?>
 
+    /**
+     * Loguje użytkownika adresem e-mail i hasłem.
+     *
+     * @param email adres przypisany do konta.
+     * @param password hasło użytkownika; nie może być logowane ani przechowywane.
+     * @return zalogowany użytkownik albo zmapowany błąd uwierzytelniania.
+     */
     suspend fun signInWithEmail(email: String, password: String): OpResult<User>
 
+    /**
+     * Tworzy konto e-mail/hasło i inicjalizuje powiązany profil użytkownika.
+     *
+     * Implementacja powinna obsłużyć częściowy błąd między utworzeniem konta Auth a zapisem profilu
+     * i nie zgłaszać pełnego sukcesu, dopóki wymagane dane konta nie są gotowe.
+     *
+     * @param name publiczna nazwa użytkownika.
+     * @param email adres nowego konta.
+     * @param password hasło zgodne z polityką aplikacji.
+     * @return utworzony użytkownik albo zmapowany błąd.
+     */
     suspend fun registerWithEmail(name: String, email: String, password: String): OpResult<User>
 
-    /** [idToken] pochodzi z Google Sign-In na urządzeniu. */
+    /**
+     * Loguje lub rejestruje użytkownika poświadczeniem Google.
+     *
+     * @param idToken krótkotrwały token ID uzyskany na urządzeniu; nie może być logowany.
+     * @return zalogowany użytkownik albo zmapowany błąd providera.
+     */
     suspend fun signInWithGoogle(idToken: String): OpResult<User>
 
+    /**
+     * Wysyła wiadomość umożliwiającą reset hasła.
+     *
+     * Odpowiedź użytkownika nie powinna ujawniać, czy podany adres istnieje w systemie.
+     *
+     * @param email adres, na który ma zostać wysłany link resetujący.
+     */
     suspend fun sendPasswordResetEmail(email: String): OpResult<Unit>
 
-    /** Wysyła ponownie email weryfikacyjny do aktualnie zalogowanego usera. */
+    /**
+     * Ponownie wysyła wiadomość weryfikacyjną dla konta e-mail/hasło.
+     *
+     * @param email adres aktualnego konta.
+     * @param password hasło używane do wymaganej reautoryzacji.
+     */
     suspend fun resendVerificationEmail(email: String, password: String): OpResult<Unit>
 
+    /**
+     * Kończy lokalną i zdalną sesję użytkownika.
+     *
+     * Wywołujący lub implementacja muszą również wyczyścić prywatny cache, token FCM, lokalizację
+     * widgetu oraz operacje oczekujące powiązane z zakończoną sesją.
+     */
     suspend fun signOut()
 
     /**
-     * Odświeża dane aktualnie zalogowanego użytkownika (np. status weryfikacji e-mail).
+     * Odświeża dane providera aktualnie zalogowanego użytkownika, np. status weryfikacji e-mail.
      */
     suspend fun refreshUser(): OpResult<Unit>
 
     /**
-     * Pobiera dokument użytkownika z kolekcji `users`.
+     * Pobiera publiczny dokument użytkownika.
      *
-     * Używane np. na ekranie szczegółów miejsca, żeby pokazać
-     * "Dodano przez: {nick}". Nie wymaga, by [userId] był aktualnie
-     * zalogowanym użytkownikiem.
+     * Metoda może służyć do wyświetlenia autora miejsca lub opinii i nie wymaga, aby [userId]
+     * należał do aktualnie zalogowanej osoby.
+     *
+     * @param userId identyfikator publicznego profilu.
      */
     suspend fun getUserById(userId: String): OpResult<User>
 
     /**
-     * Top użytkowników wg [User.placesAddedCount] (sort malejąco).
+     * Pobiera ranking użytkowników według aktualnej reguły domenowej.
      *
-     * Używane przez ekran Ranking. Drugorzędne sortowanie
-     * (np. po `reviewsCount`) wykonuje strona klienta, bo composite index
-     * wymagałby ręcznej konfiguracji w konsoli Firebase.
+     * @param limit maksymalna liczba wyników.
      */
     suspend fun getTopUsers(limit: Int = 10): OpResult<List<User>>
 
     /**
      * Aktualizuje edytowalne pola profilu zalogowanego użytkownika.
      *
-     * Zapisuje:
-     *  - `users/{uid}` w Firestore (merge: zmienia tylko podane pola, nie nadpisuje
-     *    liczników i daty utworzenia),
-     *  - `displayName` i `photoUrl` w Firebase Auth (żeby strumień [currentUser]
-     *    od razu pokazał nowy nick / avatar bez czekania na refresh tokena).
+     * Zapisuje dokument Firestore oraz dane prezentacyjne Firebase Auth. Pola prywatne i publiczne
+     * powinny być przechowywane zgodnie z aktualnym schematem bezpieczeństwa.
      *
-     * @param displayName nowy publiczny nick (login). Powinien być niepusty –
-     *   jest używany w rankingu i przy autorze opinii / miejsca.
-     * @param firstName imię (może być puste, jeśli user nie chce go podawać).
-     * @param lastName nazwisko (może być puste).
-     * @param avatarUrl URL avatara z Firebase Storage albo z Google Sign-In.
-     *   Null = "wyczyść avatar".
-     *
-     * Zwraca zaktualizowanego [User] (po stronie aplikacji można na niego
-     * reagować, mimo że [observeUser] i tak za chwilę wyemituje ten sam stan).
-     * Jeśli user nie jest zalogowany, zwraca [OpResult.Failure] z
-     * [IllegalStateException].
+     * @param displayName publiczny nick użytkownika.
+     * @param firstName opcjonalne imię.
+     * @param lastName opcjonalne nazwisko.
+     * @param avatarUrl URL avatara albo `null`, aby go wyczyścić.
+     * @return zaktualizowany model użytkownika albo błąd.
      */
     suspend fun updateUserProfile(
         displayName: String,
@@ -115,53 +142,28 @@ interface AuthRepository {
     ): OpResult<User>
 
     /**
-     * Wgrywa wybrany lokalnie obrazek do Firebase Storage pod
-     * `avatars/{uid}/avatar.jpg` i zwraca publiczny [String] download URL.
+     * Wgrywa lokalny obraz avatara do Storage.
      *
-     * Wywołujący (zwykle ProfileViewModel) jest odpowiedzialny za
-     * przekazanie tego URL-a do [updateUserProfile] – upload sam w sobie
-     * **nie aktualizuje** dokumentu usera, żeby UI mogło pokazać preview
-     * przed zapisem ("Zapisz" / "Anuluj" w sheecie edycji).
+     * Upload nie aktualizuje automatycznie profilu; zwrócony URL należy przekazać do
+     * [updateUserProfile]. Implementacja powinna walidować MIME, rozmiar i ownership ścieżki.
      *
-     * Limity (egzekwowane też w `storage.rules`): tylko obrazki (MIME image/...),
-     * maks. 5 MB. Większe pliki dostaną błąd z Firebase.
+     * @param localUri URI obrazu z aparatu lub Android Photo Picker.
+     * @return download URL albo zmapowany błąd uploadu.
      */
     suspend fun uploadAvatar(localUri: Uri): OpResult<String>
 
-    // ============================================================
-    // === Account management (zmiana hasła / e-maila / usunięcie) ===
-    // ============================================================
-
     /**
-     * Zwraca, w jaki sposób aktualnie zalogowany user był uwierzytelniony.
+     * Zwraca provider aktualnej sesji.
      *
-     * UI używa wartości do pokazania / ukrycia akcji w sekcji
-     * "Konto i bezpieczeństwo". Zwraca [SignInProvider.UNKNOWN] gdy nikt nie
-     * jest zalogowany albo provider nie jest obsługiwany.
-     *
-     * Świadomie suspend, mimo że pod spodem to synchroniczny odczyt
-     * [com.google.firebase.auth.FirebaseAuth.currentUser] – zostawiamy sobie
-     * możliwość, by w przyszłości pójść po providerData asynchronicznie
-     * (np. po refresh tokenu) bez breaking change.
+     * @return [SignInProvider.UNKNOWN], gdy brak sesji lub provider nie jest obsługiwany.
      */
     suspend fun getCurrentSignInProvider(): SignInProvider
 
     /**
-     * Zmienia hasło zalogowanego użytkownika.
+     * Zmienia hasło użytkownika konta e-mail/hasło po reautoryzacji.
      *
-     * Wymaga uprzedniej re-authentication: Firebase odrzuca [FirebaseUser.updatePassword]
-     * jeśli ostatni login był "stary" (zwykle > 5 min). Reauth jest wykonywany
-     * wewnątrz tej metody – wywołujący nie musi się o to martwić.
-     *
-     * Działa tylko dla kont [SignInProvider.EMAIL_PASSWORD]. Dla Google
-     * zwraca [OpResult.Failure] z [IllegalStateException].
-     *
-     * @param currentPassword aktualne hasło – służy zarówno jako reauth
-     *   credential, jak i jako "ludzkie" potwierdzenie ("wiesz co robisz?").
-     * @param newPassword nowe hasło zgodne z [com.kidzone.utils.PasswordPolicy]
-     *   (min. 8 znaków, mała + duża litera, znak specjalny). Walidację po stronie
-     *   klienta wykonują ChangePasswordDialog i RegisterViewModel - tutaj
-     *   pozostaje fallback Firebase server-side ([com.google.firebase.auth.FirebaseAuthWeakPasswordException]).
+     * @param currentPassword aktualne hasło używane wyłącznie jako credential reauth.
+     * @param newPassword nowe hasło zgodne z polityką aplikacji.
      */
     suspend fun changePassword(
         currentPassword: String,
@@ -169,19 +171,12 @@ interface AuthRepository {
     ): OpResult<Unit>
 
     /**
-     * Inicjuje zmianę adresu e-mail zalogowanego użytkownika.
+     * Inicjuje zmianę adresu e-mail konta e-mail/hasło.
      *
-     * **Nowy e-mail nie zostanie aktywny od razu.** Firebase wysyła link
-     * weryfikacyjny na `newEmail`; dopiero kliknięcie linku finalizuje zmianę.
-     * UI powinno o tym poinformować ("Sprawdź skrzynkę: $newEmail").
+     * Nowy adres staje się aktywny dopiero po wykonaniu procesu weryfikacyjnego Firebase.
      *
-     * Pod spodem używamy [FirebaseUser.verifyBeforeUpdateEmail] zamiast
-     * deprecated [FirebaseUser.updateEmail] – ta druga nie współpracuje
-     * z włączoną w projekcie ochroną "Email enumeration protection" (włączoną
-     * domyślnie w nowych projektach Firebase).
-     *
-     * Wymaga reauth – analogicznie jak [changePassword]. Działa tylko dla
-     * kont [SignInProvider.EMAIL_PASSWORD].
+     * @param currentPassword hasło używane do reautoryzacji.
+     * @param newEmail nowy adres e-mail.
      */
     suspend fun changeEmail(
         currentPassword: String,
@@ -189,67 +184,34 @@ interface AuthRepository {
     ): OpResult<Unit>
 
     /**
-     * Trwałe usunięcie konta wraz z danymi użytkownika z aplikacji.
+     * Trwale usuwa konto e-mail/hasło i powiązane dane.
      *
-     * Wykonuje (w tej kolejności):
-     *  1. **Reauth** – wymagany przez Firebase do `firebaseUser.delete()`.
-     *  2. Usunięcie wszystkich opinii usera (`reviews.userId == uid`).
-     *  3. Usunięcie wszystkich miejsc usera (`places.ownerUserId == uid`).
-     *     Świadomie **nie kasujemy** opinii innych userów na tych miejscach –
-     *     reguły Firestore na to nie pozwalają (kasować można tylko swoje
-     *     opinie). Te opinie zostają jako "orphans". Pełną kaskadę dałaby
-     *     dopiero Cloud Function z Admin SDK (Blaze plan), do dorobienia
-     *     w przyszłości.
-     *  4. Usunięcie dokumentu `users/{uid}`.
-     *  5. Usunięcie avatara w Storage (`avatars/{uid}/avatar.jpg`) – best
-     *     effort, błąd nie zatrzymuje procesu.
-     *  6. `firebaseUser.delete()` – ostatecznie odbiera użytkownikowi tożsamość.
+     * Operacja obejmuje reautoryzację, cleanup Firestore, Storage, FCM, lokalnych danych, widgetu i
+     * tożsamości Auth. Proces nie jest atomowy, dlatego częściowy błąd musi pozostać widoczny, a
+     * ponowienie powinno być idempotentne.
      *
-     * Po sukcesie strumień [currentUser] wyemituje `null`, więc UI naturalnie
-     * wyląduje na ekranie logowania (NavGraph reaguje na auth state).
-     *
-     * Operacja **nie jest atomowa**. Jeśli przerwie się w połowie (np. brak
-     * Internetu między krokami 3 a 4), część danych może już zniknąć, a
-     * konto Auth dalej istnieje – kolejna próba usunięcia dokończy resztę.
-     *
-     * @param currentPassword aktualne hasło dla reauth (wymagane dla email/password
-     *   user). Dla Google user MVP nie obsługuje – zwraca błąd.
+     * @param currentPassword hasło używane do reautoryzacji.
      */
     suspend fun deleteAccount(currentPassword: String): OpResult<Unit>
 
     /**
-     * Trwałe usunięcie konta użytkownika zalogowanego przez Google.
+     * Trwale usuwa konto zalogowane przez Google.
      *
-     * Reauth odbywa się przez Google credential (idToken uzyskany z Google
-     * Sign-In w UI). Po reauth wykonuje tę samą kaskadę co [deleteAccount]:
-     * opinie → miejsca → doc usera → avatar → firebaseUser.delete().
-     *
-     * @param idToken Google ID token uzyskany przez Credential Manager / Google Sign-In
+     * @param idToken token ID używany do ponownej autoryzacji; nie może być logowany.
      */
     suspend fun deleteAccountWithGoogle(idToken: String): OpResult<Unit>
 
     /**
-     * Zapisuje na dokumencie `users/{uid}` znaczniki czasu zdobycia podanych
-     * odznak.
+     * Zapisuje czas zdobycia nowych odznak w sposób idempotentny `first-write-wins`.
      *
-     * Wywoływane przez [com.kidzone.presentation.profile.ProfileViewModel]
-     * w momencie, gdy lokalny diff (`current - seen` w SharedPreferences)
-     * wykryje, że użytkownik właśnie wbił nowy próg. Zapis jest **idempotent
-     * "first-write-wins"** - jeśli dane pole `badgeEarnedAt.NAME` już istnieje
-     * w Firestore (bo inny klient już je zapisał), nie nadpisujemy go.
-     *
-     * Po co to jest: chcemy mieć **chronologiczny porządek odznak** widoczny
-     * we wszystkich klientach (na karcie usera w rankingu user widzi
-     * "od najstarszej do najnowszej"). SharedPreferences trzymane lokalnie
-     * nie wystarczą, bo karta usera A jest renderowana na urządzeniu usera B.
-     *
-     * @param badgeNames lista [com.kidzone.presentation.common.UserBadge.name]
-     *   nowo zdobytych odznak. Pusta lista = no-op (zwraca Success(Unit)).
+     * @param badgeNames nazwy nowo zdobytych odznak; pusta lista jest operacją no-op.
      */
     suspend fun recordBadgesEarned(badgeNames: List<String>): OpResult<Unit>
 
     /**
-     * Usuwa odznaki z mapy badgeEarnedAt gdy user przestal spelnic prog.
+     * Usuwa zapisane odznaki, których warunki nie są już spełnione.
+     *
+     * @param badgeNames nazwy odznak do cofnięcia; pusta lista jest operacją no-op.
      */
     suspend fun revokeBadges(badgeNames: List<String>): OpResult<Unit>
 }
