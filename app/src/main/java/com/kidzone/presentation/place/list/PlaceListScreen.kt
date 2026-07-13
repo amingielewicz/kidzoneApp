@@ -88,6 +88,7 @@ import com.kidzone.R
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
+import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.EmptyState
 import com.kidzone.presentation.common.EmptyStateAction
@@ -102,7 +103,6 @@ import com.kidzone.presentation.common.SortMenuOption
 import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.requestLocationPermissionOrOpenSettings
 import com.kidzone.presentation.common.shimmerEffect
-import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.hasLocationPermission
 import kotlinx.coroutines.launch
 
@@ -769,7 +769,9 @@ private fun PlaceCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     Spacer(Modifier.height(6.dp))
-                    SoftCategoryTag(category = place.category)
+                    CategoryBadge(
+                        category = place.category
+                    )
                 }
                 PlaceListStatus(place = place)
             }
@@ -814,23 +816,6 @@ private fun PlaceCard(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun SoftCategoryTag(category: PlaceCategory) {
-    val style = category.style
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = style.color.copy(alpha = 0.10f),
-        contentColor = style.color
-    ) {
-        Text(
-            text = stringResource(category.labelRes),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-        )
     }
 }
 

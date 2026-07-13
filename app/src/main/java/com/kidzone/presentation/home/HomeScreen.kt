@@ -76,13 +76,13 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.kidzone.R
 import com.kidzone.domain.model.Place
-import com.kidzone.presentation.common.style
+import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.KidZoneRadii
 import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.NewPlaceBadge
-import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.RatingIcon
+import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.shimmerEffect
 
@@ -789,11 +789,10 @@ private fun PlaceCard(
                     iconSize = 18.dp
                 )
                 Spacer(Modifier.width(KidZoneSpacing.GapSmall))
-                CategoryFilledBadge(
-                    category = place.category,
-                    label = categoryLabel,
-                    modifier = Modifier.weight(1f)
+                CategoryBadge(
+                    category = place.category
                 )
+                Spacer(Modifier.weight(1f))
             }
             Spacer(Modifier.height(PLACE_CARD_MAIN_GAP))
             Text(
@@ -857,31 +856,6 @@ private fun PlaceRatingStatus(place: Place) {
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun CategoryFilledBadge(
-    category: com.kidzone.domain.model.PlaceCategory,
-    label: String,
-    modifier: Modifier = Modifier
-) {
-    val style = category.style
-
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(999.dp),
-        color = style.color.copy(alpha = 0.10f),
-        contentColor = style.color
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
-        )
     }
 }
 
