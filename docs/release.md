@@ -1,167 +1,98 @@
 # Release process
 
-Powiązane issue: #166  
-Parent: #159
+Powiązane issue: #159, #166, #210, #269, #272, #274, #275, #303
+
+Ostatnia aktualizacja: 2026-07-13
 
 ## Cel
 
-Ten dokument opisuje bezpieczny proces przygotowania release aplikacji kidZone przed publikacją w Google Play.
+Dokument opisuje bezpieczny proces przygotowania wydania kidZone do Google Play. Release nie może ominąć bramek technicznych, bezpieczeństwa, prywatności i manualnego QA.
 
-Release nie powinien być wykonywany bez przejścia checklisty technicznej, bezpieczeństwa, prawnej i testowej.
+## Dokumenty źródłowe
 
-Finalna bramka Google Play security/release znajduje się w:
+- [Szczegółowy proces release](release/RELEASE_PROCESS.md)
+- [Publikacja w Google Play](release/PLAY_STORE_RELEASE.md)
+- [Go/No-Go](release/GO_NO_GO_CHECKLIST.md)
+- [Google Play security checklist](qa/google-play-security-checklist.md)
+- [Manual release test plan](qa/manual-release-test-plan.md)
+- [Manual release gates](legal/v1-release-manual-gates.md)
 
-- [Google Play security release checklist](qa/google-play-security-checklist.md)
+## Typy wydań
 
-## Zakres dokumentu
-
-Dokument obejmuje:
-
-- przygotowanie brancha release,
-- lokalną walidację builda,
-- podpisywanie aplikacji,
-- obsługę keystore,
-- GitHub Secrets,
-- Firebase i Google Play Console,
-- checklistę przed publikacją,
-- procedurę awaryjnego rollbacku.
-
-## Typy release
-
-| Typ | Przykład | Opis |
+| Typ | Przykład | Cel |
 | --- | --- | --- |
-| Alpha | `v0.1.0-alpha` | Pierwszy release techniczny, testy wewnętrzne. |
-| Beta | `v0.2.0-beta` | Szersze testy, stabilizacja danych i wydajności. |
-| Release candidate | `v1.0.0-rc1` | Kandydat do publikacji produkcyjnej. |
-| Production | `v1.0.0` | Wersja publiczna w Google Play. |
+| Alpha | `v0.1.0-alpha` | test techniczny |
+| Beta | `v0.2.0-beta` | stabilizacja i testy zamknięte |
+| Release candidate | `v1.0.0-rc1` | finalna walidacja |
+| Production | `v1.0.0` | publiczne wydanie |
 
 ## Branching
 
-Rekomendowany schemat:
-
 ```text
 main
-└── release/v0.1.0-alpha
+└── release/v1.0.0
 ```
 
 Zasady:
 
-- `main` powinien być stabilny,
+- `main` pozostaje stabilny,
 - release przygotowujemy na osobnym branchu,
-- poprawki do release trafiają przez PR,
-- nie robimy przypadkowych commitów bezpośrednio na `main`,
-- przed publikacją sprawdzamy, czy branch release zawiera ostatnie zmiany z `main`.
+- poprawki trafiają przez PR,
+- branch release musi zawierać aktualne zmiany z `main`,
+- tag wskazuje dokładny commit wysłany do Google Play.
 
-## Minimalna checklista przed release
+## Minimalna bramka przed buildem
 
-Przed wygenerowaniem paczki release trzeba potwierdzić:
+- [ ] `assembleDebug` przechodzi,
+- [ ] `bundleRelease` przechodzi,
+- [ ] testy jednostkowe i statyczne przechodzą,
+- [ ] Gitleaks nie wykrywa sekretów,
+- [ ] Firestore Rules i Storage Rules są aktualne,
+- [ ] App Check release używa Play Integrity,
+- [ ] Crashlytics i Performance są zgodne z Data Safety,
+- [ ] `versionName` i `versionCode` są poprawne,
+- [ ] changelog i release notes są gotowe.
 
-- [ ] build debug przechodzi lokalnie,
-- [ ] build release przechodzi lokalnie albo w CI,
-- [ ] testy smoke zostały wykonane,
-- [ ] nie ma krytycznych błędów w logach,
-- [ ] Firebase Rules są aktualne,
-- [ ] Storage Rules są aktualne,
-- [ ] App Check jest poprawnie skonfigurowany,
-- [ ] Crashlytics działa w release,
-- [ ] checklista wydajnosci i obciazenia zostala wykonana albo swiadomie odlozona,
-- [ ] Data Safety jest zgodne z aktualnym kodem,
-- [ ] polityka prywatności i regulamin są aktualne,
-- [ ] flow usuwania konta zostało sprawdzone,
-- [ ] wersja aplikacji została podbita,
-- [ ] changelog został przygotowany,
-- [ ] [Google Play security release checklist](qa/google-play-security-checklist.md) ma decyzję GO albo świadome NO-GO.
+## Wersjonowanie
 
-## Lokalna walidacja
+Wersja jest zarządzana w `version.properties`:
 
-Podstawowa komenda:
+```properties
+VERSION_NAME=1.0.0
+VERSION_CODE=1
+```
+
+Zasady:
+
+- `VERSION_CODE` musi rosnąć przy każdym uploadzie,
+- `VERSION_NAME` odpowiada tagowi i release notes,
+- nie publikujemy dwóch różnych buildów z tym samym `VERSION_CODE`.
+
+## Build lokalny
 
 ```powershell
 .\gradlew assembleDebug
-```
-
-Dla release:
-
-```powershell
-.\gradlew assembleRelease
-```
-
-Jeżeli projekt używa bundle do Google Play:
-
-```powershell
+.\gradlew testDebugUnitTest
+.\gradlew detekt
+.\gradlew lint
 .\gradlew bundleRelease
 ```
 
-Przed PR release warto też wykonać:
-
-```powershell
-.\gradlew test
-```
-
-Jeżeli aktywne są narzędzia jakościowe:
-
-```powershell
-.\gradlew lint
-.\gradlew detekt
-```
-
-## Wersjonowanie aplikacji
-
-Przed publikacją trzeba sprawdzić w `app/build.gradle.kts`:
-
-```kotlin
-versionCode = ...
-versionName = "..."
-```
-
-Zasady:
-
-- `versionCode` musi rosnąć przy każdej paczce wysłanej do Google Play,
-- `versionName` powinien odpowiadać tagowi release,
-- nie wolno publikować dwóch różnych buildów z tym samym `versionCode`.
-
-Przykład:
-
-```kotlin
-versionCode = 1
-versionName = "0.1.0-alpha"
-```
-
-## Podpisywanie aplikacji
-
-Release Android wymaga podpisania aplikacji.
-
-Rekomendacja:
-
-- keystore produkcyjny nie powinien być commitowany do repo,
-- hasła do keystore nie powinny być wpisane w kodzie,
-- dane podpisu powinny być trzymane w GitHub Secrets albo lokalnym `keystore.properties`,
-- `keystore.properties` musi być w `.gitignore`,
-- dostęp do keystore powinien mieć tylko właściciel projektu lub wyznaczone osoby.
-
-Przykładowe lokalne pliki:
+Wynikowy bundle:
 
 ```text
-keystore/release-key.jks
-keystore.properties
+app/build/outputs/bundle/release/app-release.aab
 ```
 
-Przykładowe pola w `keystore.properties`:
+## Podpisywanie
 
-```properties
-storeFile=keystore/release-key.jks
-storePassword=***
-keyAlias=***
-keyPassword=***
-```
+- keystore nie trafia do repo,
+- hasła są przechowywane w menedżerze haseł lub GitHub Secrets,
+- kopia keystore jest przechowywana poza repo,
+- dostęp ma tylko właściciel lub upoważnione osoby,
+- po podejrzeniu wycieku uruchamiamy procedurę rotacji.
 
-Tego pliku nie wolno commitować.
-
-## GitHub Secrets
-
-Jeżeli release jest budowany w GitHub Actions, wymagane sekrety powinny być zapisane w ustawieniach repozytorium.
-
-Rekomendowane sekrety:
+Typowe sekrety CI:
 
 ```text
 ANDROID_KEYSTORE_BASE64
@@ -172,131 +103,91 @@ MAPS_API_KEY
 GOOGLE_SERVICES_JSON
 ```
 
-Zasady bezpieczeństwa:
-
-- sekretów nie wypisujemy w logach CI,
-- sekretów nie kopiujemy do README,
-- sekretów nie commitujemy,
-- dostęp do ustawień repo ograniczamy do minimum,
-- po podejrzeniu wycieku sekret należy obrócić.
-
 ## Firebase przed release
 
-Przed publikacją sprawdzamy:
+- [ ] produkcyjny projekt Firebase,
+- [ ] produkcyjny `google-services.json`,
+- [ ] wdrożone Firestore Rules,
+- [ ] wdrożone Storage Rules,
+- [ ] App Check w oczekiwanym trybie,
+- [ ] Crashlytics działa bez danych osobowych,
+- [ ] Analytics, Performance, FCM i Remote Config odpowiadają Data Safety,
+- [ ] budżety i alerty kosztowe są skonfigurowane.
 
-- [ ] projekt Firebase wskazuje właściwe środowisko,
-- [ ] `google-services.json` pochodzi z właściwego projektu,
-- [ ] Firestore Rules są wdrożone,
-- [ ] Storage Rules są wdrożone,
-- [ ] App Check jest w oczekiwanym trybie,
-- [ ] Crashlytics działa dla release,
-- [ ] Analytics jest zgodne z Data Safety,
-- [ ] Performance Monitoring jest zgodne z decyzją kosztową,
-- [ ] Cloud Messaging jest zgodne z decyzją dotyczącą powiadomień.
+## Uprawnienia Android
 
-## Google Play Console przed publikacją
+Finalny manifest powinien zawierać tylko wymagany zakres:
 
-Przed wysłaniem paczki do Google Play trzeba sprawdzić:
+- `ACCESS_FINE_LOCATION`,
+- `ACCESS_COARSE_LOCATION`,
+- `CAMERA`,
+- `POST_NOTIFICATIONS`.
 
-- [ ] nazwa aplikacji,
-- [ ] opis krótki i pełny,
-- [ ] grafiki i ikony,
-- [ ] polityka prywatności,
-- [ ] regulamin, jeśli linkowany,
+Nie powinien zawierać:
+
+- `ACCESS_BACKGROUND_LOCATION`,
+- `READ_MEDIA_IMAGES`,
+- `READ_EXTERNAL_STORAGE`,
+- `QUERY_ALL_PACKAGES`.
+
+Photo Picker musi działać bez szerokiego dostępu do galerii. Po trwałej odmowie lokalizacji lub kamery aplikacja ma prowadzić do ustawień aplikacji, a przyciski nie mogą stawać się martwe.
+
+## Google Play Console
+
+Przed uploadem sprawdź:
+
+- [ ] nazwę i opisy,
+- [ ] grafiki i screenshoty,
+- [ ] Privacy Policy URL,
+- [ ] Account deletion URL,
 - [ ] Data Safety,
 - [ ] App access,
 - [ ] Ads declaration,
 - [ ] Content rating,
-- [ ] Target audience,
-- [ ] test internal / closed / open,
-- [ ] kraj dystrybucji.
+- [ ] Target audience: rodzice i opiekunowie,
+- [ ] kraje dystrybucji,
+- [ ] track testowy.
 
-## Smoke test przed publikacją
+## Manualne bramki
 
-Minimalny test manualny:
+Wymagany wynik PASS:
 
-- [ ] start aplikacji,
-- [ ] rejestracja,
-- [ ] logowanie,
-- [ ] wylogowanie,
-- [ ] reset hasła,
-- [ ] mapa,
-- [ ] lista miejsc,
-- [ ] ranking,
-- [ ] profil,
-- [ ] dodanie miejsca,
-- [ ] dodanie zdjęcia,
-- [ ] dodanie opinii,
-- [ ] zgłoszenie treści,
-- [ ] odmowa lokalizacji,
-- [ ] odmowa powiadomień,
-- [ ] brak internetu,
-- [ ] usunięcie konta albo ścieżka zgłoszenia usunięcia danych.
+- account deletion,
+- runtime permissions,
+- publiczne dokumenty,
+- Data Safety,
+- manualny smoke test,
+- Google Play security checklist.
 
-## Changelog
+## Rollout
 
-Przed release przygotowujemy notatkę:
+Rekomendowany staged rollout:
 
-```markdown
-## v0.1.0-alpha
-
-### Added
-- ...
-
-### Changed
-- ...
-
-### Fixed
-- ...
-
-### Security
-- ...
+```text
+5% → 20% → 50% → 100%
 ```
 
-## Tag release
+Przed zwiększeniem rollout sprawdź Android vitals, Crashlytics, problemy z logowaniem, mapą, listą, zdjęciami, uprawnieniami i kosztami.
 
-Po merge release do `main` można utworzyć tag:
+## Rollback i hotfix
 
-```powershell
-git checkout main
-git pull origin main
-git tag v0.1.0-alpha
-git push origin v0.1.0-alpha
-```
+1. Zatrzymaj rollout.
+2. Sprawdź Crashlytics, vitals i zgłoszenia.
+3. Utwórz `hotfix/*` z właściwego tagu lub `main`.
+4. Napraw problem i dodaj test regresji.
+5. Zwiększ `VERSION_CODE`.
+6. Wykonaj pełne bramki wymagane dla zakresu poprawki.
+7. Wyślij nowy build.
+8. Uzupełnij changelog i opis incydentu.
 
-Tag powinien wskazywać dokładny commit, z którego powstał build wysłany do Google Play.
-
-## Rollback i procedura awaryjna
-
-Jeżeli release ma krytyczny błąd:
-
-1. Zatrzymać rollout w Google Play Console.
-2. Sprawdzić Crashlytics i opinie testerów.
-3. Utworzyć `hotfix/...` z `main` albo z tagu release.
-4. Naprawić problem.
-5. Wykonać smoke test.
-6. Zwiększyć `versionCode`.
-7. Wysłać nowy build.
-8. Opisać problem w changelogu.
-
-## Czego nie robić
-
-- Nie commitować keystore.
-- Nie commitować haseł.
-- Nie publikować builda bez aktualnego Data Safety.
-- Nie publikować builda bez sprawdzenia usuwania konta.
-- Nie zostawiać debug providerów w release.
-- Nie wysyłać builda z testowymi kluczami API.
-- Nie zakładać, że Firebase Rules są wdrożone tylko dlatego, że plik istnieje w repo.
-
-## Kryteria gotowości release
+## Kryteria gotowości
 
 Release jest gotowy, gdy:
 
-- build jest zielony,
-- paczka jest podpisana poprawnym keystore,
-- checklisty prawne i bezpieczeństwa są wykonane,
-- Data Safety pasuje do faktycznego działania aplikacji,
-- Firebase Rules są wdrożone,
-- nie ma krytycznych błędów w Crashlytics,
-- właściciel projektu świadomie akceptuje ryzyka przed publikacją.
+- build i CI są zielone,
+- AAB jest podpisany właściwym kluczem,
+- Data Safety odpowiada finalnemu buildowi,
+- account deletion i runtime permissions mają PASS,
+- Rules i App Check są wdrożone,
+- nie ma P0/P1,
+- właściciel świadomie zatwierdził GO.
