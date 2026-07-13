@@ -617,6 +617,7 @@ class FirebaseAuthRepository @Inject constructor(
                 .edit()
                 .remove(NearbyPlacesWidget.KEY_LAST_LAT)
                 .remove(NearbyPlacesWidget.KEY_LAST_LNG)
+                .remove(NearbyPlacesWidget.KEY_LAST_LOCATION_TIME)
                 .apply()
             NearbyPlacesWidget().updateAll(appContext)
         }.onFailure { error ->

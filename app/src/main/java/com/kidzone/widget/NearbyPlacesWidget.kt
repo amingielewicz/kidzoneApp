@@ -10,7 +10,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
@@ -21,6 +20,8 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
+import androidx.glance.appwidget.lazy.LazyColumn
+import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.layout.Alignment
@@ -52,9 +53,13 @@ private val WidgetStarGold = ColorProvider(Color(0xFFFFC107))
 private val WidgetTextPrimary = ColorProvider(Color(0xFF1F2933))
 private val WidgetTextSecondary = ColorProvider(Color(0xFF68717D))
 private val WidgetRowBackground = ColorProvider(Color(0x33FFFFFF))
+private const val MAX_WIDGET_PLACES = 10
+private const val VERY_CLOSE_DISTANCE_METERS = 50
+private const val METERS_PER_KILOMETER = 1000
+private const val ONE_MINUTE_MILLIS = 60_000L
 
 /**
- * Glance AppWidget showing the 3 nearest places from the local Room cache.
+ * Glance AppWidget showing nearby places from the local Room cache.
  *
  * Layout per row: Place name | Rating (stars) | Distance (km/m)
  *
@@ -65,21 +70,22 @@ private val WidgetRowBackground = ColorProvider(Color(0x33FFFFFF))
 class NearbyPlacesWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val nearbyPlaces = withContext(Dispatchers.IO) {
-            loadNearbyPlaces(context)
+        val widgetState = withContext(Dispatchers.IO) {
+            loadWidgetState(context)
         }
 
         provideContent {
             GlanceTheme {
                 NearbyPlacesContent(
                     context = context,
-                    places = nearbyPlaces
+                    places = widgetState.places,
+                    staleLocationAgeMinutes = widgetState.staleLocationAgeMinutes
                 )
             }
         }
     }
 
-    private fun loadNearbyPlaces(context: Context): List<WidgetPlace> {
+    private fun loadWidgetState(context: Context): WidgetState {
         val db = Room.databaseBuilder(
             context,
             KidZoneDatabase::class.java,
@@ -120,29 +126,45 @@ class NearbyPlacesWidget : GlanceAppWidget() {
 
         if (userLat == 0.0 && userLng == 0.0) {
             // No location available – return top-rated places as fallback
-            return allPlaces
-                .sortedByDescending { it.averageRating }
-                .take(3)
-                .map { it.copy(distanceMeters = null) }
+            return WidgetState(
+                places = allPlaces
+                    .sortedByDescending { it.averageRating }
+                    .take(MAX_WIDGET_PLACES)
+                    .map { it.copy(distanceMeters = null) },
+                staleLocationAgeMinutes = null
+            )
         }
+        val locationTimestampMillis = prefs.getLong(KEY_LAST_LOCATION_TIME, 0L)
+        val staleLocationAgeMinutes = locationTimestampMillis
+            .takeIf { it > 0L }
+            ?.let { ((System.currentTimeMillis() - it) / ONE_MINUTE_MILLIS).toInt().coerceAtLeast(0) }
 
         // Calculate distance and sort by nearest
-        return allPlaces
-            .map { place ->
-                val results = FloatArray(1)
-                Location.distanceBetween(userLat, userLng, place.latitude, place.longitude, results)
-                place.copy(distanceMeters = results[0].toInt())
-            }
-            .sortedBy { it.distanceMeters }
-            .take(3)
+        return WidgetState(
+            places = allPlaces
+                .map { place ->
+                    val results = FloatArray(1)
+                    Location.distanceBetween(userLat, userLng, place.latitude, place.longitude, results)
+                    place.copy(distanceMeters = results[0].toInt())
+                }
+                .sortedBy { it.distanceMeters }
+                .take(MAX_WIDGET_PLACES),
+            staleLocationAgeMinutes = staleLocationAgeMinutes
+        )
     }
 
     companion object {
         const val LOCATION_PREFS = "kidzone_widget_location"
         const val KEY_LAST_LAT = "last_latitude"
         const val KEY_LAST_LNG = "last_longitude"
+        const val KEY_LAST_LOCATION_TIME = "last_location_time"
     }
 }
+
+private data class WidgetState(
+    val places: List<WidgetPlace>,
+    val staleLocationAgeMinutes: Int?
+)
 
 /**
  * Lightweight data class for widget display – only the fields we need.
@@ -162,7 +184,8 @@ data class WidgetPlace(
 @Suppress("FunctionNaming")
 private fun NearbyPlacesContent(
     context: Context,
-    places: List<WidgetPlace>
+    places: List<WidgetPlace>,
+    staleLocationAgeMinutes: Int?
 ) {
     Column(
         modifier = GlanceModifier
@@ -184,12 +207,20 @@ private fun NearbyPlacesContent(
                 )
             )
         } else {
-            places.forEachIndexed { index, place ->
-                PlaceRow(
-                    context = context,
-                    place = place
-                )
-                if (index < places.lastIndex) {
+            LazyColumn(
+                modifier = GlanceModifier
+                    .fillMaxWidth()
+                    .defaultWeight()
+            ) {
+                items(
+                    items = places,
+                    itemId = { it.stableItemId }
+                ) { place ->
+                    PlaceRow(
+                        context = context,
+                        place = place,
+                        staleLocationAgeMinutes = staleLocationAgeMinutes
+                    )
                     Spacer(modifier = GlanceModifier.height(12.dp))
                 }
             }
@@ -213,11 +244,14 @@ private fun WidgetHeader(context: Context) {
             maxLines = 1,
             modifier = GlanceModifier.defaultWeight()
         )
-        Image(
-            provider = ImageProvider(R.drawable.ic_map_marker_other),
-            contentDescription = context.getString(R.string.widget_location_content_description),
-            modifier = GlanceModifier.size(20.dp),
-            colorFilter = ColorFilter.tint(WidgetPrimaryBlue)
+        Text(
+            text = context.getString(R.string.widget_brand_label),
+            style = TextStyle(
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = WidgetPrimaryBlue
+            ),
+            maxLines = 1
         )
     }
 }
@@ -225,7 +259,8 @@ private fun WidgetHeader(context: Context) {
 @Composable
 private fun PlaceRow(
     context: Context,
-    place: WidgetPlace
+    place: WidgetPlace,
+    staleLocationAgeMinutes: Int?
 ) {
     Row(
         modifier = GlanceModifier
@@ -270,11 +305,11 @@ private fun PlaceRow(
                     color = WidgetStarGold
                 )
             )
-            val distanceText = place.distanceText()
+            val distanceText = place.distanceText(context)
             if (distanceText.isNotBlank()) {
                 Spacer(modifier = GlanceModifier.height(2.dp))
                 Text(
-                    text = distanceText,
+                    text = distanceText.withStaleAge(context, staleLocationAgeMinutes),
                     style = TextStyle(
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Normal,
@@ -292,8 +327,27 @@ private fun WidgetPlace.ratingText(): String = if (reviewsCount > 0) {
     "\u2605 —"
 }
 
-private fun WidgetPlace.distanceText(): String = distanceMeters?.let { meters ->
-    if (meters < 1000) "${meters}m" else "%.1fkm".format(meters / 1000.0)
+private fun String.withStaleAge(context: Context, staleLocationAgeMinutes: Int?): String {
+    if (this.isBlank()) return this
+    val ageText = staleLocationAgeMinutes?.let {
+        if (it <= 1) {
+            context.getString(R.string.stale_age_one_minute)
+        } else {
+            context.getString(R.string.stale_age_minutes, it)
+        }
+    }
+    return ageText?.let { "$this ($it)" } ?: this
+}
+
+private val WidgetPlace.stableItemId: Long
+    get() = id.hashCode().toLong().let { if (it > 0) it else -it + 1L }
+
+private fun WidgetPlace.distanceText(context: Context): String = distanceMeters?.let { meters ->
+    when {
+        meters <= VERY_CLOSE_DISTANCE_METERS -> context.getString(R.string.very_close_distance)
+        meters < METERS_PER_KILOMETER -> context.getString(R.string.distance_m, meters)
+        else -> context.getString(R.string.distance_km, meters / METERS_PER_KILOMETER.toDouble())
+    }
 }.orEmpty()
 
 private fun WidgetPlace.detailsIntent(context: Context): Intent =

@@ -31,7 +31,6 @@ private const val RECENTLY_ADDED_WINDOW_MILLIS = 14L * 24L * 60L * 60L * 1000L
 private const val LOCATION_RETRY_DELAY_MS = 3_000L
 private const val LOCATION_RETRY_COUNT = 3
 private const val ONE_MINUTE_MILLIS = 60_000L
-private const val KEY_LAST_LOCATION_TIME = "last_location_time"
 
 /**
  * ViewModel ekranu Home (zakładka "Start" w bottom navigation).
@@ -327,7 +326,7 @@ class HomeViewModel @Inject constructor(
             .edit()
             .putFloat(NearbyPlacesWidget.KEY_LAST_LAT, lat.toFloat())
             .putFloat(NearbyPlacesWidget.KEY_LAST_LNG, lng.toFloat())
-            .putLong(KEY_LAST_LOCATION_TIME, timestampMillis)
+            .putLong(NearbyPlacesWidget.KEY_LAST_LOCATION_TIME, timestampMillis)
             .apply()
     }
 

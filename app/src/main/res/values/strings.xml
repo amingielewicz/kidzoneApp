@@ -164,6 +164,9 @@
     <string name="distance_m">%1$d m</string>
     <string name="distance_km">%1$.1f km</string>
     <string name="distance_km_integer">%1$d km</string>
+    <string name="very_close_distance">Tuż obok</string>
+    <string name="stale_age_one_minute">1 min temu</string>
+    <string name="stale_age_minutes">%1$d min temu</string>
     <string name="rating_accessibility_label">ocena %1$.1f, liczba opinii %2$d</string>
     <string name="new_place_no_reviews">nowe miejsce bez opinii</string>
 
@@ -304,7 +307,7 @@
     <string name="widget_name">Miejsca w pobliżu</string>
     <string name="widget_nearby_places_title">Miejsca w pobliżu</string>
     <string name="widget_no_cached_places">Brak miejsc w pamięci podręcznej</string>
-    <string name="widget_location_content_description">Lokalizacja</string>
+    <string name="widget_brand_label">kidZone</string>
     <string name="place_added_success">Dodano nowe miejsce</string>
     <string name="notification_permission_title">Włącz powiadomienia</string>
     <string name="notification_permission_message">Bądź na bieżąco z nowościami w kidZone!</string>

@@ -163,6 +163,9 @@
     <string name="distance_m">%1$d m</string>
     <string name="distance_km">%1$.1f km</string>
     <string name="distance_km_integer">%1$d km</string>
+    <string name="very_close_distance">Very close</string>
+    <string name="stale_age_one_minute">1 min ago</string>
+    <string name="stale_age_minutes">%1$d min ago</string>
     <string name="rating_accessibility_label">rating %1$.1f, review count %2$d</string>
     <string name="new_place_no_reviews">new place without reviews</string>
 
@@ -301,7 +304,7 @@
     <string name="widget_name">Nearby places</string>
     <string name="widget_nearby_places_title">Nearby places</string>
     <string name="widget_no_cached_places">No cached places</string>
-    <string name="widget_location_content_description">Location</string>
+    <string name="widget_brand_label">kidZone</string>
     <string name="place_added_success">New place added</string>
     <string name="notification_permission_title">Enable notifications</string>
     <string name="notification_permission_message">Stay up to date with what\'s new in kidZone!</string>
