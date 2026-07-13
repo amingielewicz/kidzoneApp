@@ -1,12 +1,12 @@
 # State Management
 
+Ostatnia aktualizacja: 2026-07-13
+
 ## Cel
 
-Dokument opisuje zasady zarządzania stanem w aplikacji KidZone.
+Zasady zarządzania stanem w kidZone z jednym źródłem prawdy dla ekranu i jednoznacznym rozdzieleniem trwałego stanu od zdarzeń jednorazowych.
 
-## Główna zasada
-
-Stan ekranu powinien mieć jedno źródło prawdy.
+## Przepływ
 
 ```text
 Repository / Use Case
@@ -18,86 +18,110 @@ StateFlow<UiState>
 Compose UI
 ```
 
-## UI State
+## UiState
 
-Każdy większy ekran powinien posiadać jawny `UiState`.
+Większy ekran powinien mieć jawny, niemutowalny `UiState`.
 
-Typowe pola:
+Typowe elementy:
 
-```text
-isLoading
-isRefreshing
-isSaving
-data
-errorMessage
-emptyState
-selectedFilters
-```
+- dane,
+- loading i refreshing,
+- saving lub submitting,
+- empty state,
+- błąd,
+- filtry i sortowanie,
+- stan offline,
+- stan wymaganej zgody lub usługi systemowej.
+
+Dla złożonych ekranów preferowany jest sealed state albo spójna data class zamiast kilku niezależnych flag.
 
 ## StateFlow
 
-`StateFlow` jest preferowany dla trwałego stanu ekranu.
+`StateFlow` przechowuje trwały stan:
 
-Przykłady trwałego stanu:
-
-- lista miejsc,
+- listę miejsc,
+- dane formularza,
 - wybrane filtry,
-- aktualny użytkownik,
-- loading state,
-- error state,
-- dane formularza.
+- aktualnego użytkownika,
+- status synchronizacji,
+- loading, error i offline state.
+
+State powinien mieć sens po ponownej subskrypcji UI.
 
 ## Eventy jednorazowe
 
-Eventy jednorazowe nie powinny być trzymane jako trwały state.
-
-Przykłady:
+Jednorazowe akcje nie należą do trwałego stanu:
 
 - snackbar,
-- toast,
 - nawigacja po sukcesie,
+- otwarcie ustawień aplikacji,
+- uruchomienie systemowego pickera,
 - jednorazowy dialog,
 - komunikat po zapisie.
 
-Do tego można używać `SharedFlow` albo dedykowanego event stream.
+Można użyć `SharedFlow`, kanału eventów lub jawnego callbacku platformowego. Event nie może odtwarzać się przypadkowo po rotacji lub powrocie do ekranu.
 
 ## Compose
 
-Composable powinien:
+Composable:
 
-- obserwować state,
-- renderować UI,
-- przekazywać akcje do ViewModelu,
-- nie przechowywać logiki biznesowej.
+- obserwuje stan z lifecycle awareness,
+- renderuje UI,
+- wysyła intencje użytkownika,
+- przechowuje wyłącznie lokalny stan prezentacyjny,
+- nie wykonuje logiki biznesowej ani requestów do danych.
 
-Dopuszczalne lokalne state:
-
-- stan rozwinięcia menu,
-- lokalny tekst pola przed zatwierdzeniem,
-- widoczność sheet/dialog,
-- scroll state.
+Lokalny state może obejmować scroll, rozwinięcie menu, widoczność sheet/dialog i roboczy tekst pola, jeśli ViewModel nie musi go odtwarzać.
 
 ## ViewModel
 
-ViewModel powinien:
+ViewModel:
 
-- agregować dane z repozytoriów,
-- przekształcać dane na UI state,
-- obsługiwać akcje użytkownika,
-- mapować błędy na komunikaty UI.
+- agreguje dane,
+- obsługuje akcje,
+- mapuje wyniki i błędy,
+- aktualizuje stan atomowo przez `copy`,
+- nie przechowuje `Activity`, `View` ani `Context`,
+- nie uruchamia systemowych dialogów bezpośrednio.
+
+## Uprawnienia i powrót z ustawień
+
+Stan zgody należy odświeżyć po powrocie aplikacji do foreground. Samo jednorazowe wysłanie eventu „otwórz ustawienia” nie może być źródłem prawdy.
+
+Flow powinien rozróżniać:
+
+- brak zgody,
+- zwykłą odmowę,
+- trwałą odmowę,
+- zgodę nadaną,
+- wyłączoną usługę systemową.
+
+## Formularze
+
+- walidacja pól jest częścią stanu,
+- podwójne wysłanie jest blokowane,
+- stan zapisu jest jawny,
+- sukces nawigacyjny jest eventem,
+- dane formularza nie znikają przy chwilowym błędzie,
+- retry nie tworzy duplikatów.
 
 ## Antywzorce
 
-- kilka niezależnych źródeł prawdy dla tego samego ekranu,
-- trzymanie snackbarów jako trwałego state,
-- mutowanie listy bez copy/update,
+- wiele źródeł prawdy,
+- snackbar jako trwały state,
+- mutowanie listy bez `copy`,
+- `Context` w ViewModelu,
 - logika biznesowa w Composable,
-- bezpośrednie requesty z UI.
+- systemowy dialog uruchamiany ponownie po każdej recomposition,
+- event zapisany jako boolean bez mechanizmu konsumpcji.
 
-## Checklist
+## Checklista
 
-- [ ] Ekran ma jedno źródło prawdy.
-- [ ] UiState jest jawny.
-- [ ] Eventy jednorazowe nie są trwałym state.
-- [ ] Compose tylko renderuje UI.
-- [ ] ViewModel mapuje dane na stan ekranu.
+- [ ] ekran ma jedno źródło prawdy,
+- [ ] `UiState` jest jawny i niemutowalny,
+- [ ] eventy nie są trwałym stanem,
+- [ ] UI tylko renderuje i wysyła akcje,
+- [ ] ViewModel nie zależy od `Context`,
+- [ ] powrót z ustawień odświeża realny stan,
+- [ ] formularze są odporne na double submit,
+- [ ] retry jest bezpieczne.
