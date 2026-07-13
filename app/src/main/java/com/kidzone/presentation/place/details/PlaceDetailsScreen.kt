@@ -99,6 +99,7 @@ import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.RatingIcon
 import com.kidzone.presentation.common.selectUniquePhotoUris
+import com.kidzone.presentation.common.requestCameraPermissionOrOpenSettings
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -546,7 +547,14 @@ fun PlaceDetailsScreen(
                                     if (hasPerm) {
                                         launchPlaceCamera()
                                     } else {
-                                        placeCameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                                        requestCameraPermissionOrOpenSettings(
+                                            context = context,
+                                            requestPermission = {
+                                                placeCameraPermissionLauncher.launch(
+                                                    android.Manifest.permission.CAMERA
+                                                )
+                                            }
+                                        )
                                     }
                                 }
                             } else null,

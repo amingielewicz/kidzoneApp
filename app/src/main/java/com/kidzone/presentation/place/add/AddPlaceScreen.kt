@@ -97,6 +97,7 @@ import com.kidzone.presentation.common.computeRemotePhotoContentHash
 import com.kidzone.presentation.common.createCameraImageUri
 import com.kidzone.presentation.common.rememberHapticFeedback
 import com.kidzone.presentation.common.rememberNetworkStatus
+import com.kidzone.presentation.common.requestCameraPermissionOrOpenSettings
 import com.kidzone.presentation.common.requestLocationPermissionOrOpenSettings
 import com.kidzone.presentation.common.selectUniquePhotoUris
 import com.kidzone.presentation.common.style
@@ -556,7 +557,14 @@ fun AddPlaceScreen(
                         if (hasPerm) {
                             launchPlaceCamera()
                         } else {
-                            placeCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            requestCameraPermissionOrOpenSettings(
+                                context = context,
+                                requestPermission = {
+                                    placeCameraPermissionLauncher.launch(
+                                        Manifest.permission.CAMERA
+                                    )
+                                }
+                            )
                         }
                     },
                     onRemoveExisting = { index ->
