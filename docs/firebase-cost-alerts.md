@@ -3,330 +3,272 @@
 Powiązane issue: #165  
 Parent: #159
 
+Ostatnia aktualizacja: 2026-07-14
+
 ## Cel
 
-Ten dokument opisuje sposób ograniczania ryzyka niekontrolowanych kosztów Firebase i Google Cloud w projekcie kidZone.
+Ograniczenie ryzyka niekontrolowanych kosztów Firebase, Google Cloud i Google Maps w kidZone.
 
-Najważniejsze założenie:
+Najważniejsza zasada:
 
 ```text
-Nie przechodzimy na płatną konfigurację bez budżetu, alertów i świadomej decyzji właściciela projektu.
+Nie uruchamiamy płatnej konfiguracji ani kosztownej funkcji bez budżetu, alertów, właściciela i planu reakcji.
 ```
 
 ## Zakres
 
-Dokument obejmuje:
+Kontrolujemy przede wszystkim:
 
-- sprawdzenie planu Firebase,
-- konfigurację budżetu w Google Cloud Billing,
-- progi alertów kosztowych,
-- monitoring zużycia Firebase,
-- monitoring usług Google Maps Platform,
-- checklistę przed release,
-- procedurę reakcji na nagły wzrost kosztów.
+- Firestore reads, writes, deletes i listenery,
+- Storage, uploady i transfer,
+- Cloud Functions, retry i czas wykonania,
+- Google Maps Platform i aktywne API,
+- App Check jako ochronę przed abuse,
+- testy obciążeniowe i sztuczny ruch,
+- koszt migracji, cleanup i scheduled jobs.
 
-## Usługi objęte kontrolą kosztów
+## Plan Firebase
 
-W projekcie szczególnie kontrolujemy:
+Przed release zapisz aktualny plan:
 
-| Usługa | Ryzyko kosztowe | Uwagi |
-| --- | --- | --- |
-| Cloud Firestore | Średnie / wysokie po wzroście ruchu | Odczyty, zapisy, indeksy, zapytania list/mapy/rankingu. |
-| Firebase Storage | Średnie | Zdjęcia miejsc, opinii i avatarów, transfer danych. |
-| Firebase Authentication | Niskie | Zwykle bezpieczne kosztowo przy standardowym użyciu, ale sprawdzić limity. |
-| Firebase Crashlytics | Niskie | Ważne dla stabilności, zwykle bezpieczne kosztowo. |
-| Firebase Analytics | Niskie | Zostaje w aplikacji, wymaga Data Safety. |
-| Firebase Performance Monitoring | Do potwierdzenia | Chcemy używać, jeśli jest kosztowo bezpieczne. |
-| Firebase Cloud Messaging | Niskie | Push notifications, tokeny urządzeń. |
-| Firebase App Check | Niskie / zależne od konfiguracji | Chroni przed abuse; sprawdzić tryb enforcement. |
-| Google Maps Platform | Średnie / wysokie | Mapy, geokodowanie, Places API, Directions API — zależnie od włączonych API. |
-| Cloud Functions | Średnie / wysokie, jeśli używane | Koszt wywołań, czas wykonania, egress, błędne pętle. |
-
-## Spark vs Blaze
+```text
+Firebase plan: Spark / Blaze
+Billing account:
+Project ID:
+Owner:
+Date verified:
+```
 
 ### Spark
 
-Spark to bezpłatny plan Firebase.
-
-Ryzyka:
-
-- ograniczone limity,
-- po przekroczeniu limitów funkcje mogą przestać działać,
+- brak rachunku nie oznacza braku ryzyka operacyjnego,
+- przekroczenie limitu może zatrzymać funkcję,
 - część usług może wymagać Blaze,
-- brak realnego rachunku nie oznacza braku ryzyka operacyjnego.
+- limity nadal muszą być monitorowane.
 
 ### Blaze
 
-Blaze to plan płatny.
+- koszty naliczają się według użycia,
+- błędne Rules, pętle Functions lub abuse mogą szybko zwiększyć rachunek,
+- budżet nie jest twardym limitem wydatków,
+- kosztowne funkcje muszą mieć niezależne mechanizmy ograniczania.
 
-Ryzyka:
+## Budżet i alerty
 
-- możliwość naliczania kosztów po przekroczeniu darmowych limitów,
-- ryzyko abuse, jeśli Firebase Rules są błędne,
-- ryzyko kosztów przy Google Maps Platform,
-- ryzyko kosztów przy Cloud Functions.
+Budżet ustala właściciel projektu. Kwota musi być jawnie zaakceptowana i odpowiadać etapowi projektu.
 
-Zasada:
+Przykładowe progi:
 
-```text
-Przed przejściem na Blaze muszą istnieć Budgets & Alerts.
-```
-
-## Minimalna konfiguracja budżetu
-
-W Google Cloud Billing należy utworzyć budżet dla projektu używanego przez Firebase.
-
-Rekomendowany budżet początkowy:
-
-```text
-Budżet miesięczny: 10–25 PLN albo najniższa świadomie zaakceptowana kwota.
-```
-
-Progi alertów:
-
-| Próg | Znaczenie | Reakcja |
+| Próg | Znaczenie | Minimalna reakcja |
 | --- | --- | --- |
-| 50% | Wczesne ostrzeżenie | Sprawdzić, co generuje koszt. |
-| 90% | Poważne ostrzeżenie | Wstrzymać eksperymenty i sprawdzić usage. |
-| 100% | Limit budżetu osiągnięty | Ocenić wyłączenie kosztownych funkcji. |
-| 120% | Przekroczenie budżetu | Natychmiastowy przegląd billing i logów. |
+| 50% | wczesne ostrzeżenie | przegląd kosztów według usługi |
+| 80% lub 90% | poważne ostrzeżenie | zatrzymanie eksperymentów i analiza usage |
+| 100% | budżet osiągnięty | decyzja o ograniczeniu funkcji |
+| >100% | budżet przekroczony | incydent kosztowy i natychmiastowy przegląd |
 
-## Kto powinien dostawać alerty
+Progi są przykładowe. W Google Cloud zapisujemy faktyczną konfigurację, a nie zakładamy, że alert automatycznie wyłączy billing.
 
-Alerty powinny trafiać do:
+## Odbiorcy alertów
+
+Alerty powinny trafiać co najmniej do:
 
 - właściciela projektu,
-- osoby odpowiedzialnej za release,
-- osoby technicznej odpowiedzialnej za Firebase/GCP.
+- osoby odpowiedzialnej za Firebase/GCP,
+- osoby odpowiedzialnej za release lub incydenty.
 
-Minimalnie:
+Lista odbiorców jest przeglądana okresowo. Nie opieramy bezpieczeństwa kosztowego na jednym nieaktywnym adresie.
 
-```text
-1 aktywny adres e-mail właściciela projektu.
-```
+## Konfiguracja budżetu
 
-## Checklist konfiguracji Budgets & Alerts
+- [ ] wybrano właściwe konto billing,
+- [ ] budżet dotyczy właściwego projektu lub zakresu,
+- [ ] ustawiono zaakceptowane progi,
+- [ ] odbiorcy są aktualni,
+- [ ] alert testowy lub kontrola konfiguracji została wykonana,
+- [ ] wynik i data są udokumentowane,
+- [ ] wiadomo, kto podejmuje decyzję o ograniczeniu kosztów.
 
-W Google Cloud Console:
+## Firestore
 
-- [ ] wejść w Billing,
-- [ ] wybrać właściwe konto rozliczeniowe,
-- [ ] przejść do Budgets & alerts,
-- [ ] utworzyć budżet dla projektu kidZone,
-- [ ] ustawić miesięczny próg budżetu,
-- [ ] dodać alerty 50%, 90%, 100%, 120%,
-- [ ] dodać odbiorców powiadomień,
-- [ ] zapisać budżet,
-- [ ] wykonać screenshot albo notatkę potwierdzającą konfigurację.
+Główne ryzyka:
 
-## Checklist Firebase Console
-
-Przed release sprawdzić w Firebase Console:
-
-- [ ] aktualny plan Firebase: Spark albo Blaze,
-- [ ] Firestore usage,
-- [ ] Storage usage,
-- [ ] Authentication usage,
-- [ ] Cloud Messaging usage,
-- [ ] Crashlytics status,
-- [ ] Analytics status,
-- [ ] Performance Monitoring status,
-- [ ] App Check status,
-- [ ] czy Cloud Functions są włączone,
-- [ ] czy są alerty lub warningi w konsoli.
-
-## Firestore — kontrola kosztów
-
-Największe ryzyka w Firestore:
-
-- zbyt częste odczyty list,
+- listy bez limitu,
 - brak paginacji,
-- słabe zapytania dla mapy,
-- ranking liczony przez duże odczyty,
-- zbyt częste listenery realtime,
-- błędne reguły pozwalające na abuse.
+- wiele listenerów realtime,
+- mapa pobierająca zbyt duży obszar,
+- ranking liczony przez pełne kolekcje,
+- retry tworzące dodatkowe zapisy,
+- publiczne lub zbyt szerokie Rules.
 
-Checklist:
+Kontrole:
 
-- [ ] listy mają limit wyników,
-- [ ] mapa nie pobiera całej bazy bez potrzeby,
-- [ ] ranking nie wykonuje masowych odczytów przy każdym wejściu,
-- [ ] ekrany nie tworzą wielu aktywnych listenerów naraz,
-- [ ] query są indeksowane,
-- [ ] Firestore Rules ograniczają zapisy,
-- [ ] debug/test data nie generuje dużego ruchu produkcyjnego.
+- [ ] każda lista ma limit i stabilną paginację,
+- [ ] mapa używa bounds, promienia lub geohash,
+- [ ] ranking korzysta z pól agregowanych,
+- [ ] listener jest zamykany zgodnie z lifecycle,
+- [ ] zapytania mają wymagane indeksy,
+- [ ] cache ogranicza zbędne ponowne odczyty,
+- [ ] Rules i App Check ograniczają abuse,
+- [ ] testy nie używają produkcyjnego projektu bez świadomej decyzji.
 
-## Storage — kontrola kosztów
+## Storage
 
-Ryzyka:
+Główne ryzyka:
 
-- duże zdjęcia bez kompresji,
-- brak limitu rozmiaru pliku,
-- publiczne lub zbyt szerokie odczyty,
-- brak usuwania zdjęć po usunięciu konta,
-- spam uploadów.
+- duże pliki bez kompresji,
+- brak limitów MIME i rozmiaru,
+- duplikaty po retry,
+- osierocone pliki,
+- brak cleanup przy usuwaniu konta,
+- masowe pobieranie lub publiczny transfer.
 
-Checklist:
+Kontrole:
 
-- [ ] zdjęcia są kompresowane przed uploadem,
-- [ ] Storage Rules mają limit rozmiaru pliku,
-- [ ] upload wymaga zalogowanego użytkownika,
-- [ ] użytkownik zapisuje tylko do własnych ścieżek,
-- [ ] legacy ścieżki nie pozwalają na nowy zapis,
-- [ ] istnieje plan usuwania zdjęć po usunięciu konta,
-- [ ] monitoring Storage usage jest sprawdzany przed release.
+- [ ] zdjęcia są kompresowane,
+- [ ] Rules walidują ownership, MIME i rozmiar,
+- [ ] Photo Picker ogranicza niepotrzebny dostęp,
+- [ ] retry nie tworzy kilku kopii,
+- [ ] cleanup miejsca, opinii i konta jest idempotentny,
+- [ ] osierocone pliki są monitorowane,
+- [ ] transfer i stored bytes są regularnie przeglądane.
 
-## Google Maps Platform — kontrola kosztów
+## Cloud Functions
 
-Ryzyka:
+Główne ryzyka:
 
-- nieograniczony klucz API,
-- włączone niepotrzebne API,
-- brak limitów requestów,
-- częste odświeżanie mapy,
-- Places API albo geokodowanie bez kontroli.
+- pętla triggerów,
+- nieograniczony batch,
+- agresywny retry,
+- zbyt długi timeout lub nadmierna pamięć,
+- scheduled function skanująca całą bazę,
+- publiczny endpoint bez auth, App Check lub rate limiting.
 
-Checklist:
+Kontrole:
 
-- [ ] API key jest ograniczony do Android apps,
-- [ ] ustawiony jest package name,
-- [ ] ustawione są SHA-1 / SHA-256,
-- [ ] włączone są tylko potrzebne API,
-- [ ] istnieją limity albo quota tam, gdzie możliwe,
-- [ ] usage Google Maps jest sprawdzany przed release,
-- [ ] map screen nie odpala kosztownych zapytań przy każdym recomposition.
+- [ ] funkcje mają auth, role i walidację payloadu,
+- [ ] eventy są idempotentne,
+- [ ] batch i paginacja mają limity,
+- [ ] scheduled jobs używają checkpointów,
+- [ ] timeout, pamięć i retry są świadomie ustawione,
+- [ ] brak kaskady triggerów,
+- [ ] kosztowne funkcje można wyłączyć przez config lub deploy,
+- [ ] liczba wywołań i błędów jest monitorowana.
 
-## Cloud Functions — kontrola kosztów
+## Google Maps Platform
 
-Jeśli Cloud Functions są używane:
+- [ ] klucz jest ograniczony do Android package name i certyfikatów,
+- [ ] aktywne są tylko potrzebne API,
+- [ ] quota jest ustawiona tam, gdzie możliwe,
+- [ ] mapa nie odświeża requestów przy każdej recomposition,
+- [ ] ruch kamery ma debounce,
+- [ ] Places, Geocoding lub Directions nie są używane bez limitu,
+- [ ] usage jest sprawdzany przed i po rollout.
 
-- [ ] sprawdzić liczbę wywołań,
-- [ ] sprawdzić timeouty,
-- [ ] sprawdzić pamięć funkcji,
-- [ ] sprawdzić retry policy,
-- [ ] zabezpieczyć funkcje auth/App Check,
-- [ ] upewnić się, że nie ma pętli triggerów Firestore,
-- [ ] dodać alerty na nagły wzrost wywołań.
+## Analytics, Crashlytics i Performance
 
-Ryzykowny przykład:
+Te usługi również wymagają kontroli operacyjnej:
 
-```text
-Firestore trigger zapisuje dokument, który ponownie odpala ten sam trigger.
-```
+- eventy i trace nie zawierają PII,
+- debug i CI nie generują niepotrzebnego ruchu produkcyjnego,
+- nazwy trace odpowiadają aktualnemu kodowi,
+- nadmierne non-fatal i breadcrumbs nie tworzą szumu,
+- Data Safety odpowiada aktywnym SDK i konfiguracji.
 
-## Performance Monitoring
+## App Check i rate limiting
 
-Decyzja projektowa:
+App Check pomaga ograniczyć ruch z nieautoryzowanych klientów, ale nie zastępuje:
 
-```text
-Performance Monitoring chcemy używać, jeśli jest kosztowo bezpieczne.
-```
-
-Przed release trzeba potwierdzić:
-
-- [ ] czy Performance Monitoring jest aktywne w release,
-- [ ] czy nie wymaga nieakceptowanego planu/kosztu,
-- [ ] czy custom traces nie zawierają danych osobowych,
-- [ ] czy Data Safety uwzględnia performance data,
-- [ ] czy debug/CI nie generuje sztucznego ruchu produkcyjnego.
-
-## Analytics
-
-Analytics zostaje w aplikacji.
-
-Checklist:
-
-- [ ] potwierdzić, jakie eventy są zbierane,
-- [ ] nie wysyłać danych osobowych jako event parameters,
-- [ ] nie wysyłać e-maili, imienia i nazwiska ani dokładnej lokalizacji w eventach,
-- [ ] Data Safety uwzględnia app activity / analytics,
-- [ ] polityka prywatności opisuje analitykę.
-
-## App Check jako ochrona kosztów
-
-App Check pomaga ograniczyć nadużycia.
-
-Checklist:
+- auth,
+- Rules,
+- rate limitingu,
+- quota,
+- monitoringu kosztów.
 
 - [ ] debug provider działa tylko w debug,
 - [ ] release używa Play Integrity,
-- [ ] enforcement jest świadomie ustawiony,
-- [ ] przed enforcement sprawdzono, czy prawdziwi użytkownicy nie są blokowani,
-- [ ] debug tokeny nie są w repo.
+- [ ] enforcement został poprzedzony smoke,
+- [ ] prawidłowe buildy nie są blokowane,
+- [ ] istnieje rollback,
+- [ ] backendowe limity działają niezależnie od App Check.
 
-## Procedura cotygodniowego monitoringu
+## Testy wydajnościowe i obciążeniowe
 
-Raz w tygodniu, a przed release obowiązkowo:
+- wykonuj je na projekcie testowym,
+- określ maksymalną liczbę operacji przed startem,
+- sprawdź billing przed i po teście,
+- nie generuj spamu produkcyjnego,
+- usuń dane testowe i pliki,
+- zapisz wynik oraz koszt.
 
-- [ ] sprawdzić Google Cloud Billing,
-- [ ] sprawdzić Firebase usage,
-- [ ] sprawdzić Firestore reads/writes/deletes,
-- [ ] sprawdzić Storage bandwidth i stored data,
-- [ ] sprawdzić Google Maps usage,
-- [ ] sprawdzić Crashlytics i Performance,
-- [ ] sprawdzić, czy nie ma nietypowych pików.
+## Przegląd przed release
 
-## Procedura przed release
+- [ ] aktualny plan Firebase jest znany,
+- [ ] budżet i alerty są aktywne,
+- [ ] odbiorcy są aktualni,
+- [ ] usage z ostatniego okresu został sprawdzony,
+- [ ] brak nieznanych kosztów,
+- [ ] Firestore i Storage mają limity,
+- [ ] Functions nie mają pętli ani nieograniczonych batchy,
+- [ ] Maps key i quota są poprawne,
+- [ ] App Check i rate limiting są zweryfikowane,
+- [ ] wynik wpisano do release record.
 
-Przed publikacją builda:
+## Monitoring okresowy
 
-- [ ] potwierdzić plan Firebase,
-- [ ] potwierdzić aktywny budżet,
-- [ ] potwierdzić alerty 50%, 90%, 100%, 120%,
-- [ ] potwierdzić odbiorców alertów,
-- [ ] sprawdzić usage z ostatnich 7 dni,
-- [ ] sprawdzić, czy nie ma nieznanych kosztów,
-- [ ] sprawdzić Firestore i Storage Rules,
-- [ ] sprawdzić App Check,
-- [ ] sprawdzić Google Maps quota,
-- [ ] wpisać wynik w notatce release.
+Regularnie sprawdzaj:
 
-## Procedura przy nagłym wzroście kosztów
+- koszt według usługi i projektu,
+- Firestore reads/writes/deletes,
+- Storage stored bytes i egress,
+- Functions invocations, duration i errors,
+- Google Maps usage,
+- anomalie ruchu i abuse,
+- wpływ rollout i nowych funkcji.
 
-Jeśli pojawi się alert kosztowy albo nietypowy wzrost usage:
+Częstotliwość zależy od ruchu. W czasie rollout lub incydentu przegląd jest częstszy niż w spokojnym okresie.
 
-1. Wejść do Google Cloud Billing.
-2. Sprawdzić, która usługa generuje koszt.
-3. Sprawdzić usage w Firebase Console.
-4. Jeżeli problem dotyczy Firestore — sprawdzić odczyty, zapisy, listenery i reguły.
-5. Jeżeli problem dotyczy Storage — sprawdzić uploady, transfer i reguły.
-6. Jeżeli problem dotyczy Maps — sprawdzić włączone API i quota.
-7. Jeżeli problem dotyczy Functions — sprawdzić wywołania, logi i retry.
-8. Tymczasowo ograniczyć kosztowną funkcję, jeśli to konieczne.
-9. Utworzyć issue z opisem incydentu.
-10. Po naprawie dopisać zabezpieczenie do dokumentacji albo testów.
+## Reakcja na nagły wzrost kosztów
 
-## Minimalna notatka po konfiguracji alertów
+1. Potwierdź alert, projekt, czas i usługę.
+2. Sprawdź Billing Reports oraz usage usługi.
+3. Porównaj wzrost z ostatnim deployem, rollout lub zmianą Remote Config.
+4. Oceń, czy przyczyną jest legalny ruch, błąd, pętla lub abuse.
+5. Zatrzymaj rollout albo eksperyment.
+6. Ogranicz funkcję przez Remote Config, quota, Rules lub deploy.
+7. Nie wyłączaj zabezpieczeń privacy/security tylko po to, aby ograniczyć koszt.
+8. Zachowaj dowody i utwórz incident record.
+9. Po naprawie dodaj alert, limit, test lub dashboard zapobiegawczy.
+10. Zweryfikuj, że koszt wrócił do oczekiwanego poziomu.
 
-Po skonfigurowaniu alertów warto dodać komentarz do issue #165:
+## Minimalna notatka konfiguracyjna
 
-```markdown
-## Konfiguracja kosztów
-
-- Firebase plan: Spark / Blaze
-- Budżet miesięczny: ... PLN
-- Alerty: 50%, 90%, 100%, 120%
-- Odbiorcy alertów: ...
-- Data konfiguracji: YYYY-MM-DD
-- Uwagi: ...
+```text
+Firebase plan:
+Billing account:
+Budget:
+Alert thresholds:
+Recipients:
+Maps quotas:
+Owner:
+Date verified:
+Evidence:
 ```
 
 ## Kryteria zamknięcia issue #165
 
-Issue można zamknąć, gdy:
-
-- Budgets & Alerts są skonfigurowane w Google Cloud Billing,
-- znany jest aktualny plan Firebase,
-- wiadomo, gdzie sprawdzać Firestore usage,
-- wiadomo, gdzie sprawdzać Storage usage,
-- wiadomo, gdzie sprawdzać Google Maps usage,
-- dokumentacja monitorowania kosztów znajduje się w repo,
-- właściciel projektu wie, kto dostaje alerty.
+- budżet i alerty są skonfigurowane,
+- aktualny plan Firebase jest znany,
+- odbiorcy i właściciel reakcji są wskazani,
+- wiadomo, gdzie sprawdzać Firestore, Storage, Functions i Maps usage,
+- istnieje procedura incydentu kosztowego,
+- konfiguracja została udokumentowana i zweryfikowana.
 
 ## Czego nie robić
 
-- Nie przechodzić na Blaze bez budżetu.
-- Nie używać nieograniczonego Google Maps API key.
-- Nie zostawiać publicznych reguł Firebase.
-- Nie ignorować alertu 90% lub 100%.
-- Nie zakładać, że brak ruchu testowego oznacza brak ryzyka po publikacji.
+- nie przechodzić na Blaze bez świadomej decyzji,
+- nie traktować budżetu jako twardego limitu wydatków,
+- nie używać nieograniczonego klucza Maps,
+- nie pozostawiać szerokich Rules,
+- nie ignorować alertu,
+- nie wykonywać nieograniczonych testów na produkcji,
+- nie zakładać, że mały ruch dziś oznacza małe ryzyko po publikacji.
