@@ -1,12 +1,12 @@
 # Firebase Operations Handbook
 
+Ostatnia aktualizacja: 2026-07-14
+
 ## Cel
 
-Dokument opisuje operacyjne zasady utrzymania Firebase dla KidZone.
+Operacyjne zasady utrzymania Firebase dla kidZone przed release, podczas rollout i w reakcji na incydenty.
 
-## Obszary odpowiedzialności
-
-Firebase w KidZone obejmuje:
+## Zakres
 
 - Authentication,
 - Firestore,
@@ -17,81 +17,171 @@ Firebase w KidZone obejmuje:
 - Crashlytics,
 - Performance,
 - Analytics,
-- Cloud Messaging.
+- Cloud Messaging,
+- billing, quota i backup.
+
+## Odpowiedzialność
+
+Dla każdej usługi należy wskazać:
+
+- właściciela technicznego,
+- projekt Firebase i środowisko,
+- osoby z dostępem,
+- sposób deployu,
+- monitoring,
+- rollback,
+- dokumentację incydentu.
 
 ## Firestore
 
 ### Przed release
 
-- [ ] Rules wdrożone na właściwy projekt.
-- [ ] Rules testy przechodzą.
-- [ ] Indeksy wymagane przez zapytania istnieją.
-- [ ] Zapytania list i rankingów mają limity.
-- [ ] Publiczne dokumenty nie zawierają PII.
-- [ ] Dane prywatne są oddzielone od publicznych.
+- [ ] Rules i testy emulatora mają PASS,
+- [ ] indeksy są wdrożone przed aplikacją,
+- [ ] listy, mapa i ranking mają limity,
+- [ ] publiczne dokumenty nie zawierają PII,
+- [ ] dane prywatne są oddzielone,
+- [ ] migracja jest kompatybilna z aktywnymi buildami,
+- [ ] account deletion obejmuje wszystkie kolekcje.
 
 ### Po release
 
-- [ ] Sprawdzić usage.
-- [ ] Sprawdzić błędy rules.
-- [ ] Sprawdzić nietypowy wzrost odczytów.
-- [ ] Sprawdzić koszty.
+- [ ] monitoruj reads, writes i deletes,
+- [ ] sprawdź `permission-denied` i błędy indeksów,
+- [ ] wykryj nietypowy wzrost listenerów i zapytań,
+- [ ] porównaj usage z rollout,
+- [ ] zweryfikuj agregaty i błędy synchronizacji.
 
 ## Storage
 
 ### Przed release
 
-- [ ] Rules wdrożone.
-- [ ] Upload zdjęcia działa.
-- [ ] Rozmiar pliku jest walidowany.
-- [ ] Typ pliku jest walidowany.
-- [ ] EXIF/GPS są obsłużone zgodnie z decyzją privacy.
+- [ ] Storage Rules i testy mają PASS,
+- [ ] ownership ścieżek jest poprawny,
+- [ ] MIME i rozmiar są walidowane,
+- [ ] kompresja oraz EXIF/GPS cleanup działają,
+- [ ] Photo Picker nie wymaga szerokiej zgody galerii,
+- [ ] cleanup miejsca, opinii i konta jest przetestowany.
 
 ### Po release
 
-- [ ] Sprawdzić storage usage.
-- [ ] Sprawdzić błędy uploadu.
-- [ ] Sprawdzić koszty transferu.
+- [ ] monitoruj upload failures, storage i transfer,
+- [ ] sprawdź osierocone pliki,
+- [ ] wykryj spam i nietypowe rozmiary,
+- [ ] sprawdź błędy cleanup po account deletion.
+
+## Authentication
+
+- [ ] prawidłowe providery są aktywne,
+- [ ] domeny i SHA są poprawne,
+- [ ] auth errors nie ujawniają informacji o kontach,
+- [ ] logout czyści lokalny stan i tokeny,
+- [ ] operacje wrażliwe obsługują reauthentication,
+- [ ] ban i delete account kończą sesję.
 
 ## Cloud Functions
 
-- [ ] Każda funkcja modyfikująca dane ma auth check.
-- [ ] Funkcje admina nie ufają danym z klienta.
-- [ ] Funkcje mają testy.
-- [ ] Błędy funkcji są monitorowane.
-- [ ] Timeouty i retry są świadomie ustawione.
+- [ ] auth, role i payload validation,
+- [ ] idempotencja i deduplikacja,
+- [ ] kontrolowany retry oraz timeout,
+- [ ] brak pętli triggerów,
+- [ ] limity batch i kosztów,
+- [ ] bezpieczne logi bez PII,
+- [ ] monitoring błędów częściowych,
+- [ ] testy oraz smoke na właściwym projekcie.
 
 ## App Check
 
-- [ ] Debug provider nie działa w release.
-- [ ] Enforcement jest włączony świadomie.
-- [ ] Błędy App Check są monitorowane.
-- [ ] Release build działa z App Check.
+- [ ] debug provider tylko w debug,
+- [ ] release korzysta z Play Integrity,
+- [ ] signed build ma smoke PASS,
+- [ ] enforcement wdrażany jest po jednej usłudze,
+- [ ] błędy attestation są monitorowane,
+- [ ] istnieje procedura szybkiego wyłączenia enforcement.
 
 ## Remote Config
 
-Parametry powinny mieć:
+Każdy parametr ma:
 
 - wartość domyślną w aplikacji,
-- wartość produkcyjną w Firebase,
-- opis celu,
-- bezpieczny fallback.
+- wartość dla każdego środowiska,
+- opis i właściciela,
+- typ oraz bezpieczny zakres,
+- fallback,
+- plan rollbacku.
 
-## Backup i eksport
+Parametry krytyczne obejmują między innymi maintenance mode, feature flags, limity mapy, listy, rankingu, uploadu i debounce.
 
-Dla danych produkcyjnych należy ustalić:
+Zmiana produkcyjna powinna być zapisana z datą, powodem i wynikiem obserwacji.
 
-- częstotliwość eksportu,
-- miejsce przechowywania,
-- dostęp osób uprawnionych,
-- procedurę odtworzenia,
-- test odtworzenia.
+## Crashlytics, Analytics i Performance
+
+- [ ] SDK odpowiadają deklaracji Data Safety,
+- [ ] eventy, trace i custom keys nie zawierają PII,
+- [ ] release nie emituje debugowego spamu,
+- [ ] testowy non-fatal lub crash potwierdza działanie konfiguracji,
+- [ ] alerty crash/ANR są aktywne,
+- [ ] nazwy trace odpowiadają rzeczywistemu kodowi.
+
+## Cloud Messaging
+
+- [ ] tokeny są prywatne,
+- [ ] token refresh działa,
+- [ ] nieważne tokeny są sprzątane,
+- [ ] logout/delete account wykonuje cleanup,
+- [ ] payload i deep link są walidowane,
+- [ ] odmowa powiadomień nie blokuje aplikacji.
+
+## Billing i quota
+
+- [ ] znany jest plan Firebase,
+- [ ] budżet i alerty są aktywne,
+- [ ] odbiorcy alertów są aktualni,
+- [ ] Maps API key ma ograniczenia,
+- [ ] aktywne są tylko potrzebne API,
+- [ ] quota i usage są przeglądane przed release,
+- [ ] kosztowne funkcje mają limity i możliwość wyłączenia.
+
+Szczegóły: `docs/firebase-cost-alerts.md`.
+
+## Backup i restore
+
+- [ ] częstotliwość, retencja i właściciel są określone,
+- [ ] backup jest szyfrowany i odseparowany,
+- [ ] restore test ma aktualny wynik PASS,
+- [ ] keystore i konfiguracja release mają bezpieczną kopię,
+- [ ] restore uwzględnia konta usunięte po dacie kopii.
+
+## Kolejność deploy
+
+Dla zmian zależnych od backendu:
+
+1. kompatybilne Functions i Rules,
+2. migracja danych,
+3. indeksy,
+4. Remote Config,
+5. aplikacja,
+6. monitoring,
+7. usunięcie warstwy zgodności,
+8. finalne zaostrzenie Rules lub enforcement.
 
 ## Incident checklist
 
-- [ ] Ustalić, której usługi dotyczy incydent.
-- [ ] Sprawdzić Firebase Status.
-- [ ] Sprawdzić ostatnie deploye.
-- [ ] Sprawdzić billing.
-- [ ] Sprawdzić Crashlytics / Functions logs.
-- [ ] Zdecydować: rollback, hotfix, config change albo monitorowanie.
+- [ ] ustal usługę, projekt, wersję i czas rozpoczęcia,
+- [ ] sprawdź status Firebase/GCP,
+- [ ] przejrzyj ostatnie deploye i config changes,
+- [ ] sprawdź billing, quota, Crashlytics i logi Functions,
+- [ ] oceń wpływ na dane i privacy,
+- [ ] zastosuj mitigation: halt rollout, rollback, config change lub feature flag,
+- [ ] zapisz oś czasu, właściciela i dowody,
+- [ ] po naprawie dodaj kontrolę zapobiegawczą.
+
+## Przegląd okresowy
+
+- [ ] dostępy i role są aktualne,
+- [ ] debug tokeny i stare sekrety usunięte,
+- [ ] nieużywane API wyłączone,
+- [ ] alerty kosztowe i techniczne przetestowane,
+- [ ] backup i restore zweryfikowane,
+- [ ] dokumentacja odpowiada produkcji,
+- [ ] otwarte ryzyka mają issue i właściciela.
