@@ -109,6 +109,29 @@ class PlaceListViewModelTest {
 
             assertEquals(PlaceListViewModel.SortOrder.NEAREST, viewModel.uiState.value.sortOrder)
         }
+
+        @Test
+        fun `uiState combines all inputs without array index crash`() = runTest {
+            val twelvePlaces = (0 until 12).map { index ->
+                TestFixtures.place(id = "p-$index", name = "Place $index")
+            }
+            coEvery {
+                placeRepository.getPlacesPage(any(), any(), any(), any())
+            } returns OpResult.success(PagedResult(twelvePlaces, null))
+            every { locationProvider.hasPermission() } returns true
+            every { locationProvider.isServiceEnabled() } returns true
+            coEvery { locationProvider.getCurrentLocation() } returns (52.23 to 21.01)
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals(12, state.places.size)
+            assertTrue(state.hasLocationPermission)
+            assertTrue(state.isLocationServiceEnabled)
+            assertEquals(52.23 to 21.01, state.userLocation)
+            assertNull(state.errorMessage)
+        }
     }
 
     @Nested
