@@ -8,14 +8,17 @@ import timber.log.Timber
  * Timber Tree dla buildow release – przekazuje logi WARN+ do Crashlytics.
  *
  * W release nie chcemy Logcat output (dlatego nie uzywamy DebugTree),
- * ale chcemy zeby ostrzezenia i bledy trafialy jako breadcrumbs do
- * Crashlytics – ulatwiaja debugowanie crash-reportsow.
+ * ale chcemy zeby zredagowane ostrzezenia i bledy trafialy jako breadcrumbs
+ * do Crashlytics – ulatwiaja debugowanie crash-reportsow.
  *
  * Logika:
  *  - priority >= WARN  → Crashlytics.log() (breadcrumb)
- *  - throwable != null → Crashlytics.recordException() (non-fatal)
+ *  - throwable         → celowo ignorowany, aby nie wysylac surowych danych z wyjatku
  *  - komunikaty sa redagowane z podstawowych danych wrazliwych
  *  - priority < WARN   → ignorowane (nie zasmiecamy Crashlytics)
+ *
+ * Wyjatki wymagajace raportowania jako non-fatal powinny byc wysylane jawnie
+ * w miejscu, w ktorym mozna zagwarantowac, ze nie zawieraja danych wrazliwych.
  */
 class CrashlyticsTree(
     private val crashlyticsSink: CrashlyticsSink = FirebaseCrashlyticsSink()
@@ -28,14 +31,18 @@ class CrashlyticsTree(
     override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
         if (!isLoggable(tag, priority)) return
 
-        val redactedMessage = message.redactSensitiveValues().take(MAX_BREADCRUMB_LENGTH)
+        // Timber dokleja stack trace do message przed wywolaniem Tree.log().
+        // Przy obecnym kontrakcie komunikaty aplikacji sa jednoliniowe, wiec dla logow
+        // z wyjatkiem zachowujemy tylko jawny komunikat sprzed pierwszego znaku nowej linii.
+        val explicitMessage = if (t != null) message.substringBefore('\n') else message
+        val redactedMessage = explicitMessage.redactSensitiveValues().take(MAX_BREADCRUMB_LENGTH)
         if (redactedMessage.isNotBlank()) {
             crashlyticsSink.log("${priorityLabel(priority)}/${tag.orEmpty()}: $redactedMessage")
         }
 
-        if (t != null) {
-            crashlyticsSink.recordException(t)
-        }
+        // Deliberately do not forward `t` to FirebaseCrashlytics.recordException().
+        // Exception messages and nested causes may contain tokens, e-mail addresses,
+        // request URLs, identifiers or server responses that bypass breadcrumb redaction.
     }
 
     private fun priorityLabel(priority: Int): String = when (priority) {
@@ -58,7 +65,6 @@ class CrashlyticsTree(
 
 interface CrashlyticsSink {
     fun log(message: String)
-    fun recordException(throwable: Throwable)
 }
 
 private class FirebaseCrashlyticsSink : CrashlyticsSink {
@@ -66,9 +72,5 @@ private class FirebaseCrashlyticsSink : CrashlyticsSink {
 
     override fun log(message: String) {
         crashlytics.log(message)
-    }
-
-    override fun recordException(throwable: Throwable) {
-        crashlytics.recordException(throwable)
     }
 }

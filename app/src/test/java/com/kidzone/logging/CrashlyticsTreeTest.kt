@@ -3,7 +3,6 @@ package com.kidzone.logging
 import android.util.Log
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import timber.log.Timber
@@ -21,7 +20,6 @@ class CrashlyticsTreeTest {
         }
 
         assertTrue(sink.messages.isEmpty())
-        assertTrue(sink.throwables.isEmpty())
     }
 
     @Test
@@ -37,17 +35,19 @@ class CrashlyticsTreeTest {
     }
 
     @Test
-    fun `records throwable as non fatal`() {
+    fun `does not include raw throwable details in Crashlytics`() {
         val sink = RecordingCrashlyticsSink()
         val tree = CrashlyticsTree(sink)
-        val error = IllegalStateException("boom")
+        val secret = "adam@example.com"
+        val error = IllegalStateException("request failed for $secret")
 
         withPlantedTree(tree) {
-            Timber.tag("Sync").e(error, "")
+            Timber.tag("Sync").e(error, "sync failed")
         }
 
-        assertEquals(1, sink.throwables.size)
-        assertSame(error, sink.throwables.single())
+        assertEquals(listOf("E/Sync: sync failed"), sink.messages)
+        assertFalse(sink.messages.single().contains(secret))
+        assertFalse(sink.messages.single().contains(error.message.orEmpty()))
     }
 
     @Test
@@ -90,14 +90,9 @@ class CrashlyticsTreeTest {
 
     private class RecordingCrashlyticsSink : CrashlyticsSink {
         val messages = mutableListOf<String>()
-        val throwables = mutableListOf<Throwable>()
 
         override fun log(message: String) {
             messages += message
-        }
-
-        override fun recordException(throwable: Throwable) {
-            throwables += throwable
         }
     }
 }
