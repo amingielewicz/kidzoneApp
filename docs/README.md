@@ -8,7 +8,9 @@ Centralny indeks dokumentacji technicznej, produktowej, QA, bezpieczeństwa i pr
 - [Architektura systemu](architecture/ARCHITECTURE.md)
 - [Przepływ ekranów Android](android/SCREEN_FLOW.md)
 - [Strategia testów](qa/testing-strategy.md)
+- [Manualny plan testów release](qa/manual-release-test-plan.md)
 - [Proces wydania](release/RELEASE_PROCESS.md)
+- [Publikacja w Google Play](release/PLAY_STORE_RELEASE.md)
 - [Bezpieczeństwo](security.md)
 
 ## Architecture
@@ -83,9 +85,9 @@ Centralny indeks dokumentacji technicznej, produktowej, QA, bezpieczeństwa i pr
 
 - [Release overview](release.md)
 - [Detailed release process](release/RELEASE_PROCESS.md)
+- [Play Store release guide](release/PLAY_STORE_RELEASE.md)
 - [Go/No-Go checklist](release/GO_NO_GO_CHECKLIST.md)
 - [Hotfix process](release/HOTFIX_PROCESS.md)
-- [Play Store release guide](release/PLAY_STORE_RELEASE.md)
 - [Release notes template](release/RELEASE_NOTES_TEMPLATE.md)
 - [Versioning guide](release/VERSIONING.md)
 
