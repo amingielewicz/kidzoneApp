@@ -31,7 +31,11 @@ class CrashlyticsTree(
     override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
         if (!isLoggable(tag, priority)) return
 
-        val redactedMessage = message.redactSensitiveValues().take(MAX_BREADCRUMB_LENGTH)
+        // Timber dokleja stack trace do message przed wywolaniem Tree.log().
+        // Przy obecnym kontrakcie komunikaty aplikacji sa jednoliniowe, wiec dla logow
+        // z wyjatkiem zachowujemy tylko jawny komunikat sprzed pierwszego znaku nowej linii.
+        val explicitMessage = if (t != null) message.substringBefore('\n') else message
+        val redactedMessage = explicitMessage.redactSensitiveValues().take(MAX_BREADCRUMB_LENGTH)
         if (redactedMessage.isNotBlank()) {
             crashlyticsSink.log("${priorityLabel(priority)}/${tag.orEmpty()}: $redactedMessage")
         }
