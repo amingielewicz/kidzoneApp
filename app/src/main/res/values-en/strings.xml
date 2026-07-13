@@ -178,6 +178,11 @@
     <string name="gps_disabled_banner">We can\'t see where you are. Turn on location to see places in your area.</string>
     <string name="location_status_unavailable">We can\'t see where you are. Turn on location to see places in your area.</string>
     <string name="gps_acquiring_banner">Acquiring location…</string>
+    <string name="gps_disabled_title">Enable GPS</string>
+    <string name="contact_support_offline_send_action">Send when online</string>
+    <string name="delete_account_offline_action">Delete when online</string>
+    <string name="suggest_edit_comment_label">Comment</string>
+    <string name="suggest_edit_comment_counter">%1$d/%2$d characters</string>
 
     <!-- Profile / settings -->
     <string name="settings">Settings</string>
@@ -428,7 +433,7 @@
     <string name="photo_index">Photo %1$d</string>
     <string name="review_photo_index">Review photo %1$d</string>
     <string name="location_permission_denied">Location permission denied</string>
-    <string name="camera_access_denied"><string name="camera_access_denied">Camera access denied. Grant permission in settings.</string></string>
+    <string name="camera_access_denied">Camera access denied. Grant permission in settings.</string>
     <string name="camera_unavailable">Could not start the camera</string>
     <string name="edit_place_title">Edit place</string>
     <string name="place_name_label">Place name</string>
