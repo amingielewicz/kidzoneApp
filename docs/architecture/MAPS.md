@@ -1,88 +1,103 @@
 # Maps Handbook
 
+Ostatnia aktualizacja: 2026-07-13
+
 ## Cel
 
-Dokument opisuje zasady użycia Google Maps w KidZone, z naciskiem na UX, wydajność i koszty.
+Zasady użycia Google Maps w kidZone z naciskiem na dostępność, wydajność, koszty i spójne zachowanie uprawnień.
 
 ## Rola mapy
 
 Mapa służy do:
 
 - odkrywania miejsc w pobliżu,
-- szybkiej orientacji przestrzennej,
-- wyboru najbliższego miejsca,
-- przejścia do szczegółów miejsca,
-- otwarcia nawigacji w Google Maps.
+- orientacji przestrzennej,
+- wyboru miejsca,
+- przejścia do szczegółów,
+- otwarcia zewnętrznej nawigacji.
 
-Mapa nie powinna być jedynym sposobem dostępu do danych. Każde miejsce widoczne na mapie powinno być dostępne również przez listę.
+Mapa nie jest jedynym sposobem dostępu do danych. Lista miejsc pozostaje pełnym fallbackiem.
 
 ## Ładowanie danych
 
-Zasady:
+- nie pobieramy całej kolekcji,
+- używamy bounds lub promienia,
+- request następuje po ustabilizowaniu ruchu mapy,
+- liczba markerów ma limit,
+- limit i debounce mogą być sterowane przez Remote Config,
+- zmiana kamery nie może wywoływać lawiny requestów,
+- wynik jest cache'owany tam, gdzie ma to sens.
 
-- Nie pobieramy całej kolekcji miejsc na ekran mapy.
-- Pobieramy miejsca dla bounds albo promienia.
-- Request wykonujemy dopiero po ustabilizowaniu ruchu mapy.
-- Liczba markerów powinna mieć limit.
-- Limit powinien być możliwy do zmiany przez Remote Config.
+## Markery i clustering
 
-## Markery
+Marker przekazuje kategorię, status i możliwość otwarcia miejsca. Przy większej liczbie punktów używamy clusteringu.
 
-Marker powinien przekazywać:
-
-- kategorię miejsca,
-- podstawowy status miejsca,
-- możliwość otwarcia szczegółów,
-- jasne powiązanie z bottom sheetem.
-
-Przy większej liczbie miejsc stosujemy clustering.
+Kliknięcie markera powinno wybrać miejsce w sposób stabilny i nie resetować niepotrzebnie kamery ani bottom sheeta.
 
 ## Bottom sheet
 
-Bottom sheet po kliknięciu markera powinien zawierać:
+Powinien zawierać:
 
-- nazwę miejsca,
+- nazwę,
 - kategorię,
 - ocenę,
-- adres albo dystans,
-- krótkie CTA do szczegółów,
-- CTA do Google Maps, jeśli dostępne.
+- adres lub dystans,
+- CTA do szczegółów,
+- CTA do zewnętrznej nawigacji.
 
-## Stany mapy
+Komponenty kategorii powinny być spójne z listą i ekranem Start.
 
-Mapa musi obsługiwać:
+## Lokalizacja użytkownika
+
+Wspólny handler obsługuje:
+
+- pierwszą prośbę,
+- odmowę,
+- trwałą odmowę,
+- przekierowanie do ustawień aplikacji,
+- powrót z ustawień,
+- wyłączony GPS.
+
+Brak zgody nie blokuje mapy ani listy. Po trwałej odmowie akcja „Moja lokalizacja” nie może stać się martwa.
+
+## Stany
+
+Mapa obsługuje:
 
 - loading,
-- brak lokalizacji,
-- odmowę uprawnień,
+- brak zgody,
+- wyłączoną usługę lokalizacji,
 - brak internetu,
-- brak miejsc w obszarze,
+- brak miejsc,
 - błąd Google Maps,
-- błąd pobierania danych.
+- błąd pobierania danych,
+- pusty lub częściowy cache.
 
 ## Accessibility
 
-- Dane z mapy muszą mieć alternatywę listową.
-- Markery i akcje muszą mieć opisy dla TalkBack.
-- Brak lokalizacji nie może blokować całej aplikacji.
-- Użytkownik musi móc korzystać z listy bez mapy.
+- lista jest alternatywą dla markerów,
+- akcje mają opisy TalkBack,
+- nie polegamy wyłącznie na kolorze,
+- brak lokalizacji nie blokuje aplikacji,
+- bottom sheet ma logiczną kolejność fokusu.
 
-## Performance checklist
+## Security i koszty
 
-- [ ] Mapa nie pobiera wszystkich miejsc.
-- [ ] Requesty są ograniczone przez debounce/throttle.
-- [ ] Markery mają limit.
-- [ ] Clustering działa dla większej liczby markerów.
-- [ ] Bottom sheet nie resetuje się niepotrzebnie.
-- [ ] Ruch mapy nie powoduje lawiny rekompozycji.
-- [ ] Brak lokalizacji ma czytelny fallback.
+- klucz Maps jest ograniczony do package name i SHA,
+- aktywne są tylko potrzebne API,
+- usage i billing są monitorowane,
+- limity chronią przed kosztownymi zapytaniami,
+- dokładna lokalizacja nie trafia do logów ani Analytics.
 
-## Release checklist
+## Checklista
 
-- [ ] Mapa działa z lokalizacją.
-- [ ] Mapa działa bez lokalizacji.
-- [ ] Brak internetu nie powoduje crasha.
-- [ ] Markery klikają się poprawnie.
-- [ ] Bottom sheet pokazuje właściwe miejsce.
-- [ ] Google Maps API key działa w release buildzie.
-- [ ] Klucz Maps jest ograniczony do właściwego package name i SHA.
+- [ ] mapa nie pobiera wszystkich miejsc,
+- [ ] requesty mają debounce/throttle,
+- [ ] clustering działa,
+- [ ] limity są kontrolowane,
+- [ ] lista działa bez mapy i lokalizacji,
+- [ ] trwała odmowa prowadzi do ustawień,
+- [ ] powrót z ustawień odświeża stan,
+- [ ] ruch mapy nie powoduje lawiny recomposition,
+- [ ] klucz API jest ograniczony,
+- [ ] brak internetu nie powoduje crasha.
