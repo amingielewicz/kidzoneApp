@@ -116,13 +116,6 @@ private const val PLACE_DESCRIPTION_UI_MAX_LENGTH = 500
 private const val PLACE_DESCRIPTION_COUNTER_THRESHOLD = 400
 private const val PLACE_DESCRIPTION_WARNING_LENGTH = 480
 private const val NEARBY_VISIBLE_LIMIT = 5
-private const val LIMIT_REACHED_HINT = "Osiągnięto maksymalną liczbę znaków"
-private const val LOCATION_PERMISSION_HELPER = "Aby pobrać lokalizację, zezwól na dostęp do GPS."
-private const val LOCATION_GPS_HELPER = "Włącz GPS, aby pobrać lokalizację."
-private const val LOCATION_READY_HELPER = "Kliknij przycisk powyżej, aby pobrać adres."
-private const val SAVE_HINT_NAME_AND_LOCATION = "Wpisz nazwę i pobierz lokalizację, aby zapisać miejsce."
-private const val SAVE_HINT_NAME = "Wpisz nazwę miejsca, aby odblokować zapis."
-private const val SAVE_HINT_LOCATION = "Pobierz lokalizację miejsca, aby odblokować zapis."
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -307,13 +300,15 @@ fun AddPlaceScreen(
         viewModel.save(isOffline = false)
     }
 
-    val saveHint = when {
+    val saveHintRes = when {
         isOffline -> null
         state.isSaving || state.isLoadingPlace -> null
         !state.isFormValid && state.name.isBlank() &&
-                (state.latitude == null || state.longitude == null) -> SAVE_HINT_NAME_AND_LOCATION
-        !state.isFormValid && state.name.isBlank() -> SAVE_HINT_NAME
-        !state.isFormValid && (state.latitude == null || state.longitude == null) -> SAVE_HINT_LOCATION
+                (state.latitude == null || state.longitude == null) ->
+            R.string.add_place_save_hint_name_and_location
+        !state.isFormValid && state.name.isBlank() -> R.string.add_place_save_hint_name
+        !state.isFormValid && (state.latitude == null || state.longitude == null) ->
+            R.string.add_place_save_hint_location
         else -> null
     }
 
@@ -359,9 +354,9 @@ fun AddPlaceScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    saveHint?.let { hint ->
+                    saveHintRes?.let { hintRes ->
                         Text(
-                            text = hint,
+                            text = stringResource(hintRes),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -389,13 +384,13 @@ fun AddPlaceScreen(
             val descriptionLimitReached = descriptionLength >= PLACE_DESCRIPTION_UI_MAX_LENGTH
             val hasCoordinates = state.latitude != null && state.longitude != null
             val addressHelper = when {
-                !locationPermissionGranted -> LOCATION_PERMISSION_HELPER
-                !locationServiceEnabled -> LOCATION_GPS_HELPER
-                !hasCoordinates -> LOCATION_READY_HELPER
+                !locationPermissionGranted -> stringResource(R.string.add_place_location_permission_helper)
+                !locationServiceEnabled -> stringResource(R.string.add_place_location_gps_helper)
+                !hasCoordinates -> stringResource(R.string.add_place_location_ready_helper)
                 else -> null
             }
 
-            FormSection(title = "Podstawy") {
+            FormSection(title = stringResource(R.string.add_place_basics_section_title)) {
                 OutlinedTextField(
                     value = state.name,
                     onValueChange = { viewModel.onNameChange(it.take(PLACE_NAME_UI_MAX_LENGTH)) },
@@ -449,7 +444,7 @@ fun AddPlaceScreen(
                 )
             }
 
-            FormSection(title = "Lokalizacja") {
+            FormSection(title = stringResource(R.string.add_place_location_section_title)) {
                 LocationSection(
                     latitude = state.latitude,
                     longitude = state.longitude,
@@ -470,9 +465,9 @@ fun AddPlaceScreen(
                 AddressReadOnlyCard(address = state.address, helperText = addressHelper)
             }
 
-            FormSection(title = "Szczegóły") {
+            FormSection(title = stringResource(R.string.add_place_details_section_title)) {
                 Text(
-                    text = "Udogodnienia (${state.amenities.size})",
+                    text = stringResource(R.string.add_place_amenities_count, state.amenities.size),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -598,7 +593,7 @@ private fun CharacterCounterRow(
                     if (showLimitMessage) {
                         Text(text = " | ", style = MaterialTheme.typography.labelSmall, color = color, maxLines = 1)
                         Text(
-                            text = LIMIT_REACHED_HINT,
+                            text = stringResource(R.string.add_place_limit_reached_hint),
                             style = MaterialTheme.typography.labelSmall,
                             color = color,
                             maxLines = 1,
@@ -728,14 +723,14 @@ private fun LocationSection(
             if (isFetching) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.size(8.dp))
-                Text("Pobieranie lokalizacji...")
+                Text(stringResource(R.string.add_place_fetching_location))
             } else {
                 LocationActionIcon(isReady = isReady)
                 Spacer(Modifier.size(8.dp))
                 Text(
                     text = when {
-                        !hasLocationPermission -> "Zezwól na lokalizację"
-                        !isLocationEnabled -> "Włącz GPS"
+                        !hasLocationPermission -> stringResource(R.string.add_place_allow_location)
+                        !isLocationEnabled -> stringResource(R.string.gps_disabled_title)
                         latitude != null && longitude != null -> stringResource(R.string.update_location_action)
                         else -> stringResource(R.string.fetch_location_action)
                     }
@@ -924,7 +919,7 @@ private fun NearbyPlacesList(
             }
             if (hiddenCount > 0) {
                 Text(
-                    text = "+$hiddenCount więcej w pobliżu",
+                    text = stringResource(R.string.add_place_more_nearby_count, hiddenCount),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp)

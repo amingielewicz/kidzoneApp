@@ -75,9 +75,6 @@ import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.rememberNetworkStatus
 import kotlinx.coroutines.launch
 
-private const val LOGIN_CONNECTION_ERROR =
-    "Błąd połączenia. Sprawdź internet i spróbuj ponownie."
-
 /**
  * Ekran logowania - e-mail/hasło + Google + reset hasła.
  *
@@ -114,6 +111,7 @@ fun LoginScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val networkStatus by rememberNetworkStatus()
     val isNetworkAvailable = networkStatus == NetworkStatus.AVAILABLE
+    val connectionErrorMessage = stringResource(R.string.error_no_internet)
 
     // Legacy Google Sign-In launcher (fallback dla Xiaomi/MIUI/emulatorów
     // gdzie Credential Manager nie działa)
@@ -154,7 +152,7 @@ fun LoginScreen(
 
     fun showConnectionError() {
         coroutineScope.launch {
-            snackbarHostState.showSnackbar(LOGIN_CONNECTION_ERROR)
+            snackbarHostState.showSnackbar(connectionErrorMessage)
         }
     }
 

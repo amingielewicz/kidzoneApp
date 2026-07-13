@@ -125,7 +125,7 @@ class FirebaseAuthRepository @Inject constructor(
         runFirebase {
             val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
             val firebaseUser = result.user
-                ?: throw IllegalStateException("Logowanie się powiodło, ale Firebase nie zwrócił użytkownika")
+                ?: error("Sign-in succeeded, but Firebase did not return a user")
 
             // Blokada logowania bez potwierdzonego emaila.
             // Google Sign-In jest zwolniony (email zweryfikowany z natury).
@@ -152,7 +152,7 @@ class FirebaseAuthRepository @Inject constructor(
     ): OpResult<User> = runFirebase {
         val result = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
         val firebaseUser = result.user
-            ?: throw IllegalStateException("Rejestracja się powiodła, ale Firebase nie zwrócił użytkownika")
+            ?: error("Registration succeeded, but Firebase did not return a user")
 
         // Z perspektywy Firebase Auth user jest już utworzony i zalogowany -
         // dlatego dopiero tutaj możemy odpytać Firestore o unikalność loginu
@@ -215,7 +215,7 @@ class FirebaseAuthRepository @Inject constructor(
         val credential = GoogleAuthProvider.getCredential(idToken, null)
         val result = firebaseAuth.signInWithCredential(credential).await()
         val firebaseUser = result.user
-            ?: throw IllegalStateException("Logowanie Google się powiodło, ale Firebase nie zwrócił użytkownika")
+            ?: error("Google sign-in succeeded, but Firebase did not return a user")
 
         // Self-heal: niezależnie czy to nowy user (isNewUser==true) czy istniejący,
         // upewnij się, że jest dla niego doc w `users`. Ta gałąź zastępuje wcześniejszą
@@ -237,7 +237,7 @@ class FirebaseAuthRepository @Inject constructor(
         // Logujemy tymczasowo żeby mieć dostęp do FirebaseUser (sendEmailVerification wymaga zalogowania)
         val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
         val user = result.user
-            ?: throw IllegalStateException("Nie udało się zalogować w celu wysłania weryfikacji")
+            ?: error("Could not sign in to send verification")
         user.sendEmailVerification().await()
         // Wyloguj z powrotem – user nie powinien mieć sesji bez weryfikacji
         signOutAndClearLocalSessionState()
@@ -267,7 +267,7 @@ class FirebaseAuthRepository @Inject constructor(
     }
 
     override suspend fun getUserById(userId: String): OpResult<User> = try {
-        require(userId.isNotBlank()) { "userId nie może być puste" }
+        require(userId.isNotBlank()) { "userId cannot be blank" }
         val snapshot = firestore.collection(FirestoreCollections.USERS)
             .document(userId)
             .get()
@@ -276,14 +276,14 @@ class FirebaseAuthRepository @Inject constructor(
         if (dto != null) {
             OpResult.success(dto.toPublicDomain())
         } else {
-            OpResult.failure(NoSuchElementException("Brak użytkownika o id=$userId"))
+            OpResult.failure(NoSuchElementException("No user with id=$userId"))
         }
     } catch (e: Exception) {
         OpResult.failure(e)
     }
 
     override suspend fun getTopUsers(limit: Int): OpResult<List<User>> = try {
-        require(limit > 0) { "limit musi być > 0" }
+        require(limit > 0) { "limit must be > 0" }
         // Sortowanie po `placesAddedCount` desc – „kto dodał najwięcej miejsc”.
         // Drugorzędny sort po `reviewsCount` w kliencie poniżej (Firestore
         // wymagałby kompozytowego indeksu).
@@ -310,7 +310,7 @@ class FirebaseAuthRepository @Inject constructor(
         avatarUrl: String?
     ): OpResult<User> = try {
         val firebaseUser = firebaseAuth.currentUser
-            ?: throw IllegalStateException("Brak zalogowanego użytkownika")
+            ?: error("No signed-in user")
 
         // Sprawdź unikalność loginu (case-insensitive). Jeśli user zostawił
         // ten sam display name co poprzednio, query znajdzie tylko jego
@@ -383,7 +383,7 @@ class FirebaseAuthRepository @Inject constructor(
 
     override suspend fun uploadAvatar(localUri: Uri): OpResult<String> = try {
         val firebaseUser = firebaseAuth.currentUser
-            ?: throw IllegalStateException("Brak zalogowanego użytkownika")
+            ?: error("No signed-in user")
 
         // Stała ścieżka – nadpisywanie istniejącego avatara zamiast tworzenia
         // nowego pliku przy każdym uploadzie. Plus: nie generujemy "śmieci"
@@ -424,9 +424,9 @@ class FirebaseAuthRepository @Inject constructor(
         newPassword: String
     ): OpResult<Unit> = try {
         val user = firebaseAuth.currentUser
-            ?: throw IllegalStateException("Brak zalogowanego użytkownika")
+            ?: error("No signed-in user")
         val email = user.email
-            ?: throw IllegalStateException("Konto bez e-maila – nie można zmienić hasła")
+            ?: error("Account has no email - password cannot be changed")
 
         // Reauth – Firebase wymaga "fresh" credentialu do zmiany hasła.
         // EmailAuthProvider.getCredential(email, password) działa tylko dla
@@ -453,9 +453,9 @@ class FirebaseAuthRepository @Inject constructor(
         newEmail: String
     ): OpResult<Unit> = try {
         val user = firebaseAuth.currentUser
-            ?: throw IllegalStateException("Brak zalogowanego użytkownika")
+            ?: error("No signed-in user")
         val email = user.email
-            ?: throw IllegalStateException("Konto bez e-maila – nie można zmienić e-maila")
+            ?: error("Account has no email - email cannot be changed")
 
         val credential = EmailAuthProvider.getCredential(email, currentPassword)
         user.reauthenticate(credential).await()
@@ -484,7 +484,7 @@ class FirebaseAuthRepository @Inject constructor(
 
     override suspend fun deleteAccount(currentPassword: String): OpResult<Unit> = try {
         val user = firebaseAuth.currentUser
-            ?: throw IllegalStateException("Brak zalogowanego użytkownika")
+            ?: error("No signed-in user")
 
         // MVP: tylko email/password. Dla Google reauth musiałby przejść
         // przez UI launcher – wymaga większej zmiany VM/UI niż mamy czas
@@ -492,10 +492,10 @@ class FirebaseAuthRepository @Inject constructor(
         val email = user.email
         val isPasswordUser = user.providerData.any { it.providerId == EmailAuthProvider.PROVIDER_ID }
         if (email == null || !isPasswordUser) {
-            throw IllegalStateException(
-                "Usuwanie konta jest dostępne tylko dla logowania e-mail/hasłem. " +
-                    "Dla logowania przez Google – usuń konto z poziomu konta Google " +
-                    "lub napisz do nas na e-mail z prośbą o usunięcie."
+            error(
+                "Account deletion is available only for email/password sign-in. " +
+                    "For Google sign-in, delete the account from your Google account " +
+                    "or email us with a deletion request."
             )
         }
 
@@ -513,7 +513,7 @@ class FirebaseAuthRepository @Inject constructor(
 
     override suspend fun deleteAccountWithGoogle(idToken: String): OpResult<Unit> = try {
         val user = firebaseAuth.currentUser
-            ?: throw IllegalStateException("Brak zalogowanego użytkownika")
+            ?: error("No signed-in user")
 
         // Reauth przez Google credential
         val credential = GoogleAuthProvider.getCredential(idToken, null)
@@ -540,7 +540,7 @@ class FirebaseAuthRepository @Inject constructor(
      */
     private suspend fun performAccountDeletion(user: FirebaseUser) {
         val uid = user.uid
-        val anonymousName = "Nieaktywny użytkownik"
+        val anonymousName = "Inactive user"
 
         // 1) Anonimizacja opinii
         val reviewsSnap = firestore.collection(FirestoreCollections.REVIEWS)
@@ -631,7 +631,7 @@ class FirebaseAuthRepository @Inject constructor(
             OpResult.success(Unit)
         } else {
             val firebaseUser = firebaseAuth.currentUser
-                ?: throw IllegalStateException("Brak zalogowanego użytkownika")
+                ?: error("No signed-in user")
 
             // First-write-wins: czytamy istniejące timestampy i zapisujemy
             // pole `badgeEarnedAt.NAME` TYLKO dla odznak, których nie ma
@@ -672,7 +672,7 @@ class FirebaseAuthRepository @Inject constructor(
             OpResult.success(Unit)
         } else {
             val firebaseUser = firebaseAuth.currentUser
-                ?: throw IllegalStateException("Brak zalogowanego uzytkownika")
+                ?: error("No signed-in user")
             val docRef = firestore.collection(FirestoreCollections.USERS)
                 .document(firebaseUser.uid)
             val deletes = badgeNames.associate { name ->
@@ -914,13 +914,13 @@ class FirebaseAuthRepository @Inject constructor(
 
             val isBanned = bannedUntil == -1L || bannedUntil > System.currentTimeMillis()
             if (isBanned) {
-                val reason = snap.getString("banReason") ?: "Naruszenie regulaminu"
+                val reason = snap.getString("banReason") ?: "Terms violation"
                 val message = if (bannedUntil == -1L) {
-                    "Twoje konto zostało zablokowane bezpowrotnie."
+                    "Your account has been permanently blocked."
                 } else {
-                    val date = java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale("pl"))
+                    val date = java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.getDefault())
                         .format(java.util.Date(bannedUntil))
-                    "Twoje konto jest zablokowane do $date."
+                    "Your account is blocked until $date."
                 }
                 signOutAndClearLocalSessionState()
                 throw AuthException.AccountBanned(message, reason)

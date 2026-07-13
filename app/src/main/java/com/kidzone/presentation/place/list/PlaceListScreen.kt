@@ -106,7 +106,6 @@ import com.kidzone.presentation.common.style
 import com.kidzone.presentation.place.add.hasLocationPermission
 import kotlinx.coroutines.launch
 
-private const val VERY_CLOSE_DISTANCE_LABEL = "Tuż obok"
 private const val VERY_CLOSE_DISTANCE_KM = 0.05
 private const val METER_DISTANCE_THRESHOLD_KM = 1.0
 private const val METERS_PER_KILOMETER = 1000
@@ -868,15 +867,16 @@ private fun formatDistance(
     km: Double,
     staleLocationAgeMinutes: Int? = null
 ): String {
+    val veryCloseDistance = stringResource(R.string.very_close_distance)
     val distance = when {
-        km < VERY_CLOSE_DISTANCE_KM -> VERY_CLOSE_DISTANCE_LABEL
+        km < VERY_CLOSE_DISTANCE_KM -> veryCloseDistance
         km < METER_DISTANCE_THRESHOLD_KM -> {
             val meters = (km * METERS_PER_KILOMETER).toInt()
             val rounded = (
                 (meters + DISTANCE_ROUNDING_OFFSET_METERS) /
                     DISTANCE_ROUNDING_STEP_METERS
                 ) * DISTANCE_ROUNDING_STEP_METERS
-            if (rounded == 0) VERY_CLOSE_DISTANCE_LABEL else stringResource(R.string.distance_m, rounded)
+            if (rounded == 0) veryCloseDistance else stringResource(R.string.distance_m, rounded)
         }
         km < INTEGER_DISTANCE_THRESHOLD_KM -> stringResource(R.string.distance_km, km)
         else -> stringResource(R.string.distance_km_integer, km.toInt())
@@ -885,9 +885,10 @@ private fun formatDistance(
     return staleLocationAgeMinutes?.let { "$distance (${staleAgeLabel(it)})" } ?: distance
 }
 
+@Composable
 private fun staleAgeLabel(ageMinutes: Int): String = when {
-    ageMinutes <= 1 -> "1 min temu"
-    else -> "$ageMinutes min temu"
+    ageMinutes <= 1 -> stringResource(R.string.stale_age_one_minute)
+    else -> stringResource(R.string.stale_age_minutes, ageMinutes)
 }
 
 @Composable

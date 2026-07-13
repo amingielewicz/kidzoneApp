@@ -97,21 +97,12 @@ private val PLACE_CARD_STATUS_GAP = 6.dp
 private val LOCATION_PANEL_MIN_HEIGHT = 360.dp
 private val LOCATION_CTA_HEIGHT = 48.dp
 private val HOME_HORIZONTAL_PADDING = 16.dp
-private const val MANUAL_CITY_HINT = "Wybierz miasto ręcznie"
-private const val GPS_STATUS_MESSAGE = "Nie widzimy Twojej lokalizacji. Włącz GPS, aby zobaczyć atrakcje w pobliżu."
-private const val GPS_SECTION_EMPTY_MESSAGE = "Włącz lokalizację, aby zobaczyć, co polecają inni rodzice."
-private const val ENABLE_GPS = "Włącz GPS"
-private const val CHECKING_GPS = "Trwa sprawdzanie..."
 private const val WAVE_EMOJI = "👋"
 private const val WAVE_INITIAL_ROTATION = -12f
 private const val WAVE_TARGET_ROTATION = 16f
 private const val WAVE_TRANSFORM_ORIGIN_X = 0.8f
 private const val WAVE_TRANSFORM_ORIGIN_Y = 0.8f
 private const val WAVE_DURATION_MS = 650
-private const val NEARBY_SECTION_TITLE = "📍 W pobliżu"
-private const val TOP_SECTION_TITLE = "🏆 Najpopularniejsze"
-private const val RECENT_SECTION_TITLE = "🆕 Nowości w okolicy"
-private const val VERY_CLOSE_DISTANCE_LABEL = "Tuż obok"
 private const val VERY_CLOSE_DISTANCE_KM = 0.05
 private const val METER_DISTANCE_THRESHOLD_KM = 1.0
 private const val METERS_PER_KILOMETER = 1000
@@ -121,7 +112,6 @@ private const val INTEGER_DISTANCE_THRESHOLD_KM = 100.0
 private const val EMPTY_NEARBY_ICON = "📍"
 private const val EMPTY_TOP_ICON = "★"
 private const val EMPTY_RECENT_ICON = "NEW"
-private const val NO_REVIEWS_LABEL = "Brak ocen"
 
 private data class HomePlaceItem(
     val place: Place,
@@ -282,7 +272,7 @@ fun HomeScreen(
                     if (showLocationAwareContent) {
                         item {
                             HomeSection(
-                                title = NEARBY_SECTION_TITLE,
+                                title = stringResource(R.string.home_nearby_section_title),
                                 items = if (hasLocationContext) {
                                     state.nearbyPlaces.map {
                                         HomePlaceItem(it.place, it.distanceKm, staleLocationAgeMinutes)
@@ -291,7 +281,7 @@ fun HomeScreen(
                                     emptyList()
                                 },
                                 isLoading = hasLocationContext && state.isNearbyLoading,
-                                emptyMessage = GPS_SECTION_EMPTY_MESSAGE,
+                                emptyMessage = stringResource(R.string.home_gps_empty_message),
                                 emptyIcon = EMPTY_NEARBY_ICON,
                                 onPlaceClick = { onOpenPlaceDetails(it, "nearby") },
                                 animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
@@ -301,7 +291,7 @@ fun HomeScreen(
 
                         item {
                             HomeSection(
-                                title = TOP_SECTION_TITLE,
+                                title = stringResource(R.string.home_top_section_title),
                                 items = if (hasLocationContext) {
                                     state.topPlaces.map {
                                         HomePlaceItem(it.place, it.distanceKm, staleLocationAgeMinutes)
@@ -310,7 +300,7 @@ fun HomeScreen(
                                     emptyList()
                                 },
                                 isLoading = hasLocationContext && state.isTopLoading,
-                                emptyMessage = GPS_SECTION_EMPTY_MESSAGE,
+                                emptyMessage = stringResource(R.string.home_gps_empty_message),
                                 emptyIcon = EMPTY_TOP_ICON,
                                 onPlaceClick = { onOpenPlaceDetails(it, "top") },
                                 animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
@@ -320,7 +310,7 @@ fun HomeScreen(
 
                         item {
                             HomeSection(
-                                title = RECENT_SECTION_TITLE,
+                                title = stringResource(R.string.home_recent_section_title),
                                 items = if (hasLocationContext) {
                                     state.recentlyAddedPlaces.map {
                                         HomePlaceItem(it.place, it.distanceKm, staleLocationAgeMinutes)
@@ -329,7 +319,7 @@ fun HomeScreen(
                                     emptyList()
                                 },
                                 isLoading = hasLocationContext && state.isRecentlyAddedLoading,
-                                emptyMessage = GPS_SECTION_EMPTY_MESSAGE,
+                                emptyMessage = stringResource(R.string.home_gps_empty_message),
                                 emptyIcon = EMPTY_RECENT_ICON,
                                 onPlaceClick = { onOpenPlaceDetails(it, "recent") },
                                 animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
@@ -470,7 +460,7 @@ private fun LocationStatusBanner(
                 )
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    text = GPS_STATUS_MESSAGE,
+                    text = stringResource(R.string.home_gps_status_message),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f)
@@ -495,9 +485,15 @@ private fun LocationStatusBanner(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(CHECKING_GPS, style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        text = stringResource(R.string.home_checking_gps),
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 } else {
-                    Text(ENABLE_GPS, style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        text = stringResource(R.string.gps_disabled_title),
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 }
             }
             Spacer(Modifier.height(6.dp))
@@ -508,7 +504,7 @@ private fun LocationStatusBanner(
                     .height(34.dp)
             ) {
                 Text(
-                    text = MANUAL_CITY_HINT,
+                    text = stringResource(R.string.home_manual_city_short),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                     textAlign = TextAlign.Center,
@@ -590,7 +586,7 @@ private fun HomeLocationEmptyState(
             }
             TextButton(onClick = onManualCityClick) {
                 Text(
-                    text = MANUAL_CITY_HINT,
+                    text = stringResource(R.string.home_manual_city_short),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -854,7 +850,7 @@ private fun PlaceRatingStatus(place: Place) {
                 )
                 Spacer(Modifier.width(KidZoneSpacing.GapTiny))
                 Text(
-                    text = NO_REVIEWS_LABEL,
+                    text = stringResource(R.string.no_ratings),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f)
@@ -914,15 +910,16 @@ private fun DistanceLabel(
 
 @Composable
 private fun formatDistance(km: Double, staleLocationAgeMinutes: Int? = null): String {
+    val veryCloseDistance = stringResource(R.string.very_close_distance)
     val distance = when {
-        km < VERY_CLOSE_DISTANCE_KM -> VERY_CLOSE_DISTANCE_LABEL
+        km < VERY_CLOSE_DISTANCE_KM -> veryCloseDistance
         km < METER_DISTANCE_THRESHOLD_KM -> {
             val meters = (km * METERS_PER_KILOMETER).toInt()
             val rounded = (
                 (meters + DISTANCE_ROUNDING_OFFSET_METERS) /
                     DISTANCE_ROUNDING_STEP_METERS
                 ) * DISTANCE_ROUNDING_STEP_METERS
-            if (rounded == 0) VERY_CLOSE_DISTANCE_LABEL else stringResource(R.string.distance_m, rounded)
+            if (rounded == 0) veryCloseDistance else stringResource(R.string.distance_m, rounded)
         }
         km < INTEGER_DISTANCE_THRESHOLD_KM -> stringResource(R.string.distance_km, km)
         else -> stringResource(R.string.distance_km_integer, km.toInt())
@@ -930,9 +927,10 @@ private fun formatDistance(km: Double, staleLocationAgeMinutes: Int? = null): St
     return staleLocationAgeMinutes?.let { "$distance (${staleAgeLabel(it)})" } ?: distance
 }
 
+@Composable
 private fun staleAgeLabel(ageMinutes: Int): String = when {
-    ageMinutes <= 1 -> "1 min temu"
-    else -> "$ageMinutes min temu"
+    ageMinutes <= 1 -> stringResource(R.string.stale_age_one_minute)
+    else -> stringResource(R.string.stale_age_minutes, ageMinutes)
 }
 
 @Composable

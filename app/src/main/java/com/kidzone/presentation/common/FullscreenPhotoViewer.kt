@@ -310,7 +310,7 @@ private fun ZoomableImage(
     ) {
         AsyncImage(
             model = imageUrl,
-            contentDescription = "Zdjęcie pełnoekranowe",
+            contentDescription = stringResource(R.string.fullscreen_photo_content_description),
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer(

@@ -24,6 +24,7 @@ import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import com.kidzone.R
 import androidx.room.Room
 import com.kidzone.data.local.KidZoneDatabase
 import com.kidzone.data.local.PlaceEntity
@@ -48,7 +49,11 @@ class NearbyPlacesWidget : GlanceAppWidget() {
 
         provideContent {
             GlanceTheme {
-                NearbyPlacesContent(places = nearbyPlaces)
+                NearbyPlacesContent(
+                    places = nearbyPlaces,
+                    title = context.getString(R.string.widget_nearby_places_title),
+                    emptyMessage = context.getString(R.string.widget_no_cached_places)
+                )
             }
         }
     }
@@ -131,7 +136,12 @@ data class WidgetPlace(
 )
 
 @Composable
-private fun NearbyPlacesContent(places: List<WidgetPlace>) {
+@Suppress("FunctionNaming")
+private fun NearbyPlacesContent(
+    places: List<WidgetPlace>,
+    title: String,
+    emptyMessage: String
+) {
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -140,7 +150,7 @@ private fun NearbyPlacesContent(places: List<WidgetPlace>) {
         verticalAlignment = Alignment.Top
     ) {
         Text(
-            text = "Miejsca w pobliżu",
+            text = title,
             style = TextStyle(
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
@@ -151,7 +161,7 @@ private fun NearbyPlacesContent(places: List<WidgetPlace>) {
 
         if (places.isEmpty()) {
             Text(
-                text = "Brak miejsc w pamięci podręcznej",
+                text = emptyMessage,
                 style = TextStyle(
                     fontSize = 12.sp,
                     color = GlanceTheme.colors.onSurfaceVariant
