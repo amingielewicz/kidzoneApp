@@ -1,127 +1,108 @@
 # GO / NO-GO Checklist
 
-Ten dokument jest bramką jakościową przed publikacją kidZone w Google Play.
+Ostatnia aktualizacja: 2026-07-13
 
-## Statusy
+## Cel
 
-Każdy punkt powinien mieć jeden status:
+Finalna decyzja jakościowa przed publikacją kidZone w Google Play.
 
-- `OK` — sprawdzone i działa,
-- `Do poprawy` — wymaga naprawy przed release,
-- `Nie dotyczy` — świadomie pominięte z uzasadnieniem.
+Statusy:
 
-## Poziomy gotowości
+- `OK` — sprawdzone,
+- `Do poprawy` — blokuje lub wymaga jawnej decyzji,
+- `Nie dotyczy` — świadomie poza zakresem z uzasadnieniem.
 
-### MVP / Release Candidate (80–85%)
+## Minimum dla Release Candidate
 
-Minimalny poziom pozwalający rozpocząć Internal Testing lub Closed Testing.
+- [ ] signed AAB buduje się,
+- [ ] CI i testy są zielone,
+- [ ] brak P0/P1,
+- [ ] czysta instalacja i aktualizacja działają,
+- [ ] logowanie, rejestracja i reset hasła działają,
+- [ ] Start, Mapa, Lista, szczegóły, ranking i profil działają,
+- [ ] dodawanie miejsca, opinii i zdjęć działa,
+- [ ] brak internetu jest obsłużony,
+- [ ] brak lokalizacji, kamery i powiadomień nie blokuje aplikacji,
+- [ ] podstawowa accessibility jest sprawdzona,
+- [ ] Crashlytics i App Check są zweryfikowane.
 
-Wymagane:
+## Minimum dla publicznego release
 
-- [ ] Wszystkie główne funkcje działają.
-- [ ] Brak krytycznych crashy.
-- [ ] Logowanie i rejestracja działają.
-- [ ] Mapa, lista, ranking, profil i dodawanie miejsca działają.
-- [ ] UI jest spójny.
-- [ ] UX zawiera loading, empty i error states.
-- [ ] Onboarding / first-use guidance działa.
-- [ ] Podstawowa accessibility jest spełniona.
-- [ ] Cache, paginacja i limity zapytań są wdrożone.
-- [ ] Crashlytics, Analytics i Performance działają.
-- [ ] Smoke test i manual regression są wykonane.
+- [ ] Data Safety zapisane w Play Console,
+- [ ] Privacy Policy URL działa,
+- [ ] Account deletion URL działa,
+- [ ] account deletion ma PASS,
+- [ ] runtime permissions mają PASS,
+- [ ] manifest nie ma `ACCESS_BACKGROUND_LOCATION`,
+- [ ] manifest nie ma `READ_MEDIA_IMAGES` ani `READ_EXTERNAL_STORAGE`,
+- [ ] Photo Picker działa bez szerokiej zgody do galerii,
+- [ ] Firestore Rules i Storage Rules są wdrożone,
+- [ ] release nie loguje danych wrażliwych,
+- [ ] widget i cache nie ujawniają danych po logout/delete,
+- [ ] staged rollout i monitoring są przygotowane.
 
-### Optimum / Produkt Premium (90–95%)
+## Security i privacy
 
-Poziom rekomendowany dla pierwszego publicznego release.
+- [ ] App Check release używa Play Integrity,
+- [ ] debug provider nie działa w release,
+- [ ] klucz Maps jest ograniczony,
+- [ ] tokeny FCM są prywatne,
+- [ ] Analytics, Performance i Crashlytics odpowiadają Data Safety,
+- [ ] PII nie trafia do eventów, logów, breadcrumbs ani custom keys,
+- [ ] usuwanie konta czyści lub anonimizuje dane zgodnie z dokumentami.
 
-Dodatkowo wymagane:
+## Runtime permissions
 
-- [ ] Kompletny design system.
-- [ ] Skeleton loading tam, gdzie ładowanie jest zauważalne.
-- [ ] Dopracowane mikrocopy.
-- [ ] App Check enforcement zweryfikowany.
-- [ ] Release nie loguje danych wrażliwych.
-- [ ] Mapa używa limitów, bounds/promienia i marker clusteringu.
-- [ ] Remote Config kontroluje kluczowe limity.
-- [ ] Testy wydajnościowe i obciążeniowe są wykonane.
-- [ ] Smoke test na danych 1000 miejsc przechodzi.
-
-### Enterprise / Maximum (98–100%)
-
-Poziom długoterminowy, nieblokujący pierwszego publicznego release.
-
-Przykładowe wymagania:
-
-- [ ] AI/ML rekomendacje.
-- [ ] Automatyczna moderacja opinii i zdjęć.
-- [ ] OpenTelemetry / pełna observability.
-- [ ] OWASP MASVS Level 2.
-- [ ] Baseline Profiles i Macrobenchmark.
-- [ ] Load, soak i chaos testing.
-- [ ] Predictive UI.
-- [ ] Zaawansowana telemetria produktu.
-
-## Minimum do publicznego release
-
-- [ ] Signed Release Build przechodzi.
-- [ ] Aplikacja odpala się po czystej instalacji.
-- [ ] Login działa.
-- [ ] Rejestracja działa.
-- [ ] Mapa działa z lokalizacją.
-- [ ] Mapa działa bez lokalizacji.
-- [ ] Lista miejsc działa.
-- [ ] Dodawanie miejsca działa.
-- [ ] Opinie i oceny działają.
-- [ ] Ranking działa.
-- [ ] Profil działa.
-- [ ] Brak internetu jest obsłużony.
-- [ ] Brak lokalizacji jest obsłużony.
-- [ ] Crashlytics zbiera testowy crash.
-- [ ] App Check jest zweryfikowany.
-- [ ] Firestore Rules są sprawdzone.
-- [ ] Storage Rules są sprawdzone.
-- [ ] Release nie loguje danych wrażliwych.
-- [ ] Smoke test na danych 1000 miejsc przechodzi.
+- [ ] allow approximate i precise działa,
+- [ ] pierwsza odmowa jest obsłużona,
+- [ ] kolejna odmowa nie tworzy martwego przycisku,
+- [ ] trwała odmowa lokalizacji prowadzi do ustawień,
+- [ ] trwała odmowa kamery prowadzi do ustawień,
+- [ ] powrót z ustawień odświeża stan,
+- [ ] aplikacja działa bez zgód opcjonalnych.
 
 ## Release blockers
 
-Release jest zablokowany, jeżeli występuje dowolny punkt:
+NO-GO, gdy występuje co najmniej jeden punkt:
 
-- [ ] Crash przy starcie aplikacji.
-- [ ] Brak możliwości logowania.
-- [ ] Brak możliwości użycia mapy lub listy miejsc.
-- [ ] Brak możliwości dodania miejsca.
-- [ ] Krytyczny błąd Firestore / Storage Rules.
-- [ ] Release build loguje dane wrażliwe.
-- [ ] Crashlytics nie działa w release.
-- [ ] App Check nie jest zweryfikowany.
-- [ ] Signed release build nie przechodzi.
+- crash przy starcie,
+- brak logowania lub rejestracji,
+- brak mapy lub listy,
+- brak możliwości dodania miejsca,
+- krytyczny błąd Rules,
+- niepoprawny signed AAB,
+- Data Safety niezgodne z aplikacją,
+- account deletion nie działa,
+- martwe akcje po odmowie uprawnień,
+- dane prywatne widoczne po logout/delete,
+- aktywny debug provider w release,
+- krytyczna luka security lub privacy.
 
-## Go / No-Go decision
+## Decyzja GO
 
-### GO
+GO wymaga:
 
-Release może iść dalej, gdy:
+- wszystkich punktów minimum ze statusem `OK`,
+- braku aktywnych blockerów,
+- PASS dla manualnego smoke testu,
+- PASS dla account deletion,
+- PASS dla runtime permissions,
+- PASS dla security checklist,
+- akceptacji właściciela projektu.
 
-- [ ] Wszystkie punkty MVP mają status `OK`.
-- [ ] Wszystkie punkty minimum public release mają status `OK`.
-- [ ] Nie ma aktywnych blockerów P0/P1.
-- [ ] Smoke test release builda przeszedł.
+## Podpis
 
-### NO-GO
-
-Release zatrzymujemy, gdy:
-
-- [ ] Występuje dowolny release blocker.
-- [ ] Security lub Firebase Rules nie zostały zweryfikowane.
-- [ ] Crashlytics albo App Check nie zostały potwierdzone.
-- [ ] Podstawowy flow użytkownika nie działa.
-
-## Podpis release
-
-- Data:
-- Wersja:
-- Build:
-- Osoba sprawdzająca:
-- Decyzja: `GO` / `NO-GO`
-- Uwagi:
+```text
+Data:
+Wersja:
+Build / commit:
+Track:
+Osoba sprawdzająca:
+Runtime permissions: PASS / FAIL / BLOCKED
+Account deletion: PASS / FAIL / BLOCKED
+Data Safety: PASS / FAIL / BLOCKED
+Security checklist: PASS / FAIL / BLOCKED
+Decyzja: GO / NO-GO
+Uwagi:
+Dowody:
+```
