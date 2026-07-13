@@ -17,13 +17,29 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * ViewModel ekranu rejestracji.
+ * Zarządza formularzem rejestracji konta e-mail/hasło.
+ *
+ * ViewModel wykonuje lokalną walidację nazwy, adresu e-mail i hasła, uruchamia proces rejestracji
+ * przez [AuthRepository] oraz mapuje błędy domenowe na bezpieczne komunikaty UI. Po poprawnym
+ * utworzeniu konta kończy tymczasową sesję, aby użytkownik mógł przejść przez wymagany proces
+ * weryfikacji e-mail przed pierwszym logowaniem.
  */
 @HiltViewModel
 class RegisterViewModel @Inject constructor(
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
+    /**
+     * Niezmienny stan ekranu rejestracji.
+     *
+     * @property name publiczna nazwa użytkownika.
+     * @property email adres nowego konta.
+     * @property password hasło przechowywane wyłącznie w bieżącym stanie formularza.
+     * @property isLoading czy trwa tworzenie konta.
+     * @property errorMessage komunikat błędu przeznaczony dla UI.
+     * @property successMessage komunikat pokazywany po poprawnej rejestracji.
+     * @property isRegistered czy proces utworzenia konta zakończył się sukcesem.
+     */
     data class UiState(
         val name: String = "",
         val email: String = "",
@@ -33,9 +49,11 @@ class RegisterViewModel @Inject constructor(
         val successMessage: UiText? = null,
         val isRegistered: Boolean = false
     ) {
+        /** Czy nazwa użytkownika zawiera co najmniej jeden znak niebędący spacją. */
         val isNameValid: Boolean
             get() = name.trim().isNotBlank()
 
+        /** Czy adres ma minimalną strukturę wymaganą przez formularz klienta. */
         val isEmailValid: Boolean
             get() = email.trim().let { trimmed ->
                 trimmed.contains('@') &&
@@ -43,36 +61,52 @@ class RegisterViewModel @Inject constructor(
                     trimmed.length >= 5
             }
 
+        /** Czy hasło spełnia aktualną [PasswordPolicy]. */
         val isPasswordValid: Boolean
             get() = PasswordPolicy.isValid(password)
 
+        /** Czy wszystkie pola formularza przechodzą walidację lokalną. */
         val isFormValid: Boolean
             get() = isNameValid && isEmailValid && isPasswordValid
     }
 
     private val _uiState = MutableStateFlow(UiState())
+
+    /** Stan obserwowany przez ekran Compose. */
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
+    /** Aktualizuje nazwę użytkownika i czyści poprzedni błąd. */
     fun onNameChange(value: String) {
         _uiState.update { it.copy(name = value, errorMessage = null) }
     }
 
+    /** Aktualizuje adres e-mail i czyści poprzedni błąd. */
     fun onEmailChange(value: String) {
         _uiState.update { it.copy(email = value, errorMessage = null) }
     }
 
+    /** Aktualizuje hasło i czyści poprzedni błąd. */
     fun onPasswordChange(value: String) {
         _uiState.update { it.copy(password = value, errorMessage = null) }
     }
 
+    /** Pokazuje standardowy komunikat problemu z połączeniem. */
     fun showConnectionError() {
         _uiState.update { it.copy(errorMessage = UiText.StringResource(R.string.error_network)) }
     }
 
+    /** Oznacza bieżący komunikat błędu jako obsłużony. */
     fun consumeErrorMessage() {
         _uiState.update { it.copy(errorMessage = null) }
     }
 
+    /**
+     * Waliduje formularz i rozpoczyna tworzenie konta.
+     *
+     * Sukces oznacza utworzenie wymaganych danych konta przez repository. Następnie wykonywane jest
+     * wylogowanie, aby wymusić świadome przejście przez weryfikację e-mail. Błąd częściowy nie może
+     * zostać przedstawiony jako pełna rejestracja.
+     */
     fun register() {
         val state = _uiState.value
         val name = state.name.trim()
