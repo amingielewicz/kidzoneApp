@@ -1,8 +1,10 @@
 # Cloud Functions
 
+Ostatnia aktualizacja: 2026-07-13
+
 ## Cel
 
-Dokument opisuje odpowiedzialności Cloud Functions w KidZone, typy triggerów oraz zasady bezpieczeństwa i utrzymania.
+Dokument opisuje odpowiedzialności Cloud Functions w kidZone, typy triggerów oraz zasady bezpieczeństwa, idempotencji, kosztów i obsługi błędów.
 
 ## Kategorie funkcji
 
@@ -13,167 +15,167 @@ Admin actions
 Notifications
 Ranking
 Maintenance
+Account deletion
 ```
 
 ## Auth lifecycle
 
-### onUserCreated
+### User created
 
 Odpowiedzialność:
 
-- inicjalizacja danych użytkownika,
-- email powitalny,
-- powiadomienie administratora, jeśli wymagane.
+- utworzenie wymaganych danych profilu,
+- ustawienie wartości domyślnych,
+- bezpieczne zainicjalizowanie danych prywatnych,
+- opcjonalne powiadomienie lub wiadomość powitalna.
 
-Ryzyka:
+Funkcja musi być odporna na ponowne wykonanie i nie może nadpisywać danych wprowadzonych przez użytkownika.
 
-- błędne dane profilu,
-- zbyt szerokie logowanie danych użytkownika.
-
-### onUserDeleted
+### User deleted
 
 Odpowiedzialność:
 
-- sprzątanie danych powiązanych z kontem,
-- email pożegnalny,
-- powiadomienie administratora, jeśli wymagane.
+- cleanup danych prywatnych,
+- usunięcie lub anonimizacja profilu publicznego,
+- cleanup plików i tokenów FCM,
+- obsługa częściowego błędu i retry,
+- zgodność z polityką account deletion.
+
+Nie wysyłamy wiadomości po usunięciu konta, jeśli wymagałoby to zachowania e-maila dłużej niż jest to potrzebne.
 
 ## Moderation
 
-### onPlaceReport
+Eventy zgłoszeń miejsca, opinii i zdjęcia powinny:
 
-Odpowiedzialność:
-
-- obsługa zgłoszenia miejsca,
-- powiadomienie administratora,
-- przygotowanie danych do panelu admina.
-
-### onReviewReport
-
-Odpowiedzialność:
-
-- obsługa zgłoszenia opinii,
-- powiadomienie administratora,
-- powiązanie zgłoszenia z opinią i miejscem.
-
-### onPhotoReport
-
-Odpowiedzialność:
-
-- obsługa zgłoszenia zdjęcia,
-- powiadomienie administratora,
-- przygotowanie akcji administracyjnych.
+- walidować typ celu i identyfikator,
+- blokować oczywiste duplikaty,
+- zapisywać bezpieczny rekord audytowy,
+- tworzyć zadanie dla panelu administracyjnego,
+- nie kopiować zbędnych danych osobowych.
 
 ## Admin actions
 
-### adminDeletePlace
+Operacje takie jak usunięcie miejsca, opinii, zdjęcia lub zmiana danych użytkownika wymagają:
 
-Odpowiedzialność:
+- uwierzytelnienia,
+- weryfikacji roli administratora,
+- walidacji payloadu,
+- jawnego powodu operacji,
+- audytu bez PII,
+- idempotencji,
+- kontrolowanego wyniku częściowego,
+- aktualizacji agregatów i zależnych danych.
 
-- usunięcie lub oznaczenie miejsca jako usunięte,
-- zapis powodu,
-- powiadomienie użytkownika, jeśli wymagane.
-
-Wymagania:
-
-- auth check,
-- admin role check,
-- audit log albo wystarczający zapis operacji.
-
-### adminDeleteReview
-
-Odpowiedzialność:
-
-- usunięcie opinii,
-- aktualizacja pól ratingowych miejsca,
-- powiadomienie autora, jeśli wymagane.
-
-### adminDeletePhoto
-
-Odpowiedzialność:
-
-- usunięcie zdjęcia ze Storage,
-- aktualizacja dokumentu miejsca,
-- zamknięcie zgłoszenia, jeśli dotyczy.
-
-### adminUpdateUserEmail
-
-Odpowiedzialność:
-
-- aktualizacja emaila w Auth,
-- aktualizacja danych pomocniczych w Firestore, jeśli istnieją.
-
-Wymagania:
-
-- bardzo ścisła walidacja admina,
-- brak logowania pełnych danych wrażliwych.
+Klient nie może przekazywać roli ani pól administracyjnych jako zaufanego źródła.
 
 ## Notifications
 
-### onReviewCreatedPush
+Funkcje push:
 
-Odpowiedzialność:
+- sprawdzają preferencje użytkownika,
+- nie wysyłają do autora zdarzenia bez potrzeby,
+- deduplikują powiadomienia,
+- walidują target i deep link,
+- sprzątają nieważne tokeny,
+- nie umieszczają danych wrażliwych w payloadzie.
 
-- wysłanie push do właściciela miejsca po dodaniu opinii.
+## Ranking i scheduled functions
 
-### onBadgeEarned
+- operacje mają limity i paginację,
+- nie skanują całej bazy bez kontroli,
+- zapisują checkpoint lub datę ostatniego wykonania,
+- są odporne na ponowne uruchomienie,
+- mają limit liczby powiadomień,
+- błędy pojedynczego rekordu nie zatrzymują całej partii bez raportu.
 
-Odpowiedzialność:
+## Walidacja wejścia
 
-- wysłanie push o zdobyciu odznaki.
+Każda funkcja callable lub HTTP powinna walidować:
 
-### onPhotoAddedToPlace
+- auth context,
+- rolę,
+- typy i długości pól,
+- dozwolone wartości enum,
+- identyfikatory zasobów,
+- limity liczby elementów,
+- ownership lub uprawnienie administracyjne.
 
-Odpowiedzialność:
+## Bezpieczeństwo
 
-- wysłanie push o nowym zdjęciu miejsca.
+- brak sekretów i tokenów w logach,
+- brak pełnych e-maili, treści formularzy i dokładnej lokalizacji,
+- App Check włączony tam, gdzie jest obsługiwany i uzasadniony,
+- zasada najmniejszych uprawnień dla service account,
+- brak zaufania do danych przesłanych przez klienta,
+- dane administracyjne aktualizowane wyłącznie po stronie zaufanej.
 
-### onUserBanned
+## Idempotencja i retry
 
-Odpowiedzialność:
+Funkcja powinna zakładać, że event może zostać dostarczony ponownie.
 
-- powiadomienie użytkownika o blokadzie konta.
+Stosujemy:
 
-## Ranking
+- identyfikator zdarzenia lub klucz deduplikacji,
+- transakcje albo warunkowe aktualizacje,
+- status operacji,
+- bezpieczny retry z backoffem,
+- dead-letter lub follow-up dla trwałych błędów.
 
-### dailyRankingCheck
+Nie oznaczamy operacji jako zakończonej, jeśli cleanup albo zapis zależny nie został wykonany.
 
-Odpowiedzialność:
+## Koszty i wydajność
 
-- sprawdzenie zmian w rankingu,
-- wysłanie powiadomień o awansie,
-- ograniczenie liczby operacji przez limity.
+- zapytania mają limity,
+- batch ma kontrolowany rozmiar,
+- operacje masowe są dzielone,
+- unikamy N+1 reads,
+- scheduled functions mają checkpointy,
+- anomalie czasu wykonania i kosztów są monitorowane,
+- funkcje nie uruchamiają nieograniczonej kaskady triggerów.
 
-## Zasady bezpieczeństwa
+## Logowanie i monitoring
 
-- Każda funkcja HTTP admina musi sprawdzać auth.
-- Każda funkcja HTTP admina musi sprawdzać rolę admina.
-- Funkcje nie ufają danym z klienta.
-- Funkcje nie logują tokenów, haseł, pełnych danych prywatnych ani sekretów.
-- Błędy powinny być logowane w sposób diagnostyczny, ale bez danych wrażliwych.
+Bezpieczny log może zawierać:
 
-## Zasady wydajności
+- nazwę funkcji,
+- typ operacji,
+- status,
+- wersję wdrożenia,
+- liczbę przetworzonych rekordów,
+- pseudonimizowany identyfikator korelacyjny.
 
-- Funkcje powinny mieć limity zapytań.
-- Operacje masowe powinny być dzielone na batch.
-- Funkcje scheduled nie powinny przetwarzać całej bazy bez kontroli.
-- Funkcje powinny być idempotentne tam, gdzie to możliwe.
+Nie logujemy payloadów użytkownika ani pełnych tokenów.
+
+## Testy
+
+Wymagane są:
+
+- build i lint,
+- testy jednostkowe walidacji i auth,
+- testy idempotencji,
+- scenariusze błędu częściowego,
+- testy nieważnego payloadu,
+- manualny smoke na projekcie testowym dla funkcji krytycznych.
 
 ## Checklist PR
 
-- [ ] Funkcja ma jasno opisaną odpowiedzialność.
-- [ ] Auth check jest obecny, jeśli wymagany.
-- [ ] Admin role check jest obecny dla funkcji admina.
-- [ ] Dane wejściowe są walidowane.
-- [ ] Funkcja nie loguje danych wrażliwych.
-- [ ] Funkcja ma test albo manualny scenariusz weryfikacji.
-- [ ] Wpływ na koszty został sprawdzony.
+- [ ] odpowiedzialność funkcji jest jednoznaczna,
+- [ ] auth, rola i App Check są zweryfikowane,
+- [ ] payload ma walidację i limity,
+- [ ] funkcja jest idempotentna,
+- [ ] retry nie tworzy duplikatów,
+- [ ] logi nie zawierają PII,
+- [ ] wpływ na koszty jest oceniony,
+- [ ] testy pokrywają sukces i błędy częściowe,
+- [ ] wpływ na Data Safety i account deletion jest sprawdzony.
 
 ## Checklist release
 
-- [ ] Funkcje budują się poprawnie.
-- [ ] ESLint przechodzi.
-- [ ] TypeScript build przechodzi.
-- [ ] Deploy wykonany na właściwy projekt Firebase.
-- [ ] Logi funkcji po deployu nie pokazują błędów.
-- [ ] Funkcje krytyczne sprawdzone manualnie.
+- [ ] `npm run lint` przechodzi,
+- [ ] `npm run build` przechodzi,
+- [ ] testy przechodzą,
+- [ ] deploy wykonano do właściwego projektu,
+- [ ] konfiguracja i sekrety są właściwe,
+- [ ] logi po deployu są czyste,
+- [ ] funkcje krytyczne mają smoke PASS,
+- [ ] monitoring i alerty są aktywne.
