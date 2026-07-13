@@ -74,5 +74,6 @@ object PasswordPolicy {
      * próbuje submitować zbyt słabe hasło. Treść spójna z [rules].
      */
     const val DEFAULT_ERROR_MESSAGE: String =
-        "Hasło musi mieć min. $MIN_LENGTH znaków, w tym małą i dużą literę oraz znak specjalny"
+        "Password must have at least $MIN_LENGTH characters, including lowercase and uppercase letters " +
+            "and a special character"
 }

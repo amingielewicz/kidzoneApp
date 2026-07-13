@@ -266,7 +266,7 @@ fun SystemStatusIcons(
             ) {
                 Icon(
                     imageVector = Icons.Filled.SignalWifiOff,
-                    contentDescription = "Brak internetu",
+                    contentDescription = stringResource(R.string.no_internet_banner),
                     tint = SystemStatusIconColor,
                     modifier = Modifier.size(20.dp)
                 )

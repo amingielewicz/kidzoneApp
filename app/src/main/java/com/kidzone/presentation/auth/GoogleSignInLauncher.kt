@@ -88,7 +88,7 @@ suspend fun launchGoogleSignIn(
             val googleCredential = GoogleIdTokenCredential.createFrom(credential.data)
             GoogleSignInResult.Success(googleCredential.idToken)
         } else {
-            GoogleSignInResult.Error("Nieoczekiwany typ credencjala: ${credential.type}")
+            GoogleSignInResult.Error("Unexpected credential type: ${credential.type}")
         }
     } catch (e: GetCredentialCancellationException) {
         GoogleSignInResult.Cancelled
@@ -97,7 +97,7 @@ suspend fun launchGoogleSignIn(
         Timber.w(e, "NoCredentialException – falling back to legacy GoogleSignIn")
         GoogleSignInResult.FallbackToLegacy
     } catch (e: GoogleIdTokenParsingException) {
-        GoogleSignInResult.Error(e.message ?: "Błąd parsowania tokena Google")
+        GoogleSignInResult.Error(e.message ?: "Could not parse Google token")
     } catch (e: GetCredentialException) {
         // Ogólny błąd Credential Manager – fallback na legacy
         Timber.w(e, "GetCredentialException – falling back to legacy GoogleSignIn")
@@ -142,18 +142,18 @@ fun parseLegacyGoogleSignInResult(data: Intent?): GoogleSignInResult {
         if (idToken != null) {
             GoogleSignInResult.Success(idToken)
         } else {
-            GoogleSignInResult.Error("Nie udało się pobrać tokena z konta Google")
+            GoogleSignInResult.Error("Could not get a token from the Google account")
         }
     } catch (e: ApiException) {
         when (e.statusCode) {
             12501 -> GoogleSignInResult.Cancelled // user cancelled
             else -> {
                 Timber.e(e, "Legacy GoogleSignIn ApiException: ${e.statusCode}")
-                GoogleSignInResult.Error("Błąd logowania Google (kod: ${e.statusCode})")
+                GoogleSignInResult.Error("Google sign-in error (code: ${e.statusCode})")
             }
         }
     } catch (e: Exception) {
-        GoogleSignInResult.Error(e.message ?: "Nieznany błąd logowania Google")
+        GoogleSignInResult.Error(e.message ?: "Unknown Google sign-in error")
     }
 }
 

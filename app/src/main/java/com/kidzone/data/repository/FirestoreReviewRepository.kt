@@ -104,10 +104,10 @@ class FirestoreReviewRepository @Inject constructor(
     }
 
     override suspend fun addReview(review: Review): OpResult<Review> = try {
-        require(review.placeId.isNotBlank()) { "Review.placeId nie może być puste" }
-        require(review.rating in 1..5) { "Review.rating musi być w zakresie 1..5" }
+        require(review.placeId.isNotBlank()) { "Review.placeId cannot be blank" }
+        require(review.rating in 1..5) { "Review.rating must be in range 1..5" }
         require(review.comment.length <= AppConfig.REVIEW_COMMENT_MAX_LENGTH) {
-            "Review.comment przekracza limit ${AppConfig.REVIEW_COMMENT_MAX_LENGTH} znaków"
+            "Review.comment exceeds the ${AppConfig.REVIEW_COMMENT_MAX_LENGTH} character limit"
         }
 
         val reviewRef = reviewsCollection().document()
@@ -134,10 +134,10 @@ class FirestoreReviewRepository @Inject constructor(
     }
 
     override suspend fun updateReview(review: Review): OpResult<Review> = try {
-        require(review.id.isNotBlank()) { "Review.id musi być znane przy update" }
-        require(review.rating in 1..5) { "Review.rating musi być w zakresie 1..5" }
+        require(review.id.isNotBlank()) { "Review.id must be known for update" }
+        require(review.rating in 1..5) { "Review.rating must be in range 1..5" }
         require(review.comment.length <= AppConfig.REVIEW_COMMENT_MAX_LENGTH) {
-            "Review.comment przekracza limit ${AppConfig.REVIEW_COMMENT_MAX_LENGTH} znaków"
+            "Review.comment exceeds the ${AppConfig.REVIEW_COMMENT_MAX_LENGTH} character limit"
         }
 
         val updatedReview = review.copy(updatedAtMillis = System.currentTimeMillis())
@@ -168,8 +168,8 @@ class FirestoreReviewRepository @Inject constructor(
         reason: String,
         comment: String
     ): OpResult<Unit> = try {
-        require(reviewId.isNotBlank()) { "reviewId nie może być puste" }
-        require(reporterId.isNotBlank()) { "reporterId nie może być puste" }
+        require(reviewId.isNotBlank()) { "reviewId cannot be blank" }
+        require(reporterId.isNotBlank()) { "reporterId cannot be blank" }
 
         val existing = firestore.collection(FirestoreCollections.REVIEW_REPORTS)
             .whereEqualTo("reporterId", reporterId)
@@ -195,7 +195,7 @@ class FirestoreReviewRepository @Inject constructor(
             true
         }
         if (completed == null) {
-            OpResult.failure(java.util.concurrent.TimeoutException("Przekroczono czas oczekiwania"))
+            OpResult.failure(java.util.concurrent.TimeoutException("Timed out while saving the report"))
         } else {
             OpResult.success(Unit)
         }
@@ -214,7 +214,7 @@ class FirestoreReviewRepository @Inject constructor(
     }
 
     override suspend fun deleteReview(reviewId: String): OpResult<Unit> = try {
-        require(reviewId.isNotBlank()) { "reviewId nie może być puste" }
+        require(reviewId.isNotBlank()) { "reviewId cannot be blank" }
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             reviewsCollection().document(reviewId).delete().await()
@@ -240,7 +240,7 @@ class FirestoreReviewRepository @Inject constructor(
         OpResult.failure(OfflineReviewSyncDisabledException())
 
     class OfflineReviewSyncDisabledException : IllegalStateException(
-        "Nie udało się zapisać opinii offline. Sprawdź połączenie i spróbuj ponownie."
+            "Could not save the review offline. Check your connection and try again."
     )
-    class AlreadyReportedException : IllegalStateException("Już zgłosiłeś tę opinię")
+class AlreadyReportedException : IllegalStateException("You have already reported this review")
 }

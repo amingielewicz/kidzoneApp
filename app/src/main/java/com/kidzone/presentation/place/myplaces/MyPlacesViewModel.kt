@@ -53,7 +53,7 @@ class MyPlacesViewModel @Inject constructor(
                     .map<List<Place>, UiState> { UiState.Ready(it) }
                     .onStart { emit(UiState.Loading) }
                     .catch { e ->
-                        emit(UiState.Error(e.message ?: "Nie udało się wczytać Twoich miejsc"))
+                        emit(UiState.Error(e.message ?: "Could not load your places"))
                     }
             }
         }

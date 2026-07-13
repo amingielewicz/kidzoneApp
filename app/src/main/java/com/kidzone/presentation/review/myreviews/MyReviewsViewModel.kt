@@ -134,7 +134,7 @@ class MyReviewsViewModel @Inject constructor(
                     }
                     .onStart { emit(UiState.Loading) }
                     .catch { e ->
-                        emit(UiState.Error(e.message ?: "Nie udało się wczytać Twoich opinii"))
+                        emit(UiState.Error(e.message ?: "Could not load your reviews"))
                     }
             }
         }
@@ -172,7 +172,7 @@ class MyReviewsViewModel @Inject constructor(
                 is OpResult.Failure -> _dialogState.update {
                     it.copy(
                         isDeleting = false,
-                        deleteError = r.error.message ?: "Nie udało się usunąć opinii"
+                        deleteError = r.error.message ?: "Could not delete the review"
                     )
                 }
             }

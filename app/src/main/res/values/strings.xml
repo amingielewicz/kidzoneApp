@@ -105,6 +105,16 @@
     <string name="home_enable_location">Włącz lokalizację</string>
     <string name="home_location_rationale">Pokażemy Ci miejsca przyjazne dzieciom w pobliżu, gdy zezwolisz na dostęp do lokalizacji.</string>
     <string name="home_manual_city_hint">Nie chcesz używać GPS? Kliknij tutaj, aby wybrać miasto ręcznie</string>
+    <string name="home_manual_city_short">Wybierz miasto ręcznie</string>
+    <string name="home_gps_status_message">Nie widzimy Twojej lokalizacji. Włącz GPS, aby zobaczyć atrakcje w pobliżu.</string>
+    <string name="home_gps_empty_message">Włącz lokalizację, aby zobaczyć, co polecają inni rodzice.</string>
+    <string name="home_checking_gps">Trwa sprawdzanie...</string>
+    <string name="home_nearby_section_title">📍 W pobliżu</string>
+    <string name="home_top_section_title">🏆 Najpopularniejsze</string>
+    <string name="home_recent_section_title">🆕 Nowości w okolicy</string>
+    <string name="very_close_distance">Tuż obok</string>
+    <string name="stale_age_one_minute">1 min temu</string>
+    <string name="stale_age_minutes">%1$d min temu</string>
 
     <!-- Map -->
     <string name="map_my_location">Moja lokalizacja</string>
@@ -116,7 +126,7 @@
     <string name="map_no_places_to_display">Brak miejsc do wyświetlenia.</string>
     <string name="map_open_place_details_label">Otwórz szczegóły miejsca</string>
     <string name="map_place_rating_count_label">Ocena %1$.1f, liczba opinii: %2$d</string>
-    <string name="map_no_reviews">Brak ocen</string>
+    <string name="map_no_reviews">Brak opinii</string>
     <string name="map_location_banner_text">Włącz lokalizację, żeby zobaczyć siebie na mapie</string>
     <string name="allow">Pozwól</string>
     <string name="category_all">Wszystkie</string>
@@ -164,9 +174,6 @@
     <string name="distance_m">%1$d m</string>
     <string name="distance_km">%1$.1f km</string>
     <string name="distance_km_integer">%1$d km</string>
-    <string name="very_close_distance">Tuż obok</string>
-    <string name="stale_age_one_minute">1 min temu</string>
-    <string name="stale_age_minutes">%1$d min temu</string>
     <string name="rating_accessibility_label">ocena %1$.1f, liczba opinii %2$d</string>
     <string name="new_place_no_reviews">nowe miejsce bez opinii</string>
 
@@ -305,12 +312,14 @@
     <!-- Widget -->
     <string name="widget_description">Pokazuje 3 najbliższe miejsca przyjazne dzieciom</string>
     <string name="widget_name">Miejsca w pobliżu</string>
+    <string name="widget_loading">Ładowanie...</string>
     <string name="widget_nearby_places_title">Miejsca w pobliżu</string>
     <string name="widget_no_cached_places">Brak miejsc w pamięci podręcznej</string>
-    <string name="widget_brand_label">kidZone</string>
     <string name="place_added_success">Dodano nowe miejsce</string>
     <string name="notification_permission_title">Włącz powiadomienia</string>
     <string name="notification_permission_message">Bądź na bieżąco z nowościami w kidZone!</string>
+    <string name="notification_channel_name">Powiadomienia kidZone</string>
+    <string name="notification_channel_description">Opinie, nowe miejsca i inne aktywności</string>
     <string name="enable">Włącz</string>
     <string name="enable_notifications">Włącz powiadomienia</string>
     <string name="notification_prompt_first_place">Super, że dodałeś miejsce! Włącz powiadomienia, aby widzieć, kiedy inni dodadzą do niego zdjęcia lub opinię.</string>
@@ -433,12 +442,28 @@
     <string name="photos_with_count">Zdjęcia (%1$d)</string>
     <string name="photo_index">Zdjęcie %1$d</string>
     <string name="review_photo_index">Zdjęcie opinii %1$d</string>
+    <string name="fullscreen_photo_content_description">Zdjęcie pełnoekranowe</string>
     <string name="location_permission_denied">Brak uprawnienia do lokalizacji</string>
     <string name="camera_access_denied">Brak dostępu do aparatu. Nadaj uprawnienie w ustawieniach.</string>
     <string name="camera_unavailable">Nie udało się uruchomić aparatu</string>
     <string name="edit_place_title">Edytuj miejsce</string>
     <string name="place_name_label">Nazwa miejsca</string>
     <string name="place_description_label">Opis</string>
+    <string name="add_place_basics_section_title">Podstawy</string>
+    <string name="add_place_details_section_title">Szczegóły</string>
+    <string name="add_place_location_section_title">Lokalizacja</string>
+    <string name="add_place_amenities_count">Udogodnienia (%1$d)</string>
+    <string name="add_place_limit_reached_hint">Osiągnięto maksymalną liczbę znaków</string>
+    <string name="add_place_location_permission_helper">Aby pobrać lokalizację, zezwól na dostęp do GPS.</string>
+    <string name="add_place_location_gps_helper">Włącz GPS, aby pobrać lokalizację.</string>
+    <string name="add_place_location_ready_helper">Kliknij przycisk powyżej, aby pobrać adres.</string>
+    <string name="add_place_save_hint_name_and_location">Wpisz nazwę i pobierz lokalizację, aby zapisać miejsce.</string>
+    <string name="add_place_save_hint_name">Wpisz nazwę miejsca, aby odblokować zapis.</string>
+    <string name="add_place_save_hint_location">Pobierz lokalizację miejsca, aby odblokować zapis.</string>
+    <string name="add_place_allow_location">Zezwól na lokalizację</string>
+    <string name="add_place_fetching_location">Pobieranie lokalizacji...</string>
+    <string name="add_place_more_nearby_count">+%1$d więcej w pobliżu</string>
+    <string name="add_place_location_error_generic">Problem z ustaleniem lokalizacji. Spróbuj później.</string>
     <string name="location_required_hint">Lokalizacja jest wymagana. Pobierz GPS w miejscu, które dodajesz.</string>
     <string name="location_fetched_hint">Lokalizacja pobrana. Możesz zapisać miejsce.</string>
     <string name="address_label">Adres</string>
@@ -543,8 +568,6 @@
     <string name="gallery_limit">Galeria (%1$d/%2$d)</string>
     <string name="rate_star_label">Oceń na %1$d</string>
     <string name="suggest_edit_subtitle">Zmień dane, które uważasz za nieprawidłowe. Propozycja zostanie wysłana do weryfikacji.</string>
-    <string name="suggest_edit_comment_label">Komentarz</string>
-    <string name="suggest_edit_comment_counter">%1$d/%2$d znaków</string>
     <string name="submit_suggested_edit">Wyślij propozycję zmiany</string>
     <string name="location_correction_subtitle">Pobierz aktualną lokalizację GPS, aby zaproponować poprawną pozycję tego miejsca na mapie.</string>
     <string name="fetch_location">Pobierz lokalizację</string>

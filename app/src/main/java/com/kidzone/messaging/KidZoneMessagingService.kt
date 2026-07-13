@@ -89,10 +89,10 @@ class KidZoneMessagingService : FirebaseMessagingService() {
             if (manager.getNotificationChannel(channelId) == null) {
                 val channel = NotificationChannel(
                     channelId,
-                    "Powiadomienia kidZone",
+                    getString(R.string.notification_channel_name),
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply {
-                    description = "Opinie, nowe miejsca i inne aktywności"
+                    description = getString(R.string.notification_channel_description)
                 }
                 manager.createNotificationChannel(channel)
             }

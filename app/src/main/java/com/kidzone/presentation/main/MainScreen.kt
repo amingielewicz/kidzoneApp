@@ -246,6 +246,7 @@ fun MainScreen(
             onFocusConsumed()
         }
     }
+    val noInternetMessage = stringResource(R.string.error_no_internet)
 
     Scaffold(
         topBar = {
@@ -272,7 +273,7 @@ fun MainScreen(
                         onNetworkClick = {
                             Toast.makeText(
                                 context,
-                                "Brak internetu. Sprawdź połączenie sieciowe.",
+                                noInternetMessage,
                                 Toast.LENGTH_SHORT
                             ).show()
                         },

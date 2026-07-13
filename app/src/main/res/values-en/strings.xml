@@ -104,6 +104,16 @@
     <string name="home_enable_location">Enable location</string>
     <string name="home_location_rationale">We\'ll show you kid-friendly places nearby when you allow location access.</string>
     <string name="home_manual_city_hint">Don’t want to use GPS? Tap here to choose a city manually</string>
+    <string name="home_manual_city_short">Choose city manually</string>
+    <string name="home_gps_status_message">We can\'t see your location. Turn on GPS to see attractions nearby.</string>
+    <string name="home_gps_empty_message">Enable location to see what other parents recommend.</string>
+    <string name="home_checking_gps">Checking...</string>
+    <string name="home_nearby_section_title">📍 Nearby</string>
+    <string name="home_top_section_title">🏆 Most popular</string>
+    <string name="home_recent_section_title">🆕 New nearby</string>
+    <string name="very_close_distance">Very close</string>
+    <string name="stale_age_one_minute">1 min ago</string>
+    <string name="stale_age_minutes">%1$d min ago</string>
 
     <!-- Map -->
     <string name="map_my_location">My location</string>
@@ -115,7 +125,7 @@
     <string name="map_no_places_to_display">No places to display.</string>
     <string name="map_open_place_details_label">Open place details</string>
     <string name="map_place_rating_count_label">Rating %1$.1f, review count: %2$d</string>
-    <string name="map_no_reviews">No ratings.</string>
+    <string name="map_no_reviews">No reviews</string>
     <string name="map_location_banner_text">Enable location to see yourself on the map</string>
     <string name="allow">Allow</string>
     <string name="category_all">All</string>
@@ -163,9 +173,6 @@
     <string name="distance_m">%1$d m</string>
     <string name="distance_km">%1$.1f km</string>
     <string name="distance_km_integer">%1$d km</string>
-    <string name="very_close_distance">Very close</string>
-    <string name="stale_age_one_minute">1 min ago</string>
-    <string name="stale_age_minutes">%1$d min ago</string>
     <string name="rating_accessibility_label">rating %1$.1f, review count %2$d</string>
     <string name="new_place_no_reviews">new place without reviews</string>
 
@@ -176,13 +183,9 @@
     <string name="location_sorting_rationale">Enable location to sort places by distance.</string>
     <string name="no_internet_banner">No internet connection. Waiting for network…</string>
     <string name="gps_disabled_banner">We can\'t see where you are. Turn on location to see places in your area.</string>
+    <string name="gps_disabled_title">Turn on GPS</string>
     <string name="location_status_unavailable">We can\'t see where you are. Turn on location to see places in your area.</string>
     <string name="gps_acquiring_banner">Acquiring location…</string>
-    <string name="gps_disabled_title">Enable GPS</string>
-    <string name="contact_support_offline_send_action">Send when online</string>
-    <string name="delete_account_offline_action">Delete when online</string>
-    <string name="suggest_edit_comment_label">Comment</string>
-    <string name="suggest_edit_comment_counter">%1$d/%2$d characters</string>
 
     <!-- Profile / settings -->
     <string name="settings">Settings</string>
@@ -228,6 +231,7 @@
     <string name="contact_support_subject_label">Subject</string>
     <string name="contact_support_message_label">Message</string>
     <string name="contact_support_send">Send</string>
+    <string name="contact_support_offline_send_action">Send when online</string>
     <string name="contact_support_subject_counter">%1$d/%2$d characters, min. 3</string>
     <string name="contact_support_message_counter">%1$d/%2$d characters, min. 10</string>
     <string name="contact_support_hint">The message will be saved as a support request and forwarded to support by email.</string>
@@ -307,12 +311,14 @@
     <!-- Widget -->
     <string name="widget_description">Shows 3 nearest kid-friendly places</string>
     <string name="widget_name">Nearby places</string>
+    <string name="widget_loading">Loading...</string>
     <string name="widget_nearby_places_title">Nearby places</string>
     <string name="widget_no_cached_places">No cached places</string>
-    <string name="widget_brand_label">kidZone</string>
     <string name="place_added_success">New place added</string>
     <string name="notification_permission_title">Enable notifications</string>
     <string name="notification_permission_message">Stay up to date with what\'s new in kidZone!</string>
+    <string name="notification_channel_name">kidZone notifications</string>
+    <string name="notification_channel_description">Reviews, new places and other activity</string>
     <string name="enable">Enable</string>
     <string name="enable_notifications">Enable notifications</string>
     <string name="notification_prompt_first_place">Nice, you added a place! Enable notifications to see when others add photos or reviews to it.</string>
@@ -432,12 +438,28 @@
     <string name="photos_with_count">Photos (%1$d)</string>
     <string name="photo_index">Photo %1$d</string>
     <string name="review_photo_index">Review photo %1$d</string>
+    <string name="fullscreen_photo_content_description">Fullscreen photo</string>
     <string name="location_permission_denied">Location permission denied</string>
     <string name="camera_access_denied">Camera access denied. Grant permission in settings.</string>
     <string name="camera_unavailable">Could not start the camera</string>
     <string name="edit_place_title">Edit place</string>
     <string name="place_name_label">Place name</string>
     <string name="place_description_label">Description</string>
+    <string name="add_place_basics_section_title">Basics</string>
+    <string name="add_place_details_section_title">Details</string>
+    <string name="add_place_location_section_title">Location</string>
+    <string name="add_place_amenities_count">Amenities (%1$d)</string>
+    <string name="add_place_limit_reached_hint">Maximum number of characters reached</string>
+    <string name="add_place_location_permission_helper">To fetch location, allow GPS access.</string>
+    <string name="add_place_location_gps_helper">Turn on GPS to fetch location.</string>
+    <string name="add_place_location_ready_helper">Tap the button above to fetch the address.</string>
+    <string name="add_place_save_hint_name_and_location">Enter a name and fetch location to save the place.</string>
+    <string name="add_place_save_hint_name">Enter place name to enable saving.</string>
+    <string name="add_place_save_hint_location">Fetch place location to enable saving.</string>
+    <string name="add_place_allow_location">Allow location</string>
+    <string name="add_place_fetching_location">Fetching location...</string>
+    <string name="add_place_more_nearby_count">+%1$d more nearby</string>
+    <string name="add_place_location_error_generic">Could not determine location. Try again later.</string>
     <string name="location_required_hint">Location is required. Fetch GPS at the place you are adding.</string>
     <string name="location_fetched_hint">Location fetched. You can save the place.</string>
     <string name="address_label">Address</string>
@@ -587,6 +609,7 @@
     <string name="change_email_verification_sent">Verification link sent to %1$s. Click it to confirm the address change.</string>
     <string name="account_action_failed">Failed to complete action</string>
     <string name="delete_account_failed">Failed to delete account</string>
+    <string name="delete_account_offline_action">Delete when online</string>
     <string name="error_unauthorized">You do not have permission to perform this action</string>
     <string name="empty_my_reviews_title">You don\'t have any reviews yet</string>
     <string name="empty_my_reviews_subtitle">Open any place from the list or map and add your first review.</string>

@@ -34,14 +34,6 @@ import kotlin.coroutines.resume
 private const val LOCATION_TIMEOUT_MS = 15_000L
 
 /**
- * Wspólny komunikat dla użytkownika, gdy lokalizacji nie udało się ustalić
- * w sensownym czasie. Trzymamy go w jednym miejscu, żeby Home, AddPlace i
- * lista miejsc używały dokładnie tego samego brzmienia.
- */
-const val LOCATION_TIMEOUT_USER_MESSAGE: String =
-    "Problem z ustaleniem lokalizacji. Spróbuj później."
-
-/**
  * Sprawdza, czy użytkownik nadał aplikacji uprawnienie do lokalizacji
  * (`ACCESS_FINE_LOCATION` lub `ACCESS_COARSE_LOCATION`).
  */
@@ -70,12 +62,6 @@ fun isLocationServiceEnabled(context: Context): Boolean {
     return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
         locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
 }
-
-/**
- * Komunikat dla użytkownika, gdy usługa lokalizacji jest wyłączona w systemie.
- */
-const val LOCATION_SERVICE_DISABLED_MESSAGE: String =
-    "Lokalizacja jest wy\u0142\u0105czona. W\u0142\u0105cz GPS w ustawieniach telefonu."
 
 /**
  * Pobiera aktualną lokalizację użytkownika przez FusedLocationProviderClient.

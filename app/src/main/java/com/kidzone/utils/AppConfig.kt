@@ -33,8 +33,8 @@ object AppConfig {
      * Domyślny komunikat po przekroczeniu timeout Firestore.
      */
     const val TIMEOUT_MESSAGE: String =
-        "Zapis trwa zbyt długo. Sprawdź połączenie z Internetem, " +
-            "a jeśli używasz emulatora – wykonaj Cold Boot."
+        "Saving is taking too long. Check your internet connection, " +
+            "and if you use an emulator, perform a Cold Boot."
 
     // ========== Review limits ==========
 
