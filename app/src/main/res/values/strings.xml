@@ -116,7 +116,7 @@
     <string name="map_no_places_to_display">Brak miejsc do wyświetlenia.</string>
     <string name="map_open_place_details_label">Otwórz szczegóły miejsca</string>
     <string name="map_place_rating_count_label">Ocena %1$.1f, liczba opinii: %2$d</string>
-    <string name="map_no_reviews">Brak opinii</string>
+    <string name="map_no_reviews">Brak ocen</string>
     <string name="map_location_banner_text">Włącz lokalizację, żeby zobaczyć siebie na mapie</string>
     <string name="allow">Pozwól</string>
     <string name="category_all">Wszystkie</string>

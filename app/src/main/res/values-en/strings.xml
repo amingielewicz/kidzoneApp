@@ -115,7 +115,7 @@
     <string name="map_no_places_to_display">No places to display.</string>
     <string name="map_open_place_details_label">Open place details</string>
     <string name="map_place_rating_count_label">Rating %1$.1f, review count: %2$d</string>
-    <string name="map_no_reviews">No reviews</string>
+    <string name="map_no_reviews">No ratings.</string>
     <string name="map_location_banner_text">Enable location to see yourself on the map</string>
     <string name="allow">Allow</string>
     <string name="category_all">All</string>
