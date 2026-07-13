@@ -1,16 +1,12 @@
 # Release Process
 
-Dokument opisuje proces przygotowania i publikacji wersji kidZone.
+Ostatnia aktualizacja: 2026-07-13
 
-## Cele procesu
+## Cel
 
-- minimalizować ryzyko regresji,
-- zapewnić powtarzalny release,
-- wymusić kontrolę security i privacy,
-- mieć jasne kryterium GO / NO-GO,
-- utrzymać historię decyzji release.
+Proces przygotowania i publikacji wersji kidZone. Celem jest powtarzalny release, ograniczenie regresji oraz jednoznaczna decyzja GO / NO-GO.
 
-## Standardowy przepływ
+## Przepływ
 
 ```text
 feature branch
@@ -23,7 +19,7 @@ CI green
   ↓
 merge to main
   ↓
-release candidate
+release branch / candidate
   ↓
 internal testing
   ↓
@@ -32,100 +28,121 @@ closed testing
 production rollout
 ```
 
-## 1. Przygotowanie release candidate
+## 1. Release candidate
 
-Przed RC:
-
-- [ ] wszystkie P0 zamknięte,
-- [ ] wszystkie P1 zamknięte albo świadomie przeniesione,
+- [ ] brak otwartych P0,
+- [ ] P1 zamknięte albo jawnie zaakceptowane,
+- [ ] `VERSION_NAME` i `VERSION_CODE` ustawione,
 - [ ] release notes przygotowane,
-- [ ] GO / NO-GO checklist rozpoczęta,
-- [ ] signed build możliwy do wygenerowania,
-- [ ] Firebase project i Google Play config zweryfikowane.
+- [ ] signed AAB możliwy do wygenerowania,
+- [ ] właściwy projekt Firebase i konfiguracja Google Play,
+- [ ] GO / NO-GO rozpoczęte.
 
-## 2. Build
-
-Wymagane:
+## 2. Build i CI
 
 - [ ] `assembleDebug` przechodzi,
-- [ ] testy jednostkowe przechodzą,
-- [ ] release AAB/APK podpisany,
-- [ ] brak sekretów w repo,
-- [ ] release nie zawiera debug-only tools.
+- [ ] `testDebugUnitTest` przechodzi,
+- [ ] `detekt` i `lint` przechodzą,
+- [ ] `bundleRelease` przechodzi,
+- [ ] release AAB jest podpisany,
+- [ ] Gitleaks nie wykrywa sekretów,
+- [ ] release nie zawiera narzędzi debugowych ani debug providerów.
 
 ## 3. Internal Testing
 
-Internal testing służy do sprawdzenia technicznej gotowości.
+Sprawdź:
 
-Sprawdzić:
-
-- [ ] czysta instalacja,
-- [ ] aktualizacja z poprzedniej wersji,
-- [ ] logowanie/rejestracja,
-- [ ] mapa,
-- [ ] lista,
-- [ ] dodawanie miejsca,
-- [ ] opinie,
-- [ ] ranking,
-- [ ] profil,
+- [ ] czystą instalację,
+- [ ] aktualizację z poprzedniej wersji,
+- [ ] logowanie i rejestrację,
+- [ ] Start, Mapę, Listę i szczegóły miejsca,
+- [ ] dodawanie miejsca, opinii i zdjęć,
+- [ ] ranking i profil,
 - [ ] brak internetu,
-- [ ] brak lokalizacji.
+- [ ] działanie bez lokalizacji,
+- [ ] działanie bez kamery i powiadomień,
+- [ ] trwałe odmowy i powrót z ustawień aplikacji,
+- [ ] account deletion na koncie testowym.
 
 ## 4. Closed Testing
 
-Closed testing służy do zebrania feedbacku UX i stabilności.
+- [ ] kilka fizycznych urządzeń,
+- [ ] różni producenci i wersje Androida,
+- [ ] test na słabszym urządzeniu,
+- [ ] test użytkownika nietechnicznego,
+- [ ] Crashlytics i Performance zweryfikowane,
+- [ ] koszty Firebase i Maps sprawdzone,
+- [ ] większy zbiór danych nie blokuje UI.
 
-Wymagane:
+## 5. Bramy compliance
 
-- [ ] minimum kilka realnych urządzeń,
-- [ ] test z użytkownikiem nietechnicznym,
-- [ ] sprawdzenie Crashlytics,
-- [ ] sprawdzenie wydajności na słabszym Androidzie,
-- [ ] sprawdzenie danych 1000 miejsc, jeśli dotyczy.
+Wymagany PASS:
 
-## 5. Production rollout
+- `docs/legal/account-deletion-test-checklist.md`,
+- `docs/qa/android-permissions-device-matrix.md`,
+- `docs/legal/google-play-data-safety-draft.md`,
+- `docs/qa/google-play-security-checklist.md`,
+- publiczne URL-e dokumentów,
+- finalny legal review.
 
-Rekomendowany rollout:
+## 6. Production rollout
 
 ```text
-5% → obserwacja → 20% → obserwacja → 50% → obserwacja → 100%
+5% → 20% → 50% → 100%
 ```
 
 Przed zwiększeniem rollout:
 
-- [ ] crash rate akceptowalny,
+- [ ] crash rate i ANR są akceptowalne,
 - [ ] brak nowych P0/P1,
-- [ ] brak problemów z logowaniem,
-- [ ] brak problemów z mapą,
-- [ ] brak alertów kosztowych Firebase / Maps.
+- [ ] logowanie i account deletion działają,
+- [ ] mapa, lista i zdjęcia działają,
+- [ ] brak nowych problemów z uprawnieniami,
+- [ ] brak alertów kosztowych.
 
-## Rollback
+## 7. Halt rollout
 
-Rollback rozważyć, gdy:
+Zatrzymaj rollout, gdy:
 
-- crash rate rośnie gwałtownie,
+- rośnie crash rate lub ANR,
 - login lub podstawowe flow nie działa,
-- pojawia się krytyczna luka bezpieczeństwa,
-- koszt Firebase / Maps rośnie nienaturalnie,
-- występuje utrata danych.
+- account deletion nie działa,
+- występuje utrata danych,
+- pojawia się luka privacy/security,
+- uprawnienia powodują martwe akcje lub pętle,
+- koszty rosną nietypowo.
 
-## Hotfix
+## 8. Hotfix
 
-Hotfix idzie poza standardowym cyklem, ale nadal wymaga:
+Hotfix nadal wymaga:
 
-- [ ] minimalnego code review,
-- [ ] testu fixowanego flow,
-- [ ] signed release build,
-- [ ] aktualizacji release notes,
-- [ ] obserwacji Crashlytics po wydaniu.
+- minimalnego review,
+- testu poprawianego flow,
+- testu regresji obszaru ryzyka,
+- signed AAB,
+- zwiększenia `VERSION_CODE`,
+- aktualizacji release notes,
+- obserwacji po wydaniu.
 
-## Po release
+## 9. Po release
 
-Po zakończeniu rollout:
+- [ ] Crashlytics i Android vitals sprawdzone,
+- [ ] Performance i Analytics sprawdzone,
+- [ ] Firebase i Maps usage sprawdzone,
+- [ ] opinie użytkowników przejrzane,
+- [ ] problemy zapisane jako follow-up issues,
+- [ ] milestone release zamknięty dopiero po stabilizacji.
 
-- [ ] sprawdzić Crashlytics,
-- [ ] sprawdzić Performance,
-- [ ] sprawdzić Analytics,
-- [ ] zanotować problemy,
-- [ ] utworzyć follow-up issue,
-- [ ] zamknąć release milestone.
+## Wynik
+
+```text
+Release:
+Commit / tag:
+AAB:
+Track:
+Internal testing: PASS / FAIL / BLOCKED
+Closed testing: PASS / FAIL / BLOCKED
+Compliance gates: PASS / FAIL / BLOCKED
+GO / NO-GO:
+Dowody:
+```
