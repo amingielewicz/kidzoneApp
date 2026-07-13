@@ -5,10 +5,23 @@ import com.kidzone.utils.OpResult
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Operacje na opiniach o miejscach.
+ * Kontrakt dostępu do opinii o miejscach.
+ *
+ * Implementacja odpowiada za synchronizację danych z backendem, aktualizację lokalnego cache oraz
+ * utrzymanie spójności agregatów miejsca. Warstwa prezentacji nie powinna zależeć od szczegółów
+ * Firestore ani Room.
  */
 interface ReviewRepository {
 
+    /**
+     * Obserwuje publiczne opinie przypisane do wskazanego miejsca.
+     *
+     * Implementacja może najpierw wyemitować dane z cache, a następnie odświeżyć je ze źródła
+     * zdalnego. Opinie ukryte przez moderację nie powinny trafiać do publicznego strumienia.
+     *
+     * @param placeId identyfikator miejsca; pusty identyfikator powinien zwrócić pusty strumień.
+     * @return strumień aktualnej listy opinii dla miejsca.
+     */
     fun observeReviewsForPlace(placeId: String): Flow<List<Review>>
 
     /**
@@ -23,9 +36,21 @@ interface ReviewRepository {
      * Wykonywane klient-side, żeby uniknąć composite indexu.
      *
      * Emituje pustą listę gdy [userId] jest pusty.
+     *
+     * @param userId identyfikator autora opinii.
+     * @return strumień opinii użytkownika.
      */
     fun observeReviewsByUser(userId: String): Flow<List<Review>>
 
+    /**
+     * Dodaje nową opinię i aktualizuje agregaty miejsca oraz użytkownika.
+     *
+     * Operacja powinna być odporna na ponowienie i nie tworzyć duplikatu po timeoutcie lub
+     * wielokrotnym kliknięciu. Sukces oznacza potwierdzony zapis po stronie backendu.
+     *
+     * @param review kompletna opinia do zapisania.
+     * @return zapisana opinia albo zmapowany błąd domenowy.
+     */
     suspend fun addReview(review: Review): OpResult<Review>
 
     /**
@@ -39,6 +64,9 @@ interface ReviewRepository {
      *
      * Pola immutowalne (`id`, `placeId`, `userId`, `authorName`, `createdAtMillis`)
      * są ignorowane przez implementację – używa wartości z istniejącego dokumentu.
+     *
+     * @param review opinia zawierająca nową ocenę lub komentarz.
+     * @return zaktualizowana opinia albo zmapowany błąd domenowy.
      */
     suspend fun updateReview(review: Review): OpResult<Review>
 
@@ -51,6 +79,9 @@ interface ReviewRepository {
      *
      * Reguły Firestore na razie pozwalają usunąć tylko własną opinię
      * (`userId == auth.uid`).
+     *
+     * @param reviewId identyfikator opinii do usunięcia.
+     * @return sukces po zakończeniu zapisu i aktualizacji agregatów albo błąd.
      */
     suspend fun deleteReview(reviewId: String): OpResult<Unit>
 
@@ -59,6 +90,11 @@ interface ReviewRepository {
      *
      * Analogicznie do [PlaceRepository.reportPlace]: zapis do kolekcji
      * `review_reports` z danymi zgłaszającego, powodem i komentarzem.
+     *
+     * @param reviewId identyfikator zgłaszanej opinii.
+     * @param reporterId identyfikator zgłaszającego użytkownika.
+     * @param reason wybrany powód zgłoszenia.
+     * @param comment opcjonalny opis uzupełniający.
      */
     suspend fun reportReviewAsSpam(
         reviewId: String,
@@ -68,7 +104,10 @@ interface ReviewRepository {
     ): OpResult<Unit>
 
     /**
-     * Pobiera listę ID opinii zgłoszonych przez danego użytkownika.
+     * Pobiera identyfikatory opinii zgłoszonych przez użytkownika.
+     *
+     * @param userId identyfikator zgłaszającego.
+     * @return zbiór identyfikatorów opinii; pusty zbiór, gdy brak zgłoszeń.
      */
     suspend fun getReportedReviews(userId: String): Set<String>
 }
