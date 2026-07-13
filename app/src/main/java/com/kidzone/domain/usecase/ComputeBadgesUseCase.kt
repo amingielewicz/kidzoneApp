@@ -10,20 +10,25 @@ import com.kidzone.utils.OpResult
 import javax.inject.Inject
 
 /**
- * Wylicza odznaki użytkownika na podstawie rankingów (top userów + top miejsc).
+ * Wylicza odznaki użytkownika wymagające kontekstu rankingowego.
  *
- * Logika rankingowa jest spójna z [com.kidzone.presentation.ranking.RankingViewModel]:
- *  - userzy filtrujemy do aktywnych (>=1 miejsce LUB >=1 opinia),
- *  - miejsca filtrujemy do takich z >0 opinii i >0.0 średniej.
- *
- * Best-effort: przy błędzie fetcha zwracamy pusty [BadgeContext],
- * co oznacza brak odznak rankingowych (count-based dalej działają).
+ * Use case pobiera ograniczoną pulę użytkowników i miejsc, wyznacza pozycję użytkownika oraz
+ * najlepszą pozycję należącego do niego miejsca, a następnie łączy te dane z odznakami licznikowymi.
+ * Błąd pobrania rankingu jest obsługiwany best-effort i nie blokuje odznak zależnych wyłącznie od
+ * danych profilu.
  */
 class ComputeBadgesUseCase @Inject constructor(
     private val authRepository: AuthRepository,
     private val placeRepository: PlaceRepository
 ) {
 
+    /**
+     * Wynik obliczenia odznak i pozycji rankingowych.
+     *
+     * @property obtainedBadges wszystkie aktualnie spełnione odznaki użytkownika.
+     * @property userRank pozycja użytkownika w rankingu albo `null`, gdy nie został sklasyfikowany.
+     * @property bestPlaceRank najlepsza pozycja miejsca użytkownika albo `null`, gdy brak wyniku.
+     */
     data class BadgeResult(
         val obtainedBadges: List<UserBadge>,
         val userRank: Int?,
@@ -31,8 +36,11 @@ class ComputeBadgesUseCase @Inject constructor(
     )
 
     /**
-     * @param user bogaty profil usera z Firestore (z licznikami)
-     * @param rankPool max ilość userów/miejsc do pobrania (domyślnie 100)
+     * Oblicza odznaki dla wskazanego profilu.
+     *
+     * @param user pełny profil użytkownika zawierający liczniki aktywności.
+     * @param rankPool maksymalna liczba użytkowników i miejsc pobierana do obliczeń.
+     * @return odznaki oraz dostępne pozycje rankingowe.
      */
     suspend operator fun invoke(user: User, rankPool: Int = RANK_POOL): BadgeResult {
         val context = computeBadgeContext(user, rankPool)
