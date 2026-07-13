@@ -1,0 +1,5 @@
+<resources>
+    <!-- Place details / suggest edit -->
+    <string name="suggest_edit_comment_label">Comment</string>
+    <string name="suggest_edit_comment_counter">%1$d/%2$d characters</string>
+</resources>
