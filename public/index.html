@@ -8,166 +8,29 @@
   <link rel="icon" type="image/png" href="/assets/kidzone-logo.png">
   <title>kidZone — miejsca przyjazne dzieciom</title>
   <style>
-    :root {
-      --brand: #0f74d4;
-      --brand-dark: #0a5ca9;
-      --brand-soft: #eaf5ff;
-      --ink: #102a43;
-      --muted: #60758a;
-      --surface: #ffffff;
-      --line: #dfe9f2;
-      --bg: #f6faff;
-      --support: #102a43;
-      --radius-xl: 30px;
-      --radius-lg: 22px;
-      --shadow: 0 18px 48px rgba(31, 73, 110, .10);
-    }
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--bg); line-height: 1.6; }
-    a { color: inherit; }
-    img { display: block; max-width: 100%; }
-    .container { width: min(1160px, calc(100% - 36px)); margin: 0 auto; }
-    .topbar { position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.94); border-bottom: 1px solid rgba(15,116,212,.08); backdrop-filter: blur(16px); }
-    .nav { min-height: 82px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-    .brand { display: inline-flex; align-items: center; gap: 14px; text-decoration: none; font-size: 25px; font-weight: 900; letter-spacing: -.5px; }
-    .brand-logo { width: 68px; height: 68px; object-fit: contain; filter: drop-shadow(0 10px 22px rgba(15,116,212,.18)); }
-    .nav-links { display: flex; align-items: center; gap: 24px; }
-    .nav-links a { text-decoration: none; font-weight: 750; color: #476278; }
-    .nav-links a:hover { color: var(--brand); }
-    .hero { padding: 84px 0 76px; background: radial-gradient(circle at 88% 10%, rgba(15,116,212,.12), transparent 30%), radial-gradient(circle at 10% 88%, rgba(255,193,7,.10), transparent 24%), linear-gradient(180deg, #fff 0%, #f1f8ff 100%); }
-    .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 64px; align-items: center; }
-    .eyebrow { display: inline-flex; padding: 9px 14px; border-radius: 999px; background: var(--brand-soft); color: var(--brand-dark); font-size: 14px; font-weight: 850; }
-    h1 { margin: 22px 0 20px; font-size: clamp(46px, 7vw, 78px); line-height: 1.02; letter-spacing: -2.6px; }
-    .lead { max-width: 700px; margin: 0 0 30px; color: var(--muted); font-size: clamp(18px, 2vw, 22px); }
-    .actions { display: flex; flex-wrap: wrap; gap: 14px; }
-    .button { min-height: 54px; padding: 0 24px; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-weight: 850; transition: transform .18s ease, box-shadow .18s ease; }
-    .button:hover { transform: translateY(-2px); }
-    .button-primary { background: var(--brand); color: #fff; box-shadow: 0 12px 28px rgba(15,116,212,.24); }
-    .button-secondary { background: #fff; color: var(--ink); border: 1px solid var(--line); }
-    .logo-stage { min-height: 440px; display: grid; place-items: center; position: relative; overflow: hidden; border-radius: var(--radius-xl); background: linear-gradient(145deg, #fff 0%, #e8f4ff 100%); border: 1px solid rgba(15,116,212,.10); box-shadow: var(--shadow); }
-    .logo-stage::before, .logo-stage::after { content: ""; position: absolute; border-radius: 50%; background: rgba(15,116,212,.07); }
-    .logo-stage::before { width: 220px; height: 220px; top: -70px; right: -40px; }
-    .logo-stage::after { width: 180px; height: 180px; bottom: -55px; left: -35px; }
-    .hero-logo { width: min(80%, 390px); position: relative; z-index: 1; filter: drop-shadow(0 24px 34px rgba(20,74,112,.18)); }
-    section { padding: 82px 0; }
-    .section-heading { max-width: 760px; margin: 0 auto 42px; text-align: center; }
-    .section-heading h2 { margin: 0 0 12px; font-size: clamp(32px, 4.4vw, 48px); line-height: 1.12; letter-spacing: -1.2px; }
-    .section-heading p { margin: 0; color: var(--muted); font-size: 18px; }
-    .features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; align-items: stretch; }
-    .feature { min-height: 220px; height: 100%; padding: 28px; display: flex; flex-direction: column; align-items: flex-start; border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--line); box-shadow: 0 12px 30px rgba(35,79,115,.06); }
-    .feature-icon { width: 52px; height: 52px; margin-bottom: 18px; display: grid; place-items: center; border-radius: 16px; background: var(--brand-soft); font-size: 28px; }
-    .feature h3 { margin: 0 0 8px; font-size: 21px; }
-    .feature p { margin: 0; color: var(--muted); }
-    .info-section { background: #fff; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-    .info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: stretch; }
-    .info-card { min-height: 250px; height: 100%; padding: 34px; display: flex; flex-direction: column; justify-content: flex-start; border-radius: var(--radius-lg); background: linear-gradient(145deg, #fff 0%, #f7fbff 100%); border: 1px solid var(--line); box-shadow: 0 12px 30px rgba(35,79,115,.05); }
-    .info-card h2, .info-card h3 { margin: 0 0 12px; }
-    .info-card h2 { font-size: clamp(28px, 3.4vw, 40px); line-height: 1.15; }
-    .info-card h3 { font-size: 24px; }
-    .info-card p { margin: 0; color: var(--muted); font-size: 17px; }
-    .info-card a { color: var(--brand); }
-    .support { background: var(--support); color: #fff; }
-    .support-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 36px; align-items: center; padding: 44px; border-radius: var(--radius-xl); background: linear-gradient(145deg, #173c5d 0%, #0d2236 100%); border: 1px solid rgba(255,255,255,.10); }
-    .support h2 { margin: 0 0 12px; font-size: clamp(32px, 4vw, 46px); line-height: 1.12; }
-    .support p { margin: 0; max-width: 760px; color: #d5e5f1; font-size: 18px; }
-    .support-note { margin-top: 14px !important; font-size: 14px !important; color: #a8bfd1 !important; }
-    .suppi-widget { display: inline-block; border-radius: 12px; overflow: hidden; transition: transform .18s ease, box-shadow .18s ease; box-shadow: 0 12px 28px rgba(100,87,253,.25); }
-    .suppi-widget:hover { transform: translateY(-2px); }
-    .suppi-widget img { width: 192px; height: auto; }
-    footer { padding: 34px 0; background: #fff; border-top: 1px solid var(--line); }
-    .footer-grid { display: flex; justify-content: space-between; align-items: center; gap: 22px; flex-wrap: wrap; }
-    .footer-links { display: flex; flex-wrap: wrap; gap: 18px; }
-    .footer-links a { text-decoration: none; color: #557086; }
-    .footer-links a:hover { color: var(--brand); }
-    @media (max-width: 900px) { .hero-grid, .support-card { grid-template-columns: 1fr; } .hero { padding-top: 56px; } .logo-stage { min-height: 360px; } .features { grid-template-columns: repeat(2, minmax(0,1fr)); } .support-card { text-align: center; } }
-    @media (max-width: 700px) { .info-grid { grid-template-columns: 1fr; } .info-card { min-height: 0; } }
-    @media (max-width: 640px) { .container { width: min(100% - 24px, 1160px); } .nav { min-height: 72px; } .brand-logo { width: 56px; height: 56px; } .nav-links a:not(.nav-support) { display: none; } h1 { letter-spacing: -1.4px; } .actions .button { width: 100%; } .features { grid-template-columns: 1fr; } .feature { min-height: 0; } .logo-stage { min-height: 300px; } .support-card { padding: 30px 22px; } }
+    :root{--brand:#0f74d4;--brand-dark:#0a5ca9;--brand-soft:#eaf5ff;--ink:#102a43;--muted:#60758a;--surface:#fff;--line:#dfe9f2;--bg:#f6faff;--support:#102a43;--radius-xl:30px;--radius-lg:22px;--shadow:0 18px 48px rgba(31,73,110,.10)}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg);line-height:1.65}a{color:inherit}img{display:block;max-width:100%}.container{width:min(1160px,calc(100% - 36px));margin:0 auto}
+    .topbar{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.94);border-bottom:1px solid rgba(15,116,212,.08);backdrop-filter:blur(16px)}.nav{min-height:82px;display:flex;align-items:center;justify-content:space-between;gap:24px}.brand{display:inline-flex;align-items:center;gap:14px;text-decoration:none;font-size:25px;font-weight:900}.brand-logo{width:68px;height:68px;object-fit:contain}.nav-links{display:flex;align-items:center;gap:24px}.nav-links a{text-decoration:none;font-weight:750;color:#476278}.nav-links a:hover{color:var(--brand)}
+    .hero{padding:84px 0 76px;background:radial-gradient(circle at 88% 10%,rgba(15,116,212,.12),transparent 30%),linear-gradient(180deg,#fff 0%,#f1f8ff 100%)}.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:64px;align-items:center}.eyebrow{display:inline-flex;padding:9px 14px;border-radius:999px;background:var(--brand-soft);color:var(--brand-dark);font-size:14px;font-weight:850}h1{margin:22px 0 20px;font-size:clamp(46px,7vw,78px);line-height:1.02;letter-spacing:-2.6px}.lead{max-width:700px;margin:0 0 30px;color:var(--muted);font-size:clamp(18px,2vw,22px)}.actions{display:flex;flex-wrap:wrap;gap:14px}.button{min-height:54px;padding:0 24px;border-radius:16px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;font-weight:850;transition:.18s}.button:hover{transform:translateY(-2px)}.button-primary{background:var(--brand);color:#fff;box-shadow:0 12px 28px rgba(15,116,212,.24)}.button-secondary{background:#fff;border:1px solid var(--line)}.logo-stage{min-height:440px;display:grid;place-items:center;border-radius:var(--radius-xl);background:linear-gradient(145deg,#fff,#e8f4ff);border:1px solid rgba(15,116,212,.10);box-shadow:var(--shadow)}.hero-logo{width:min(80%,390px)}
+    section{padding:82px 0}.section-heading{max-width:800px;margin:0 auto 42px;text-align:center}.section-heading h2,.content-card h2{margin:0 0 12px;font-size:clamp(32px,4.4vw,48px);line-height:1.12}.section-heading p{margin:0;color:var(--muted);font-size:18px}.features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}.feature{min-height:220px;padding:28px;border-radius:var(--radius-lg);background:#fff;border:1px solid var(--line);box-shadow:0 12px 30px rgba(35,79,115,.06)}.feature-icon{width:52px;height:52px;margin-bottom:18px;display:grid;place-items:center;border-radius:16px;background:var(--brand-soft);font-size:28px}.feature h3{margin:0 0 8px}.feature p{margin:0;color:var(--muted)}
+    .about-section{background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.content-card{padding:44px;border-radius:var(--radius-xl);background:linear-gradient(145deg,#fff,#f5faff);border:1px solid var(--line);box-shadow:var(--shadow)}.content-card p{color:var(--muted);font-size:18px}.content-card h3{font-size:26px;margin:30px 0 10px}.check-list,.support-list{list-style:none;padding:0;margin:24px 0;display:grid;gap:12px}.check-list li,.support-list li{padding:14px 16px;border-radius:14px;background:#fff;border:1px solid var(--line)}
+    .support{background:var(--support);color:#fff}.support-grid{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:34px;align-items:start}.support-card{padding:44px;border-radius:var(--radius-xl);background:linear-gradient(145deg,#173c5d,#0d2236);border:1px solid rgba(255,255,255,.10)}.support h2{margin:0 0 14px;font-size:clamp(32px,4vw,46px)}.support p{color:#d5e5f1;font-size:18px}.support-list li{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1)}.support-note{padding:18px;border-radius:16px;background:rgba(255,255,255,.06);color:#d5e5f1}.suppi-widget{display:inline-block;margin-top:18px;border-radius:12px;overflow:hidden;box-shadow:0 12px 28px rgba(100,87,253,.25)}.suppi-widget img{width:192px}
+    .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin-top:32px}.stat{padding:22px;border-radius:18px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);text-align:center}.stat strong{display:block;font-size:30px}.stat span{color:#bcd0df}.stats-note{margin-top:12px!important;font-size:14px!important;color:#a8bfd1!important}
+    .download-card{padding:28px;border-radius:24px;background:#fff;color:var(--ink);text-align:center}.download-card h3{margin:0 0 10px}.download-card p{color:var(--muted);font-size:15px}.qr{width:200px;margin:18px auto;border-radius:16px;border:10px solid #fff}.play-link{width:100%;margin-top:10px}.contact{padding:64px 0;background:#fff}.contact-card{display:flex;justify-content:space-between;gap:24px;align-items:center;padding:30px;border:1px solid var(--line);border-radius:var(--radius-lg)}
+    footer{padding:34px 0;background:#fff;border-top:1px solid var(--line)}.footer-grid{display:flex;justify-content:space-between;align-items:center;gap:22px;flex-wrap:wrap}.footer-links{display:flex;gap:18px;flex-wrap:wrap}.footer-links a{text-decoration:none;color:#557086}
+    @media(max-width:900px){.hero-grid,.support-grid{grid-template-columns:1fr}.features{grid-template-columns:repeat(2,minmax(0,1fr))}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.logo-stage{min-height:350px}.download-card{max-width:360px;margin:0 auto}.contact-card{align-items:flex-start;flex-direction:column}}
+    @media(max-width:640px){.container{width:min(100% - 24px,1160px)}.brand-logo{width:56px;height:56px}.nav-links a:not(.nav-support){display:none}.actions .button{width:100%}.features,.stats{grid-template-columns:1fr}.feature{min-height:0}.content-card,.support-card{padding:28px 22px}.logo-stage{min-height:300px}}
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div class="container nav">
-      <a class="brand" href="#start" aria-label="kidZone — strona główna">
-        <img class="brand-logo" src="/assets/kidzone-logo.png" alt="Logo kidZone">
-        <span>kidZone</span>
-      </a>
-      <nav class="nav-links" aria-label="Główna nawigacja">
-        <a href="#funkcje">Funkcje</a>
-        <a class="nav-support" href="#wesprzyj">Wesprzyj</a>
-        <a href="#o-projekcie">O aplikacji</a>
-      </nav>
-    </div>
-  </header>
-  <main>
-    <section class="hero" id="start">
-      <div class="container hero-grid">
-        <div>
-          <span class="eyebrow">Społecznościowa aplikacja dla rodziców</span>
-          <h1>Odkrywaj miejsca przyjazne dzieciom</h1>
-          <p class="lead">Znajdź place zabaw, rodzinne restauracje, kawiarnie, parki i atrakcje polecane przez innych rodziców.</p>
-          <div class="actions">
-            <a class="button button-primary" href="#funkcje">Poznaj aplikację</a>
-            <a class="button button-secondary" href="#wesprzyj">☕ Wesprzyj rozwój</a>
-          </div>
-        </div>
-        <div class="logo-stage" aria-label="Logo aplikacji kidZone">
-          <img class="hero-logo" src="/assets/kidzone-logo.png" alt="Logo aplikacji kidZone">
-        </div>
-      </div>
-    </section>
-    <section id="funkcje">
-      <div class="container">
-        <div class="section-heading">
-          <h2>Najważniejsze funkcje</h2>
-          <p>Wszystko, czego potrzeba, aby szybko znaleźć sprawdzone miejsce dla całej rodziny.</p>
-        </div>
-        <div class="features">
-          <article class="feature"><div class="feature-icon">🗺️</div><h3>Mapa miejsc</h3><p>Przeglądaj miejsca w okolicy i sprawdzaj, co znajduje się najbliżej Ciebie.</p></article>
-          <article class="feature"><div class="feature-icon">⭐</div><h3>Oceny i opinie</h3><p>Czytaj doświadczenia innych rodziców i dziel się własną opinią.</p></article>
-          <article class="feature"><div class="feature-icon">📷</div><h3>Zdjęcia</h3><p>Zobacz, jak miejsce wygląda w praktyce, zanim wybierzesz się tam z dzieckiem.</p></article>
-          <article class="feature"><div class="feature-icon">🧸</div><h3>Udogodnienia</h3><p>Sprawdź przewijaki, parking, krzesełka, strefy zabawy i inne ważne udogodnienia.</p></article>
-          <article class="feature"><div class="feature-icon">🏆</div><h3>Rankingi</h3><p>Odkrywaj najlepiej oceniane miejsca i najbardziej aktywnych użytkowników.</p></article>
-          <article class="feature"><div class="feature-icon">➕</div><h3>Dodawanie miejsc</h3><p>Dodawaj nowe lokalizacje i pomagaj rozwijać bazę przyjaznych miejsc.</p></article>
-        </div>
-      </div>
-    </section>
-    <section class="support" id="wesprzyj">
-      <div class="container">
-        <div class="support-card">
-          <div>
-            <h2>Pomóż rozwijać aplikację kidZone</h2>
-            <p>Twoje wsparcie pomaga pokrywać koszty serwerów, map, przechowywania zdjęć oraz dalszego rozwoju aplikacji.</p>
-            <p class="support-note">Wsparcie jest dobrowolne i nie odblokowuje żadnych dodatkowych funkcji ani konta Premium.</p>
-          </div>
-          <a class="suppi-widget" href="https://suppi.pl/kidzone" target="_blank" rel="noopener noreferrer" aria-label="Wesprzyj kidZone na Suppi">
-            <img width="192" src="https://suppi.pl/api/widget/button.svg?fill=6457FD&amp;textColor=ffffff" alt="Wesprzyj kidZone na Suppi">
-          </a>
-        </div>
-      </div>
-    </section>
-    <section class="info-section" id="o-projekcie">
-      <div class="container info-grid">
-        <article class="info-card">
-          <h2>O aplikacji kidZone</h2>
-          <p>kidZone to bezpłatna aplikacja dla rodziców, która pomaga odkrywać i oceniać miejsca przyjazne dzieciom. Społeczność tworzy wspólną bazę sprawdzonych miejsc, zdjęć i praktycznych opinii.</p>
-        </article>
-        <article class="info-card">
-          <h3>Kontakt</h3>
-          <p>Masz pytanie, sugestię lub znalazłeś błąd? Napisz na adres <a href="mailto:bonoboczemunie@gmail.com">bonoboczemunie@gmail.com</a>.</p>
-        </article>
-      </div>
-    </section>
-  </main>
-  <footer>
-    <div class="container footer-grid">
-      <div>© 2026 kidZone</div>
-      <div class="footer-links">
-        <a href="/privacy-policy">Polityka prywatności</a>
-        <a href="/terms-of-service">Regulamin</a>
-        <a href="/account-deletion">Usunięcie konta</a>
-      </div>
-    </div>
-  </footer>
+<header class="topbar"><div class="container nav"><a class="brand" href="#start"><img class="brand-logo" src="/assets/kidzone-logo.png" alt="Logo kidZone"><span>kidZone</span></a><nav class="nav-links"><a href="#funkcje">Funkcje</a><a href="#o-aplikacji">O aplikacji</a><a class="nav-support" href="#wsparcie">Wsparcie</a></nav></div></header>
+<main>
+<section class="hero" id="start"><div class="container hero-grid"><div><span class="eyebrow">Społecznościowa aplikacja dla rodziców</span><h1>Odkrywaj miejsca przyjazne dzieciom</h1><p class="lead">Znajdź place zabaw, rodzinne restauracje, kawiarnie, parki i atrakcje polecane przez innych rodziców.</p><div class="actions"><a class="button button-primary" href="https://play.google.com/store/apps/details?id=com.kidzone" target="_blank" rel="noopener noreferrer">Pobierz z Google Play</a><a class="button button-secondary" href="#wsparcie">Wesprzyj rozwój</a></div></div><div class="logo-stage"><img class="hero-logo" src="/assets/kidzone-logo.png" alt="Logo aplikacji kidZone"></div></div></section>
+<section id="funkcje"><div class="container"><div class="section-heading"><h2>Najważniejsze funkcje</h2><p>Wszystko, czego potrzeba, aby szybko znaleźć sprawdzone miejsce dla całej rodziny.</p></div><div class="features"><article class="feature"><div class="feature-icon">📍</div><h3>Mapa miejsc</h3><p>Wyszukuj miejsca w swojej okolicy.</p></article><article class="feature"><div class="feature-icon">⭐</div><h3>Oceny i opinie</h3><p>Czytaj i dodawaj opinie innych rodziców.</p></article><article class="feature"><div class="feature-icon">📷</div><h3>Zdjęcia</h3><p>Przeglądaj zdjęcia miejsc przed wizytą.</p></article><article class="feature"><div class="feature-icon">🧸</div><h3>Udogodnienia</h3><p>Sprawdzaj przewijaki, parkingi i inne udogodnienia.</p></article><article class="feature"><div class="feature-icon">➕</div><h3>Dodawanie miejsc</h3><p>Dodawaj nowe miejsca do wspólnej bazy.</p></article><article class="feature"><div class="feature-icon">❤️</div><h3>Społeczność</h3><p>Pomagaj innym rodzinom odkrywać wartościowe miejsca.</p></article></div></div></section>
+<section class="about-section" id="o-aplikacji"><div class="container"><article class="content-card"><h2>Czym jest kidZone?</h2><h3>kidZone – miejsca przyjazne dzieciom w jednym miejscu</h3><p>kidZone to bezpłatna aplikacja mobilna stworzona z myślą o rodzicach i opiekunach, którzy chcą szybko znaleźć sprawdzone miejsca przyjazne dzieciom.</p><p>Dzięki społeczności użytkowników możesz odkrywać place zabaw, rodzinne restauracje, kawiarnie, sale zabaw, parki, atrakcje i wiele innych miejsc, które zostały ocenione przez innych rodziców.</p><ul class="check-list"><li>📍 wyszukiwać miejsca w swojej okolicy</li><li>⭐ czytać i dodawać opinie</li><li>📷 przeglądać zdjęcia</li><li>🧸 sprawdzać dostępne udogodnienia</li><li>➕ dodawać nowe miejsca</li><li>❤️ pomagać innym rodzinom tworzyć największą bazę miejsc przyjaznych dzieciom</li></ul><p>Naszym celem jest stworzenie społeczności, która ułatwi rodzinom wspólne spędzanie czasu i odkrywanie nowych, wartościowych miejsc.</p></article></div></section>
+<section class="support" id="wsparcie"><div class="container"><div class="support-grid"><div class="support-card"><h2>Dlaczego warto wesprzeć kidZone?</h2><p>kidZone jest rozwijane niezależnie, po godzinach i bez wsparcia dużej firmy.</p><p>Każde wsparcie pomaga pokryć koszty związane z utrzymaniem i rozwojem aplikacji:</p><ul class="support-list"><li>☁️ serwery i usługi Firebase</li><li>🗺️ usługi Google Maps</li><li>🔔 powiadomienia</li><li>💾 przechowywanie zdjęć użytkowników</li><li>🛠️ nowe funkcje i aktualizacje</li><li>📱 testy na różnych urządzeniach</li><li>🐞 poprawianie błędów</li><li>🚀 publikacja kolejnych wersji aplikacji</li></ul><p>Twoje wsparcie pozwala poświęcić więcej czasu na rozwój projektu i sprawić, że kidZone będzie jeszcze lepszym miejscem dla rodziców.</p><div class="support-note"><strong>Ważna informacja</strong><br>❤️ Wsparcie jest całkowicie dobrowolne. Wpłata nie odblokowuje dodatkowych funkcji ani konta Premium. Każdy TIP to sygnał, że kidZone jest wartościowym projektem i warto go dalej rozwijać.</div><a class="suppi-widget" href="https://suppi.pl/kidzone" target="_blank" rel="noopener noreferrer"><img width="192" src="https://suppi.pl/api/widget/button.svg?fill=6457FD&amp;textColor=ffffff" alt="Wesprzyj kidZone na Suppi"></a><div class="stats"><div class="stat"><strong>—</strong><span>użytkowników</span></div><div class="stat"><strong>—</strong><span>dodanych miejsc</span></div><div class="stat"><strong>—</strong><span>opinii</span></div><div class="stat"><strong>—</strong><span>osób wspierających</span></div></div><p class="stats-note">Statystyki zostaną uzupełnione rzeczywistymi danymi po premierze aplikacji.</p></div><aside class="download-card"><h3>Pobierz kidZone</h3><p>Zeskanuj kod QR telefonem albo przejdź bezpośrednio do Google Play.</p><img class="qr" src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&amp;data=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.kidzone" alt="Kod QR do pobrania kidZone z Google Play"><a class="button button-primary play-link" href="https://play.google.com/store/apps/details?id=com.kidzone" target="_blank" rel="noopener noreferrer">Google Play</a></aside></div></div></section>
+<section class="contact"><div class="container"><div class="contact-card"><div><h2>Kontakt</h2><p>Masz pytanie, sugestię lub znalazłeś błąd?</p></div><a class="button button-secondary" href="mailto:bonoboczemunie@gmail.com">bonoboczemunie@gmail.com</a></div></div></section>
+</main>
+<footer><div class="container footer-grid"><div>© 2026 kidZone</div><div class="footer-links"><a href="/privacy-policy">Polityka prywatności</a><a href="/terms-of-service">Regulamin</a><a href="/account-deletion">Usunięcie konta</a></div></div></footer>
 </body>
 </html>
