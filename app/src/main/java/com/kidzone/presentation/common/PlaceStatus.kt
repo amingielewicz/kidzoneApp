@@ -2,8 +2,8 @@
 
 package com.kidzone.presentation.common
 
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -21,12 +21,23 @@ private const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
 private val NewPlaceContainerColor = Color(0xFFE3F2FD)
 private val NewPlaceContentColor = Color(0xFF0D47A1)
 
-fun Place.isNewWithoutReviews(nowMillis: Long = System.currentTimeMillis()): Boolean {
+fun isNewWithoutReviews(
+    reviewsCount: Int,
+    createdAtMillis: Long,
+    nowMillis: Long = System.currentTimeMillis()
+): Boolean {
     if (reviewsCount > 0 || createdAtMillis <= 0L) return false
 
     val ageMillis = nowMillis - createdAtMillis
     return ageMillis in 0..(NEW_PLACE_WINDOW_DAYS * MILLIS_PER_DAY)
 }
+
+fun Place.isNewWithoutReviews(nowMillis: Long = System.currentTimeMillis()): Boolean =
+    isNewWithoutReviews(
+        reviewsCount = reviewsCount,
+        createdAtMillis = createdAtMillis,
+        nowMillis = nowMillis
+    )
 
 @Composable
 fun NewPlaceBadge(modifier: Modifier = Modifier) {
