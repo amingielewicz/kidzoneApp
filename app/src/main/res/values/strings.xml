@@ -302,6 +302,9 @@
     <!-- Widget -->
     <string name="widget_description">Pokazuje 3 najbliższe miejsca przyjazne dzieciom</string>
     <string name="widget_name">Miejsca w pobliżu</string>
+    <string name="widget_nearby_places_title">Miejsca w pobliżu</string>
+    <string name="widget_no_cached_places">Brak miejsc w pamięci podręcznej</string>
+    <string name="widget_location_content_description">Lokalizacja</string>
     <string name="place_added_success">Dodano nowe miejsce</string>
     <string name="notification_permission_title">Włącz powiadomienia</string>
     <string name="notification_permission_message">Bądź na bieżąco z nowościami w kidZone!</string>

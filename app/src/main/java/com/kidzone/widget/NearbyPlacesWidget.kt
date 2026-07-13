@@ -1,34 +1,57 @@
+@file:Suppress("FunctionNaming", "MagicNumber")
+
 package com.kidzone.widget
 
 import android.content.Context
+import android.content.Intent
 import android.location.Location
+import android.net.Uri
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.Image
+import androidx.glance.ImageProvider
+import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.action.actionStartActivity
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
+import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import androidx.glance.unit.ColorProvider
+import com.kidzone.MainActivity
+import com.kidzone.R
 import androidx.room.Room
 import com.kidzone.data.local.KidZoneDatabase
-import com.kidzone.data.local.PlaceEntity
+import com.kidzone.domain.model.PlaceCategory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+private val WidgetGlassBackground = ColorProvider(Color(0xE6FFFFFF))
+private val WidgetPrimaryBlue = ColorProvider(Color(0xFF1976D2))
+private val WidgetStarGold = ColorProvider(Color(0xFFFFC107))
+private val WidgetTextPrimary = ColorProvider(Color(0xFF1F2933))
+private val WidgetTextSecondary = ColorProvider(Color(0xFF68717D))
+private val WidgetRowBackground = ColorProvider(Color(0x33FFFFFF))
 
 /**
  * Glance AppWidget showing the 3 nearest places from the local Room cache.
@@ -48,7 +71,10 @@ class NearbyPlacesWidget : GlanceAppWidget() {
 
         provideContent {
             GlanceTheme {
-                NearbyPlacesContent(places = nearbyPlaces)
+                NearbyPlacesContent(
+                    context = context,
+                    places = nearbyPlaces
+                )
             }
         }
     }
@@ -65,7 +91,7 @@ class NearbyPlacesWidget : GlanceAppWidget() {
             // already in IO context from provideGlance. Use blocking query
             // as a workaround for widget simplicity.
             val cursor = db.openHelper.readableDatabase.query(
-                "SELECT id, name, averageRating, reviewsCount, latitude, longitude FROM places"
+                "SELECT id, name, category, averageRating, reviewsCount, latitude, longitude FROM places"
             )
             val result = mutableListOf<WidgetPlace>()
             while (cursor.moveToNext()) {
@@ -73,10 +99,11 @@ class NearbyPlacesWidget : GlanceAppWidget() {
                     WidgetPlace(
                         id = cursor.getString(0),
                         name = cursor.getString(1),
-                        averageRating = cursor.getDouble(2),
-                        reviewsCount = cursor.getInt(3),
-                        latitude = cursor.getDouble(4),
-                        longitude = cursor.getDouble(5)
+                        category = PlaceCategory.fromKey(cursor.getString(2)),
+                        averageRating = cursor.getDouble(3),
+                        reviewsCount = cursor.getInt(4),
+                        latitude = cursor.getDouble(5),
+                        longitude = cursor.getDouble(6)
                     )
                 )
             }
@@ -123,6 +150,7 @@ class NearbyPlacesWidget : GlanceAppWidget() {
 data class WidgetPlace(
     val id: String,
     val name: String,
+    val category: PlaceCategory,
     val averageRating: Double,
     val reviewsCount: Int,
     val latitude: Double,
@@ -131,93 +159,158 @@ data class WidgetPlace(
 )
 
 @Composable
-private fun NearbyPlacesContent(places: List<WidgetPlace>) {
+@Suppress("FunctionNaming")
+private fun NearbyPlacesContent(
+    context: Context,
+    places: List<WidgetPlace>
+) {
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
-            .padding(12.dp)
-            .background(GlanceTheme.colors.surface),
+            .background(WidgetGlassBackground)
+            .cornerRadius(20.dp)
+            .padding(16.dp),
         verticalAlignment = Alignment.Top
     ) {
-        Text(
-            text = "Miejsca w pobliżu",
-            style = TextStyle(
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = GlanceTheme.colors.onSurface
-            )
-        )
-        Spacer(modifier = GlanceModifier.height(8.dp))
+        WidgetHeader(context = context)
+        Spacer(modifier = GlanceModifier.height(12.dp))
 
         if (places.isEmpty()) {
             Text(
-                text = "Brak miejsc w pamięci podręcznej",
+                text = context.getString(R.string.widget_no_cached_places),
                 style = TextStyle(
                     fontSize = 12.sp,
-                    color = GlanceTheme.colors.onSurfaceVariant
+                    color = WidgetTextSecondary
                 )
             )
         } else {
-            places.forEach { place ->
-                PlaceRow(place = place)
-                Spacer(modifier = GlanceModifier.height(6.dp))
+            places.forEachIndexed { index, place ->
+                PlaceRow(
+                    context = context,
+                    place = place
+                )
+                if (index < places.lastIndex) {
+                    Spacer(modifier = GlanceModifier.height(12.dp))
+                }
             }
         }
     }
 }
 
 @Composable
-private fun PlaceRow(place: WidgetPlace) {
+private fun WidgetHeader(context: Context) {
     Row(
         modifier = GlanceModifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Name (takes remaining space)
+        Text(
+            text = context.getString(R.string.widget_nearby_places_title),
+            style = TextStyle(
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = WidgetTextPrimary
+            ),
+            maxLines = 1,
+            modifier = GlanceModifier.defaultWeight()
+        )
+        Image(
+            provider = ImageProvider(R.drawable.ic_map_marker_other),
+            contentDescription = context.getString(R.string.widget_location_content_description),
+            modifier = GlanceModifier.size(20.dp),
+            colorFilter = ColorFilter.tint(WidgetPrimaryBlue)
+        )
+    }
+}
+
+@Composable
+private fun PlaceRow(
+    context: Context,
+    place: WidgetPlace
+) {
+    Row(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .background(WidgetRowBackground)
+            .cornerRadius(14.dp)
+            .clickable(actionStartActivity(place.detailsIntent(context)))
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Image(
+            provider = ImageProvider(place.category.widgetIconRes),
+            contentDescription = null,
+            modifier = GlanceModifier.size(32.dp),
+            contentScale = ContentScale.Fit
+        )
+
+        Spacer(modifier = GlanceModifier.width(10.dp))
+
         Text(
             text = place.name,
             style = TextStyle(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
-                color = GlanceTheme.colors.onSurface
+                color = WidgetTextPrimary
             ),
-            maxLines = 1,
+            maxLines = 2,
             modifier = GlanceModifier.defaultWeight()
         )
 
         Spacer(modifier = GlanceModifier.width(8.dp))
 
-        // Rating
-        val ratingText = if (place.reviewsCount > 0) {
-            "\u2605 %.1f".format(place.averageRating)
-        } else {
-            "\u2605 —"
-        }
-        Text(
-            text = ratingText,
-            style = TextStyle(
-                fontSize = 12.sp,
-                color = GlanceTheme.colors.onSurfaceVariant
-            )
-        )
-
-        Spacer(modifier = GlanceModifier.width(8.dp))
-
-        // Distance
-        val distanceText = place.distanceMeters?.let { meters ->
-            if (meters < 1000) "${meters}m" else "%.1fkm".format(meters / 1000.0)
-        } ?: ""
-        if (distanceText.isNotEmpty()) {
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                text = distanceText,
+                text = place.ratingText(),
                 style = TextStyle(
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
-                    color = GlanceTheme.colors.primary
+                    color = WidgetStarGold
                 )
             )
+            val distanceText = place.distanceText()
+            if (distanceText.isNotBlank()) {
+                Spacer(modifier = GlanceModifier.height(2.dp))
+                Text(
+                    text = distanceText,
+                    style = TextStyle(
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = WidgetPrimaryBlue
+                    )
+                )
+            }
         }
     }
 }
+
+private fun WidgetPlace.ratingText(): String = if (reviewsCount > 0) {
+    "\u2605 %.1f".format(averageRating)
+} else {
+    "\u2605 —"
+}
+
+private fun WidgetPlace.distanceText(): String = distanceMeters?.let { meters ->
+    if (meters < 1000) "${meters}m" else "%.1fkm".format(meters / 1000.0)
+}.orEmpty()
+
+private fun WidgetPlace.detailsIntent(context: Context): Intent =
+    Intent(Intent.ACTION_VIEW, Uri.parse("kidzone://place/$id"))
+        .setClass(context, MainActivity::class.java)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+private val PlaceCategory.widgetIconRes: Int
+    get() = when (this) {
+        PlaceCategory.PLAYGROUND -> R.drawable.ic_map_marker_playground
+        PlaceCategory.PLAY_ROOM -> R.drawable.ic_map_marker_play_room
+        PlaceCategory.CAFE -> R.drawable.ic_map_marker_cafe
+        PlaceCategory.RESTAURANT -> R.drawable.ic_map_marker_restaurant
+        PlaceCategory.PARK -> R.drawable.ic_map_marker_park
+        PlaceCategory.ATTRACTION -> R.drawable.ic_map_marker_attraction
+        PlaceCategory.OTHER -> R.drawable.ic_map_marker_other
+    }
 
 /**
  * BroadcastReceiver that triggers widget updates.

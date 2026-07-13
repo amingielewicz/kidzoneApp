@@ -299,6 +299,9 @@
     <!-- Widget -->
     <string name="widget_description">Shows 3 nearest kid-friendly places</string>
     <string name="widget_name">Nearby places</string>
+    <string name="widget_nearby_places_title">Nearby places</string>
+    <string name="widget_no_cached_places">No cached places</string>
+    <string name="widget_location_content_description">Location</string>
     <string name="place_added_success">New place added</string>
     <string name="notification_permission_title">Enable notifications</string>
     <string name="notification_permission_message">Stay up to date with what\'s new in kidZone!</string>
