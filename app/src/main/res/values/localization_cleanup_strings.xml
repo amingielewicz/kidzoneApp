@@ -1,0 +1,4 @@
+<resources>
+    <string name="google_sign_in_unavailable">Logowanie przez Google jest chwilowo niedostępne. Spróbuj ponownie później.</string>
+    <string name="error_account_banned">To konto zostało zablokowane. Skontaktuj się z pomocą techniczną, jeśli potrzebujesz wyjaśnień.</string>
+</resources>
