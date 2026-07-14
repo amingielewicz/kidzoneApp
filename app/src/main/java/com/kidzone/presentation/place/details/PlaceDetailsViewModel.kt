@@ -39,6 +39,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeoutException
 import javax.inject.Inject
+import timber.log.Timber
 
 private const val TOP_RANKING_POOL = 100
 private const val MAX_PLACE_PHOTOS_ON_DETAILS = 5
@@ -732,6 +733,8 @@ class PlaceDetailsViewModel @Inject constructor(
         return duplicateSkipped
     }
 
+    @Suppress("TooGenericExceptionCaught")
+
     private suspend fun uploadPickedPlacePhoto(
         photoUri: android.net.Uri,
         place: Place,
@@ -762,8 +765,9 @@ class PlaceDetailsViewModel @Inject constructor(
                 is OpResult.Failure -> PlacePhotoUploadResult.SKIPPED
             }
         } catch (e: Exception) {
-        PlacePhotoUploadResult.SKIPPED
-    }
+            Timber.e(e, "Could not upload place photo")
+            PlacePhotoUploadResult.SKIPPED
+        }
     }
 
     private fun addUploadedPlacePhoto(

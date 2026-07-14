@@ -29,6 +29,10 @@ import javax.inject.Inject
  * (zamknięte miejsca, zmienione opisy itp.).
  */
 private const val CACHE_TTL_MS = 7L * 24 * 60 * 60 * 1000 // 7 dni
+private const val FIREBASE_EMULATOR_HOST = "10.0.2.2"
+private const val AUTH_EMULATOR_PORT = 9099
+private const val FIRESTORE_EMULATOR_PORT = 8080
+private const val STORAGE_EMULATOR_PORT = 9199
 
 /**
  * Klasa [Application] uruchamiająca Hilt jako kontener DI dla całej aplikacji.
@@ -72,10 +76,10 @@ class KidZoneApplication : Application() {
         if (!BuildConfig.DEBUG) return
 
         FirebaseAuth.getInstance()
-            .useEmulator("10.0.2.2", 9099)
+            .useEmulator(FIREBASE_EMULATOR_HOST, AUTH_EMULATOR_PORT)
 
         FirebaseFirestore.getInstance().apply {
-            useEmulator("10.0.2.2", 8080)
+            useEmulator(FIREBASE_EMULATOR_HOST, FIRESTORE_EMULATOR_PORT)
 
             firestoreSettings = FirebaseFirestoreSettings.Builder()
                 .setLocalCacheSettings(
@@ -85,7 +89,7 @@ class KidZoneApplication : Application() {
         }
 
         FirebaseStorage.getInstance()
-            .useEmulator("10.0.2.2", 9199)
+            .useEmulator(FIREBASE_EMULATOR_HOST, STORAGE_EMULATOR_PORT)
 
         Timber.d(
             "Firebase emulators configured: " +

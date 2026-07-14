@@ -79,6 +79,7 @@ class NearbyPlacesWidget : GlanceAppWidget() {
         }
     }
 
+    @Suppress("LongMethod")
     private fun loadWidgetState(context: Context): WidgetState {
         val db = Room.databaseBuilder(
             context,

@@ -278,6 +278,7 @@ class FirestorePlaceRepository @Inject constructor(
         OpResult.failure(e)
     }
 
+    @Suppress("LongMethod")
     override suspend fun submitChangeRequest(
         placeId: String,
         requesterId: String,

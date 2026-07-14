@@ -1087,7 +1087,7 @@ private fun AccountSecurityCard(
     }
 }
 
-@Suppress("FunctionNaming", "LongParameterList")
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 @Composable
 private fun SettingsCard(
     onTermsOfService: () -> Unit,
