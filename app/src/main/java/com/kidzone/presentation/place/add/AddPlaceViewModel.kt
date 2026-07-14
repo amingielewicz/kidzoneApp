@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import java.util.UUID
 
 /**
  * ViewModel ekranu dodawania / edycji miejsca.
@@ -128,7 +129,7 @@ class AddPlaceViewModel @Inject constructor(
         /** Wszystkie wymagane pola wypełnione – można kliknąć "Zapisz". */
         val isFormValid: Boolean
             get() = name.trim().isNotBlank() &&
-                latitude != null && longitude != null
+                    latitude != null && longitude != null
     }
 
     private val _uiState = MutableStateFlow(UiState())
@@ -223,8 +224,6 @@ class AddPlaceViewModel @Inject constructor(
                             errorMessage = null
                         )
                     }
-                    // Seed hash set z istniejących zdjęć dla dedup detection
-                    seedPhotoHashes(result.data.photoUrls)
                 }
                 is OpResult.Failure -> {
                     _uiState.update {
@@ -329,7 +328,7 @@ class AddPlaceViewModel @Inject constructor(
                                 val input = _uiState.value.name.trim().lowercase()
                                 if (input.isNotEmpty() &&
                                     (nearby.name.lowercase().contains(input) ||
-                                        input.contains(nearby.name.lowercase()))
+                                            input.contains(nearby.name.lowercase()))
                                 ) 1 else 0
                             }.thenBy { it.distanceMeters }
                         )
@@ -381,10 +380,10 @@ class AddPlaceViewModel @Inject constructor(
             val inputName = state.name.trim().lowercase()
             val duplicate = state.nearbyPlaces.firstOrNull { nearby ->
                 val sameCategoryClose = nearby.category == state.category &&
-                    nearby.distanceMeters <= DUPLICATE_RADIUS_METERS
+                        nearby.distanceMeters <= DUPLICATE_RADIUS_METERS
                 val similarName = inputName.isNotEmpty() &&
-                    (nearby.name.lowercase().contains(inputName) ||
-                        inputName.contains(nearby.name.lowercase()))
+                        (nearby.name.lowercase().contains(inputName) ||
+                                inputName.contains(nearby.name.lowercase()))
                 sameCategoryClose || similarName
             }
             if (duplicate != null) {
@@ -419,29 +418,6 @@ class AddPlaceViewModel @Inject constructor(
 
     // --- Zarządzanie zdjęciami ---
 
-    /** Zbiór hashów (MD5 skompresowanych bajtów) istniejących zdjęć. */
-    private val photoContentHashes: MutableSet<String> =
-        (savedStateHandle.get<List<String>>("photoHashes") ?: emptyList()).toMutableSet()
-
-    private fun persistHashes() {
-        savedStateHandle["photoHashes"] = photoContentHashes.toList()
-    }
-
-    /** Seeduje hash set z Firestore (pole `photoContentHashes` na dokumencie miejsca). */
-    private fun seedPhotoHashes(urls: List<String>) {
-        // Hashe są teraz trzymane w Firestore na dokumencie miejsca (pole photoHashes).
-        // Przy edycji pobieramy je stamtąd — zero downloadu obrazów po sieci.
-        viewModelScope.launch {
-            val placeId = _uiState.value.editingPlaceId ?: return@launch
-            try {
-                val place = (placeRepository.getPlace(placeId) as? OpResult.Success)?.data
-                val storedHashes = place?.photoHashes.orEmpty()
-                photoContentHashes.addAll(storedHashes)
-                persistHashes()
-            } catch (_: Exception) { /* best-effort */ }
-        }
-    }
-
     /** Dodaje zdjęcia z photo pickera (respektuje limit MAX_PLACE_PHOTOS). */
     fun addPhotos(uris: List<Uri>) {
         _uiState.update { state ->
@@ -451,6 +427,8 @@ class AddPlaceViewModel @Inject constructor(
             state.copy(photoUris = state.photoUris + toAdd)
         }
     }
+
+    private val selectedPhotoHashes = mutableSetOf<String>()
 
     /** Usuwa nowe (jeszcze nie-uploadowane) zdjęcie po indeksie. */
     fun removeNewPhoto(index: Int) {
@@ -470,11 +448,15 @@ class AddPlaceViewModel @Inject constructor(
     /** Usuwa istniejące (już uploadowane) zdjęcie po indeksie. */
     fun removeExistingPhoto(index: Int) {
         _uiState.update { state ->
-            val removed = state.existingPhotoUrls[index]
-            removedPhotoUrls.add(removed)
+            val removedUrl = state.existingPhotoUrls.getOrNull(index)
+                ?: return@update state
+
+            removedPhotoUrls.add(removedUrl)
             persistRemovedPhotos()
+
             state.copy(
-                existingPhotoUrls = state.existingPhotoUrls.toMutableList().apply { removeAt(index) }
+                existingPhotoUrls = state.existingPhotoUrls
+                    .filterNot { it == removedUrl }
             )
         }
     }
@@ -496,6 +478,9 @@ class AddPlaceViewModel @Inject constructor(
                 return@launch
             }
 
+            val targetPlaceId = state.editingPlaceId
+                ?: UUID.randomUUID().toString()
+
             // Upload nowych zdjęć (kompresja + Firebase Storage + dedup)
             val uploadedUrls = mutableListOf<String>()
             var duplicatesSkipped = 0
@@ -508,21 +493,20 @@ class AddPlaceViewModel @Inject constructor(
                         val hash = java.security.MessageDigest.getInstance("MD5")
                             .digest(bytes)
                             .joinToString("") { "%02x".format(it) }
-                        if (hash in photoContentHashes) {
+                        if (hash in selectedPhotoHashes) {
                             duplicatesSkipped++
                             continue
                         }
-                        photoContentHashes.add(hash)
-                        persistHashes()
 
                         try {
-                            val tempId = state.editingPlaceId ?: "pending_${System.currentTimeMillis()}"
                             val url = photoUploader.uploadPlacePhoto(
                                 ownerUserId = currentUser.id,
-                                placeId = tempId,
+                                placeId = targetPlaceId,
                                 imageBytes = bytes
                             )
+
                             uploadedUrls.add(url)
+                            selectedPhotoHashes.add(hash)
                         } catch (e: Exception) {
                             _uiState.update {
                                 it.copy(
@@ -562,12 +546,20 @@ class AddPlaceViewModel @Inject constructor(
 
             // Budujemy mapę photoUploadedBy: zachowujemy istniejącą (edycja)
             // + dodajemy nowo-uploadowane URL-e z bieżącym userId
-            val existingUploadedBy = editingOriginal?.photoUploadedBy.orEmpty()
-            val newUploadedBy = uploadedUrls.associateWith { currentUser.id }
-            val allPhotoUploadedBy = existingUploadedBy + newUploadedBy
+            val retainedExistingUrls = state.existingPhotoUrls.toSet()
 
-            // Persist all known hashes for future dedup (no more downloading images)
-            val allPhotoHashes = photoContentHashes.toList()
+            val existingUploadedBy = editingOriginal
+                ?.photoUploadedBy
+                .orEmpty()
+                .filterKeys { url ->
+                    url in retainedExistingUrls
+                }
+
+            val newUploadedBy = uploadedUrls.associateWith {
+                currentUser.id
+            }
+
+            val allPhotoUploadedBy = existingUploadedBy + newUploadedBy
 
             val result = if (state.isEditMode && editingOriginal != null) {
                 val original = editingOriginal!!
@@ -585,7 +577,7 @@ class AddPlaceViewModel @Inject constructor(
                     amenities = state.amenities,
                     photoUrls = allPhotoUrls,
                     photoUploadedBy = allPhotoUploadedBy,
-                    photoHashes = allPhotoHashes
+                    photoHashes = emptyList(),
                 )
                 placeRepository.updatePlace(updated)
             } else {
@@ -593,7 +585,7 @@ class AddPlaceViewModel @Inject constructor(
                     .take(PLACE_NAME_MAX_LENGTH)
                     .trim()
                 val newPlace = Place(
-                    id = "",
+                    id = targetPlaceId,
                     ownerUserId = currentUser.id,
                     name = normalizedName,
                     description = TextNormalization.toSentenceCase(state.description)
@@ -605,37 +597,54 @@ class AddPlaceViewModel @Inject constructor(
                     amenities = state.amenities,
                     photoUrls = allPhotoUrls,
                     photoUploadedBy = allPhotoUploadedBy,
-                    photoHashes = allPhotoHashes,
+                    photoHashes = emptyList(),
                     createdAtMillis = System.currentTimeMillis()
                 )
                 placeRepository.addPlace(newPlace)
             }
 
-            _uiState.update {
-                when (result) {
-                    is OpResult.Success -> {
-                        // Usuń z Storage zdjęcia oznaczone do usunięcia (best-effort)
-                        for (url in removedPhotoUrls) {
+            when (result) {
+                is OpResult.Success -> {
+                    // Firestore jest już zapisany. Teraz sprzątamy pliki w Storage.
+                    for (url in removedPhotoUrls.toList()) {
+                        try {
                             photoUploader.deletePhoto(url)
+                        } catch (_: Exception) {
+                            // Best-effort: błąd sprzątania nie cofa poprawnego zapisu miejsca.
                         }
-                        removedPhotoUrls.clear()
+                    }
+                    removedPhotoUrls.clear()
+                    persistRemovedPhotos()
 
-                        val isCreate = !state.isEditMode
+                    val isCreate = !state.isEditMode
+                    _uiState.update {
                         it.copy(
                             isSaving = false,
                             isSaved = true,
                             savedNewLatitude = if (isCreate) result.data.latitude else null,
                             savedNewLongitude = if (isCreate) result.data.longitude else null,
-                            shouldRequestReview = if (isCreate) inAppReviewManager.onPlaceAdded() else false
+                            shouldRequestReview = if (isCreate) {
+                                inAppReviewManager.onPlaceAdded()
+                            } else {
+                                false
+                            }
                         )
                     }
-                    is OpResult.Failure -> it.copy(
-                        isSaving = false,
-                        errorMessage = result.error.toPlacesErrorMessage(
-                            if (state.isEditMode) UiText.StringResource(R.string.error_update_place)
-                            else UiText.StringResource(R.string.error_save_place)
+                }
+
+                is OpResult.Failure -> {
+                    _uiState.update {
+                        it.copy(
+                            isSaving = false,
+                            errorMessage = result.error.toPlacesErrorMessage(
+                                if (state.isEditMode) {
+                                    UiText.StringResource(R.string.error_update_place)
+                                } else {
+                                    UiText.StringResource(R.string.error_save_place)
+                                }
+                            )
                         )
-                    )
+                    }
                 }
             }
         }
@@ -684,8 +693,8 @@ private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double):
     val dLat = Math.toRadians(lat2 - lat1)
     val dLon = Math.toRadians(lon2 - lon1)
     val a = kotlin.math.sin(dLat / 2).let { it * it } +
-        kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
-        kotlin.math.sin(dLon / 2).let { it * it }
+            kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
+            kotlin.math.sin(dLon / 2).let { it * it }
     val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
     return r * c
 }

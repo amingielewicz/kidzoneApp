@@ -1,7 +1,9 @@
 package com.kidzone.utils
 
+import android.net.Uri
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
+import com.google.firebase.storage.StorageReference
 import com.kidzone.analytics.PerformanceTraces
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
@@ -9,15 +11,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Upload skompresowanych zdjęć (WebP ByteArray) do Firebase Storage.
+ * Upload skompresowanych zdjęć WebP do Firebase Storage.
  *
- * Ścieżki w Storage:
- *  - Miejsca: `places/{ownerUserId}/{placeId}/photos/{uuid}.webp`
- *  - Opinie:  `reviews/{ownerUserId}/{reviewId}/photos/{uuid}.webp`
- *  - Avatary: `avatars/{userId}/avatar.jpg` (istniejące, nie ruszamy)
+ * Ścieżki:
+ * - miejsca: places/{ownerUserId}/{placeId}/photos/{uuid}.webp
+ * - opinie: reviews/{ownerUserId}/{reviewId}/photos/{uuid}.webp
  *
- * Zwraca download URL po pomyślnym uploadzie.
- * Each upload is wrapped with a Firebase Performance trace.
+ * Każdy upload jest objęty pomiarem Firebase Performance.
  */
 @Singleton
 class PhotoUploader @Inject constructor(
@@ -29,50 +29,32 @@ class PhotoUploader @Inject constructor(
         .setContentType("image/webp")
         .build()
 
-    /**
-     * Uploaduje zdjęcie miejsca.
-     *
-     * @param ownerUserId ID użytkownika, który dodaje zdjęcie
-     * @param placeId ID miejsca
-     * @param imageBytes skompresowany WebP
-     * @return download URL
-     */
-    suspend fun uploadPlacePhoto(ownerUserId: String, placeId: String, imageBytes: ByteArray): String {
-        val trace = performanceTraces.startTrace(PerformanceTraces.PHOTO_UPLOAD)
+    suspend fun uploadPlacePhoto(
+        ownerUserId: String,
+        placeId: String,
+        imageBytes: ByteArray
+    ): String {
+        require(ownerUserId.isNotBlank()) {
+            "ownerUserId must not be blank"
+        }
+        require(placeId.isNotBlank()) {
+            "placeId must not be blank"
+        }
+
+        val trace = performanceTraces.startTrace(
+            PerformanceTraces.PHOTO_UPLOAD
+        )
         trace.putAttribute("type", "place")
         trace.putMetric("size_bytes", imageBytes.size.toLong())
+
         return try {
-            require(ownerUserId.isNotBlank()) { "ownerUserId must not be blank" }
-            require(placeId.isNotBlank()) { "placeId must not be blank" }
-
             val fileName = "${UUID.randomUUID()}.webp"
-            val ref = storage.reference.child("places/$ownerUserId/$placeId/photos/$fileName")
-            ref.putBytes(imageBytes, webpMetadata).await()
-            val url = ref.downloadUrl.await().toString()
-            trace.putAttribute("status", "success")
-            url
-        } catch (e: Exception) {
-        trace.putAttribute("status", "error")
-        throw e
-        } finally {
-            performanceTraces.stopTrace(trace)
-        }
-    }
+            val ref = storage.reference.child(
+                "places/$ownerUserId/$placeId/photos/$fileName"
+            )
 
-    /**
-     * Uploaduje zdjęcie opinii.
-     */
-    suspend fun uploadReviewPhoto(ownerUserId: String, reviewId: String, imageBytes: ByteArray): String {
-        val trace = performanceTraces.startTrace(PerformanceTraces.PHOTO_UPLOAD)
-        trace.putAttribute("type", "review")
-        trace.putMetric("size_bytes", imageBytes.size.toLong())
-        return try {
-            require(ownerUserId.isNotBlank()) { "ownerUserId must not be blank" }
-            require(reviewId.isNotBlank()) { "reviewId must not be blank" }
-
-            val fileName = "${UUID.randomUUID()}.webp"
-            val ref = storage.reference.child("reviews/$ownerUserId/$reviewId/photos/$fileName")
             ref.putBytes(imageBytes, webpMetadata).await()
+
             val url = ref.downloadUrl.await().toString()
             trace.putAttribute("status", "success")
             url
@@ -84,16 +66,70 @@ class PhotoUploader @Inject constructor(
         }
     }
 
-    /**
-     * Usuwa zdjęcie z podanego URL-a Storage.
-     * Best-effort – jeśli się nie uda (np. URL nieprawidłowy), ignorujemy.
-     */
+    suspend fun uploadReviewPhoto(
+        ownerUserId: String,
+        reviewId: String,
+        imageBytes: ByteArray
+    ): String {
+        require(ownerUserId.isNotBlank()) {
+            "ownerUserId must not be blank"
+        }
+        require(reviewId.isNotBlank()) {
+            "reviewId must not be blank"
+        }
+
+        val trace = performanceTraces.startTrace(
+            PerformanceTraces.PHOTO_UPLOAD
+        )
+        trace.putAttribute("type", "review")
+        trace.putMetric("size_bytes", imageBytes.size.toLong())
+
+        return try {
+            val fileName = "${UUID.randomUUID()}.webp"
+            val ref = storage.reference.child(
+                "reviews/$ownerUserId/$reviewId/photos/$fileName"
+            )
+
+            ref.putBytes(imageBytes, webpMetadata).await()
+
+            val url = ref.downloadUrl.await().toString()
+            trace.putAttribute("status", "success")
+            url
+        } catch (e: Exception) {
+            trace.putAttribute("status", "error")
+            throw e
+        } finally {
+            performanceTraces.stopTrace(trace)
+        }
+    }
+
     suspend fun deletePhoto(downloadUrl: String) {
-        try {
-            val ref = storage.getReferenceFromUrl(downloadUrl)
-            ref.delete().await()
-        } catch (_: Exception) {
-            // Best-effort – nie blokujemy operacji nadrzędnej
+        val ref = getStorageReference(downloadUrl)
+        ref.delete().await()
+    }
+
+    private fun getStorageReference(
+        downloadUrl: String
+    ): StorageReference {
+        return runCatching {
+            storage.getReferenceFromUrl(downloadUrl)
+        }.getOrElse {
+            val uri = Uri.parse(downloadUrl)
+
+            val encodedObjectPath = uri.encodedPath
+                ?.substringAfter(
+                    delimiter = "/o/",
+                    missingDelimiterValue = ""
+                )
+                .orEmpty()
+
+            require(encodedObjectPath.isNotBlank()) {
+                "Nie można odczytać ścieżki pliku Storage z URL-a"
+            }
+
+            storage.reference.child(
+                Uri.decode(encodedObjectPath)
+            )
         }
     }
 }

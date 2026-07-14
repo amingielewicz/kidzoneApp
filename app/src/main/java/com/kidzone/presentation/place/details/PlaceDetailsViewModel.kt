@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.UUID
 import java.util.concurrent.TimeoutException
 import javax.inject.Inject
 import timber.log.Timber
@@ -407,8 +408,10 @@ class PlaceDetailsViewModel @Inject constructor(
         comment: String,
         photoUris: List<android.net.Uri>
     ) {
+        val targetReviewId = UUID.randomUUID().toString()
         val uploadedPhotoUrls = mutableListOf<String>()
         val newHashes = mutableSetOf<String>()
+
         for (uri in photoUris) {
             val bytes = imageCompressor.compressToWebp(uri)
             if (bytes != null) {
@@ -420,7 +423,7 @@ class PlaceDetailsViewModel @Inject constructor(
                 try {
                     val url = photoUploader.uploadReviewPhoto(
                         ownerUserId = user.id,
-                        reviewId = "pending_${System.currentTimeMillis()}",
+                        reviewId = targetReviewId,
                         imageBytes = bytes
                     )
                     uploadedPhotoUrls.add(url)
@@ -430,7 +433,7 @@ class PlaceDetailsViewModel @Inject constructor(
         }
 
         val review = Review(
-            id = "",
+            id = targetReviewId,
             placeId = place.id,
             userId = user.id,
             authorName = user.name,
@@ -538,12 +541,8 @@ class PlaceDetailsViewModel @Inject constructor(
 
         val finalPhotoUrls = retainedPhotoUrls + newUploadedUrls
 
-        val removedUrls = existing.photoUrls.filter { it !in retainedPhotoUrls }
-        for (url in removedUrls) {
-            try {
-                photoUploader.deletePhoto(url)
-            } catch (_: Exception) {
-            }
+        val removedUrls = existing.photoUrls.filter {
+            it !in retainedPhotoUrls
         }
 
         val updated = existing.copy(
@@ -554,6 +553,14 @@ class PlaceDetailsViewModel @Inject constructor(
 
         when (val result = reviewRepository.updateReview(updated)) {
             is OpResult.Success -> {
+                for (url in removedUrls) {
+                    try {
+                        photoUploader.deletePhoto(url)
+                    } catch (e: Exception) {
+                        Timber.e(e, "Could not delete review photo: $url")
+                    }
+                }
+
                 val count = place.reviewsCount
                 val oldAvg = place.averageRating
                 val oldRating = existing.rating

@@ -216,12 +216,25 @@ class FirestorePlaceRepository @Inject constructor(
     override suspend fun addPlace(place: Place): OpResult<Place> =
         performanceTraces.measureResult(PerformanceTraces.ADD_PLACE) {
             try {
-                val doc = placesCollection().document()
-                val p = place.copy(id = doc.id)
-                placesCollection().document(p.id).set(PlaceDto.fromDomain(p)).await()
-                placeDao.upsert(PlaceEntity.fromDomain(p))
-                OpResult.success(p)
-            } catch (e: Exception) { OpResult.failure(e) }
+                val placeId = place.id.ifBlank {
+                    placesCollection().document().id
+                }
+
+                val placeWithId = place.copy(id = placeId)
+
+                placesCollection()
+                    .document(placeId)
+                    .set(PlaceDto.fromDomain(placeWithId))
+                    .await()
+
+                placeDao.upsert(
+                    PlaceEntity.fromDomain(placeWithId)
+                )
+
+                OpResult.success(placeWithId)
+            } catch (e: Exception) {
+                OpResult.failure(e)
+            }
         }
 
     override suspend fun updatePlace(place: Place): OpResult<Place> = try {
