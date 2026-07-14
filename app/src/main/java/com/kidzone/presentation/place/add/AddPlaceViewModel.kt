@@ -224,7 +224,9 @@ class AddPlaceViewModel @Inject constructor(
                             errorMessage = null
                         )
                     }
+
                     selectedPhotoHashes.addAll(result.data.photoHashes.values)
+
                 }
                 is OpResult.Failure -> {
                     _uiState.update {
@@ -418,7 +420,6 @@ class AddPlaceViewModel @Inject constructor(
     }
 
     // --- Zarządzanie zdjęciami ---
-
     /** Dodaje zdjęcia z photo pickera (respektuje limit MAX_PLACE_PHOTOS). */
     fun addPhotos(uris: List<Uri>) {
         _uiState.update { state ->
@@ -449,11 +450,13 @@ class AddPlaceViewModel @Inject constructor(
     /** Usuwa istniejące (już uploadowane) zdjęcie po indeksie. */
     fun removeExistingPhoto(index: Int) {
         _uiState.update { state ->
+
             val removedUrl = state.existingPhotoUrls.getOrNull(index)
                 ?: return@update state
 
             removedPhotoUrls.add(removedUrl)
             editingOriginal?.photoHashes?.get(removedUrl)?.let(selectedPhotoHashes::remove)
+
             persistRemovedPhotos()
             state.copy(
                 existingPhotoUrls = state.existingPhotoUrls
@@ -507,8 +510,10 @@ class AddPlaceViewModel @Inject constructor(
                             )
 
                             uploadedUrls.add(url)
+
                             selectedPhotoHashes.add(hash)
                             uploadedHashes[url] = hash
+
                         } catch (e: Exception) {
                             _uiState.update {
                                 it.copy(
@@ -548,6 +553,7 @@ class AddPlaceViewModel @Inject constructor(
 
             // Budujemy mapę photoUploadedBy: zachowujemy istniejącą (edycja)
             // + dodajemy nowo-uploadowane URL-e z bieżącym userId
+
             val retainedExistingUrls = state.existingPhotoUrls.toSet()
 
             val existingUploadedBy = editingOriginal
@@ -560,7 +566,7 @@ class AddPlaceViewModel @Inject constructor(
             val newUploadedBy = uploadedUrls.associateWith {
                 currentUser.id
             }
-
+            
             val allPhotoUploadedBy = existingUploadedBy + newUploadedBy
 
             // Persist all known hashes for future dedup (no more downloading images)

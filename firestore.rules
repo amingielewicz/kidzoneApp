@@ -51,6 +51,15 @@ service cloud.firestore {
           && request.resource.data.photoHashes.size() == request.resource.data.photoUrls.size());
     }
 
+    function hasValidPhotoHashes() {
+      return !request.resource.data.keys().hasAny(['photoHashes'])
+        || (request.resource.data.photoHashes is map
+          && request.resource.data.photoHashes.size() <= 5
+          && request.resource.data.photoUrls is list
+          && request.resource.data.photoHashes.keys().hasOnly(request.resource.data.photoUrls)
+          && request.resource.data.photoHashes.size() == request.resource.data.photoUrls.size());
+    }
+
     function hasNoPrivateUserFields() {
       return !request.resource.data.keys().hasAny([
         'email',
@@ -386,6 +395,14 @@ service cloud.firestore {
           isSignedIn()
           && resource.data.ownerUserId == request.auth.uid
         );
+=======
+        && (isAdmin()
+        || (isSignedIn()
+          && resource.data.ownerUserId == request.auth.uid
+          && isNotUpdating(['averageRating', 'reviewsCount', 'ownerUserId'])));
+
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.ownerUserId == request.auth.uid);
+>>>>>>> origin/main
     }
 
     match /reviews/{reviewId} {
