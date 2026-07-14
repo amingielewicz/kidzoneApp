@@ -20,8 +20,8 @@ data class Place(
     val photoUrls: List<String> = emptyList(),
     /** Mapowanie URL zdjęcia → userId autora. Do blokowania zgłoszenia własnych zdjęć. */
     val photoUploadedBy: Map<String, String> = emptyMap(),
-    /** MD5 hashe skompresowanych zdjęć — do wykrywania duplikatów bez downloadu. */
-    val photoHashes: List<String> = emptyList(),
+    /** Mapowanie URL zdjęcia → MD5 skompresowanych bajtów. */
+    val photoHashes: Map<String, String> = emptyMap(),
     val createdAtMillis: Long = 0L,
     /** Timestamp of last update — used for server-wins conflict resolution during sync. */
     val updatedAtMillis: Long = 0L

@@ -224,7 +224,7 @@ class AddPlaceViewModel @Inject constructor(
                         )
                     }
                     // Seed hash set z istniejących zdjęć dla dedup detection
-                    seedPhotoHashes(result.data.photoUrls)
+                    seedPhotoHashes()
                 }
                 is OpResult.Failure -> {
                     _uiState.update {
@@ -428,14 +428,14 @@ class AddPlaceViewModel @Inject constructor(
     }
 
     /** Seeduje hash set z Firestore (pole `photoContentHashes` na dokumencie miejsca). */
-    private fun seedPhotoHashes(urls: List<String>) {
+    private fun seedPhotoHashes() {
         // Hashe są teraz trzymane w Firestore na dokumencie miejsca (pole photoHashes).
         // Przy edycji pobieramy je stamtąd — zero downloadu obrazów po sieci.
         viewModelScope.launch {
             val placeId = _uiState.value.editingPlaceId ?: return@launch
             try {
                 val place = (placeRepository.getPlace(placeId) as? OpResult.Success)?.data
-                val storedHashes = place?.photoHashes.orEmpty()
+                val storedHashes = place?.photoHashes.orEmpty().values
                 photoContentHashes.addAll(storedHashes)
                 persistHashes()
             } catch (_: Exception) { /* best-effort */ }
@@ -472,7 +472,9 @@ class AddPlaceViewModel @Inject constructor(
         _uiState.update { state ->
             val removed = state.existingPhotoUrls[index]
             removedPhotoUrls.add(removed)
+            editingOriginal?.photoHashes?.get(removed)?.let(photoContentHashes::remove)
             persistRemovedPhotos()
+            persistHashes()
             state.copy(
                 existingPhotoUrls = state.existingPhotoUrls.toMutableList().apply { removeAt(index) }
             )
@@ -498,6 +500,7 @@ class AddPlaceViewModel @Inject constructor(
 
             // Upload nowych zdjęć (kompresja + Firebase Storage + dedup)
             val uploadedUrls = mutableListOf<String>()
+            val uploadedHashes = mutableMapOf<String, String>()
             var duplicatesSkipped = 0
             if (state.photoUris.isNotEmpty()) {
                 _uiState.update { it.copy(isUploadingPhotos = true) }
@@ -512,9 +515,6 @@ class AddPlaceViewModel @Inject constructor(
                             duplicatesSkipped++
                             continue
                         }
-                        photoContentHashes.add(hash)
-                        persistHashes()
-
                         try {
                             val tempId = state.editingPlaceId ?: "pending_${System.currentTimeMillis()}"
                             val url = photoUploader.uploadPlacePhoto(
@@ -523,6 +523,9 @@ class AddPlaceViewModel @Inject constructor(
                                 imageBytes = bytes
                             )
                             uploadedUrls.add(url)
+                            uploadedHashes[url] = hash
+                            photoContentHashes.add(hash)
+                            persistHashes()
                         } catch (e: Exception) {
                             _uiState.update {
                                 it.copy(
@@ -563,11 +566,14 @@ class AddPlaceViewModel @Inject constructor(
             // Budujemy mapę photoUploadedBy: zachowujemy istniejącą (edycja)
             // + dodajemy nowo-uploadowane URL-e z bieżącym userId
             val existingUploadedBy = editingOriginal?.photoUploadedBy.orEmpty()
+                .filterKeys { it in state.existingPhotoUrls }
             val newUploadedBy = uploadedUrls.associateWith { currentUser.id }
             val allPhotoUploadedBy = existingUploadedBy + newUploadedBy
 
             // Persist all known hashes for future dedup (no more downloading images)
-            val allPhotoHashes = photoContentHashes.toList()
+            val existingPhotoHashes = editingOriginal?.photoHashes.orEmpty()
+                .filterKeys { it in state.existingPhotoUrls }
+            val allPhotoHashes = existingPhotoHashes + uploadedHashes
 
             val result = if (state.isEditMode && editingOriginal != null) {
                 val original = editingOriginal!!

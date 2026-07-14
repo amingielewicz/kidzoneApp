@@ -102,7 +102,7 @@ function createPlacePhotos(index, ownerUserId) {
     return {
       photoUrls: [],
       photoUploadedBy: {},
-      photoHashes: []
+      photoHashes: {}
     };
   }
 
@@ -115,7 +115,9 @@ function createPlacePhotos(index, ownerUserId) {
   return {
     photoUrls,
     photoUploadedBy: Object.fromEntries(photoUrls.map((url) => [url, ownerUserId])),
-    photoHashes: photoUrls.map((_, photoIndex) => placeholderPhotoHash('place', index, photoIndex))
+    photoHashes: Object.fromEntries(
+      photoUrls.map((url, photoIndex) => [url, placeholderPhotoHash('place', index, photoIndex)])
+    )
   };
 }
 
