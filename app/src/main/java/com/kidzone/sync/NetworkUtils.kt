@@ -6,26 +6,28 @@ import java.net.UnknownHostException
 import java.util.concurrent.TimeoutException
 
 /**
- * Utilities for detecting network-related errors.
+ * Pomocnicze rozpoznawanie błędów połączenia.
  *
- * Used by repositories to decide whether to queue an operation offline
- * vs. propagate the error to the UI.
+ * Wynik może służyć do decyzji, czy operacja jest kandydatem do późniejszego ponowienia. Nie jest
+ * jednak wystarczającą podstawą do automatycznego kolejkowania zapisu: dany typ operacji nadal musi
+ * posiadać kompletny, idempotentny processor w [SyncWorker].
  */
 object NetworkUtils {
 
     /**
-     * Returns true if the exception indicates a network connectivity issue
-     * (as opposed to a server-side error or validation failure).
+     * Sprawdza, czy wyjątek wskazuje na problem transportowy lub brak łączności.
      *
-     * Network errors are candidates for offline queueing because they will
-     * likely succeed when connectivity is restored.
+     * Walidacja, brak uprawnień, konflikt danych i błąd biznesowy nie powinny zostać sklasyfikowane
+     * jako błąd sieci. Dla wyjątków opakowanych sprawdzana jest również bezpośrednia przyczyna.
+     *
+     * @param e wyjątek zwrócony przez warstwę infrastruktury.
+     * @return `true`, gdy błąd prawdopodobnie wynika z braku sieci, DNS albo timeoutu.
      */
     fun isNetworkError(e: Exception): Boolean {
         return when (e) {
-            is UnknownHostException -> true    // DNS resolution failed (no internet)
-            is SocketTimeoutException -> true  // Connection timed out
+            is UnknownHostException -> true
+            is SocketTimeoutException -> true
             is IOException -> {
-                // Firebase Firestore wraps network issues in IOException
                 val message = e.message?.lowercase().orEmpty()
                 message.contains("network") ||
                     message.contains("unavailable") ||
@@ -33,9 +35,8 @@ object NetworkUtils {
                     message.contains("timeout") ||
                     message.contains("failed to connect")
             }
-            is TimeoutException -> true        // Our AppConfig.WRITE_TIMEOUT_MS exceeded
+            is TimeoutException -> true
             else -> {
-                // Check for Firebase-specific offline indicators
                 val cause = e.cause
                 cause is IOException || cause is UnknownHostException
             }
