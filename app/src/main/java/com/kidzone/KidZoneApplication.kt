@@ -3,6 +3,11 @@ package com.kidzone
 import android.app.Application
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreSettings
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.MemoryCacheSettings
+import com.google.firebase.storage.FirebaseStorage
 import com.kidzone.analytics.ColdStartTrace
 import com.kidzone.data.local.PlaceDao
 import com.kidzone.data.remote.RemoteConfigService
@@ -51,13 +56,43 @@ class KidZoneApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
         initTimber()
+        configureFirebaseEmulators()
+
         coldStartTrace.start()
         initDebugTools()
         initAppCheck()
         initRemoteConfig()
         cleanStaleCache()
         com.kidzone.messaging.KidZoneMessagingService.registerCurrentToken(this)
+    }
+
+    private fun configureFirebaseEmulators() {
+        if (!BuildConfig.DEBUG) return
+
+        FirebaseAuth.getInstance()
+            .useEmulator("10.0.2.2", 9099)
+
+        FirebaseFirestore.getInstance().apply {
+            useEmulator("10.0.2.2", 8080)
+
+            firestoreSettings = FirebaseFirestoreSettings.Builder()
+                .setLocalCacheSettings(
+                    MemoryCacheSettings.newBuilder().build()
+                )
+                .build()
+        }
+
+        FirebaseStorage.getInstance()
+            .useEmulator("10.0.2.2", 9199)
+
+        Timber.d(
+            "Firebase emulators configured: " +
+                    "Auth=10.0.2.2:9099, " +
+                    "Firestore=10.0.2.2:8080, " +
+                    "Storage=10.0.2.2:9199"
+        )
     }
 
     /**

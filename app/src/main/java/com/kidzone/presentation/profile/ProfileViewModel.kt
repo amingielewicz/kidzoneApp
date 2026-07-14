@@ -91,7 +91,11 @@ class ProfileViewModel @Inject constructor(
 
     private val richUser = authRepository.currentUser
         .flatMapLatest { current ->
-            if (current == null) flowOf(null) else authRepository.observeUser(current.id)
+            if (current == null) {
+                flowOf(null)
+            } else {
+                authRepository.observeUser(current.id)
+            }
         }
         .catch { emit(null) }
 
@@ -99,20 +103,42 @@ class ProfileViewModel @Inject constructor(
         if (user == null) return@map null to BadgeContext()
 
         coroutineScope {
-            val placesTask = async { placeRepository.getTopPlaces(RANKING_LIMIT) }
-            val usersTask = async { authRepository.getTopUsers(RANKING_LIMIT) }
+            val placesTask = async {
+                placeRepository.getTopPlaces(RANKING_LIMIT)
+            }
 
-            val topPlaces = (placesTask.await() as? OpResult.Success)?.data.orEmpty()
-            val topUsers = (usersTask.await() as? OpResult.Success)?.data.orEmpty()
+            val usersTask = async {
+                authRepository.getTopUsers(RANKING_LIMIT)
+            }
+
+            val topPlaces = (placesTask.await() as? OpResult.Success)
+                ?.data
+                .orEmpty()
+
+            val topUsers = (usersTask.await() as? OpResult.Success)
+                ?.data
+                .orEmpty()
 
             val myRank = topUsers.indexOfFirst { it.id == user.id }
-                .takeIf { it != -1 }?.let { it + 1 }
-            val myBestPlaceRank = topPlaces.indexOfFirst { it.ownerUserId == user.id }
-                .takeIf { it != -1 }?.let { it + 1 }
+                .takeIf { it != -1 }
+                ?.let { it + 1 }
 
-            user to BadgeContext(userRank = myRank, bestPlaceRank = myBestPlaceRank)
+            val myBestPlaceRank = topPlaces.indexOfFirst {
+                it.ownerUserId == user.id
+            }
+                .takeIf { it != -1 }
+                ?.let { it + 1 }
+
+            user to BadgeContext(
+                userRank = myRank,
+                bestPlaceRank = myBestPlaceRank
+            )
         }
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        null
+    )
 
     val user: StateFlow<User?> = userContext.map { it?.first }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SUBSCRIPTION_TIMEOUT_MS), null)

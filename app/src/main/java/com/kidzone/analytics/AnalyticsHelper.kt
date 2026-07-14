@@ -21,6 +21,22 @@ enum class PlaceReportReason(val analyticsCode: String) {
     OTHER("other")
 }
 
+enum class ReviewReportReason(val analyticsCode: String) {
+    SPAM("spam"),
+    OFFENSIVE("offensive"),
+    FALSE_INFO("false_info"),
+    NOT_RELEVANT("not_relevant"),
+    OTHER("other")
+}
+
+enum class PhotoReportReason(val analyticsCode: String) {
+    INAPPROPRIATE("inappropriate"),
+    NOT_RELEVANT("not_relevant"),
+    COPYRIGHT("copyright"),
+    OFFENSIVE("offensive"),
+    OTHER("other")
+}
+
 /**
  * Centralna klasa do logowania eventow Firebase Analytics w aplikacji kidZone.
  *
@@ -83,10 +99,12 @@ class AnalyticsHelper @Inject constructor(
         }
     }
 
-    fun logReportPlace(placeId: String, reason: PlaceReportReason) {
-        Timber.d("Analytics: report_place → reason=${reason.analyticsCode}")
+    fun logReportPlace(reason: PlaceReportReason) {
+        Timber.d(
+            "Analytics: report_place → reason=${reason.analyticsCode}"
+        )
+
         analytics.logEvent("report_place") {
-            param("place_id", placeId)
             param("reason", reason.analyticsCode)
         }
     }
@@ -108,12 +126,28 @@ class AnalyticsHelper @Inject constructor(
         }
     }
 
+    fun logReportReview(reason: ReviewReportReason) {
+        analytics.logEvent("report_review") {
+            param("reason", reason.analyticsCode)
+        }
+    }
+
     // ─── Photos ─────────────────────────────────────────────────────────
 
     fun logAddPhoto(source: String) {
         Timber.d("Analytics: add_photo → source=$source")
         analytics.logEvent("add_photo") {
             param("source", source)
+        }
+    }
+
+    fun logReportPhoto(reason: PhotoReportReason) {
+        Timber.d(
+            "Analytics: report_photo → reason=${reason.analyticsCode}"
+        )
+
+        analytics.logEvent("report_photo") {
+            param("reason", reason.analyticsCode)
         }
     }
 

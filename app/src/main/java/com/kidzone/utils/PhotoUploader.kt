@@ -1,6 +1,7 @@
 package com.kidzone.utils
 
 import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageMetadata
 import com.kidzone.analytics.PerformanceTraces
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
@@ -23,6 +24,11 @@ class PhotoUploader @Inject constructor(
     private val storage: FirebaseStorage,
     private val performanceTraces: PerformanceTraces
 ) {
+
+    private val webpMetadata = StorageMetadata.Builder()
+        .setContentType("image/webp")
+        .build()
+
     /**
      * Uploaduje zdjęcie miejsca.
      *
@@ -41,13 +47,13 @@ class PhotoUploader @Inject constructor(
 
             val fileName = "${UUID.randomUUID()}.webp"
             val ref = storage.reference.child("places/$ownerUserId/$placeId/photos/$fileName")
-            ref.putBytes(imageBytes).await()
+            ref.putBytes(imageBytes, webpMetadata).await()
             val url = ref.downloadUrl.await().toString()
             trace.putAttribute("status", "success")
             url
         } catch (e: Exception) {
-            trace.putAttribute("status", "error")
-            throw e
+        trace.putAttribute("status", "error")
+        throw e
         } finally {
             performanceTraces.stopTrace(trace)
         }
@@ -66,7 +72,7 @@ class PhotoUploader @Inject constructor(
 
             val fileName = "${UUID.randomUUID()}.webp"
             val ref = storage.reference.child("reviews/$ownerUserId/$reviewId/photos/$fileName")
-            ref.putBytes(imageBytes).await()
+            ref.putBytes(imageBytes, webpMetadata).await()
             val url = ref.downloadUrl.await().toString()
             trace.putAttribute("status", "success")
             url

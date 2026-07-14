@@ -8,6 +8,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.R
+import com.kidzone.analytics.AnalyticsHelper
+import com.kidzone.analytics.PlaceReportReason
+import com.kidzone.analytics.ReviewReportReason
+import com.kidzone.analytics.PhotoReportReason
 import com.kidzone.data.repository.FirestoreReviewRepository
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.Review
@@ -52,7 +56,8 @@ class PlaceDetailsViewModel @Inject constructor(
     private val locationProvider: LocationProvider,
     private val photoUploader: PhotoUploader,
     private val imageCompressor: ImageCompressorPort,
-    private val inAppReviewManager: InAppReviewManager
+    private val inAppReviewManager: InAppReviewManager,
+    private val analyticsHelper: AnalyticsHelper
 ) : ViewModel() {
 
     data class UiState(
@@ -107,7 +112,7 @@ class PlaceDetailsViewModel @Inject constructor(
         fun getLabel(): String = stringResource(labelRes)
     }
 
-    enum class ReviewActionEvent { ADDED, UPDATED }
+    enum class      ReviewActionEvent { ADDED, UPDATED }
 
     private val placeId: String =
         savedStateHandle.get<String>(Route.PlaceDetails.ARG_PLACE_ID).orEmpty()
@@ -594,48 +599,81 @@ class PlaceDetailsViewModel @Inject constructor(
         }
     }
 
-    fun reportPlace(reason: String, comment: String = "") {
+    fun reportPlace(
+        reason: PlaceReportReason,
+        comment: String = ""
+    ) {
         val place = _uiState.value.place ?: return
         val user = currentUser.value ?: return
+
         viewModelScope.launch {
             val result = placeRepository.reportPlace(
                 placeId = place.id,
                 reporterId = user.id,
-                reason = reason,
+                reason = reason.name,
                 comment = comment
             )
+
             if (result is OpResult.Success) {
-                _uiState.update { it.copy(isPlaceReported = true) }
+                analyticsHelper.logReportPlace(reason)
+
+                _uiState.update {
+                    it.copy(isPlaceReported = true)
+                }
             }
         }
     }
 
-    fun reportReview(reviewId: String, reason: String, comment: String = "") {
+    fun reportReview(
+        reviewId: String,
+        reason: ReviewReportReason,
+        comment: String = ""
+    ) {
         val user = currentUser.value ?: return
+
         viewModelScope.launch {
             val result = reviewRepository.reportReviewAsSpam(
                 reviewId = reviewId,
                 reporterId = user.id,
-                reason = reason,
+                reason = reason.name,
                 comment = comment
             )
+
             if (result is OpResult.Success) {
-                _uiState.update { it.copy(reportedReviewIds = it.reportedReviewIds + reviewId) }
+                analyticsHelper.logReportReview(reason)
+
+                _uiState.update {
+                    it.copy(
+                        reportedReviewIds = it.reportedReviewIds + reviewId
+                    )
+                }
             }
         }
     }
 
-    fun reportPhoto(photoUrl: String, reason: String, comment: String = "") {
+    fun reportPhoto(
+        photoUrl: String,
+        reason: PhotoReportReason,
+        comment: String = ""
+    ) {
         val user = currentUser.value ?: return
+
         viewModelScope.launch {
             val result = placeRepository.reportPhoto(
                 photoUrl = photoUrl,
                 reporterId = user.id,
-                reason = reason,
+                reason = reason.name,
                 comment = comment
             )
+
             if (result is OpResult.Success) {
-                _uiState.update { it.copy(reportedPhotoUrls = it.reportedPhotoUrls + photoUrl) }
+                analyticsHelper.logReportPhoto(reason)
+
+                _uiState.update {
+                    it.copy(
+                        reportedPhotoUrls = it.reportedPhotoUrls + photoUrl
+                    )
+                }
             }
         }
     }
@@ -723,9 +761,9 @@ class PlaceDetailsViewModel @Inject constructor(
 
                 is OpResult.Failure -> PlacePhotoUploadResult.SKIPPED
             }
-        } catch (_: Exception) {
-            PlacePhotoUploadResult.SKIPPED
-        }
+        } catch (e: Exception) {
+        PlacePhotoUploadResult.SKIPPED
+    }
     }
 
     private fun addUploadedPlacePhoto(
