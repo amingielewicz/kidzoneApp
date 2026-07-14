@@ -1,4 +1,9 @@
-@file:Suppress("LargeClass", "LongParameterList", "ReturnCount")
+@file:Suppress(
+    "LargeClass",
+    "LongParameterList",
+    "ReturnCount",
+    "TooGenericExceptionCaught"
+)
 
 package com.kidzone.presentation.place.details
 
