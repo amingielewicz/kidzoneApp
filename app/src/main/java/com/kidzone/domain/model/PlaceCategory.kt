@@ -4,13 +4,13 @@ import androidx.annotation.StringRes
 import com.kidzone.R
 
 /**
- * Kategorie miejsc, jakie użytkownik może dodać i filtrować.
+ * Kategorie miejsc dostępne w formularzach, filtrach, mapie i rankingu.
  *
- * **Kolejność deklaracji jest istotna** – `entries` w tej kolejności jest
- * wyświetlane w UI (chipy filtrów na liście, dropdown w AddPlace).
- * Niealfabetycznie – ułożone według logicznej grupy: dwa "place zabaw"
- * (outdoor + indoor), dwie "jedzeniowe" (kawiarnia + restauracja), park,
- * atrakcje, inne.
+ * Nazwa wartości enuma jest trwałym kluczem zapisywanym w Firestore, dlatego istniejących nazw nie
+ * należy zmieniać bez migracji danych i kompatybilności ze starszymi buildami. Kolejność deklaracji
+ * jest równocześnie domyślną kolejnością prezentacji w UI.
+ *
+ * @property labelRes zasób przetłumaczonej etykiety kategorii.
  */
 enum class PlaceCategory(@StringRes val labelRes: Int) {
     PLAYGROUND(R.string.category_playground),
@@ -22,6 +22,12 @@ enum class PlaceCategory(@StringRes val labelRes: Int) {
     OTHER(R.string.category_other);
 
     companion object {
+        /**
+         * Mapuje klucz zapisany w backendzie na kategorię domenową.
+         *
+         * @param key nazwa enuma, bez rozróżniania wielkości liter.
+         * @return dopasowana kategoria albo [OTHER], gdy klucz jest pusty lub nieznany.
+         */
         fun fromKey(key: String?): PlaceCategory =
             entries.firstOrNull { it.name.equals(key, ignoreCase = true) } ?: OTHER
     }
