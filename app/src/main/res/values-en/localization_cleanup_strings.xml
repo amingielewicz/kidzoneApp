@@ -1,0 +1,4 @@
+<resources>
+    <string name="google_sign_in_unavailable">Google sign-in is temporarily unavailable. Please try again later.</string>
+    <string name="error_account_banned">This account has been suspended. Contact support if you need more information.</string>
+</resources>
