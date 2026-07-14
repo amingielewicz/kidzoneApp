@@ -1,13 +1,15 @@
 package com.kidzone.domain.model
 
 /**
- * Generic wrapper for cursor-based paginated results.
+ * Wynik pojedynczej strony danych pobieranej kursorem.
  *
- * @param T the type of items in the page
- * @property items the items for the current page
- * @property nextCursor opaque cursor token for fetching the next page.
- *   Null when there are no more pages (last page).
- * @property hasMore convenience flag: true when [nextCursor] != null
+ * Kursor jest nieprzezroczystym tokenem przekazywanym z powrotem do repository. Warstwa UI nie
+ * powinna interpretować jego zawartości ani zakładać, że jest numerem strony.
+ *
+ * @param T typ elementów strony.
+ * @property items elementy bieżącej strony.
+ * @property nextCursor token następnej strony albo `null`, gdy bieżąca strona jest ostatnia.
+ * @property hasMore wygodna flaga informująca, czy można pobrać kolejną stronę.
  */
 data class PagedResult<T>(
     val items: List<T>,
