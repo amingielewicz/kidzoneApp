@@ -32,7 +32,11 @@ const placesWithIncompleteUploaders = placesWithPhotos.filter((place) => {
 });
 
 const placesWithHashMismatch = placesWithPhotos.filter((place) => {
-  return (place.photoHashes ?? []).length !== (place.photoUrls ?? []).length;
+  const hashes = place.photoHashes ?? {};
+  const urls = place.photoUrls ?? [];
+  return Array.isArray(hashes)
+    || Object.keys(hashes).length !== urls.length
+    || urls.some((url) => typeof hashes[url] !== 'string');
 });
 
 console.log('Photo validation summary');

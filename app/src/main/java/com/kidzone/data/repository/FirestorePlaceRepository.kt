@@ -1,8 +1,6 @@
 package com.kidzone.data.repository
 
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
 import com.kidzone.analytics.PerformanceTraces
 import com.kidzone.data.local.PlaceDao
 import com.kidzone.data.local.PlaceEntity
@@ -431,20 +429,28 @@ class FirestorePlaceRepository @Inject constructor(
     override suspend fun addPhotoUrl(
         placeId: String,
         photoUrl: String,
-        uploadedByUserId: String
+        uploadedByUserId: String,
+        photoHash: String
     ): OpResult<Unit> = try {
         require(placeId.isNotBlank()) { "placeId nie może być puste" }
         require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
         require(uploadedByUserId.isNotBlank()) { "uploadedByUserId nie może być puste" }
+        require(photoHash.isNotBlank()) { "photoHash nie może być pusty" }
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
-            placesCollection().document(placeId).set(
-                mapOf(
-                    "photoUrls" to FieldValue.arrayUnion(photoUrl),
-                    "photoUploadedBy" to mapOf(photoUrl to uploadedByUserId)
-                ),
-                SetOptions.merge()
-            ).await()
+            val reference = placesCollection().document(placeId)
+            firestore.runTransaction { transaction ->
+                val place = transaction.get(reference).toObject(PlaceDto::class.java)?.toDomain()
+                    ?: error("Nie znaleziono miejsca: $placeId")
+                transaction.update(
+                    reference,
+                    mapOf(
+                        "photoUrls" to (place.photoUrls + photoUrl).distinct(),
+                        "photoUploadedBy" to (place.photoUploadedBy + (photoUrl to uploadedByUserId)),
+                        "photoHashes" to (place.photoHashes + (photoUrl to photoHash))
+                    )
+                )
+            }.await()
             true
         }
         if (completed == null) {
@@ -471,7 +477,8 @@ class FirestorePlaceRepository @Inject constructor(
             placesCollection().document(placeId).update(
                 mapOf(
                     "photoUrls" to place.photoUrls.filterNot { it == photoUrl },
-                    "photoUploadedBy" to place.photoUploadedBy - photoUrl
+                    "photoUploadedBy" to place.photoUploadedBy - photoUrl,
+                    "photoHashes" to place.photoHashes - photoUrl
                 )
             ).await()
             true

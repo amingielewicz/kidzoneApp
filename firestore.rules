@@ -42,6 +42,15 @@ service cloud.firestore {
         && rating <= 5;
     }
 
+    function hasValidPhotoHashes() {
+      return !request.resource.data.keys().hasAny(['photoHashes'])
+        || (request.resource.data.photoHashes is map
+          && request.resource.data.photoHashes.size() <= 5
+          && request.resource.data.photoUrls is list
+          && request.resource.data.photoHashes.keys().hasOnly(request.resource.data.photoUrls)
+          && request.resource.data.photoHashes.size() == request.resource.data.photoUrls.size());
+    }
+
     function hasNoPrivateUserFields() {
       return !request.resource.data.keys().hasAny([
         'email',
@@ -355,17 +364,21 @@ service cloud.firestore {
         && request.resource.data.averageRating is number
         && request.resource.data.averageRating == 0
         && request.resource.data.reviewsCount is int
-        && request.resource.data.reviewsCount == 0;
+        && request.resource.data.reviewsCount == 0
+        && hasValidPhotoHashes();
 
-      allow update: if isAdmin()
-        || (
-          isSignedIn()
-          && resource.data.ownerUserId == request.auth.uid
-          && isNotUpdating([
-            'averageRating',
-            'reviewsCount',
-            'ownerUserId'
-          ])
+      allow update: if hasValidPhotoHashes()
+        && (
+          isAdmin()
+          || (
+            isSignedIn()
+            && resource.data.ownerUserId == request.auth.uid
+            && isNotUpdating([
+              'averageRating',
+              'reviewsCount',
+              'ownerUserId'
+            ])
+          )
         );
 
       allow delete: if isAdmin()

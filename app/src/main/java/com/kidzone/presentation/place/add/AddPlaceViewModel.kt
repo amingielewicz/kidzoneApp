@@ -224,6 +224,7 @@ class AddPlaceViewModel @Inject constructor(
                             errorMessage = null
                         )
                     }
+                    selectedPhotoHashes.addAll(result.data.photoHashes.values)
                 }
                 is OpResult.Failure -> {
                     _uiState.update {
@@ -452,8 +453,8 @@ class AddPlaceViewModel @Inject constructor(
                 ?: return@update state
 
             removedPhotoUrls.add(removedUrl)
+            editingOriginal?.photoHashes?.get(removedUrl)?.let(selectedPhotoHashes::remove)
             persistRemovedPhotos()
-
             state.copy(
                 existingPhotoUrls = state.existingPhotoUrls
                     .filterNot { it == removedUrl }
@@ -483,6 +484,7 @@ class AddPlaceViewModel @Inject constructor(
 
             // Upload nowych zdjęć (kompresja + Firebase Storage + dedup)
             val uploadedUrls = mutableListOf<String>()
+            val uploadedHashes = mutableMapOf<String, String>()
             var duplicatesSkipped = 0
             if (state.photoUris.isNotEmpty()) {
                 _uiState.update { it.copy(isUploadingPhotos = true) }
@@ -497,7 +499,6 @@ class AddPlaceViewModel @Inject constructor(
                             duplicatesSkipped++
                             continue
                         }
-
                         try {
                             val url = photoUploader.uploadPlacePhoto(
                                 ownerUserId = currentUser.id,
@@ -507,6 +508,7 @@ class AddPlaceViewModel @Inject constructor(
 
                             uploadedUrls.add(url)
                             selectedPhotoHashes.add(hash)
+                            uploadedHashes[url] = hash
                         } catch (e: Exception) {
                             _uiState.update {
                                 it.copy(
@@ -561,6 +563,11 @@ class AddPlaceViewModel @Inject constructor(
 
             val allPhotoUploadedBy = existingUploadedBy + newUploadedBy
 
+            // Persist all known hashes for future dedup (no more downloading images)
+            val existingPhotoHashes = editingOriginal?.photoHashes.orEmpty()
+                .filterKeys { it in state.existingPhotoUrls }
+            val allPhotoHashes = existingPhotoHashes + uploadedHashes
+
             val result = if (state.isEditMode && editingOriginal != null) {
                 val original = editingOriginal!!
                 val normalizedName = TextNormalization.toTitleCase(state.name)
@@ -577,7 +584,7 @@ class AddPlaceViewModel @Inject constructor(
                     amenities = state.amenities,
                     photoUrls = allPhotoUrls,
                     photoUploadedBy = allPhotoUploadedBy,
-                    photoHashes = emptyList(),
+                    photoHashes = allPhotoHashes,
                 )
                 placeRepository.updatePlace(updated)
             } else {
@@ -597,7 +604,7 @@ class AddPlaceViewModel @Inject constructor(
                     amenities = state.amenities,
                     photoUrls = allPhotoUrls,
                     photoUploadedBy = allPhotoUploadedBy,
-                    photoHashes = emptyList(),
+                    photoHashes = allPhotoHashes,
                     createdAtMillis = System.currentTimeMillis()
                 )
                 placeRepository.addPlace(newPlace)

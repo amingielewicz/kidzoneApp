@@ -25,7 +25,7 @@ object OfflinePayload {
         val amenities: List<String>,
         val photoUrls: List<String>,
         val photoUploadedBy: Map<String, String>,
-        val photoHashes: List<String>,
+        val photoHashes: Any?,
         val createdAtMillis: Long,
         val updatedAtMillis: Long
     )
@@ -68,7 +68,7 @@ object OfflinePayload {
             amenities = payload.amenities.map { Amenity.valueOf(it) }.toSet(),
             photoUrls = payload.photoUrls,
             photoUploadedBy = payload.photoUploadedBy,
-            photoHashes = payload.photoHashes,
+            photoHashes = payload.photoHashes.toPhotoHashMap(),
             createdAtMillis = payload.createdAtMillis,
             updatedAtMillis = payload.updatedAtMillis
         )
@@ -122,4 +122,12 @@ object OfflinePayload {
         )
         return map["id"].orEmpty()
     }
+
+    private fun Any?.toPhotoHashMap(): Map<String, String> =
+        (this as? Map<*, *>)
+            ?.mapNotNull { (url, hash) ->
+                if (url is String && hash is String) url to hash else null
+            }
+            ?.toMap()
+            .orEmpty()
 }

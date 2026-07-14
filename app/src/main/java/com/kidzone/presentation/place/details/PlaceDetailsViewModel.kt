@@ -180,7 +180,7 @@ class PlaceDetailsViewModel @Inject constructor(
                     }
                     loadAuthor(result.data.ownerUserId)
                     loadTopRank()
-                    seedPlacePhotoHashes(result.data.photoUrls)
+                    seedPlacePhotoHashes(result.data.photoHashes.values)
                     loadUserReports()
                 }
 
@@ -768,7 +768,7 @@ class PlaceDetailsViewModel @Inject constructor(
                 placeId = place.id,
                 imageBytes = newBytes
             )
-            when (placeRepository.addPhotoUrl(place.id, url, userId)) {
+            when (placeRepository.addPhotoUrl(place.id, url, userId, newHash)) {
                 is OpResult.Success -> {
                     addUploadedPlacePhoto(url, userId, newHash)
                     PlacePhotoUploadResult.ADDED
@@ -796,7 +796,8 @@ class PlaceDetailsViewModel @Inject constructor(
                 state.copy(
                     place = place.copy(
                         photoUrls = place.photoUrls + url,
-                        photoUploadedBy = place.photoUploadedBy + (url to userId)
+                        photoUploadedBy = place.photoUploadedBy + (url to userId),
+                        photoHashes = place.photoHashes + (url to hash)
                     )
                 )
             }
@@ -824,12 +825,13 @@ class PlaceDetailsViewModel @Inject constructor(
                         it.copy(
                             place = place.copy(
                                 photoUrls = place.photoUrls - photoUrl,
-                                photoUploadedBy = place.photoUploadedBy - photoUrl
+                                photoUploadedBy = place.photoUploadedBy - photoUrl,
+                                photoHashes = place.photoHashes - photoUrl
                             ),
                             isUploadingPlacePhoto = false
                         )
                     }
-                    seedPlacePhotoHashes((_uiState.value.place?.photoUrls).orEmpty())
+                    seedPlacePhotoHashes((_uiState.value.place?.photoHashes?.values).orEmpty())
                 }
 
                 is OpResult.Failure -> {
@@ -866,26 +868,9 @@ class PlaceDetailsViewModel @Inject constructor(
         }
     }
 
-    private fun seedPlacePhotoHashes(photoUrls: List<String>) {
+    private fun seedPlacePhotoHashes(hashes: Collection<String>) {
         placePhotoHashes.clear()
-        if (photoUrls.isEmpty()) return
-        viewModelScope.launch {
-            for (url in photoUrls) {
-                try {
-                    val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        val conn = java.net.URL(url).openConnection()
-                        conn.connectTimeout = 10_000
-                        conn.readTimeout = 10_000
-                        conn.getInputStream().readBytes()
-                    }
-                    val hash = java.security.MessageDigest.getInstance("MD5")
-                        .digest(bytes)
-                        .joinToString("") { "%02x".format(it) }
-                    placePhotoHashes.add(hash)
-                } catch (_: Exception) {
-                }
-            }
-        }
+        placePhotoHashes.addAll(hashes)
     }
 
     fun submitSuggestedEdit(
