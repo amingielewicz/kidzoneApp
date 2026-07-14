@@ -129,13 +129,18 @@ interface PlaceRepository {
 
     /**
      * Dodaje URL zdjęcia do listy `photoUrls` na dokumencie miejsca.
-     * Zapisuje też kto dodał zdjęcie w `photoUploadedBy`.
+     * Zapisuje też autora w `photoUploadedBy` i hash w `photoHashes`.
      */
-    suspend fun addPhotoUrl(placeId: String, photoUrl: String, uploadedByUserId: String): OpResult<Unit>
+    suspend fun addPhotoUrl(
+        placeId: String,
+        photoUrl: String,
+        uploadedByUserId: String,
+        photoHash: String
+    ): OpResult<Unit>
 
     /**
      * Usuwa URL zdjęcia z listy `photoUrls` na dokumencie miejsca.
-     * Usuwa też wpis z `photoUploadedBy`.
+     * Usuwa też wpisy z `photoUploadedBy` i `photoHashes`.
      *
      * Autoryzacja po stronie klienta: wywołujący powinien upewnić się,
      * że `photoUploadedBy[photoUrl] == currentUserId` przed wywołaniem.

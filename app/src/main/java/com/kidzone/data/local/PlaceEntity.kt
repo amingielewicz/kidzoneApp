@@ -5,6 +5,8 @@ import androidx.room.PrimaryKey
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 
 /**
  * Room entity reprezentujący miejsce w lokalnym cache.
@@ -28,7 +30,7 @@ data class PlaceEntity(
     val reviewsCount: Int,
     val amenities: String, // pipe-separated amenity names
     val photoUrls: String, // pipe-separated URLs
-    val photoHashes: String = "", // pipe-separated MD5 hashes
+    val photoHashes: String = "", // JSON map: photo URL -> MD5 hash
     val createdAtMillis: Long,
     val updatedAtMillis: Long = 0L,
     /** Czas ostatniego zapisu do cache – do ewentualnej polityki TTL. */
@@ -53,9 +55,7 @@ data class PlaceEntity(
         photoUrls = photoUrls
             .split("|")
             .filter { it.isNotBlank() },
-        photoHashes = photoHashes
-            .split("|")
-            .filter { it.isNotBlank() },
+        photoHashes = decodePhotoHashes(photoHashes),
         createdAtMillis = createdAtMillis,
         updatedAtMillis = updatedAtMillis
     )
@@ -74,9 +74,19 @@ data class PlaceEntity(
             reviewsCount = place.reviewsCount,
             amenities = place.amenities.joinToString("|") { it.name },
             photoUrls = place.photoUrls.joinToString("|"),
-            photoHashes = place.photoHashes.joinToString("|"),
+            photoHashes = Gson().toJson(place.photoHashes),
             createdAtMillis = place.createdAtMillis,
             updatedAtMillis = place.updatedAtMillis
         )
     }
+}
+
+private fun decodePhotoHashes(value: String): Map<String, String> {
+    if (!value.trimStart().startsWith("{")) return emptyMap()
+    return runCatching {
+        Gson().fromJson<Map<String, String>>(
+            value,
+            object : TypeToken<Map<String, String>>() {}.type
+        ).orEmpty()
+    }.getOrDefault(emptyMap())
 }
