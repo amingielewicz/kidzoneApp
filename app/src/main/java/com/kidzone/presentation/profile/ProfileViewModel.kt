@@ -14,6 +14,7 @@ import com.kidzone.domain.usecase.NotificationPrefsUseCase
 import com.kidzone.i18n.AppLanguage
 import com.kidzone.i18n.LanguagePreferences
 import com.kidzone.presentation.common.BadgeContext
+import com.kidzone.presentation.common.ScreenState
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.computeBadges
 import com.kidzone.utils.AuthException
@@ -88,15 +89,30 @@ class ProfileViewModel @Inject constructor(
     private var pendingSeenBadgesUserId: String? = null
     private var pendingSeenBadgeNames: Set<String> = emptySet()
     private var pendingNewBadgeNames: Set<String> = emptySet()
+    private val profileReload = MutableStateFlow(0)
 
-    private val richUser = authRepository.currentUser
-        .flatMapLatest { current ->
-            if (current == null) flowOf(null) else authRepository.observeUser(current.id)
+    val profileState: StateFlow<ScreenState<User>> = profileReload
+        .flatMapLatest {
+            authRepository.currentUser.flatMapLatest { current ->
+                if (current == null) {
+                    flowOf(ScreenState.Error(UiText.StringResource(R.string.profile_load_error)))
+                } else {
+                    authRepository.observeUser(current.id).map { user ->
+                        if (user == null) {
+                            ScreenState.Error(UiText.StringResource(R.string.profile_load_error))
+                        } else {
+                            ScreenState.Content(user)
+                        }
+                    }
+                }
+            }
         }
-        .catch { emit(null) }
+        .catch { emit(ScreenState.Error(UiText.StringResource(R.string.profile_load_error))) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ScreenState.Loading)
 
-    private val userContext = richUser.map { user ->
-        if (user == null) return@map null to BadgeContext()
+    private val userContext = profileState.map { state ->
+        val user = (state as? ScreenState.Content)?.data
+            ?: return@map null to BadgeContext()
 
         coroutineScope {
             val placesTask = async { placeRepository.getTopPlaces(RANKING_LIMIT) }
@@ -146,9 +162,12 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
             authRepository.refreshUser()
+            profileReload.update { it + 1 }
             _uiState.update { it.copy(isRefreshing = false) }
         }
     }
+
+    fun retryProfile() = refreshProfile()
 
     fun signOut(onSignedOut: () -> Unit) {
         viewModelScope.launch {

@@ -12,6 +12,7 @@ import com.kidzone.domain.usecase.NotificationPrefsUseCase
 import com.kidzone.i18n.AppLanguage
 import com.kidzone.i18n.LanguagePreferences
 import com.kidzone.presentation.common.UserBadge
+import com.kidzone.presentation.common.ScreenState
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.AuthException
@@ -153,6 +154,28 @@ class ProfileViewModelTest {
 
             assertEquals("uid-1", viewModel.user.value?.id)
             assertEquals("Jan", viewModel.user.value?.name)
+            assertTrue(viewModel.profileState.value is ScreenState.Content)
+        }
+
+        @Test
+        fun `missing profile is exposed as error instead of endless loading`() = runTest {
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.profileState.value is ScreenState.Error)
+        }
+
+        @Test
+        fun `retry transitions profile from error to content`() = runTest {
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+            assertTrue(viewModel.profileState.value is ScreenState.Error)
+
+            currentUserFlow.value = TestFixtures.user(id = "uid-retry")
+            viewModel.retryProfile()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.profileState.value is ScreenState.Content)
         }
     }
 

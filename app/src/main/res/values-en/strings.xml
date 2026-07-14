@@ -395,6 +395,8 @@
     <string name="maintenance_title">Maintenance break</string>
     <string name="maintenance_message">The application is temporarily unavailable. Please try again later.</string>
     <string name="retry">Try again</string>
+    <string name="profile_load_error">Unable to load the profile.</string>
+    <string name="screen_load_error">Unable to load the data.</string>
     <string name="uploading_photo">Uploading photo...</string>
     <string name="gallery">Gallery</string>
     <string name="gallery_with_count">Gallery (%1$d/5)</string>
