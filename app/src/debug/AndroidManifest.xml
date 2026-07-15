@@ -5,7 +5,7 @@
     <application
         android:networkSecurityConfig="@xml/network_security_config_debug"
         android:usesCleartextTraffic="true"
-        tools:replace="android:networkSecurityConfig,android:usesCleartextTraffic">
+        tools:replace="android:networkSecurityConfig">
 
         <meta-data
             android:name="firebase_performance_collection_deactivated"
