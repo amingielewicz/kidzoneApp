@@ -42,6 +42,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.CancellationException
 import java.util.UUID
 import java.util.concurrent.TimeoutException
 import javax.inject.Inject
@@ -50,6 +52,7 @@ import timber.log.Timber
 private const val TOP_RANKING_POOL = 100
 private const val MAX_PLACE_PHOTOS_ON_DETAILS = 5
 private const val TOP_RANKING_BADGE_LIMIT = 10
+private const val PLACE_PHOTO_UPLOAD_TIMEOUT_MS = 30_000L
 
 /**
  * ViewModel ekranu szczegółów miejsca.
@@ -711,20 +714,44 @@ class PlaceDetailsViewModel @Inject constructor(
         addPhotosToPlace(listOf(photoUri))
     }
 
-    fun addPhotosToPlace(photoUris: List<android.net.Uri>) {
-        if (photoUris.isEmpty()) {
-            return
-        }
-        val user = currentUser.value ?: return
-        viewModelScope.launch {
-            _uiState.update { it.copy(isUploadingPlacePhoto = true) }
-            val duplicateSkipped = uploadPickedPlacePhotos(photoUris, user.id)
 
+    fun addPhotosToPlace(photoUris: List<android.net.Uri>) {
+        if (photoUris.isEmpty()) return
+
+        val user = currentUser.value ?: return
+
+        viewModelScope.launch {
             _uiState.update {
-                it.copy(
-                    isUploadingPlacePhoto = false,
-                    placePhotoDuplicateEvent = it.placePhotoDuplicateEvent || duplicateSkipped
-                )
+                it.copy(isUploadingPlacePhoto = true)
+            }
+
+            var duplicateSkipped = false
+
+            try {
+                val result = withTimeoutOrNull(PLACE_PHOTO_UPLOAD_TIMEOUT_MS) {
+                    uploadPickedPlacePhotos(
+                        photoUris = photoUris,
+                        userId = user.id
+                    )
+                }
+
+                if (result == null) {
+                    Timber.e("Place photo upload timed out")
+                } else {
+                    duplicateSkipped = result
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Could not add photos to place")
+            } finally {
+                _uiState.update {
+                    it.copy(
+                        isUploadingPlacePhoto = false,
+                        placePhotoDuplicateEvent =
+                            it.placePhotoDuplicateEvent || duplicateSkipped
+                    )
+                }
             }
         }
     }
@@ -776,6 +803,8 @@ class PlaceDetailsViewModel @Inject constructor(
 
                 is OpResult.Failure -> PlacePhotoUploadResult.SKIPPED
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Timber.e(e, "Could not upload place photo")
             PlacePhotoUploadResult.SKIPPED

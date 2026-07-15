@@ -51,15 +51,6 @@ service cloud.firestore {
           && request.resource.data.photoHashes.size() == request.resource.data.photoUrls.size());
     }
 
-    function hasValidPhotoHashes() {
-      return !request.resource.data.keys().hasAny(['photoHashes'])
-        || (request.resource.data.photoHashes is map
-          && request.resource.data.photoHashes.size() <= 5
-          && request.resource.data.photoUrls is list
-          && request.resource.data.photoHashes.keys().hasOnly(request.resource.data.photoUrls)
-          && request.resource.data.photoHashes.size() == request.resource.data.photoUrls.size());
-    }
-
     function hasNoPrivateUserFields() {
       return !request.resource.data.keys().hasAny([
         'email',
@@ -82,58 +73,10 @@ service cloud.firestore {
         && !request.resource.data.keys().hasAny(['fcmTokens']);
     }
 
-    function isValidOptionalDescription(maxLength) {
-      return !request.resource.data.keys().hasAny(['description'])
-        || (
-          request.resource.data.description is string
-          && request.resource.data.description.size() <= maxLength
-        );
-    }
 
-    function isValidPlaceReportReason(reason) {
-      return reason is string
-        && reason in [
-          'incorrect_information',
-          'closed_or_missing',
-          'duplicate',
-          'inappropriate_content',
-          'other'
-        ];
-    }
 
-    function isValidReviewReportReason(reason) {
-      return reason is string
-        && reason in [
-          'spam',
-          'offensive_content',
-          'false_information',
-          'personal_data',
-          'inappropriate_content',
-          'other'
-        ];
-    }
 
-    function isValidPhotoReportReason(reason) {
-      return reason is string
-        && reason in [
-          'inappropriate_content',
-          'personal_data',
-          'copyright',
-          'unrelated',
-          'other'
-        ];
-    }
 
-    function isValidPlaceChangeReason(reason) {
-      return reason is string
-        && reason in [
-          'incorrect_information',
-          'location_change',
-          'opening_hours_change',
-          'amenities_change',
-          'other'
-        ];
-    }
 
     function isValidPlaceReport() {
       return request.resource.data.keys().hasOnly([
@@ -182,6 +125,7 @@ service cloud.firestore {
         && request.resource.data.reviewId.size() <= 128
         && request.resource.data.reporterId is string
         && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.reason is string
         && request.resource.data.reason in [
           'SPAM',
           'OFFENSIVE',
@@ -193,6 +137,7 @@ service cloud.firestore {
         && request.resource.data.comment.size() <= 1000
         && request.resource.data.createdAtMillis is int
         && request.resource.data.createdAtMillis > 0
+        && request.resource.data.status is string
         && request.resource.data.status == 'pending'
         && exists(
           /databases/$(database)/documents/reviews/$(request.resource.data.reviewId)
@@ -213,6 +158,7 @@ service cloud.firestore {
         && request.resource.data.photoUrl.size() <= 2048
         && request.resource.data.reporterId is string
         && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.reason is string
         && request.resource.data.reason in [
           'INAPPROPRIATE',
           'NOT_RELEVANT',
@@ -224,6 +170,7 @@ service cloud.firestore {
         && request.resource.data.comment.size() <= 1000
         && request.resource.data.createdAtMillis is int
         && request.resource.data.createdAtMillis > 0
+        && request.resource.data.status is string
         && request.resource.data.status == 'pending';
     }
 
@@ -395,14 +342,6 @@ service cloud.firestore {
           isSignedIn()
           && resource.data.ownerUserId == request.auth.uid
         );
-=======
-        && (isAdmin()
-        || (isSignedIn()
-          && resource.data.ownerUserId == request.auth.uid
-          && isNotUpdating(['averageRating', 'reviewsCount', 'ownerUserId'])));
-
-      allow delete: if isAdmin() || (isSignedIn() && resource.data.ownerUserId == request.auth.uid);
->>>>>>> origin/main
     }
 
     match /reviews/{reviewId} {
