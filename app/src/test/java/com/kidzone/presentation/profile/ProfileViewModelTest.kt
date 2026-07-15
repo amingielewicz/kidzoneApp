@@ -26,7 +26,9 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -76,6 +78,7 @@ class ProfileViewModelTest {
         every { authRepository.currentUser } returns currentUserFlow
         coEvery { authRepository.getCurrentSignInProvider() } returns SignInProvider.EMAIL_PASSWORD
         every { authRepository.observeUser(any()) } returns currentUserFlow
+        coEvery { authRepository.refreshUser() } returns OpResult.success(Unit)
         coEvery { placeRepository.getTopPlaces(any()) } returns OpResult.success(emptyList())
         coEvery { authRepository.getTopUsers(any()) } returns OpResult.success(emptyList())
         coEvery { notificationPrefsUseCase.load() } returns NotificationPrefs()
@@ -698,6 +701,27 @@ class ProfileViewModelTest {
             viewModel.refreshProfile()
             advanceUntilIdle()
 
+            assertFalse(viewModel.uiState.value.isRefreshing)
+            coVerify { authRepository.refreshUser() }
+        }
+
+        @Test
+        fun `retry shows loading while waiting after profile error`() = runTest {
+            val testUser = TestFixtures.user(id = "uid-retry")
+            currentUserFlow.value = testUser
+            every { authRepository.observeUser(testUser.id) } returnsMany listOf(
+                flow { throw RuntimeException("offline") },
+                flow { awaitCancellation() }
+            )
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+            assertTrue(viewModel.profileState.value is ScreenState.Error)
+
+            viewModel.retryProfile()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.profileState.value is ScreenState.Loading)
             assertFalse(viewModel.uiState.value.isRefreshing)
             coVerify { authRepository.refreshUser() }
         }

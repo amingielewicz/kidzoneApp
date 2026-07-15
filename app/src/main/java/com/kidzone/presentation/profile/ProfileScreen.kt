@@ -244,6 +244,7 @@ fun ProfileScreen(
             initialLastName = user!!.lastName,
             currentAvatarUrl = user!!.avatarUrl,
             isSaving = ui.isSaving,
+            isOffline = isOffline,
             errorMessage = ui.saveError,
             onDismiss = viewModel::dismissEditSheet,
             onSave = { displayName, firstName, lastName, newAvatarUri ->

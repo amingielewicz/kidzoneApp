@@ -116,9 +116,10 @@ class ProfileViewModel @Inject constructor(
                             }
                         }
                 }
+            }.catch {
+                emit(ScreenState.Error(UiText.StringResource(R.string.profile_load_error)))
             }
         }
-        .catch { emit(ScreenState.Error(UiText.StringResource(R.string.profile_load_error))) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, ScreenState.Loading)
 
     private val userContext = profileState.map { state ->

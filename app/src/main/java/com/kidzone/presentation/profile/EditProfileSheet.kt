@@ -20,8 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +50,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.kidzone.R
+import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.utils.UiText
 import kotlinx.coroutines.launch
 
@@ -67,6 +66,7 @@ fun EditProfileSheet(
     initialLastName: String,
     currentAvatarUrl: String?,
     isSaving: Boolean,
+    isOffline: Boolean,
     errorMessage: UiText?,
     onDismiss: () -> Unit,
     onSave: (displayName: String, firstName: String, lastName: String, newAvatarUri: Uri?) -> Unit,
@@ -207,7 +207,8 @@ fun EditProfileSheet(
                     Text(stringResource(R.string.cancel))
                 }
                 Spacer(Modifier.width(8.dp))
-                Button(
+                OfflineAwareSubmitButton(
+                    label = stringResource(R.string.save_changes),
                     onClick = {
                         onSave(
                             displayName.trim(),
@@ -216,21 +217,12 @@ fun EditProfileSheet(
                             pendingAvatarUri,
                         )
                     },
-                    enabled = !isSaving && isFormValid,
+                    isOffline = isOffline,
+                    enabled = isFormValid,
+                    isLoading = isSaving,
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp),
-                ) {
-                    if (isSaving) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    } else {
-                        Text(stringResource(R.string.save_changes))
-                    }
-                }
+                )
             }
         }
     }
