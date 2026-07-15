@@ -77,8 +77,16 @@ class LoginViewModel @Inject constructor(
                             message = mapError(result.error),
                             isMessageError = true,
                             showResendVerification = isEmailNotVerified,
-                            banMessage = if (isBanned) (result.error as AuthException.AccountBanned).banMessage else null,
-                            banReason = if (isBanned) (result.error as AuthException.AccountBanned).banReason else null
+                            banMessage = if (isBanned) {
+                                (result.error as AuthException.AccountBanned).banMessage
+                            } else {
+                                null
+                            },
+                            banReason = if (isBanned) {
+                                (result.error as AuthException.AccountBanned).banReason
+                            } else {
+                                null
+                            }
                         )
                     }
                 }
@@ -99,8 +107,16 @@ class LoginViewModel @Inject constructor(
                             isLoading = false,
                             message = mapError(result.error),
                             isMessageError = true,
-                            banMessage = if (isBanned) (result.error as AuthException.AccountBanned).banMessage else null,
-                            banReason = if (isBanned) (result.error as AuthException.AccountBanned).banReason else null
+                            banMessage = if (isBanned) {
+                                (result.error as AuthException.AccountBanned).banMessage
+                            } else {
+                                null
+                            },
+                            banReason = if (isBanned) {
+                                (result.error as AuthException.AccountBanned).banReason
+                            } else {
+                                null
+                            }
                         )
                     }
                 }
@@ -109,7 +125,12 @@ class LoginViewModel @Inject constructor(
     }
 
     fun showInlineMessage(text: String, isError: Boolean = true) {
-        _uiState.update { it.copy(message = UiText.DynamicString(text), isMessageError = isError) }
+        val message = if (isGoogleSignInTechnicalMessage(text)) {
+            UiText.StringResource(R.string.google_sign_in_unavailable)
+        } else {
+            UiText.DynamicString(text)
+        }
+        _uiState.update { it.copy(message = message, isMessageError = isError) }
     }
 
     fun showConnectionError() {
@@ -157,7 +178,6 @@ class LoginViewModel @Inject constructor(
     }
 
     private fun mapError(throwable: Throwable): UiText = when (throwable) {
-        is AuthException.AccountBanned -> UiText.DynamicString(throwable.banMessage)
         is AuthException.Network -> UiText.StringResource(R.string.error_no_internet)
         is AuthException -> UiText.StringResource(throwable.messageRes)
         else -> UiText.StringResource(R.string.error_unknown)
@@ -185,5 +205,25 @@ class LoginViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun isGoogleSignInTechnicalMessage(message: String): Boolean {
+        val normalized = message.lowercase()
+        return GOOGLE_SIGN_IN_TECHNICAL_MARKERS.any(normalized::contains)
+    }
+
+    private companion object {
+        val GOOGLE_SIGN_IN_TECHNICAL_MARKERS = listOf(
+            "firebase console",
+            "google-services.json",
+            "missing activity",
+            "unexpected credential type",
+            "could not parse google token",
+            "could not get a token",
+            "google sign-in error",
+            "unknown google sign-in error",
+            "włącz google sign-in",
+            "nie udało się uruchomić logowania google"
+        )
     }
 }

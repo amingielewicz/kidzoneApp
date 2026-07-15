@@ -36,5 +36,8 @@ sealed class AuthException(val messageRes: Int) : Exception() {
     data class Network(val networkCause: Throwable) : AuthException(R.string.error_network)
 
     /** Konto użytkownika zostało zablokowane przez administratora. */
-    data class AccountBanned(val banMessage: String, val banReason: String) : AuthException(0)
+    data class AccountBanned(
+        val banMessage: String,
+        val banReason: String
+    ) : AuthException(R.string.error_account_banned)
 }
