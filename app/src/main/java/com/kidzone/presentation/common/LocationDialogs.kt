@@ -12,6 +12,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.kidzone.R
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Wyświetlanie systemowych dialogów zachęcających do włączenia usług lokalizacji.
+ */
 @Composable
 @Suppress("FunctionNaming")
 fun EnableLocationDialog(

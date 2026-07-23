@@ -1,25 +1,23 @@
 package com.kidzone.domain.model
 
 /**
+ * 📌 Przeznaczenie:
  * Domenowy model użytkownika kidZone.
- *
- * Model łączy publiczne dane profilu, liczniki aktywności oraz pola potrzebne do zarządzania stanem
- * konta. Nie wszystkie właściwości powinny być przechowywane w publicznym dokumencie Firestore;
- * prywatne dane muszą być mapowane zgodnie z aktualnym schematem bezpieczeństwa.
+ * Łączy publiczne dane profilu, statystyki aktywności oraz stan konta (blokady).
  *
  * @property id identyfikator użytkownika zgodny z Firebase Auth UID.
  * @property name publiczna nazwa wyświetlana w aplikacji.
- * @property email adres e-mail; pole prywatne, nieprzeznaczone do publicznego profilu.
+ * @property email adres e-mail (pole prywatne).
  * @property firstName opcjonalne imię.
  * @property lastName opcjonalne nazwisko.
  * @property avatarUrl URL aktualnego avatara albo `null`.
- * @property placesAddedCount zmaterializowana liczba dodanych miejsc.
- * @property reviewsCount zmaterializowana liczba opinii.
+ * @property placesAddedCount liczba dodanych miejsc (materialized counter).
+ * @property reviewsCount liczba opinii (materialized counter).
  * @property createdAtMillis czas utworzenia konta.
- * @property nameLowercase znormalizowana nazwa używana do wyszukiwania i sortowania.
+ * @property nameLowercase znormalizowana nazwa do wyszukiwania i sortowania.
  * @property badgeEarnedAt mapa nazw odznak do czasu ich pierwszego zdobycia.
- * @property bannedUntilMillis czas końca blokady, `-1` dla blokady bezterminowej, `0` dla braku blokady.
- * @property banReason administracyjny powód blokady przeznaczony do kontrolowanego komunikatu UI.
+ * @property bannedUntilMillis czas końca blokady (-1 = permanentna, 0 = brak).
+ * @property banReason administracyjny powód blokady.
  * @property emailNotificationsEnabled prywatna zgoda na powiadomienia e-mail.
  */
 data class User(

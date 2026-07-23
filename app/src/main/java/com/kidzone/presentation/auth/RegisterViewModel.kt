@@ -4,10 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.R
 import com.kidzone.domain.repository.AuthRepository
-import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.PasswordPolicy
 import com.kidzone.utils.UiText
+import com.kidzone.utils.toAuthErrorMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,12 +17,41 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Zarządza formularzem rejestracji konta e-mail/hasło.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie formularzem rejestracji nowego konta użytkownika.
+ * - Lokalna walidacja danych (format e-mail, siła hasła, unikalność nazwy).
+ * - Mapowanie błędów rejestracji na bezpieczne komunikaty UI.
  *
- * ViewModel wykonuje lokalną walidację nazwy, adresu e-mail i hasła, uruchamia proces rejestracji
- * przez [AuthRepository] oraz mapuje błędy domenowe na bezpieczne komunikaty UI. Po poprawnym
- * utworzeniu konta kończy tymczasową sesję, aby użytkownik mógł przejść przez wymagany proces
- * weryfikacji e-mail przed pierwszym logowaniem.
+ * 🚫 Poza zakresem:
+ * - Brak zarządzania sesją (sesja jest kończona zaraz po rejestracji).
+ * - Brak retry logiki dla operacji sieciowych.
+ * - Brak decyzji o kolejce offline.
+ *
+ * 📥 Wejście:
+ * - Dane wejściowe od użytkownika (nazwa, email, hasło).
+ * - Akcja zatwierdzenia formularza.
+ *
+ * 📤 Wyjście:
+ * - Stan ekranu rejestracji ([UiState]).
+ * - Status pomyślnej rejestracji ([UiState.isRegistered]).
+ *
+ * ✅ Gwarancje:
+ * - Wymuszenie wylogowania po rejestracji (wymuszona weryfikacja e-mail).
+ * - Brak logowania wrażliwych danych użytkownika.
+ *
+ * 🔌 Offline:
+ * - Nie wspiera tworzenia konta w trybie offline.
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla operacji I/O i sieciowych.
+ * - Brak blokujących operacji na wątku Main.
+ *
+ * 🧪 Testowalność:
+ * - Pełne DI.
+ * - Deterministyczne mapowanie walidacji na stan błędu.
+ *
+ * 🧼 Lifecycle:
+ * - Kończenie sesji tymczasowej po pomyślnej rejestracji.
  */
 @HiltViewModel
 class RegisterViewModel @Inject constructor(
@@ -147,16 +176,11 @@ class RegisterViewModel @Inject constructor(
                     )
                     is OpResult.Failure -> it.copy(
                         isLoading = false,
-                        errorMessage = mapError(result.error)
+                        errorMessage = result.error.toAuthErrorMessage(R.string.error_unknown)
                     )
                 }
             }
         }
     }
 
-    private fun mapError(throwable: Throwable): UiText = when (throwable) {
-        is AuthException.Network -> UiText.StringResource(R.string.error_network)
-        is AuthException -> UiText.StringResource(throwable.messageRes)
-        else -> UiText.StringResource(R.string.error_unknown)
-    }
 }

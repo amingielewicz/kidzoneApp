@@ -22,6 +22,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Prezentacja spójnego wizualnie stanu braku danych (Empty State) w całej aplikacji.
+ * - Udostępnianie opcjonalnego przycisku akcji (np. "Spróbuj ponownie").
+ */
 @Suppress("FunctionNaming")
 @Composable
 fun EmptyState(

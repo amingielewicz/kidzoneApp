@@ -17,11 +17,13 @@ import kotlinx.coroutines.SupervisorJob
 import javax.inject.Singleton
 
 /**
- * Hilt module dostarczający Room database i DAO.
+ * 🎯 Odpowiedzialności:
+ * - Dostarczanie instancji bazy danych Room ([KidZoneDatabase]) i jej obiektów DAO.
+ * - Konfiguracja globalnego [ApplicationScope] dla operacji asynchronicznych.
  *
- * `fallbackToDestructiveMigration()` – cache można bezpiecznie odbudować
- * z Firestore, więc przy zmianie schematu po prostu czyścimy bazę zamiast
- * pisać migracje (upraszcza development w fazie MVP).
+ * ✅ Gwarancje:
+ * - Singletony dla wszystkich obiektów dostępu do danych.
+ * - Bezpieczne czyszczenie bazy przy zmianach schematu (Destructive Migration).
  */
 @Module
 @InstallIn(SingletonComponent::class)

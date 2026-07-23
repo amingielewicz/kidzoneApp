@@ -8,11 +8,28 @@ import com.kidzone.utils.OpResult
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Kontrakt operacji na miejscach.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie cyklem życia i widocznością miejsc przyjaznych dzieciom.
+ * - Koordynacja synchronizacji między Firestore a lokalnym cache Room.
+ * - Obsługa geo-zapytań (bliskość, viewport mapy).
  *
- * Implementacja odpowiada za komunikację z backendem i cache, mapowanie błędów oraz utrzymanie
- * spójności danych. UI może ograniczać akcje właścicielskie, ale ostateczna autoryzacja musi być
- * egzekwowana przez backend i reguły bezpieczeństwa.
+ * 🔌 Strategia Cache:
+ * - Single Source of Truth: Wszystkie obserwowane dane (Flow) pochodzą z Room.
+ * - Room jest aktualizowany reaktywnie przez listenery Firestore w tle.
+ *
+ * 🛡️ Autoryzacja i Bezpieczeństwo:
+ * - Odczyt publiczny dostępny dla wszystkich.
+ * - Akcje modyfikujące (add/update/delete) wymagają autoryzacji [AuthRepository].
+ *
+ * ✅ Gwarancje spójności:
+ * - Zmiany liczników ocen wykonywane atomowo na backendzie.
+ * - Synchronizacja zdjęć (URL + Autor + Hash) jako jedna operacja.
+ *
+ * 📤 Mapowanie błędów:
+ * - Techniczne błędy Firestore mapowane na [OpResult] z czytelnym kontekstem.
+ *
+ * 🧵 Threading:
+ * - Wszystkie implementacje muszą być bezpieczne do wywołania z dowolnego wątku (Dispatcher.IO).
  */
 interface PlaceRepository {
 
@@ -174,13 +191,19 @@ interface PlaceRepository {
     ): OpResult<Unit>
 
     /**
-     * Dodaje URL zdjęcia do miejsca i zapisuje autora uploadu.
+     * Dodaje URL zdjęcia do miejsca wraz z hashem MD5 dla deduplikacji.
      *
      * @param placeId identyfikator miejsca.
      * @param photoUrl URL pliku po udanym uploadzie.
      * @param uploadedByUserId identyfikator autora zdjęcia.
+     * @param hash hash MD5 zawartości zdjęcia.
      */
-    suspend fun addPhotoUrl(placeId: String, photoUrl: String, uploadedByUserId: String): OpResult<Unit>
+    suspend fun addPhotoWithHash(
+        placeId: String,
+        photoUrl: String,
+        uploadedByUserId: String,
+        hash: String
+    ): OpResult<Unit>
 
     /**
      * Usuwa URL zdjęcia z miejsca.

@@ -45,6 +45,7 @@ import com.kidzone.R
 import com.kidzone.data.local.KidZoneDatabase
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.presentation.common.isNewWithoutReviews
+import com.kidzone.utils.DistanceUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -57,10 +58,22 @@ private val WidgetRowBackground = ColorProvider(Color(0x33FFFFFF))
 private val WidgetNewBackground = ColorProvider(Color(0xFFE3F2FD))
 private val WidgetNewText = ColorProvider(Color(0xFF0D47A1))
 private const val MAX_WIDGET_PLACES = 50
-private const val VERY_CLOSE_DISTANCE_METERS = 50
-private const val METERS_PER_KILOMETER = 1000
 private const val ONE_MINUTE_MILLIS = 60_000L
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Wyświetlanie listy najbliższych miejsc przyjaznych dzieciom bezpośrednio na ekranie głównym systemu.
+ * - Udostępnianie statusu świeżości lokalizacji (stale location indicator).
+ * - Szybka nawigacja (Deep Linking) do szczegółów wybranych miejsc.
+ *
+ * 🛡️ Bezpieczeństwo i Prywatność:
+ * - Wykorzystuje przybliżoną lokalizację zapisaną w SharedPreferences.
+ * - Nie pobiera lokalizacji w tle (tylko odczytuje stan z apki głównej).
+ *
+ * ⚡ Wydajność i Zasoby:
+ * - Odczyt danych z cache Room (brak zapytań sieciowych z poziomu widgetu).
+ * - Ograniczenie liczby wyświetlanych elementów do [MAX_WIDGET_PLACES] dla oszczędności RAM.
+ */
 class NearbyPlacesWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
@@ -80,6 +93,41 @@ class NearbyPlacesWidget : GlanceAppWidget() {
     }
 
     private fun loadWidgetState(context: Context): WidgetState {
+        val allPlaces = loadPlacesFromCache(context)
+
+        val prefs = context.getSharedPreferences(LOCATION_PREFS, Context.MODE_PRIVATE)
+        val userLat = prefs.getFloat(KEY_LAST_LAT, 0f).toDouble()
+        val userLng = prefs.getFloat(KEY_LAST_LNG, 0f).toDouble()
+
+        if (userLat == 0.0 && userLng == 0.0) {
+            return WidgetState(
+                places = allPlaces
+                    .sortedByDescending { it.averageRating }
+                    .take(MAX_WIDGET_PLACES)
+                    .map { it.copy(distanceMeters = null) },
+                staleLocationAgeMinutes = null
+            )
+        }
+
+        val locationTimestampMillis = prefs.getLong(KEY_LAST_LOCATION_TIME, 0L)
+        val staleLocationAgeMinutes = locationTimestampMillis
+            .takeIf { it > 0L }
+            ?.let { ((System.currentTimeMillis() - it) / ONE_MINUTE_MILLIS).toInt().coerceAtLeast(0) }
+
+        return WidgetState(
+            places = allPlaces
+                .map { place ->
+                    val results = FloatArray(1)
+                    Location.distanceBetween(userLat, userLng, place.latitude, place.longitude, results)
+                    place.copy(distanceMeters = results[0].toInt())
+                }
+                .sortedBy { it.distanceMeters }
+                .take(MAX_WIDGET_PLACES),
+            staleLocationAgeMinutes = staleLocationAgeMinutes
+        )
+    }
+
+    private fun loadPlacesFromCache(context: Context): List<WidgetPlace> {
         val db = Room.databaseBuilder(
             context,
             KidZoneDatabase::class.java,
@@ -114,37 +162,7 @@ class NearbyPlacesWidget : GlanceAppWidget() {
         }.getOrElse { emptyList() }
 
         db.close()
-
-        val prefs = context.getSharedPreferences(LOCATION_PREFS, Context.MODE_PRIVATE)
-        val userLat = prefs.getFloat(KEY_LAST_LAT, 0f).toDouble()
-        val userLng = prefs.getFloat(KEY_LAST_LNG, 0f).toDouble()
-
-        if (userLat == 0.0 && userLng == 0.0) {
-            return WidgetState(
-                places = allPlaces
-                    .sortedByDescending { it.averageRating }
-                    .take(MAX_WIDGET_PLACES)
-                    .map { it.copy(distanceMeters = null) },
-                staleLocationAgeMinutes = null
-            )
-        }
-
-        val locationTimestampMillis = prefs.getLong(KEY_LAST_LOCATION_TIME, 0L)
-        val staleLocationAgeMinutes = locationTimestampMillis
-            .takeIf { it > 0L }
-            ?.let { ((System.currentTimeMillis() - it) / ONE_MINUTE_MILLIS).toInt().coerceAtLeast(0) }
-
-        return WidgetState(
-            places = allPlaces
-                .map { place ->
-                    val results = FloatArray(1)
-                    Location.distanceBetween(userLat, userLng, place.latitude, place.longitude, results)
-                    place.copy(distanceMeters = results[0].toInt())
-                }
-                .sortedBy { it.distanceMeters }
-                .take(MAX_WIDGET_PLACES),
-            staleLocationAgeMinutes = staleLocationAgeMinutes
-        )
+        return allPlaces
     }
 
     companion object {
@@ -375,11 +393,7 @@ private fun RatingRow(
 private fun String.withStaleAge(context: Context, staleLocationAgeMinutes: Int?): String {
     if (isBlank()) return this
     val ageText = staleLocationAgeMinutes?.let {
-        if (it <= 1) {
-            context.getString(R.string.stale_age_one_minute)
-        } else {
-            context.getString(R.string.stale_age_minutes, it)
-        }
+        DistanceUtils.formatStaleAge(context, it)
     }
     return ageText?.let { "$this ($it)" } ?: this
 }
@@ -388,11 +402,7 @@ private val WidgetPlace.stableItemId: Long
     get() = id.hashCode().toLong().let { if (it > 0) it else -it + 1L }
 
 private fun WidgetPlace.distanceText(context: Context): String = distanceMeters?.let { meters ->
-    when {
-        meters <= VERY_CLOSE_DISTANCE_METERS -> context.getString(R.string.very_close_distance)
-        meters < METERS_PER_KILOMETER -> context.getString(R.string.distance_m, meters)
-        else -> context.getString(R.string.distance_km, meters / METERS_PER_KILOMETER.toDouble())
-    }
+    DistanceUtils.formatDistanceMeters(context, meters)
 }.orEmpty()
 
 private fun WidgetPlace.detailsIntent(context: Context): Intent =

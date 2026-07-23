@@ -18,11 +18,39 @@ import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 /**
- * Udostępnia miejsca należące do aktualnie zalogowanego użytkownika.
+ * 🎯 Odpowiedzialności:
+ * - Udostępnianie listy miejsc należących wyłącznie do zalogowanego użytkownika.
+ * - Reagowanie na zmiany w sesji użytkownika (anulowanie strumieni po wylogowaniu).
+ * - Zarządzanie stanami ładowania, sukcesu i błędu dla widoku "Moje miejsca".
  *
- * Zmiana stanu sesji przełącza aktywny strumień przez `flatMapLatest`. Po wylogowaniu, banie albo
- * usunięciu konta listener poprzedniego użytkownika jest anulowany i emitowana jest pusta lista,
- * dzięki czemu prywatne dane nie pozostają widoczne podczas zmiany graphu nawigacji.
+ * 🚫 Poza zakresem:
+ * - Brak decyzji o offline queue.
+ * - Brak retry logiki dla operacji sieciowych.
+ * - Brak bezpośredniego zarządzania sesją (delegowane do [AuthRepository]).
+ *
+ * 📥 Wejście:
+ * - Strumień aktualnego użytkownika z [AuthRepository].
+ *
+ * 📤 Wyjście:
+ * - Stan ekranu "Moje miejsca" ([UiState]).
+ *
+ * ✅ Gwarancje:
+ * - Automatyczne czyszczenie danych prywatnych z UI po zakończeniu sesji.
+ * - Spójność danych dzięki reaktywnemu połączeniu z bazą danych (Firestore listeners).
+ *
+ * 🔌 Offline:
+ * - Wspiera odczyt własnych miejsc z cache lokalnego Room.
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla reaktywnych strumieni danych.
+ * - Brak blokujących operacji na wątku Main.
+ *
+ * 🧪 Testowalność:
+ * - Pełne DI.
+ * - Deterministyczne mapowanie stanów sesji na zawartość listy miejsc.
+ *
+ * 🧼 Lifecycle:
+ * - Automatyczne zamykanie listenerów Firestore przy zmianie użytkownika.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel

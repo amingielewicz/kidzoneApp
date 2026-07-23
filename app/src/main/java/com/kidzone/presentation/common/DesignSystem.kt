@@ -11,6 +11,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Przechowywanie stałych wartości systemu projektowego (Design System) aplikacji kidZone.
+ * - Definiowanie promieni zaokrągleń (Radii), odstępów (Spacing) oraz wyniesień (Elevation).
+ * - Udostępnianie bazowych komponentów wizualnych, takich jak [KidZoneCard].
+ */
 object KidZoneRadii {
     val Card = 8.dp
     val Control = 8.dp

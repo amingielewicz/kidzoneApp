@@ -90,6 +90,9 @@ android {
             )
         }
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+
+        // Dane administratora ładowane z local.properties (ADMIN_NAME)
+        buildConfigField("String", "ADMIN_NAME", "\"${resolveSecret("ADMIN_NAME")}\"")
     }
 
     /**

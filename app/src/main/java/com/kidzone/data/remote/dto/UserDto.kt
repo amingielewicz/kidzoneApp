@@ -3,16 +3,12 @@ package com.kidzone.data.remote.dto
 import com.kidzone.domain.model.User
 
 /**
+ * ⚙️ Techniczne:
  * Reprezentacja [User] zapisywana w kolekcji `users` w Firestore.
  *
- * Pusty konstruktor jest wymagany przez Firestore do deserializacji.
- *
- * Wszystkie pola mają domyślne wartości – dzięki temu dokumenty zapisane
- * w starszej wersji schematu nadal się poprawnie deserializują.
- *
- * Prywatne pola (`email`, `firstName`, `lastName`,
- * `emailNotificationsEnabled`) zostają tu tylko jako legacy fallback. Nowe
- * zapisy powinny trafiać do `users/{uid}/private/profile`.
+ * @property nameLowercase Wersja małych liter [name] dla zapytań case-insensitive.
+ * @property badgeEarnedAt Mapa nazw odznak na czas ich zdobycia (timestamp).
+ * @property emailNotificationsEnabled Flaga statusu powiadomień e-mail (legacy fallback).
  */
 data class UserDto(
     val id: String = "",

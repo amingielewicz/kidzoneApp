@@ -7,6 +7,7 @@ import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.UiText
+import com.kidzone.utils.toAuthErrorMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,11 +17,41 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Zarządza formularzem logowania, resetem hasła i ponowną wysyłką weryfikacji e-mail.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie formularzem logowania, resetem hasła i ponowną wysyłką weryfikacji.
+ * - Mapowanie błędów autoryzacji na bezpieczne komunikaty UI.
+ * - Rozróżnianie stanów konta (niezweryfikowane, zablokowane).
  *
- * ViewModel obsługuje logowanie e-mail/hasło i Google, mapuje błędy domenowe na bezpieczne
- * komunikaty UI oraz rozróżnia brak weryfikacji e-mail od blokady konta. Nie przechowuje haseł poza
- * bieżącym stanem formularza i nie loguje tokenów ani danych uwierzytelniających.
+ * 🚫 Poza zakresem:
+ * - Brak bezpośredniego zarządzania sesją (delegowane do [AuthRepository]).
+ * - Brak retry logiki dla operacji sieciowych.
+ * - Brak przechowywania haseł w pamięci trwałej.
+ *
+ * 📥 Wejście:
+ * - Interakcje użytkownika z polami formularza (email, hasło).
+ * - Żądania logowania (E-mail/Password, Google).
+ *
+ * 📤 Wyjście:
+ * - Stan ekranu logowania ([UiState]).
+ * - Flaga sukcesu zalogowania ([isSignedIn]).
+ *
+ * ✅ Gwarancje:
+ * - Brak logowania wrażliwych danych (hasła, tokeny).
+ * - Bezpieczne mapowanie technicznych błędów Firebase na zrozumiały język.
+ *
+ * 🔌 Offline:
+ * - Nie wspiera operacji w trybie offline (wymagana łączność z serwerami Auth).
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla wszystkich operacji autoryzacji.
+ * - Brak blokujących operacji na wątku Main.
+ *
+ * 🧪 Testowalność:
+ * - Pełne DI (mockowanie repozytorium autoryzacji).
+ * - Deterministyczne zmiany stanu w odpowiedzi na błędy i sukcesy.
+ *
+ * 🧼 Lifecycle:
+ * - Operacje wiązane z viewModelScope (anulowane automatycznie).
  */
 @HiltViewModel
 class LoginViewModel @Inject constructor(
@@ -99,7 +130,7 @@ class LoginViewModel @Inject constructor(
                         val isEmailNotVerified = result.error is AuthException.EmailNotVerified
                         it.copy(
                             isLoading = false,
-                            message = mapError(result.error),
+                            message = result.error.toAuthErrorMessage(R.string.error_unknown),
                             isMessageError = true,
                             showResendVerification = isEmailNotVerified,
                             banMessage = if (isBanned) (result.error as AuthException.AccountBanned).banMessage else null,
@@ -127,7 +158,7 @@ class LoginViewModel @Inject constructor(
                         val isBanned = result.error is AuthException.AccountBanned
                         it.copy(
                             isLoading = false,
-                            message = mapError(result.error),
+                            message = result.error.toAuthErrorMessage(R.string.error_unknown),
                             isMessageError = true,
                             banMessage = if (isBanned) (result.error as AuthException.AccountBanned).banMessage else null,
                             banReason = if (isBanned) (result.error as AuthException.AccountBanned).banReason else null
@@ -187,19 +218,12 @@ class LoginViewModel @Inject constructor(
                     )
                     is OpResult.Failure -> it.copy(
                         isLoading = false,
-                        message = mapError(result.error),
+                        message = result.error.toAuthErrorMessage(R.string.error_unknown),
                         isMessageError = true
                     )
                 }
             }
         }
-    }
-
-    private fun mapError(throwable: Throwable): UiText = when (throwable) {
-        is AuthException.AccountBanned -> UiText.DynamicString(throwable.banMessage)
-        is AuthException.Network -> UiText.StringResource(R.string.error_no_internet)
-        is AuthException -> UiText.StringResource(throwable.messageRes)
-        else -> UiText.StringResource(R.string.error_unknown)
     }
 
     /**

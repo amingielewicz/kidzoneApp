@@ -16,11 +16,28 @@ import kotlinx.coroutines.flow.Flow
 enum class SignInProvider { EMAIL_PASSWORD, GOOGLE, UNKNOWN }
 
 /**
- * Kontrakt uwierzytelniania i zarządzania kontem użytkownika.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie cyklem życia sesji użytkownika (Login, Register, Logout, Delete).
+ * - Synchronizacja danych profilowych między Firebase Auth a dokumentem Firestore.
+ * - Zarządzanie odznakami i uprawnieniami (rolami) użytkownika.
  *
- * Obejmuje logowanie e-mail/hasło i Google, obserwację sesji, publiczne dane profilu,
- * aktualizację konta oraz trwałe usuwanie danych. Implementacja mapuje błędy Firebase do
- * [OpResult] i nie powinna przekazywać surowych komunikatów backendu do UI.
+ * 🔌 Strategia Cache:
+ * - Sesja uwierzytelniania zarządzana przez Firebase SDK (trwała między restartami).
+ * - Dokument profilu użytkownika (stats, badges) cache'owany lokalnie w Room.
+ *
+ * 🛡️ Autoryzacja i Bezpieczeństwo:
+ * - Metody zarządzania kontem (zmiana email/hasła, usunięcie) wymagają świeżej reautoryzacji.
+ * - Brak logowania haseł, tokenów i danych PII w dziennikach systemowych.
+ *
+ * ✅ Gwarancje spójności:
+ * - Idempotentność zapisu odznak (first-write-wins).
+ * - Atomowość wylogowania: jednoczesne czyszczenie lokalnego cache, sesji i tokenów FCM.
+ *
+ * 📤 Mapowanie błędów:
+ * - Kody błędów Firebase (np. `weak-password`, `invalid-credential`) mapowane na [AuthException] i [OpResult].
+ *
+ * 🧵 Threading:
+ * - Bezpieczne wywołania z dowolnego wątku. Strumień [currentUser] emituje zmiany natychmiast po zmianie stanu w SDK.
  */
 interface AuthRepository {
 

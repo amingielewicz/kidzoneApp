@@ -40,6 +40,22 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 
+/**
+ * 🧪 Cel testu:
+ * - Weryfikacja zarządzania stanem profilu użytkownika przez [ProfileViewModel].
+ * - Sprawdzenie logiki odznak, preferencji oraz akcji na koncie (wylogowanie, usuwanie).
+ *
+ * 🛠️ Środowisko:
+ * - MockK do symulacji zachowania warstwy domeny i usług Firebase.
+ * - [MainDispatcherRule] dla synchronicznego wykonania operacji asynchronicznych.
+ *
+ * 🔍 Scenariusze:
+ * - Ładowanie i odświeżanie profilu (w tym stan pusty).
+ * - Zarządzanie odznakami (wykrywanie nowych, oznaczanie jako widoczne).
+ * - Edycja danych profilowych i zmiana języka.
+ * - Akcje krytyczne: zmiana hasła, zmiana e-maila i usuwanie konta.
+ * - Proces wylogowania (natychmiastowe czyszczenie sesji).
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProfileViewModelTest {
 

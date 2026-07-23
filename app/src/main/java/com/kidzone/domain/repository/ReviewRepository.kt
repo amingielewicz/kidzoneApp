@@ -5,11 +5,29 @@ import com.kidzone.utils.OpResult
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Kontrakt dostępu do opinii o miejscach.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie opiniami o miejscach (dodawanie, edycja, usuwanie).
+ * - Obsługa zgłoszeń (spam, naruszenia).
+ * - Koordynacja agregatów ocen na poziomie miejsca.
  *
- * Implementacja odpowiada za synchronizację danych z backendem, aktualizację lokalnego cache oraz
- * utrzymanie spójności agregatów miejsca. Warstwa prezentacji nie powinna zależeć od szczegółów
- * Firestore ani Room.
+ * 🔌 Strategia Cache:
+ * - Single Source of Truth (Room) dla wyświetlanych list opinii.
+ * - Aktywne nasłuchiwanie (Snapshot Listeners) dla aktualnego miejsca.
+ *
+ * 🛡️ Autoryzacja i Bezpieczeństwo:
+ * - Odczyt opinii jest publiczny.
+ * - Tworzenie/edycja wymaga zalogowanego użytkownika.
+ * - Edycja i usuwanie dozwolone wyłącznie dla autora opinii lub administratora.
+ *
+ * ✅ Gwarancje spójności:
+ * - Atomowe przeliczanie średniej oceny miejsca przy dodawaniu/usuwaniu opinii (backend-side).
+ * - Automatyczne ukrywanie opinii zgłoszonych jako spam w strumieniu publicznym.
+ *
+ * 📤 Mapowanie błędów:
+ * - Błędy sieci i uprawnień mapowane na [OpResult].
+ *
+ * 🧵 Threading:
+ * - Bezpieczne do wywołania z dowolnego wątku.
  */
 interface ReviewRepository {
 

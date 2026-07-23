@@ -29,11 +29,39 @@ private const val MIN_DISPLAY_MS = 800L
 private const val AUTH_CHECK_TIMEOUT_MS = 5_000L
 
 /**
- * Ustala docelowy graph nawigacji po uruchomieniu aplikacji.
+ * 🎯 Odpowiedzialności:
+ * - Rozstrzyganie docelowego celu nawigacji po uruchomieniu aplikacji.
+ * - Koordynacja czasu prezentacji ekranu powitalnego (Splash).
+ * - Zarządzanie timeoutem przy braku odpowiedzi z systemu autoryzacji.
  *
- * ViewModel czeka na pierwszy element z [AuthRepository.currentUser], respektuje minimalny czas
- * prezentacji splasha i stosuje timeout dla niedostępnego źródła sesji. Nie wykonuje nawigacji
- * bezpośrednio; warstwa UI obserwuje [state] i reaguje na zmianę.
+ * 🚫 Poza zakresem:
+ * - Brak decyzji o offline queue.
+ * - Brak retry logiki dla autoryzacji.
+ * - Brak bezpośredniej nawigacji (decyduje UI na podstawie stanu).
+ *
+ * 📥 Wejście:
+ * - Strumień aktualnego użytkownika z [AuthRepository].
+ *
+ * 📤 Wyjście:
+ * - Stan rozstrzygnięcia sesji ([State]).
+ *
+ * ✅ Gwarancje:
+ * - Minimalny czas wyświetlania splasha ([MIN_DISPLAY_MS]), aby uniknąć mignięć UI.
+ * - Przejście do stanu wylogowanego po przekroczeniu [AUTH_CHECK_TIMEOUT_MS].
+ *
+ * 🔌 Offline:
+ * - Wspiera odczyt sesji z cache Firebase Auth.
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla operacji asynchronicznych i opóźnień.
+ * - Brak blokujących operacji na wątku Main.
+ *
+ * 🧪 Testowalność:
+ * - Pełne DI.
+ * - Deterministyczne rozstrzyganie celu nawigacji na podstawie mockowanych danych.
+ *
+ * 🧼 Lifecycle:
+ * - Krótkotrwały cykl życia ograniczony do czasu startu aplikacji.
  */
 @HiltViewModel
 class SplashViewModel @Inject constructor(

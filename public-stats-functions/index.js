@@ -18,6 +18,13 @@ async function countAuthUsers() {
   return total;
 }
 
+/**
+ * 🎯 Cel: Dostarczanie zagregowanych statystyk publicznych (użytkownicy, miejsca, opinie).
+ * ⚡ Wyzwalacz (Trigger): Request HTTP (GET).
+ * ✅ Efekty uboczne: Brak modyfikacji danych.
+ * 🛡️ Bezpieczeństwo: Publicznie dostępny endpoint (bez Auth). Brak PII.
+ * ⚙️ Techniczne: Region europe-central2, Cache 5 min (s-maxage=300).
+ */
 exports.publicStats = onRequest(
   {
     region: "europe-central2",

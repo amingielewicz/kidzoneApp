@@ -15,6 +15,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Renderowanie ujednoliconych chipów filtrujących (Filter Chips) zgodnie z Material Design 3.
+ * - Obsługa spójnej kolorystyki dla stanów aktywnych i nieaktywnych.
+ */
 @Composable
 fun KidZoneFilterChip(
     selected: Boolean,

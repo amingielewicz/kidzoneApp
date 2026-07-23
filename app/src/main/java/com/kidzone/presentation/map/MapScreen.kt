@@ -110,6 +110,7 @@ import com.kidzone.presentation.common.RatingIcon
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.common.requestLocationPermissionOrOpenSettings
+import com.kidzone.utils.NumberUtils
 import com.kidzone.presentation.place.add.fetchCurrentLocation
 import com.kidzone.presentation.place.add.hasLocationPermission
 import com.kidzone.presentation.place.add.isLocationServiceEnabled
@@ -130,8 +131,6 @@ private const val SPIDERFY_RADIUS_DEGREES = 0.00012
 private const val SPIDERFY_RADIUS_STEP_DEGREES = 0.000015
 private const val SPIDERFY_MAX_EXTRA = 8
 private val MAP_TOP_OVERLAY_SPACING = 8.dp
-private const val LOCATION_PERMISSION_PREFS = "location_permission_preferences"
-private const val LOCATION_PERMISSION_REQUESTED_KEY = "fine_location_requested"
 
 @SuppressLint("MissingPermission")
 @OptIn(
@@ -818,7 +817,7 @@ private fun PlacePreviewContent(
                     )
                     Spacer(Modifier.width(2.dp))
                     Text(
-                        text = "%.1f".format(place.averageRating),
+                        text = NumberUtils.formatRating(place.averageRating),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium
                     )

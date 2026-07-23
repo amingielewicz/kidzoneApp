@@ -11,15 +11,20 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Manages in-app review prompts via Google Play Review API.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie logiką wyzwalania próśb o ocenę aplikacji (Google Play Review API).
+ * - Śledzenie aktywności użytkownika (liczba dodanych miejsc/opinii).
  *
- * Prompt logic:
- *  - Triggered after the user's 3rd added place OR 3rd submitted review.
- *  - Each trigger type fires at most once (won't nag on 4th, 5th, etc.).
- *  - Google Play controls actual display frequency – we only request;
- *    the API may silently no-op if quota is exceeded.
+ * 🛡️ Bezpieczeństwo i Prywatność:
+ * - Przechowuje wyłącznie anonimowe liczniki akcji w lokalnych ustawieniach (SharedPreferences).
  *
- * Counts are persisted in SharedPreferences so they survive process death.
+ * ⚡ Wydajność i Zasoby:
+ * - Lekkie operacje na plikach ustawień.
+ * - Wywołania API Google Play są asynchroniczne i nie blokują interfejsu.
+ *
+ * ✅ Gwarancje:
+ * - Ochrona przed spamowaniem użytkownika: prośba wyświetla się maksymalnie raz na dany typ wyzwalacza.
+ * - Obsługa błędów (silent fallback): awaria API nie przerywa pracy aplikacji.
  */
 @Singleton
 class InAppReviewManager @Inject constructor(

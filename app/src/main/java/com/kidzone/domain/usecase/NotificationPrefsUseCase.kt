@@ -9,11 +9,14 @@ import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 /**
- * Ładuje i zapisuje preferencje powiadomień aktualnego użytkownika.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie preferencjami powiadomień użytkownika (kategorie + zgoda e-mail).
+ * - Koordynacja zapisu między publicznym dokumentem użytkownika a prywatnym profilem.
+ * - Ukrywanie szczegółów technicznych Firestore (Batch, Merge) przed warstwą UI.
  *
- * Publiczne ustawienia kategorii powiadomień są przechowywane w dokumencie użytkownika, natomiast
- * prywatna zgoda na wiadomości e-mail trafia do `users/{uid}/private/profile`. Use case ukrywa
- * szczegóły Firestore przed ViewModelem i stosuje bezpieczne wartości domyślne przy braku pól.
+ * ✅ Gwarancje:
+ * - Atomowość zapisu (Batch): albo oba dokumenty zostaną zaktualizowane, albo żaden.
+ * - Bezpieczne wartości domyślne przy braku danych w bazie.
  */
 class NotificationPrefsUseCase @Inject constructor(
     private val authRepository: AuthRepository,

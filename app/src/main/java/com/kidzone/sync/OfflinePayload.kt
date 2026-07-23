@@ -55,7 +55,7 @@ object OfflinePayload {
         val amenities: List<String>,
         val photoUrls: List<String>,
         val photoUploadedBy: Map<String, String>,
-        val photoHashes: List<String>,
+        val photoHashes: Map<String, String>,
         val createdAtMillis: Long,
         val updatedAtMillis: Long
     )
@@ -102,13 +102,13 @@ object OfflinePayload {
             ownerUserId = payload.ownerUserId,
             name = payload.name,
             description = payload.description,
-            category = PlaceCategory.valueOf(payload.category),
+            category = PlaceCategory.fromKey(payload.category),
             latitude = payload.latitude,
             longitude = payload.longitude,
             address = payload.address,
             averageRating = payload.averageRating,
             reviewsCount = payload.reviewsCount,
-            amenities = payload.amenities.map { Amenity.valueOf(it) }.toSet(),
+            amenities = payload.amenities.mapNotNull(Amenity.Companion::fromKey).toSet(),
             photoUrls = payload.photoUrls,
             photoUploadedBy = payload.photoUploadedBy,
             photoHashes = payload.photoHashes,
@@ -127,7 +127,9 @@ object OfflinePayload {
      * @property rating ocena liczbowa.
      * @property comment treść opinii.
      * @property photoUrls zdjęcia dołączone do opinii.
+     * @property photoHashes hashe zdjęć dla spójnej deduplikacji.
      * @property createdAtMillis czas utworzenia.
+     * @property updatedAtMillis czas ostatniej aktualizacji.
      */
     data class ReviewPayload(
         val id: String,
@@ -137,7 +139,9 @@ object OfflinePayload {
         val rating: Int,
         val comment: String,
         val photoUrls: List<String>,
-        val createdAtMillis: Long
+        val photoHashes: Map<String, String>,
+        val createdAtMillis: Long,
+        val updatedAtMillis: Long
     )
 
     /**
@@ -155,7 +159,9 @@ object OfflinePayload {
             rating = review.rating,
             comment = review.comment,
             photoUrls = review.photoUrls,
-            createdAtMillis = review.createdAtMillis
+            photoHashes = review.photoHashes,
+            createdAtMillis = review.createdAtMillis,
+            updatedAtMillis = review.updatedAtMillis
         )
         return gson.toJson(payload)
     }
@@ -176,7 +182,9 @@ object OfflinePayload {
             rating = payload.rating,
             comment = payload.comment,
             photoUrls = payload.photoUrls,
-            createdAtMillis = payload.createdAtMillis
+            photoHashes = payload.photoHashes,
+            createdAtMillis = payload.createdAtMillis,
+            updatedAtMillis = payload.updatedAtMillis
         )
     }
 

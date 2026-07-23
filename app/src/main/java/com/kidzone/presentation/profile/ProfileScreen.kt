@@ -110,14 +110,12 @@ import com.kidzone.presentation.common.shouldShowNotificationPrompt
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.RequiredFieldLabel
 import com.kidzone.presentation.common.rememberNetworkStatus
+import com.kidzone.utils.DateUtils
 import com.kidzone.utils.UiText
 import nl.dionsegijn.konfetti.compose.KonfettiView
 import nl.dionsegijn.konfetti.core.Party
 import nl.dionsegijn.konfetti.core.Position
 import nl.dionsegijn.konfetti.core.emitter.Emitter
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 private const val CONTACT_SUBJECT_MAX_LENGTH = 80
@@ -1087,7 +1085,7 @@ private fun AccountSecurityCard(
     }
 }
 
-@Suppress("FunctionNaming", "LongParameterList")
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 @Composable
 private fun SettingsCard(
     onTermsOfService: () -> Unit,
@@ -1619,8 +1617,7 @@ private fun SectionCard(
 
 
 private fun formatDate(millis: Long): String {
-    val formatter = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
-    return formatter.format(Date(millis))
+    return DateUtils.formatDate(millis)
 }
 
 @Suppress("FunctionNaming", "LongMethod")

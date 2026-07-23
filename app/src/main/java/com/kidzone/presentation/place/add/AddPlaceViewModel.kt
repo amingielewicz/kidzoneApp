@@ -14,6 +14,7 @@ import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.service.ImageCompressorPort
 import com.kidzone.navigation.Route
 import com.kidzone.review.InAppReviewManager
+import com.kidzone.utils.GeoUtils
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.PhotoUploader
 import com.kidzone.utils.TextNormalization
@@ -31,14 +32,42 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * ViewModel ekranu dodawania / edycji miejsca.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie stanem formularza dodawania i edycji miejsca.
+ * - Walidacja pól (nazwa, opis, adres, udogodnienia) przed zapisem.
+ * - Koordynacja kompresji i uploadu zdjęć.
  *
- * Działa w dwóch trybach:
- *  - **create** (placeId = null) – formularz pusty, `save()` wola
- *    `addPlace()`.
- *  - **edit** (placeId z nawigacji) – pre-filluje stan z `getPlace()` i
- *    `save()` woła `updatePlace()` zachowując immutowalne pola
- *    (id, ownerUserId, createdAtMillis, averageRating, reviewsCount).
+ * 🚫 Poza zakresem:
+ * - Brak decyzji o offline queue (obsługiwane przez Repository).
+ * - Brak retry logiki dla operacji sieciowych.
+ * - Brak zarządzania sesją użytkownika.
+ *
+ * 📥 Wejście:
+ * - [SavedStateHandle] z opcjonalnym ID edytowanego miejsca.
+ * - Interakcje użytkownika z polami formularza.
+ *
+ * 📤 Wyjście:
+ * - Stan formularza ([UiState]).
+ * - Status zapisu i ewentualne zdarzenia nawigacji.
+ *
+ * ✅ Gwarancje:
+ * - Zachowanie pól immutowalnych (id, ownerId, counters) przy edycji.
+ * - Normalizacja tekstu przed zapisem do bazy.
+ *
+ * 🔌 Offline:
+ * - Wspiera odczyt danych edytowanego miejsca z cache lokalnego.
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla wszystkich operacji asynchronicznych (zapis, upload).
+ * - Brak blokujących operacji na wątku Main.
+ *
+ * 🧪 Testowalność:
+ * - Pełne DI.
+ * - Brak zależności od singletonów.
+ * - Deterministyczność stanu formularza.
+ *
+ * 🧼 Lifecycle:
+ * - Pre-fillowanie stanu przy startu (tryb edycji) na podstawie SavedStateHandle.
  */
 @HiltViewModel
 class AddPlaceViewModel @Inject constructor(
@@ -311,10 +340,10 @@ class AddPlaceViewModel @Inject constructor(
                     is OpResult.Success -> result.data
                         .filter { it.id != _uiState.value.editingPlaceId } // nie pokazuj edytowanego
                         .map { place ->
-                            val distMeters = (haversineKm(
+                            val distMeters = GeoUtils.haversineMeters(
                                 latitude, longitude,
                                 place.latitude, place.longitude
-                            ) * 1000).toInt()
+                            )
                             NearbyPlace(
                                 id = place.id,
                                 name = place.name,
@@ -435,7 +464,7 @@ class AddPlaceViewModel @Inject constructor(
             val placeId = _uiState.value.editingPlaceId ?: return@launch
             try {
                 val place = (placeRepository.getPlace(placeId) as? OpResult.Success)?.data
-                val storedHashes = place?.photoHashes.orEmpty()
+                val storedHashes = place?.photoHashes.orEmpty().values
                 photoContentHashes.addAll(storedHashes)
                 persistHashes()
             } catch (_: Exception) { /* best-effort */ }
@@ -498,6 +527,7 @@ class AddPlaceViewModel @Inject constructor(
 
             // Upload nowych zdjęć (kompresja + Firebase Storage + dedup)
             val uploadedUrls = mutableListOf<String>()
+            val newUploadedHashes = mutableMapOf<String, String>()
             var duplicatesSkipped = 0
             if (state.photoUris.isNotEmpty()) {
                 _uiState.update { it.copy(isUploadingPhotos = true) }
@@ -523,6 +553,7 @@ class AddPlaceViewModel @Inject constructor(
                                 imageBytes = bytes
                             )
                             uploadedUrls.add(url)
+                            newUploadedHashes[url] = hash
                         } catch (e: Exception) {
                             _uiState.update {
                                 it.copy(
@@ -564,10 +595,14 @@ class AddPlaceViewModel @Inject constructor(
             // + dodajemy nowo-uploadowane URL-e z bieżącym userId
             val existingUploadedBy = editingOriginal?.photoUploadedBy.orEmpty()
             val newUploadedBy = uploadedUrls.associateWith { currentUser.id }
-            val allPhotoUploadedBy = existingUploadedBy + newUploadedBy
+            val allPhotoUploadedBy = (existingUploadedBy + newUploadedBy)
+                .filterKeys { it !in removedPhotoUrls }
 
-            // Persist all known hashes for future dedup (no more downloading images)
-            val allPhotoHashes = photoContentHashes.toList()
+            // Budujemy mapę photoHashes: zachowujemy istniejącą (edycja)
+            // + dodajemy nowo-uploadowane URL-e z ich MD5
+            val existingHashes = editingOriginal?.photoHashes.orEmpty()
+            val allPhotoHashes = (existingHashes + newUploadedHashes)
+                .filterKeys { it !in removedPhotoUrls }
 
             val result = if (state.isEditMode && editingOriginal != null) {
                 val original = editingOriginal!!
@@ -677,15 +712,3 @@ const val PLACE_NAME_MAX_LENGTH = 50
 
 /** Maksymalna długość opisu miejsca widoczna w formularzach i zapisie. */
 const val PLACE_DESCRIPTION_MAX_LENGTH = 500
-
-/** Odległość w km między dwoma punktami (formuła haversine). */
-private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-    val r = 6371.0
-    val dLat = Math.toRadians(lat2 - lat1)
-    val dLon = Math.toRadians(lon2 - lon1)
-    val a = kotlin.math.sin(dLat / 2).let { it * it } +
-        kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
-        kotlin.math.sin(dLon / 2).let { it * it }
-    val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
-    return r * c
-}

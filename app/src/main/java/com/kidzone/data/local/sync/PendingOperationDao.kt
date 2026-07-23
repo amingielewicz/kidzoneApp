@@ -7,59 +7,63 @@ import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 /**
- * DAO for the pending operations sync queue.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie cyklem życia operacji w kolejce synchronizacji (Sync Queue).
+ * - Obsługa stanów przejścia operacji: PENDING -> IN_PROGRESS -> FAILED/RESOLVED.
+ * - Utrzymywanie porządku FIFO (First-In-First-Out).
  *
- * Operations are processed FIFO (ordered by createdAtMillis).
- * Failed operations are retried with exponential backoff up to [MAX_RETRIES].
+ * ✅ Gwarancje:
+ * - Atomowość zmian stanu w obrębie tabeli `pending_operations`.
+ * - Automatyczny powrót operacji "utkniętych" (in_progress) do stanu pending po restarcie.
  */
 @Dao
 interface PendingOperationDao {
 
-    /** Enqueue a new operation. */
+    /** Dodaje operację do kolejki. */
     @Insert
     suspend fun enqueue(operation: PendingOperationEntity): Long
 
-    /** Get all pending operations ordered by creation time (FIFO). */
+    /** Pobiera wszystkie oczekujące operacje w porządku FIFO. */
     @Query("SELECT * FROM pending_operations WHERE status = 'pending' ORDER BY createdAtMillis ASC")
     suspend fun getPending(): List<PendingOperationEntity>
 
-    /** Get count of pending operations (for UI badge/indicator). */
+    /** Obserwuje liczbę oczekujących operacji (dla licznika w UI). */
     @Query("SELECT COUNT(*) FROM pending_operations WHERE status IN ('pending', 'failed')")
     fun observePendingCount(): Flow<Int>
 
-    /** Get pending count (one-shot). */
+    /** Pobiera liczbę oczekujących operacji (jednorazowo). */
     @Query("SELECT COUNT(*) FROM pending_operations WHERE status IN ('pending', 'failed')")
     suspend fun getPendingCount(): Int
 
-    /** Mark operation as in-progress. */
+    /** Oznacza operację jako "w toku". */
     @Query("UPDATE pending_operations SET status = 'in_progress' WHERE id = :id")
     suspend fun markInProgress(id: Long)
 
-    /** Mark operation as failed and increment retry count. */
+    /** Oznacza operację jako błąd i zwiększa licznik ponowień. */
     @Query("UPDATE pending_operations SET status = 'failed', retryCount = retryCount + 1 WHERE id = :id")
     suspend fun markFailed(id: Long)
 
-    /** Move to dead letter (permanently failed). */
+    /** Przenosi do dead letter (trwały błąd). */
     @Query("UPDATE pending_operations SET status = 'dead_letter' WHERE id = :id")
     suspend fun markDeadLetter(id: Long)
 
-    /** Remove successfully synced operation. */
+    /** Usuwa pomyślnie zsynchronizowaną operację. */
     @Query("DELETE FROM pending_operations WHERE id = :id")
     suspend fun delete(id: Long)
 
-    /** Get failed operations eligible for retry (retryCount < maxRetries). */
+    /** Pobiera operacje do ponowienia (licznik < limit). */
     @Query("SELECT * FROM pending_operations WHERE status = 'failed' AND retryCount < :maxRetries ORDER BY createdAtMillis ASC")
     suspend fun getRetryable(maxRetries: Int): List<PendingOperationEntity>
 
-    /** Clear all dead-letter operations (admin/debug action). */
+    /** Usuwa wszystkie operacje z dead-letter (akcja administratora). */
     @Query("DELETE FROM pending_operations WHERE status = 'dead_letter'")
     suspend fun clearDeadLetters()
 
-    /** Reset in-progress operations back to pending (app restart recovery). */
+    /** Resetuje operacje "utknięte" z powrotem do stanu oczekiwania (odzyskiwanie po awarii). */
     @Query("UPDATE pending_operations SET status = 'pending' WHERE status = 'in_progress'")
     suspend fun resetInProgress()
 
-    /** Get all operations (for debug/admin). */
+    /** Pobiera wszystkie operacje (cele diagnostyczne). */
     @Query("SELECT * FROM pending_operations ORDER BY createdAtMillis DESC")
     suspend fun getAll(): List<PendingOperationEntity>
 }

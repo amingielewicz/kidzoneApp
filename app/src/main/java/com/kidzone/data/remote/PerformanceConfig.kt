@@ -1,5 +1,14 @@
 package com.kidzone.data.remote
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Przechowywanie parametrów wpływających na wydajność i koszty (limits, radius).
+ * - Definiowanie bezpiecznych wartości domyślnych dla systemu.
+ *
+ * ⚙️ Techniczne:
+ * - Wartości są wstrzykiwane dynamicznie przez [RemoteConfigService].
+ * - Klucze mapują się 1:1 na parametry w Firebase Console.
+ */
 data class PerformanceConfig(
     val homeNearbyLimit: Int = HOME_NEARBY_LIMIT_DEFAULT,
     val homeTopPlacesLimit: Int = HOME_TOP_PLACES_LIMIT_DEFAULT,

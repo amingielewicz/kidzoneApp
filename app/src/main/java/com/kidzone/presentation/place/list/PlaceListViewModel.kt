@@ -12,7 +12,10 @@ import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.service.LocationProvider
+import com.kidzone.utils.AppConfig
+import com.kidzone.utils.GeoUtils
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.SearchNormalization
 import com.kidzone.utils.UiText
 import com.kidzone.utils.toPlacesErrorMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,7 +27,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.text.Normalizer
 import java.util.Locale
 import javax.inject.Inject
 import kotlin.math.atan2
@@ -37,14 +39,46 @@ private const val SEARCH_PREFETCH_PAGE_SIZE = 500
 private val LIST_ERROR_FALLBACK = UiText.StringResource(R.string.error_fetch_list)
 private val LIST_MORE_ERROR_FALLBACK = UiText.StringResource(R.string.error_fetch_more)
 
-private const val FLOW_SUBSCRIPTION_TIMEOUT_MS = 5000L
-private const val EARTH_RADIUS_KM = 6371.0
 private const val SEARCH_CONTAINS_RANK_OFFSET = 100
 private const val HAS_REVIEWS_SORT_WEIGHT = 0
 private const val NO_REVIEWS_SORT_WEIGHT = 1
 
 /**
- * ViewModel listy miejsc.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie stanem listy miejsc (wyniki wyszukiwania, sortowanie, stronicowanie).
+ * - Koordynacja wyszukiwania pełnotekstowego z filtrami kategorii i udogodnień.
+ * - Obliczanie dystansów i stanów pustych dla list miejsc.
+ *
+ * 🚫 Poza zakresem:
+ * - Brak decyzji o offline queue.
+ * - Brak retry logiki dla operacji sieciowych.
+ * - Brak zarządzania sesją użytkownika.
+ *
+ * 📥 Wejście:
+ * - Parametry wyszukiwania (fraza, kategoria, wybrane udogodnienia).
+ * - Sygnały o przewijaniu listy (stronicowanie).
+ * - Lokalizacja użytkownika z [LocationProvider].
+ *
+ * 📤 Wyjście:
+ * - Stan UI zawierający listę miejsc ([UiState]).
+ *
+ * ✅ Gwarancje:
+ * - Normalizacja tekstu przed wyszukiwaniem.
+ * - Stabilne sortowanie wyników na podstawie dystansu i dopasowania nazwy.
+ *
+ * 🔌 Offline:
+ * - Wspiera wyświetlanie miejsc z lokalnego cache Room.
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla reaktywnych strumieni Flow i operacji wyszukiwania.
+ * - Brak blokujących operacji na wątku Main.
+ *
+ * 🧪 Testowalność:
+ * - Pełne DI.
+ * - Deterministyczne łączenie filtrów w końcowe zapytanie.
+ *
+ * 🧼 Lifecycle:
+ * - Zarządzanie stanem paginacji w cyklu życia ekranu.
  */
 @OptIn(ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
 @HiltViewModel
@@ -191,7 +225,7 @@ class PlaceListViewModel @Inject constructor(
             isUsingStaleLocation = location.isUsingStaleLocation,
             staleLocationAgeMinutes = location.staleLocationAgeMinutes
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SUBSCRIPTION_TIMEOUT_MS), UiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(AppConfig.FLOW_SUBSCRIPTION_TIMEOUT_MS), UiState())
 
     init {
         refresh()
@@ -398,7 +432,12 @@ class PlaceListViewModel @Inject constructor(
                 .thenBy { it.averageRating }
                 .thenByDescending { it.reviewsCount }
             SortOrder.NEAREST -> if (params.location != null) {
-                compareBy<Place> { distance(it.latitude, it.longitude, params.location.first, params.location.second) }
+                compareBy<Place> {
+                    GeoUtils.haversineKm(
+                        it.latitude, it.longitude,
+                        params.location.first, params.location.second
+                    )
+                }
             } else {
                 compareByDescending<Place> { it.createdAtMillis }
             }
@@ -412,8 +451,8 @@ class PlaceListViewModel @Inject constructor(
     }
 
     private fun Place.matchesFilters(params: FilterParams): Boolean {
-        val normalizedName = name.normalizedForSearch()
-        val normalizedQuery = params.query.normalizedForSearch()
+        val normalizedName = SearchNormalization.normalize(name)
+        val normalizedQuery = SearchNormalization.normalize(params.query)
         val matchesQuery = normalizedQuery.isBlank() || normalizedName.contains(normalizedQuery)
         val matchesCategory = params.category == null || category == params.category
         val matchesAmenities = params.amenities.isEmpty() || amenities.containsAll(params.amenities)
@@ -423,8 +462,8 @@ class PlaceListViewModel @Inject constructor(
     }
 
     private fun Place.searchRank(query: String): Int {
-        val normalizedName = name.normalizedForSearch()
-        val normalizedQuery = query.normalizedForSearch()
+        val normalizedName = SearchNormalization.normalize(name)
+        val normalizedQuery = SearchNormalization.normalize(query)
         val wordPrefixIndex = normalizedName
             .split(" ")
             .indexOfFirst { it.startsWith(normalizedQuery) }
@@ -470,19 +509,4 @@ class PlaceListViewModel @Inject constructor(
         val amenities: Set<Amenity>
     )
 
-    private fun distance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = sin(dLat / 2) * sin(dLat / 2) +
-            cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
-            sin(dLon / 2) * sin(dLon / 2)
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        return EARTH_RADIUS_KM * c
-    }
-
-    private fun String.normalizedForSearch(): String =
-        Normalizer.normalize(this, Normalizer.Form.NFD)
-            .replace("\\p{Mn}+".toRegex(), "")
-            .replace("ł", "l", ignoreCase = true)
-            .lowercase(Locale("pl", "PL"))
 }

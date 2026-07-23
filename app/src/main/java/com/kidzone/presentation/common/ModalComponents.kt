@@ -31,6 +31,11 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Dostarczanie reużywalnych komponentów do budowy dialogów i arkuszy modalnych.
+ * - Standaryzacja przycisków akcji, etykiet pól wymaganych oraz dialogów tekstowych (np. regulamin).
+ */
 @Suppress("MagicNumber")
 val ModalActionColor = Color(0xFF1976D2)
 

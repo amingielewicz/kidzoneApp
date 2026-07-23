@@ -1,8 +1,13 @@
 package com.kidzone.navigation
 
 /**
- * Central validation for route arguments coming from deep links, push payloads,
- * saved state, or manual route creation.
+ * 🎯 Odpowiedzialności:
+ * - Centralna walidacja argumentów nawigacji pochodzących z Deep Linków, Push oraz stanu zapisanego.
+ * - Ochrona przed wstrzykiwaniem niebezpiecznych identyfikatorów do zapytań repozytorium.
+ *
+ * ✅ Gwarancje:
+ * - Dopuszcza wyłącznie bezpieczne identyfikatory (A-Z, a-z, 0-9, _, -).
+ * - Ogranicza długość identyfikatorów, zapobiegając nadmiarowemu użyciu pamięci.
  */
 object NavigationArgumentValidator {
 

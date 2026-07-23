@@ -1,27 +1,13 @@
 package com.kidzone.utils
 
 /**
- * Polityka siły hasła egzekwowana po stronie klienta.
+ * 🎯 Odpowiedzialności:
+ * - Definiowanie i egzekwowanie polityki siły haseł po stronie klienta.
+ * - Udostępnianie reguł walidacji dla komponentów UI (np. checklisty wymagań).
  *
- * Wymagania (wszystkie muszą być spełnione, by hasło było prawidłowe):
- *  - minimum [MIN_LENGTH] znaków
- *  - co najmniej jedna mała litera
- *  - co najmniej jedna duża litera
- *  - co najmniej jeden znak specjalny (znak nie będący literą ani cyfrą)
- *
- * Te same reguły obowiązują w 3 miejscach:
- *  - rejestracja (RegisterScreen / RegisterViewModel)
- *  - zmiana hasła (ChangePasswordDialog / ProfileViewModel)
- *  - ekran logowania (komunikat dla "weak password" z Firebase)
- *
- * Firebase Auth dodatkowo wymaga min. 6 znaków server-side. Nasza polityka
- * jest mocniejsza, więc Firebase nigdy nie odrzuci hasła, które przeszło
- * lokalną walidację - chyba że projekt Firebase ma własną politykę
- * silniejszą niż ta tutaj. Na MVP nie konfigurujemy server-side policy,
- * bo wymagałoby to Identity Platform (płatne).
- *
- * Mała litera: testowana po Locale-independent toLowerCase, żeby polskie
- * znaki diakrytyczne (ą, ć, ę, ...) liczyły się tak samo jak ASCII.
+ * ✅ Gwarancje:
+ * - Deterministyczna walidacja haseł przed wysyłką do Firebase Auth.
+ * - Spójność reguł między ekranami rejestracji i zmiany hasła.
  */
 object PasswordPolicy {
 
@@ -70,10 +56,8 @@ object PasswordPolicy {
     data class RuleStatus(val labelKey: LabelKey, val isSatisfied: Boolean)
 
     /**
-     * Krótki komunikat dla snackbara / pola "errorMessage" w VM, gdy user
-     * próbuje submitować zbyt słabe hasło. Treść spójna z [rules].
+     * Krótki komunikat błędu, gdy hasło nie spełnia wymagań.
      */
     const val DEFAULT_ERROR_MESSAGE: String =
-        "Password must have at least $MIN_LENGTH characters, including lowercase and uppercase letters " +
-            "and a special character"
+        "Hasło musi mieć co najmniej $MIN_LENGTH znaków, zawierać małe i duże litery oraz znak specjalny."
 }

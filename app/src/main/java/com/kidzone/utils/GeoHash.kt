@@ -1,19 +1,14 @@
 package com.kidzone.utils
 
 /**
- * Oblicza geohash dla podanych współrzędnych.
+ * 🎯 Odpowiedzialności:
+ * - Kodowanie współrzędnych geograficznych (lat, lng) do formatu Geohash.
+ * - Wyznaczanie optymalnej długości prefixu dla zapytań o promieniu.
  *
- * Geohash to string alfanumeryczny kodujący lokalizację geograficzną
- * w prostokątny „bucket". Im dłuższy prefix, tym mniejszy obszar:
- *  - 4 znaki ≈ 39 km × 20 km
- *  - 5 znaków ≈ 5 km × 5 km
- *  - 6 znaków ≈ 1.2 km × 0.6 km
- *  - 7 znaków ≈ 150 m × 150 m
- *
- * Używamy precision=7 przy zapisie do Firestore. Przy query wybieramy
- * prefix odpowiedni do promienia wyszukiwania (zob. [geohashPrefixLength]).
- *
- * Implementacja czysto Kotlin – zero zewnętrznych zależności.
+ * ⚙️ Techniczne:
+ * - Wykorzystuje bazę BASE32 (standard Geohash).
+ * - Precision 7 ≈ 150m (używane do zapisu w Firestore).
+ * - Algorytm czysto obliczeniowy, brak zewnętrznych zależności.
  */
 object GeoHash {
 

@@ -32,6 +32,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kidzone.R
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Renderowanie ujednoliconego menu sortowania dla list obiektów (Miejsca, Opinie).
+ * - Obsługa stanów wyboru oraz prezentacja ikon tematycznych.
+ */
 data class SortMenuOption<T>(
     val value: T,
     val label: String,

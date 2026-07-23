@@ -8,6 +8,7 @@ import com.kidzone.data.remote.PerformanceConfigProvider
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.service.LocationProvider
+import com.kidzone.utils.GeoUtils
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.UiText
 import com.kidzone.utils.toPlacesErrorMessage
@@ -21,10 +22,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
 
 /** Okno czasowe używane przez sekcję ostatnio dodanych miejsc. */
 private const val RECENTLY_ADDED_WINDOW_MILLIS = 14L * 24L * 60L * 60L * 1000L
@@ -33,16 +30,40 @@ private const val LOCATION_RETRY_COUNT = 3
 private const val ONE_MINUTE_MILLIS = 60_000L
 
 /**
- * Zarządza sekcjami lokalizacyjnymi ekranu Start.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie sekcjami lokalizacyjnymi ekranu Start.
+ * - Budowanie sekcji (najlepiej oceniane, najbliższe, nowości) z jednego zestawu danych.
  *
- * ViewModel pobiera jedną lokalizację i jeden zestaw miejsc, a następnie buduje z niego trzy sekcje:
- * najlepiej oceniane miejsca w lokalnym promieniu, najbliższe miejsca oraz miejsca dodane w ciągu
- * ostatnich 14 dni. Dzięki temu nie powiela odczytów lokalizacji ani zapytań do backendu.
+ * 🚫 Poza zakresem:
+ * - Brak decyzji o offline queue (obsługiwane przez Repository).
+ * - Brak retry logiki (delegowane do mechanizmów niższego poziomu).
+ * - Brak zarządzania sesją użytkownika.
  *
- * Gdy bieżąca lokalizacja jest chwilowo niedostępna, ViewModel może zachować istniejące dane lub
- * użyć ostatniej poprawnej pozycji i jawnie oznaczyć wynik jako przestarzały. Dokładna lokalizacja
- * jest zapisywana lokalnie wyłącznie na potrzeby widgetu i musi zostać wyczyszczona podczas logout,
- * ban sign-out i account deletion.
+ * 📥 Wejście:
+ * - Strumień lokalizacji z [LocationProvider].
+ * - Dane o miejscach z [PlaceRepository].
+ *
+ * 📤 Wyjście:
+ * - Stan UI zawierający posegregowane listy miejsc.
+ *
+ * ✅ Gwarancje:
+ * - Spójność danych między sekcjami.
+ * - Użycie ostatniej poprawnej lokalizacji przy błędach odczytu.
+ *
+ * 🔌 Offline:
+ * - Wspiera odczyt z cache Room, gdy Firestore jest niedostępny.
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla operacji asynchronicznych.
+ * - Brak blokujących operacji na wątku Main.
+ *
+ * 🧪 Testowalność:
+ * - Pełne wstrzykiwanie zależności (DI).
+ * - Brak ukrytych singletonów.
+ * - Deterministyczne zachowanie stanu.
+ *
+ * 🧼 Lifecycle:
+ * - Odświeżanie danych przy starcie ekranu (wykrywanie powrotu online).
  */
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -298,7 +319,7 @@ class HomeViewModel @Inject constructor(
         ) {
             is OpResult.Success -> {
                 val placesWithDistance = result.data
-                    .map { it to haversineKm(lat, lng, it.latitude, it.longitude) }
+                    .map { it to GeoUtils.haversineKm(lat, lng, it.latitude, it.longitude) }
 
                 val homeSections = buildHomeSections(placesWithDistance, performanceConfig)
 
@@ -422,18 +443,4 @@ internal fun buildHomeSections(
         nearbyPlaces = nearby,
         recentlyAddedPlaces = recentlyAdded
     )
-}
-
-/**
- * Oblicza odległość między dwoma punktami geograficznymi formułą haversine.
- */
-private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-    val r = 6371.0
-    val dLat = Math.toRadians(lat2 - lat1)
-    val dLon = Math.toRadians(lon2 - lon1)
-    val a = sin(dLat / 2).let { it * it } +
-        cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
-        sin(dLon / 2).let { it * it }
-    val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-    return r * c
 }

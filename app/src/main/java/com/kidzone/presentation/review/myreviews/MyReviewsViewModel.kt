@@ -42,11 +42,39 @@ data class MyReviewItem(
 )
 
 /**
- * Udostępnia opinie aktualnego użytkownika i obsługuje ich usuwanie.
+ * 🎯 Odpowiedzialności:
+ * - Udostępnianie listy opinii należących do aktualnie zalogowanego użytkownika.
+ * - Łączenie danych opinii z podstawowymi informacjami o miejscach (nazwa, kategoria).
+ * - Obsługa usuwania opinii i odświeżania stanu powiązanego.
  *
- * ViewModel reaguje na zmianę sesji, obserwuje opinie użytkownika i równolegle dociąga minimalne
- * dane powiązanych miejsc. Po wylogowaniu lub usunięciu konta poprzedni listener jest anulowany i
- * emitowana jest pusta lista, aby prywatny stan nie pozostał na ekranie.
+ * 🚫 Poza zakresem:
+ * - Brak decyzji o offline queue.
+ * - Brak retry logiki dla operacji sieciowych.
+ * - Brak bezpośredniego zarządzania sesją (delegowane do [AuthRepository]).
+ *
+ * 📥 Wejście:
+ * - Strumień aktualnego użytkownika z [AuthRepository].
+ *
+ * 📤 Wyjście:
+ * - Stan ekranu "Moje opinie" ([UiState]) zawierający listę elementów [MyReviewItem].
+ *
+ * ✅ Gwarancje:
+ * - Automatyczne czyszczenie danych prywatnych po zakończeniu sesji.
+ * - Deterministyczne łączenie opinii z danymi miejsc.
+ *
+ * 🔌 Offline:
+ * - Wspiera odczyt własnych opinii z cache lokalnego Room.
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla reaktywnych strumieni danych i usuwania opinii.
+ * - Wykorzystanie [async]/[awaitAll] do wydajnego dociągania danych miejsc.
+ *
+ * 🧪 Testowalność:
+ * - Pełne DI.
+ * - Deterministyczne mapowanie stanów bazy na listę UI.
+ *
+ * 🧼 Lifecycle:
+ * - Zarządzanie równoległym dociąganiem danych przy zmianie sesji.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel

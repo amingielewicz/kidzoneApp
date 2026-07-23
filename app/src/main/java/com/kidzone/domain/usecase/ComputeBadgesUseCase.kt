@@ -10,12 +10,13 @@ import com.kidzone.utils.OpResult
 import javax.inject.Inject
 
 /**
- * Wylicza odznaki użytkownika wymagające kontekstu rankingowego.
+ * 🎯 Odpowiedzialności:
+ * - Wyliczanie odznak użytkownika na podstawie aktywności i kontekstu rankingowego.
+ * - Koordynacja pobierania danych rankingowych do celów analitycznych.
  *
- * Use case pobiera ograniczoną pulę użytkowników i miejsc, wyznacza pozycję użytkownika oraz
- * najlepszą pozycję należącego do niego miejsca, a następnie łączy te dane z odznakami licznikowymi.
- * Błąd pobrania rankingu jest obsługiwany best-effort i nie blokuje odznak zależnych wyłącznie od
- * danych profilu.
+ * ✅ Gwarancje:
+ * - Obsługa błędów "best-effort": błąd pobierania rankingu nie blokuje odznak stałych.
+ * - Deterministyczne mapowanie statystyk na konkretne typy [UserBadge].
  */
 class ComputeBadgesUseCase @Inject constructor(
     private val authRepository: AuthRepository,

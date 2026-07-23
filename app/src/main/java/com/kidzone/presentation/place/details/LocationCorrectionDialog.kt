@@ -35,6 +35,7 @@ import com.kidzone.presentation.common.LocationActionIcon
 import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.requestLocationPermissionOrOpenSettings
+import com.kidzone.utils.GeoUtils
 import com.kidzone.presentation.place.add.fetchCurrentLocation
 import com.kidzone.presentation.place.add.hasLocationPermission
 import com.kidzone.presentation.place.add.isLocationServiceEnabled
@@ -173,9 +174,11 @@ fun LocationCorrectionDialog(
                 }
             }
 
-            if (latitude != null && longitude != null) {
+            val currentLat = latitude
+            val currentLng = longitude
+            if (currentLat != null && currentLng != null) {
                 Text(
-                    text = "GPS: %.5f, %.5f".format(latitude, longitude),
+                    text = "GPS: ${GeoUtils.formatCoordinates(currentLat, currentLng)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -31,6 +31,16 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.*
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Implementacja [PlaceRepository] integrująca Firestore z lokalnym cache Room.
+ * - Obsługa zaawansowanych zapytań przestrzennych z wykorzystaniem geohashy.
+ * - Zarządzanie kolejką synchronizacji operacji modyfikujących.
+ *
+ * ⚙️ Techniczne:
+ * - Wykorzystuje ConcurrentHashMap do cache'owania wyników zapytań o geohashe.
+ * - Implementuje logikę "server-wins" poprzez transakcje przy aktualizacji zdjęć.
+ */
 @Singleton
 class FirestorePlaceRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
@@ -364,20 +374,23 @@ class FirestorePlaceRepository @Inject constructor(
         OpResult.failure(e)
     }
 
-    override suspend fun addPhotoUrl(
+    override suspend fun addPhotoWithHash(
         placeId: String,
         photoUrl: String,
-        uploadedByUserId: String
+        uploadedByUserId: String,
+        hash: String
     ): OpResult<Unit> = try {
         require(placeId.isNotBlank()) { "placeId nie może być puste" }
         require(photoUrl.isNotBlank()) { "photoUrl nie może być puste" }
         require(uploadedByUserId.isNotBlank()) { "uploadedByUserId nie może być puste" }
+        require(hash.isNotBlank()) { "hash nie może być pusty" }
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
             placesCollection().document(placeId).set(
                 mapOf(
                     "photoUrls" to FieldValue.arrayUnion(photoUrl),
-                    "photoUploadedBy" to mapOf(photoUrl to uploadedByUserId)
+                    "photoUploadedBy" to mapOf(photoUrl to uploadedByUserId),
+                    "photoHashes" to mapOf(photoUrl to hash)
                 ),
                 SetOptions.merge()
             ).await()
@@ -407,7 +420,8 @@ class FirestorePlaceRepository @Inject constructor(
             placesCollection().document(placeId).update(
                 mapOf(
                     "photoUrls" to place.photoUrls.filterNot { it == photoUrl },
-                    "photoUploadedBy" to place.photoUploadedBy - photoUrl
+                    "photoUploadedBy" to place.photoUploadedBy - photoUrl,
+                    "photoHashes" to place.photoHashes - photoUrl
                 )
             ).await()
             true

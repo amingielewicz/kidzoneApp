@@ -38,8 +38,14 @@ private const val ONBOARDING_PREFS = "kidzone_onboarding"
 private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
 
 /**
- * Główny graf nawigacji aplikacji – obsługuje przejścia pre-auth oraz
- * pchanie ekranów stackowych ponad shellem [MainScreen].
+ * 🎯 Odpowiedzialności:
+ * - Definiowanie głównego grafu nawigacji aplikacji kidZone.
+ * - Obsługa przejść między stanami (Auth, Main, Onboarding, Maintenance).
+ * - Koordynacja Deep Linków oraz animacji Shared Transitions.
+ *
+ * ✅ Gwarancje:
+ * - Ochrona tras wymagających uwierzytelnienia.
+ * - Spójność nawigacji po restartu aplikacji (obsługa Intent).
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")

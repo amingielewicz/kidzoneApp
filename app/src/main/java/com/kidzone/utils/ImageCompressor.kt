@@ -9,12 +9,18 @@ import androidx.exifinterface.media.ExifInterface
 import java.io.ByteArrayOutputStream
 
 /**
- * Utility do kompresji zdjęć przed uploadem do Firebase Storage.
+ * 🎯 Odpowiedzialności:
+ * - Kompresja i optymalizacja zdjęć przed wysyłką do Firebase Storage.
+ * - Automatyczna korekta orientacji na podstawie metadanych EXIF.
+ * - Skalowanie obrazów do optymalnych wymiarów (max 1024px).
  *
- * Pipeline: URI → decode → auto-rotate (EXIF) → resize (max [MAX_DIMENSION]) →
- * compress to WebP (quality [WEBP_QUALITY]) → ByteArray.
+ * ⚙️ Techniczne:
+ * - Format wyjściowy: WebP (75% jakości).
+ * - Wykorzystuje downsampling przy dekodowaniu (inSampleSize) dla oszczędności pamięci RAM.
  *
- * Typowy wynik: zdjęcie 4000x3000 (12MP, ~4MB JPEG) → 1024x768, WebP ~80-150KB.
+ * ✅ Gwarancje:
+ * - Znaczna redukcja transferu danych (zdjęcia ~4MB -> ~150KB).
+ * - Prawidłowe wyświetlanie zdjęć pionowych (korekta rotation).
  */
 object ImageCompressor {
 

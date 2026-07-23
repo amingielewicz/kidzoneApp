@@ -4,16 +4,13 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
+ * ⚙️ Techniczne:
  * Rekord operacji oczekującej na przetworzenie przez kolejkę synchronizacji.
- *
- * Encja przechowuje lokalny kontrakt pomiędzy repository, [com.kidzone.sync.SyncManager] i
- * [com.kidzone.sync.SyncWorker]. Obecność rekordu nie oznacza sukcesu operacji po stronie backendu.
- * Payload może zawierać treści użytkownika i nie powinien być logowany ani wysyłany do telemetryki.
+ * Encja przechowuje kontrakt pomiędzy Repository, [com.kidzone.sync.SyncManager] i [com.kidzone.sync.SyncWorker].
  *
  * @property id lokalny identyfikator nadawany przez Room.
  * @property type typ operacji z [OperationType].
- * @property payload zserializowane dane wymagane do odtworzenia operacji.
- * @property createdAtMillis czas dodania do kolejki używany do kolejności FIFO.
+ * @property payload zserializowane dane (JSON). Może zawierać PII.
  * @property retryCount liczba nieudanych prób przetworzenia.
  * @property status bieżący status z [OperationStatus].
  */

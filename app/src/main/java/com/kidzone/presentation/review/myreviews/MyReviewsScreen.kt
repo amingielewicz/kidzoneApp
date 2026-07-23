@@ -57,9 +57,7 @@ import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.KidZoneCard
 import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.RatingIcon
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.kidzone.utils.DateUtils
 
 /**
  * Lista opinii wystawionych przez aktualnie zalogowanego usera.
@@ -305,11 +303,10 @@ private fun StarRow(rating: Int) {
 
 @Composable
 private fun formatReviewDate(review: com.kidzone.domain.model.Review): String {
-    val formatter = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
     return if (review.updatedAtMillis > review.createdAtMillis) {
-        stringResource(R.string.edited_date, formatter.format(Date(review.updatedAtMillis)))
+        stringResource(R.string.edited_date, DateUtils.formatDate(review.updatedAtMillis))
     } else {
-        stringResource(R.string.added_date, formatter.format(Date(review.createdAtMillis)))
+        stringResource(R.string.added_date, DateUtils.formatDate(review.createdAtMillis))
     }
 }
 

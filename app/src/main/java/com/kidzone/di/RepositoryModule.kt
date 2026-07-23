@@ -13,7 +13,11 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Wiąże implementacje Firebase z interfejsami warstwy domain.
+ * 🎯 Odpowiedzialności:
+ * - Wiązanie implementacji warstwy danych (Firebase/Room) z interfejsami warstwy domeny.
+ *
+ * ✅ Gwarancje:
+ * - Singletony dla wszystkich repozytoriów, zapewniające spójność stanu danych w całej aplikacji.
  */
 @Module
 @InstallIn(SingletonComponent::class)

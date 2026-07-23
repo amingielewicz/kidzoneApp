@@ -90,9 +90,14 @@ Framework
 
 ViewModele nie zależą bezpośrednio od `android.content.Context`. Funkcje platformowe są wystawione przez interfejsy warstwy domain i implementowane w warstwie data.
 
+Wszystkie kluczowe komponenty posiadają ustrukturyzowaną dokumentację KDoc (🎯 Odpowiedzialności, 📥 Wejście, 📤 Wyjście, ✅ Gwarancje), co ułatwia onboarding i utrzymanie spójności architektonicznej.
+
 Szczegóły:
 
 - [indeks dokumentacji](docs/README.md),
+- [standardy dokumentacji KDoc (Android)](docs/api/VIEWMODEL_KDOC_STANDARD.md),
+- [standardy dokumentacji (Admin Panel)](docs/api/ADMIN_PANEL_DOC_STANDARD.md),
+- [standardy dokumentacji (Cloud Functions)](docs/api/CLOUD_FUNCTIONS_DOC_STANDARD.md),
 - [architektura systemu](docs/architecture/ARCHITECTURE.md),
 - [przepływ danych](docs/architecture/DATA_FLOW.md),
 - [tryb offline](docs/android/OFFLINE_MODE.md),

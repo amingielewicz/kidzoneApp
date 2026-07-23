@@ -26,14 +26,40 @@ import javax.inject.Inject
 private val RANKING_ERROR_FALLBACK = UiText.StringResource(com.kidzone.R.string.error_fetch_list)
 
 /**
- * Zarządza jednorazowym pobieraniem rankingu miejsc i użytkowników.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie jednorazowym pobieraniem rankingów miejsc i użytkowników.
+ * - Równoległe pobieranie danych i ich agregacja w stan UI.
+ * - Prekomputacja odznak rankingowych dla użytkowników.
  *
- * Obie listy są pobierane równolegle, filtrowane do aktywnych rekordów i ograniczane wartościami
- * Remote Config. Ranking nie korzysta ze stałych listenerów, ponieważ nie wymaga aktualizacji w
- * czasie rzeczywistym, a one-shot ogranicza liczbę odczytów Firestore.
+ * 🚫 Poza zakresem:
+ * - Brak decyzji o offline queue.
+ * - Brak retry logiki dla operacji sieciowych.
+ * - Brak zarządzania sesją użytkownika.
  *
- * ViewModel prekomputuje także odznaki rankingowe, aby karta użytkownika i profil używały tej samej
- * interpretacji pozycji w rankingu.
+ * 📥 Wejście:
+ * - Dane konfiguracyjne z Remote Config poprzez [PerformanceConfigProvider].
+ * - Wyniki zapytań z [PlaceRepository] i [AuthRepository].
+ *
+ * 📤 Wyjście:
+ * - Stan zakładki rankingu ([UiState]) zawierający listy top miejsc i użytkowników.
+ *
+ * ✅ Gwarancje:
+ * - Spójność prezentowanych odznak między rankingiem a profilem użytkownika.
+ * - Minimalizacja odczytów Firestore poprzez zapytania one-shot (brak listenerów).
+ *
+ * 🔌 Offline:
+ * - Nie wspiera odświeżania rankingu w trybie offline (brak cache'owania rankingów).
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla operacji asynchronicznych.
+ * - Wykorzystanie [coroutineScope] i [async] do równoległego pobierania list.
+ *
+ * 🧪 Testowalność:
+ * - Pełne DI.
+ * - Deterministyczne mapowanie pozycji w rankingu na odznaki UI.
+ *
+ * 🧼 Lifecycle:
+ * - One-shot loading wyzwalany przy inicjalizacji.
  */
 @HiltViewModel
 class RankingViewModel @Inject constructor(

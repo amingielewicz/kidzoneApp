@@ -18,15 +18,21 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Zarządza lokalną kolejką zapisów i harmonogramem synchronizacji WorkManager.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie lokalną kolejką operacji oczekujących (zapis z opóźnieniem).
+ * - Harmonogramowanie zadań [SyncWorker] poprzez WorkManager.
  *
- * [SyncManager] zapisuje zserializowane operacje w Room i uruchamia unikalny [SyncWorker] wymagający
- * połączenia z siecią. Samo dodanie operacji do kolejki nie oznacza, że zapis został wykonany po
- * stronie backendu.
+ * 🛡️ Bezpieczeństwo i Prywatność:
+ * - Zawartość operacji może zawierać dane osobowe (PII); zabrania się logowania pełnej treści.
+ * - Operacje są powiązane z sesją użytkownika na poziomie bazy danych.
  *
- * Replay zapisów użytkownika pozostaje funkcją kontrolowaną. Nowy typ operacji można kolejkować
- * dopiero wtedy, gdy [SyncWorker] posiada kompletny, idempotentny processor z testami integracyjnymi.
- * Payload może zawierać treści użytkownika i nie powinien być logowany.
+ * ⚡ Wydajność i Zasoby:
+ * - Wykorzystuje WorkManager z wykładniczym czasem ponowień (Backoff).
+ * - Ogranicza aktywność do momentu uzyskania stabilnego połączenia sieciowego.
+ *
+ * ✅ Gwarancje:
+ * - Trwałość danych (Persistence): operacje przeżywają restart aplikacji i urządzenia.
+ * - Kolejkowanie FIFO (pierwsze weszło, pierwsze wyszło) na poziomie bazy danych.
  */
 @Singleton
 class SyncManager @Inject constructor(

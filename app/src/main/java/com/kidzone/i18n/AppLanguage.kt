@@ -3,6 +3,11 @@ package com.kidzone.i18n
 import androidx.annotation.StringRes
 import com.kidzone.R
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Definiowanie wspieranych przez aplikację języków.
+ * - Mapowanie języków na kody systemowe (languageTag) oraz etykiety UI.
+ */
 enum class AppLanguage(
     val storageValue: String,
     val languageTag: String?,

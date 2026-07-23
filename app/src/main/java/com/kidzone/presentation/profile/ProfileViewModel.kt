@@ -16,9 +16,11 @@ import com.kidzone.i18n.LanguagePreferences
 import com.kidzone.presentation.common.BadgeContext
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.computeBadges
+import com.kidzone.utils.AppConfig
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.UiText
+import com.kidzone.utils.toAuthErrorMessage
 import com.kidzone.utils.toUploadErrorMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -39,13 +41,48 @@ import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 private const val RANKING_LIMIT = 100
-private const val FLOW_SUBSCRIPTION_TIMEOUT_MS = 5000L
 private const val CONTACT_SUBJECT_MIN_LENGTH = 3
 private const val CONTACT_MESSAGE_MIN_LENGTH = 10
 private const val CONTACT_MESSAGE_FUNCTION = "submitContactMessage"
 
 /**
- * ViewModel profilu użytkownika.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie stanem profilu użytkownika (dane osobowe, statystyki, odznaki).
+ * - Obsługa preferencji (język, powiadomienia) i ustawień konta.
+ * - Koordynacja procesu wylogowania i kontaktu z supportem.
+ *
+ * 🚫 Poza zakresem:
+ * - Brak decyzji o offline queue (obsługiwane przez Repository).
+ * - Brak retry logiki dla operacji sieciowych.
+ * - Brak bezpośredniego zarządzania sesją (delegowane do [AuthRepository]).
+ *
+ * 📥 Wejście:
+ * - Strumień aktualnego użytkownika z [AuthRepository].
+ * - Interakcje użytkownika (edycja profilu, zmiana haseł, wybór języka).
+ *
+ * 📤 Wyjście:
+ * - Stan ekranu profilu ([UiState]).
+ * - Zdarzenia nawigacji (np. po wylogowaniu).
+ *
+ * ✅ Gwarancje:
+ * - Deterministyczne obliczanie odznak na podstawie statystyk użytkownika.
+ * - Spójność lokalnych preferencji językowych z systemem.
+ *
+ * 🔌 Offline:
+ * - Wspiera odczyt profilu z cache lokalnego Room.
+ * - Natychmiastowe lokalne wylogowanie bez oczekiwania na sieć.
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla operacji asynchronicznych i strumieni Flow.
+ * - Brak blokujących operacji na wątku Main.
+ *
+ * 🧪 Testowalność:
+ * - Pełne DI.
+ * - Brak zależności od singletonów.
+ * - Deterministyczne mapowanie modelu domeny na odznaki UI.
+ *
+ * 🧼 Lifecycle:
+ * - Obserwacja zmian sesji i automatyczne przełączanie strumieni danych.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -115,7 +152,7 @@ class ProfileViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     val user: StateFlow<User?> = userContext.map { it?.first }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SUBSCRIPTION_TIMEOUT_MS), null)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(AppConfig.FLOW_SUBSCRIPTION_TIMEOUT_MS), null)
 
     init {
         viewModelScope.launch {
@@ -195,7 +232,7 @@ class ProfileViewModel @Inject constructor(
                     is OpResult.Success -> it.copy(isSaving = false, isEditOpen = false)
                     is OpResult.Failure -> it.copy(
                         isSaving = false,
-                        saveError = result.error.toAuthUiText(R.string.profile_update_failed)
+                        saveError = result.error.toAuthErrorMessage(R.string.profile_update_failed)
                     )
                 }
             }
@@ -227,7 +264,7 @@ class ProfileViewModel @Inject constructor(
                     )
                     is OpResult.Failure -> it.copy(
                         isAccountActionInProgress = false,
-                        accountActionError = result.error.toAuthUiText(R.string.account_action_failed)
+                        accountActionError = result.error.toAuthErrorMessage(R.string.account_action_failed)
                     )
                 }
             }
@@ -257,7 +294,7 @@ class ProfileViewModel @Inject constructor(
                     )
                     is OpResult.Failure -> it.copy(
                         isAccountActionInProgress = false,
-                        accountActionError = result.error.toAuthUiText(R.string.account_action_failed)
+                        accountActionError = result.error.toAuthErrorMessage(R.string.account_action_failed)
                     )
                 }
             }
@@ -291,7 +328,7 @@ class ProfileViewModel @Inject constructor(
                         isAccountActionInProgress = false,
                         accountActionError = (result as? OpResult.Failure)
                             ?.error
-                            ?.toAuthUiText(R.string.delete_account_failed)
+                            ?.toAuthErrorMessage(R.string.delete_account_failed)
                             ?: UiText.StringResource(R.string.delete_account_failed)
                     )
                 }
@@ -314,7 +351,7 @@ class ProfileViewModel @Inject constructor(
                         isAccountActionInProgress = false,
                         accountActionError = (result as? OpResult.Failure)
                             ?.error
-                            ?.toAuthUiText(R.string.delete_account_failed)
+                            ?.toAuthErrorMessage(R.string.delete_account_failed)
                             ?: UiText.StringResource(R.string.delete_account_failed)
                     )
                 }
@@ -472,11 +509,4 @@ class ProfileViewModel @Inject constructor(
     fun consumeAccountActionInfo() {
         _uiState.update { it.copy(accountActionInfo = null) }
     }
-
-    private fun Throwable.toAuthUiText(fallbackRes: Int): UiText =
-        when (this) {
-            is AuthException.AccountBanned -> UiText.DynamicString(banMessage)
-            is AuthException -> UiText.StringResource(messageRes.takeIf { it != 0 } ?: fallbackRes)
-            else -> UiText.StringResource(fallbackRes)
-        }
 }

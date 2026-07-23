@@ -1,3 +1,15 @@
+/**
+ * 🎯 Odpowiedzialności:
+ * - Pobieranie publicznych statystyk z API i renderowanie ich na stronach statycznych.
+ * - Formatowanie liczb zgodnie z polską lokalizacją (pl-PL).
+ * - Zarządzanie komunikatami o błędach pobierania.
+ *
+ * 📥 Wejście:
+ * - Dane JSON z endpointu '/api/public-stats'.
+ *
+ * ⚡ Zarządzanie stanem:
+ * - Bezpośrednia manipulacja DOM poprzez atrybuty data-stat.
+ */
 (() => {
   const statElements = {
     users: document.querySelector('[data-stat="users"]'),

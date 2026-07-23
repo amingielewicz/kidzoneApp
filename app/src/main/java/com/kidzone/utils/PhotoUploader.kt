@@ -8,15 +8,22 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Upload skompresowanych zdjęć (WebP ByteArray) do Firebase Storage.
+ * 🎯 Odpowiedzialności:
+ * - Wysyłanie (upload) skompresowanych bajtów zdjęć do Firebase Storage.
+ * - Zarządzanie hierarchią folderów w Storage (places, reviews, avatars).
+ * - Monitorowanie wydajności uploadu poprzez [PerformanceTraces].
  *
- * Ścieżki w Storage:
- *  - Miejsca: `places/{ownerUserId}/{placeId}/photos/{uuid}.webp`
- *  - Opinie:  `reviews/{ownerUserId}/{reviewId}/photos/{uuid}.webp`
- *  - Avatary: `avatars/{userId}/avatar.jpg` (istniejące, nie ruszamy)
+ * 🛡️ Bezpieczeństwo i Prywatność:
+ * - Nie loguje treści zdjęć.
+ * - Ścieżki zapisu są izolowane per użytkownik (ownerUserId).
  *
- * Zwraca download URL po pomyślnym uploadzie.
- * Each upload is wrapped with a Firebase Performance trace.
+ * ⚡ Wydajność i Zasoby:
+ * - Zwraca download URL natychmiast po udanym zapisie.
+ * - Wykorzystuje asynchroniczne wywołania Task API Firebase.
+ *
+ * ✅ Gwarancje:
+ * - Unikalność nazw plików dzięki zastosowaniu UUID.
+ * - Operacje usuwania działają w trybie "best-effort" (nie blokują UI przy błędach).
  */
 @Singleton
 class PhotoUploader @Inject constructor(

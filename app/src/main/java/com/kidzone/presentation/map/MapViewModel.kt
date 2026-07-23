@@ -10,6 +10,7 @@ import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
+import com.kidzone.utils.AppConfig
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.UiText
 import com.kidzone.utils.toPlacesErrorMessage
@@ -33,22 +34,45 @@ import javax.inject.Inject
 private const val VIEWPORT_DEBOUNCE_MS = 300L
 private const val VIEWPORT_CACHE_SIZE = 20
 private const val CACHE_EXPIRATION_MS = 600_000L
-private const val FLOW_SUBSCRIPTION_TIMEOUT_MS = 5000L
 private const val TOP_RATED_THRESHOLD = 4.0
 
 private val MAP_ERROR_FALLBACK = UiText.StringResource(R.string.error_fetch_places)
 
 /**
- * Zarządza stanem mapy miejsc oraz zapytaniami zależnymi od aktualnego viewportu.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie stanem mapy i danymi o miejscach widocznymi w aktualnym viewporcie.
+ * - Koordynacja filtrowania (kategorie, oceny, własność) z zapytaniami przestrzennymi.
+ * - Optymalizacja liczby zapytań poprzez debounce i cache wyników granic (LRU).
  *
- * ViewModel łączy granice mapy, filtry kategorii, filtr najlepiej ocenianych miejsc i filtr
- * właściciela. Zmiany viewportu są opóźniane przez debounce, podobne granice są deduplikowane, a
- * wyniki są przechowywane w krótkotrwałym cache LRU, aby ograniczyć liczbę odczytów Firestore i
- * kosztów Google Maps.
+ * 🚫 Poza zakresem:
+ * - Brak pobierania lokalizacji GPS (otrzymuje współrzędne z zewnątrz).
+ * - Brak zarządzania uprawnieniami (obsługiwane przez UI/PermissionHandler).
+ * - Brak zarządzania sesją użytkownika.
  *
- * ViewModel nie pobiera lokalizacji urządzenia i nie zarządza uprawnieniami. Otrzymuje wyłącznie
- * [GeoBounds] przekazane przez warstwę UI. Nawigacja do szczegółów pozostaje odpowiedzialnością
- * ekranu obserwującego [uiState].
+ * 📥 Wejście:
+ * - Zmiany granic widoczności ([GeoBounds]) z mapy.
+ * - Interakcje użytkownika z filtrami.
+ *
+ * 📤 Wyjście:
+ * - Stan UI zawierający listę miejsc do wyświetlenia na mapie ([UiState]).
+ *
+ * ✅ Gwarancje:
+ * - Minimalizacja kosztów Firestore poprzez inteligentne cache'owanie wyników dla podobnych granic.
+ * - Płynność UI dzięki opóźnianiu zapytań przy szybkich ruchach mapą.
+ *
+ * 🔌 Offline:
+ * - Wspiera wyświetlanie miejsc z lokalnego cache Room.
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla reaktywnych strumieni Flow i zapytań Firestore.
+ * - Brak blokujących operacji na wątku Main.
+ *
+ * 🧪 Testowalność:
+ * - Pełne DI.
+ * - Deterministyczne łączenie filtrów i granic w wyniki zapytania.
+ *
+ * 🧼 Lifecycle:
+ * - Automatyczne czyszczenie cache LRU przy niszczeniu ViewModelu.
  */
 @HiltViewModel
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
@@ -191,7 +215,7 @@ class MapViewModel @Inject constructor(
             isPlaceCountCapped = isPlaceCountCapped,
             errorMessage = if (load is PlacesLoad.Error) load.message else null
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SUBSCRIPTION_TIMEOUT_MS), UiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(AppConfig.FLOW_SUBSCRIPTION_TIMEOUT_MS), UiState())
 
     /** Ustawia kategorię używaną przez zapytanie mapy. */
     fun onCategorySelect(category: PlaceCategory?) {

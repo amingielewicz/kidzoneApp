@@ -1,12 +1,11 @@
 package com.kidzone.data.remote.dto
 
 /**
- * Prywatna część profilu użytkownika przechowywana pod:
- * users/{uid}/private/profile
+ * ⚙️ Techniczne:
+ * Prywatna część profilu użytkownika (`users/{uid}/private/profile`).
  *
- * Ten dokument powinien być dostępny wyłącznie dla właściciela konta i admina.
- * Nie należy używać go na ekranach publicznych, takich jak ranking, lista autorów
- * czy publiczny profil użytkownika.
+ * 🛡️ Bezpieczeństwo:
+ * Dane wrażliwe (PII) oddzielone od profilu publicznego. Dostępne wyłącznie dla właściciela i adminów.
  */
 data class UserPrivateDto(
     val userId: String = "",

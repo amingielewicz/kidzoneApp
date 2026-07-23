@@ -83,9 +83,11 @@ import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.model.User
 import com.kidzone.presentation.common.CategoryIcon
+import com.kidzone.presentation.common.formatDistance
 import com.kidzone.presentation.common.FullscreenPhotoAction
 import com.kidzone.presentation.common.KidZoneActionDialog
 import com.kidzone.presentation.common.KidZoneDropdownMenuItem
+import com.kidzone.presentation.common.KidZoneReportDialog
 import com.kidzone.presentation.common.KidZoneSortMenu
 import com.kidzone.presentation.common.NewPlaceBadge
 import com.kidzone.presentation.common.NetworkStatus
@@ -100,11 +102,10 @@ import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.common.RatingIcon
 import com.kidzone.presentation.common.selectUniquePhotoUris
 import com.kidzone.presentation.common.requestCameraPermissionOrOpenSettings
-import java.text.SimpleDateFormat
-import java.util.Date
+import com.kidzone.utils.DateUtils
+import com.kidzone.utils.GeoUtils
+import com.kidzone.utils.NumberUtils
 import java.util.Locale
-
-private const val VERY_CLOSE_DISTANCE_LABEL = "Tuż obok"
 
 private val PLACE_DETAILS_SECTION_SPACING = 12.dp
 private val PLACE_DETAILS_CONTENT_PADDING = 16.dp
@@ -141,7 +142,6 @@ private val PLACE_DETAILS_DISTRIBUTION_BAR_RADIUS = 3.dp
 private val PLACE_DETAILS_DISTRIBUTION_ICON_SIZE = 12.dp
 
 private val PLACE_DETAILS_DIALOG_PROGRESS_STROKE_WIDTH = 2.dp
-private val PLACE_DETAILS_DIALOG_OPTION_VERTICAL_PADDING = 6.dp
 
 private val PLACE_DETAILS_PLACE_PHOTO_SIZE = 120.dp
 private val PLACE_DETAILS_REVIEW_PHOTO_SIZE = 64.dp
@@ -163,18 +163,8 @@ private val PLACE_DETAILS_SKELETON_CHIP_RADIUS = 16.dp
 private val PLACE_DETAILS_DIVIDER_THICKNESS = 1.dp
 private const val PLACE_DETAILS_DIVIDER_ALPHA = 0.5f
 
-private const val COORDINATE_FORMAT = "%.5f, %.5f"
-private const val AVERAGE_RATING_FORMAT = "%.1f"
-private const val DATE_FORMAT = "dd.MM.yyyy"
 private const val PLACE_DETAILS_MAX_PHOTOS = 5
 
-private const val VERY_CLOSE_DISTANCE_KM = 0.05
-private const val METER_DISTANCE_THRESHOLD_KM = 1.0
-private const val INTEGER_DISTANCE_THRESHOLD_KM = 100.0
-private const val METERS_PER_KILOMETER = 1000
-private const val DISTANCE_ROUNDING_OFFSET_METERS = 25
-private const val DISTANCE_ROUNDING_STEP_METERS = 50
-private const val EARTH_RADIUS_KM = 6371.0
 /**
  * Szczegóły miejsca.
  */
@@ -791,7 +781,7 @@ private fun PlaceDetailsContent(
                 currentUserId = currentUserId,
                 topRank = topRank,
                 distanceKm = userLocation?.let { (lat, lng) ->
-                    haversineKm(lat, lng, place.latitude, place.longitude)
+                    GeoUtils.haversineKm(lat, lng, place.latitude, place.longitude)
                 },
                 staleLocationAgeMinutes = staleLocationAgeMinutes,
                 sharedTransitionScope = sharedTransitionScope,
@@ -1022,7 +1012,7 @@ private fun PlaceMainCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = COORDINATE_FORMAT.format(place.latitude, place.longitude),
+                        text = GeoUtils.formatCoordinates(place.latitude, place.longitude),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1102,7 +1092,7 @@ private fun PlaceMainCard(
                 Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
                 val datePart = place.createdAtMillis
                     .takeIf { it > 0L }
-                    ?.let { formatDate(it) }
+                    ?.let { DateUtils.formatDate(it) }
                     .orEmpty()
                 val authorName = author?.name?.takeIf { it.isNotBlank() }
                 Text(
@@ -1137,7 +1127,7 @@ private fun PlaceDetailsRatingStatus(place: Place) {
                 RatingIcon(size = PLACE_DETAILS_ICON_SIZE)
                 Spacer(Modifier.width(PLACE_DETAILS_CHIP_CONTENT_SPACING))
                 Text(
-                    text = AVERAGE_RATING_FORMAT.format(place.averageRating),
+                    text = NumberUtils.formatRating(place.averageRating),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -1180,58 +1170,6 @@ private fun PlaceDetailsRatingStatus(place: Place) {
 }
 
 @Composable
-private fun formatDistance(
-    km: Double,
-    staleLocationAgeMinutes: Int? = null
-): String {
-    val distance = when {
-        km < VERY_CLOSE_DISTANCE_KM -> VERY_CLOSE_DISTANCE_LABEL
-        km < METER_DISTANCE_THRESHOLD_KM -> {
-            val meters = (km * METERS_PER_KILOMETER).toInt()
-            val rounded = (
-                (meters + DISTANCE_ROUNDING_OFFSET_METERS) /
-                    DISTANCE_ROUNDING_STEP_METERS
-                ) * DISTANCE_ROUNDING_STEP_METERS
-            if (rounded == 0) VERY_CLOSE_DISTANCE_LABEL else stringResource(R.string.distance_m, rounded)
-        }
-        km < INTEGER_DISTANCE_THRESHOLD_KM -> stringResource(R.string.distance_km, km)
-        else -> stringResource(R.string.distance_km_integer, km.toInt())
-    }
-
-    return staleLocationAgeMinutes?.let { "$distance (${staleAgeLabel(it)})" } ?: distance
-}
-
-private fun staleAgeLabel(ageMinutes: Int): String = when {
-    ageMinutes <= 1 -> "1 min temu"
-    else -> "$ageMinutes min temu"
-}
-
-private fun haversineKm(
-    fromLat: Double,
-    fromLng: Double,
-    toLat: Double,
-    toLng: Double
-): Double {
-    val radiusKm = EARTH_RADIUS_KM
-    val dLat = Math.toRadians(toLat - fromLat)
-    val dLng = Math.toRadians(toLng - fromLng)
-
-    val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
-            kotlin.math.cos(Math.toRadians(fromLat)) *
-            kotlin.math.cos(Math.toRadians(toLat)) *
-            kotlin.math.sin(dLng / 2) *
-            kotlin.math.sin(dLng / 2)
-
-    val c = 2 * kotlin.math.atan2(
-        kotlin.math.sqrt(a),
-        kotlin.math.sqrt(1 - a)
-    )
-
-    return radiusKm * c
-}
-
-
-@Composable
 private fun MainCardDivider() {
     Spacer(Modifier.height(PLACE_DETAILS_SMALL_SPACING))
     androidx.compose.material3.HorizontalDivider(
@@ -1240,13 +1178,6 @@ private fun MainCardDivider() {
     )
     Spacer(Modifier.height(PLACE_DETAILS_SMALL_SPACING))
 }
-
-private fun formatDate(millis: Long): String {
-    val formatter = SimpleDateFormat(DATE_FORMAT, Locale.getDefault())
-    return formatter.format(Date(millis))
-}
-
-
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -1598,7 +1529,7 @@ private fun ReviewTimestampRow(
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (createdAtMillis > 0L) {
             Text(
-                text = formatDate(createdAtMillis),
+                text = DateUtils.formatDate(createdAtMillis),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -1606,7 +1537,7 @@ private fun ReviewTimestampRow(
         if (updatedAtMillis > createdAtMillis && updatedAtMillis > 0L) {
             Spacer(Modifier.width(PLACE_DETAILS_SMALL_SPACING))
             Text(
-                text = stringResource(R.string.edited_with_date, formatDate(updatedAtMillis)),
+                text = stringResource(R.string.edited_with_date, DateUtils.formatDate(updatedAtMillis)),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
@@ -1626,7 +1557,7 @@ private fun ReviewDistributionChart(reviews: List<Review>) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = AVERAGE_RATING_FORMAT.format(avg),
+                text = NumberUtils.formatRating(avg),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
@@ -1796,58 +1727,13 @@ private fun ReportPlaceDialog(
         "FALSE_DATA" to stringResource(R.string.report_reason_false_data),
         "OTHER" to stringResource(R.string.report_reason_other)
     )
-    var selectedReason by remember { mutableStateOf(reasons.first().first) }
-    var comment by remember { mutableStateOf("") }
-
-    KidZoneActionDialog(
+    KidZoneReportDialog(
         title = stringResource(R.string.report),
-        icon = Icons.Filled.Flag,
-        iconTint = MaterialTheme.colorScheme.error,
+        reasons = reasons,
         onDismiss = onDismiss,
-        confirmButton = {
-            OfflineAwareSubmitButton(
-                label = stringResource(R.string.report_submit),
-                onClick = { onSubmit(selectedReason, comment.trim()) },
-                isOffline = isOffline
-            )
-        }
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = stringResource(R.string.report_choose_reason),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
-            reasons.forEach { (code, label) ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { selectedReason = code }
-                        .padding(vertical = PLACE_DETAILS_DIALOG_OPTION_VERTICAL_PADDING),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    androidx.compose.material3.RadioButton(
-                        selected = selectedReason == code,
-                        onClick = { selectedReason = code }
-                    )
-                    Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-            Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
-            androidx.compose.material3.OutlinedTextField(
-                value = comment,
-                onValueChange = { comment = it },
-                label = { Text(stringResource(R.string.report_comment_label)) },
-                maxLines = 3,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
+        onSubmit = onSubmit,
+        isOffline = isOffline
+    )
 }
 
 @Composable
@@ -1864,78 +1750,16 @@ private fun ReportReviewDialog(
         "NOT_RELEVANT" to stringResource(R.string.report_reason_not_relevant),
         "OTHER" to stringResource(R.string.report_reason_other)
     )
-    var selectedReason by remember { mutableStateOf(reasons.first().first) }
-    var comment by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Filled.Flag,
-                contentDescription = stringResource(R.string.report_review),
-                tint = MaterialTheme.colorScheme.error
-            )
-        },
-        title = { Text(stringResource(R.string.report_review)) },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                val reviewContext = stringResource(
-                    R.string.report_review_context,
-                    authorName.ifBlank { stringResource(R.string.anonymous) }
-                )
-                Text(
-                    text = reviewContext,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
-                Text(
-                    text = stringResource(R.string.report_choose_reason),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
-                reasons.forEach { (code, label) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { selectedReason = code }
-                            .padding(vertical = PLACE_DETAILS_DIALOG_OPTION_VERTICAL_PADDING),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        androidx.compose.material3.RadioButton(
-                            selected = selectedReason == code,
-                            onClick = { selectedReason = code }
-                        )
-                        Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-                Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
-                androidx.compose.material3.OutlinedTextField(
-                    value = comment,
-                    onValueChange = { comment = it },
-                    label = { Text(stringResource(R.string.report_comment_label)) },
-                    maxLines = 3,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            OfflineAwareSubmitButton(
-                label = stringResource(R.string.report_submit),
-                onClick = { onSubmit(selectedReason, comment.trim()) },
-                isOffline = isOffline
-            )
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
+    KidZoneReportDialog(
+        title = stringResource(R.string.report_review),
+        reasons = reasons,
+        onDismiss = onDismiss,
+        onSubmit = onSubmit,
+        isOffline = isOffline,
+        description = stringResource(
+            R.string.report_review_context,
+            authorName.ifBlank { stringResource(R.string.anonymous) }
+        )
     )
 }
 
@@ -2015,67 +1839,11 @@ private fun ReportPhotoDialog(
         "OFFENSIVE" to stringResource(R.string.report_reason_offensive_vulgar),
         "OTHER" to stringResource(R.string.report_reason_other)
     )
-    var selectedReason by remember { mutableStateOf(reasons.first().first) }
-    var comment by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Filled.Flag,
-                contentDescription = stringResource(R.string.report_photo),
-                tint = MaterialTheme.colorScheme.error
-            )
-        },
-        title = { Text(stringResource(R.string.report_photo)) },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = stringResource(R.string.report_choose_reason),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
-                reasons.forEach { (code, label) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { selectedReason = code }
-                            .padding(vertical = PLACE_DETAILS_DIALOG_OPTION_VERTICAL_PADDING),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        androidx.compose.material3.RadioButton(
-                            selected = selectedReason == code,
-                            onClick = { selectedReason = code }
-                        )
-                        Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-                Spacer(Modifier.height(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
-                androidx.compose.material3.OutlinedTextField(
-                    value = comment,
-                    onValueChange = { comment = it },
-                    label = { Text(stringResource(R.string.report_comment_label)) },
-                    maxLines = 3,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            OfflineAwareSubmitButton(
-                label = stringResource(R.string.report_submit),
-                onClick = { onSubmit(selectedReason, comment.trim()) },
-                isOffline = isOffline
-            )
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
+    KidZoneReportDialog(
+        title = stringResource(R.string.report_photo),
+        reasons = reasons,
+        onDismiss = onDismiss,
+        onSubmit = onSubmit,
+        isOffline = isOffline
     )
 }

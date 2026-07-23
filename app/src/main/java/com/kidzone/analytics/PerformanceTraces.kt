@@ -8,33 +8,17 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Centralized Firebase Performance custom traces for critical user paths.
+ * 🎯 Odpowiedzialności:
+ * - Centralizacja śledzenia opóźnień (latency) w kluczowych ścieżkach użytkownika.
+ * - Monitorowanie wydajności operacji sieciowych i obliczeniowych (GPS, obrazki, Firestore).
  *
- * Custom traces measure latency of key operations that directly impact UX:
- * - Location fetch (GPS → coordinates)
- * - Image compression + upload
- * - Place loading (Firestore → UI)
- * - Review submission
- * - App cold start → first content
+ * ⚡ Wydajność i Zasoby:
+ * - Minimalny narzut dzięki wykorzystaniu natywnego SDK Firebase Performance.
+ * - Przesyła dane analityczne w zoptymalizowanych paczkach w tle.
  *
- * ## Usage in ViewModel/Repository:
- *
- * ```kotlin
- * val trace = performanceTraces.startTrace(PerformanceTraces.LOCATION_FETCH)
- * val location = fetchCurrentLocation()
- * trace.putAttribute("provider", "fused")
- * performanceTraces.stopTrace(trace)
- * ```
- *
- * ## Usage with inline helper:
- *
- * ```kotlin
- * val result = performanceTraces.measure(PerformanceTraces.PLACE_LOAD) {
- *     placeRepository.getPlace(placeId)
- * }
- * ```
- *
- * Traces are visible in Firebase Console → Performance → Custom traces.
+ * ✅ Gwarancje:
+ * - Brak wpływu na logikę biznesową (automatyczna obsługa błędów w blokach pomiarowych).
+ * - Spójność nazewnictwa śladów (traces) w całym systemie.
  */
 @Singleton
 class PerformanceTraces @Inject constructor() {
@@ -42,10 +26,10 @@ class PerformanceTraces @Inject constructor() {
     private val perf: FirebasePerformance = FirebasePerformance.getInstance()
 
     /**
-     * Starts a named custom trace.
+     * Rozpoczyna nazwany ślad wydajności.
      *
-     * @param name trace name (use constants from companion object)
-     * @return started [Trace] — caller must call [stopTrace] when done
+     * @param name Nazwa śladu (używaj stałych z companion object).
+     * @return Uruchomiony [Trace] — wywołujący musi zawołać [stopTrace] po zakończeniu.
      */
     fun startTrace(name: String): Trace {
         Timber.d("Perf trace started: $name")
@@ -53,7 +37,7 @@ class PerformanceTraces @Inject constructor() {
     }
 
     /**
-     * Stops a running trace. Safe to call multiple times (no-op after first stop).
+     * Zatrzymuje działający ślad. Bezpieczne do wielokrotnego wywołania.
      */
     fun stopTrace(trace: Trace) {
         trace.stop()
@@ -61,9 +45,9 @@ class PerformanceTraces @Inject constructor() {
     }
 
     /**
-     * Inline helper — measures a suspend block and returns its result.
+     * Pomocnik inline — mierzy blok typu suspend i zwraca jego wynik.
      *
-     * Automatically starts/stops the trace and adds success/failure attribute.
+     * Automatycznie startuje/zatrzymuje ślad i dodaje atrybut sukcesu/błędu.
      *
      * ```kotlin
      * val places = performanceTraces.measure(NEARBY_PLACES_LOAD) {
@@ -87,7 +71,7 @@ class PerformanceTraces @Inject constructor() {
     }
 
     /**
-     * Variant for repository methods that return [OpResult] instead of throwing.
+     * Wariant dla metod repozytorium, które zwracają [OpResult] zamiast rzucać wyjątki.
      */
     suspend fun <T> measureResult(traceName: String, block: suspend () -> OpResult<T>): OpResult<T> {
         val trace = startTrace(traceName)
@@ -113,7 +97,7 @@ class PerformanceTraces @Inject constructor() {
     }
 
     /**
-     * Non-suspend version of [measure] for synchronous operations.
+     * Wersja nie-suspend metody [measure] dla operacji synchronicznych.
      */
     fun <T> measureSync(traceName: String, block: () -> T): T {
         val trace = startTrace(traceName)
@@ -131,48 +115,48 @@ class PerformanceTraces @Inject constructor() {
     }
 
     companion object {
-        // ─── Trace names ─────────────────────────────────────────────────
+        // ─── Nazwy śladów (Traces) ───────────────────────────────────────
 
-        /** GPS/fused location acquisition (from request to coordinates). */
+        /** Pobieranie lokalizacji GPS/fused (od żądania do współrzędnych). */
         const val LOCATION_FETCH = "location_fetch"
 
-        /** Image compression pipeline (decode → rotate → resize → WebP). */
+        /** Kompresja obrazu (decode → rotate → resize → WebP). */
         const val IMAGE_COMPRESS = "image_compress"
 
-        /** Photo upload to Firebase Storage (compressed bytes → download URL). */
+        /** Wysyłanie zdjęcia do Firebase Storage (bajty → URL). */
         const val PHOTO_UPLOAD = "photo_upload"
 
-        /** Single place load from Firestore (getPlace by ID). */
+        /** Ładowanie pojedynczego miejsca z Firestore. */
         const val PLACE_LOAD = "place_load"
 
-        /** Nearby places query (geohash range query + haversine filter). */
+        /** Zapytanie o miejsca w pobliżu (geohash + haversine). */
         const val NEARBY_PLACES_LOAD = "nearby_places_load"
 
-        /** Places loaded for the visible map viewport. */
+        /** Ładowanie miejsc widocznych w viewporcie mapy. */
         const val MAP_PLACES_LOAD = "map_places_load"
 
-        /** Top places ranking query. */
+        /** Zapytanie o ranking miejsc. */
         const val TOP_PLACES_LOAD = "top_places_load"
 
-        /** Paginated place list query without search text. */
+        /** Stronicowane zapytanie listy miejsc (bez wyszukiwania tekstowego). */
         const val PLACES_PAGE_LOAD = "places_page_load"
 
-        /** Search-driven place query. */
+        /** Zapytanie wyszukiwania miejsc. */
         const val PLACE_SEARCH_LOAD = "place_search_load"
 
-        /** Review submission (validation + Firestore write). */
+        /** Wysyłanie opinii (walidacja + zapis Firestore). */
         const val REVIEW_SUBMIT = "review_submit"
 
-        /** Add place flow (form submit → Firestore write + photo uploads). */
+        /** Proces dodawania miejsca (zapis + upload zdjęć). */
         const val ADD_PLACE = "add_place"
 
-        /** App cold start to first meaningful content on screen. */
+        /** "Zimny start" aplikacji do pierwszego wyrenderowania treści. */
         const val COLD_START = "cold_start"
 
-        /** Remote Config fetch + activate. */
+        /** Pobieranie i aktywacja Firebase Remote Config. */
         const val REMOTE_CONFIG_FETCH = "remote_config_fetch"
 
-        /** Ranking/badge context computation (top users + top places fetch). */
+        /** Obliczanie odznak i kontekstu rankingu. */
         const val BADGE_COMPUTATION = "badge_computation"
     }
 }

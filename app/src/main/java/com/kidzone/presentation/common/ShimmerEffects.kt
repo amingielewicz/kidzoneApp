@@ -18,8 +18,9 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.IntSize
 
 /**
- * Reusable modifier to apply a shimmer loading effect to any Composable.
- * Best used on simple Shapes (Box, Surface) with a clip/shape applied.
+ * 🎯 Odpowiedzialności:
+ * - Aplikowanie efektu animowanego ładowania (Shimmer) do dowolnego komponentu Composable.
+ * - Zapewnienie płynnej animacji przejścia kolorów symulującej ładowanie treści.
  */
 fun Modifier.shimmerEffect(): Modifier = composed {
     var size by remember { mutableStateOf(IntSize.Zero) }
