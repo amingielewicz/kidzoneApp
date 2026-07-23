@@ -44,15 +44,13 @@ service cloud.firestore {
 
     function hasValidPhotoHashes() {
       let data = request.resource.data;
-      let photoHashes = data.get('photoHashes', null);
-      let photoUrls = data.get('photoUrls', null);
-      return photoHashes == null || (
-          photoHashes is map
+      let photoHashes = data.get('photoHashes', {});
+      let photoUrls = data.get('photoUrls', []);
+      return photoHashes is map
           && photoHashes.size() <= 5
           && photoUrls is list
           && photoHashes.keys().hasOnly(photoUrls)
-          && photoHashes.size() == photoUrls.size()
-        );
+          && photoHashes.size() == photoUrls.size();
     }
 
     function hasNoPrivateUserFields() {
@@ -77,24 +75,21 @@ service cloud.firestore {
         && !request.resource.data.keys().hasAny(['fcmTokens']);
     }
 
-    function isOnlyUpdatingPhotos() {
+    function isOnlyAddingPhotos() {
       let data = request.resource.data;
       let oldData = resource.data;
       let affected = data.diff(oldData).affectedKeys();
 
-      // Muszą być obecne wszystkie 3 pola (spójność)
+      // Tylko pola zdjęć mogą być zmieniane
       let isPhotoField = affected.hasOnly(['photoUrls', 'photoUploadedBy', 'photoHashes']);
 
-      // Zabezpieczenie: nie można usuwać istniejących zdjęć innych osób
-      let noDeletion = data.photoUrls.toSet().hasAll(oldData.photoUrls.toSet());
+      // Zabezpieczenie dla gości: mogą dodawać, ale nie mogą usuwać cudzych zdjęć
+      let currentUrls = data.get('photoUrls', []).toSet();
+      let oldUrls = oldData.get('photoUrls', []).toSet();
+      let noDeletion = currentUrls.hasAll(oldUrls);
 
       return isPhotoField && noDeletion;
     }
-
-
-
-
-
 
     function isValidPlaceReport() {
       let data = request.resource.data;
@@ -312,12 +307,14 @@ service cloud.firestore {
           || (
             isSignedIn()
             && (
+              // Właściciel miejsca może zmieniać wszystko poza licznikami (w tym USUWAĆ zdjęcia)
               (resource.data.ownerUserId == request.auth.uid && isNotUpdating([
                 'averageRating',
                 'reviewsCount',
                 'ownerUserId'
               ]))
-              || isOnlyUpdatingPhotos()
+              // Osoby trzecie mogą tylko DODAWAC zdjęcia
+              || isOnlyAddingPhotos()
             )
           )
         );
