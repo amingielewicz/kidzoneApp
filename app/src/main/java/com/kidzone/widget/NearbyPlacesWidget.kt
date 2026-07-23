@@ -92,6 +92,7 @@ class NearbyPlacesWidget : GlanceAppWidget() {
         }
     }
 
+    @Suppress("LongMethod")
     private fun loadWidgetState(context: Context): WidgetState {
         val allPlaces = loadPlacesFromCache(context)
 

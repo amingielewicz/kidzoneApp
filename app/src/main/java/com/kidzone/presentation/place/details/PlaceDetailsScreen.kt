@@ -79,6 +79,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.kidzone.analytics.PlaceReportReason
+import com.kidzone.analytics.ReviewReportReason
+import com.kidzone.analytics.PhotoReportReason
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.model.User
@@ -576,8 +579,19 @@ fun PlaceDetailsScreen(
         ReportPlaceDialog(
             isOffline = isOffline,
             onSubmit = { reason, comment ->
-                viewModel.reportPlace(reason, comment)
+                val typedReason = runCatching {
+                    PlaceReportReason.valueOf(reason)
+                }.getOrElse {
+                    PlaceReportReason.OTHER
+                }
+
+                viewModel.reportPlace(
+                    reason = typedReason,
+                    comment = comment
+                )
+
                 showReportDialog = false
+
                 scope.launch {
                     snackbarHostState.showSnackbar(thankYouReport)
                 }
@@ -630,6 +644,7 @@ fun PlaceDetailsScreen(
             initialRating = editing?.rating ?: 0,
             initialComment = editing?.comment.orEmpty(),
             initialPhotoUrls = editing?.photoUrls.orEmpty(),
+            initialPhotoHashes = editing?.photoHashes.orEmpty(),
             isEditing = editing != null
         )
     }
@@ -640,7 +655,17 @@ fun PlaceDetailsScreen(
             authorName = reviewToReport!!.authorName,
             isOffline = isOffline,
             onSubmit = { reason, comment ->
-                viewModel.reportReview(reviewToReport!!.id, reason, comment)
+                val typedReason = runCatching {
+                    ReviewReportReason.valueOf(reason)
+                }.getOrElse {
+                    ReviewReportReason.OTHER
+                }
+
+                viewModel.reportReview(
+                    reviewId = reviewToReport!!.id,
+                    reason = typedReason,
+                    comment = comment
+                )
                 showReportReviewDialog = false
                 reviewToReport = null
                 scope.launch {
@@ -711,12 +736,25 @@ fun PlaceDetailsScreen(
 
     if (showReportPhotoDialog && photoUrlToReport != null) {
         val thankYouReportPhoto = stringResource(R.string.thank_you_report_photo)
+
         ReportPhotoDialog(
             isOffline = isOffline,
             onSubmit = { reason, comment ->
-                viewModel.reportPhoto(photoUrlToReport!!, reason, comment)
+                val typedReason = runCatching {
+                    PhotoReportReason.valueOf(reason)
+                }.getOrElse {
+                    PhotoReportReason.OTHER
+                }
+
+                viewModel.reportPhoto(
+                    photoUrl = photoUrlToReport!!,
+                    reason = typedReason,
+                    comment = comment
+                )
+
                 showReportPhotoDialog = false
                 photoUrlToReport = null
+
                 scope.launch {
                     snackbarHostState.showSnackbar(thankYouReportPhoto)
                 }

@@ -196,13 +196,13 @@ interface PlaceRepository {
      * @param placeId identyfikator miejsca.
      * @param photoUrl URL pliku po udanym uploadzie.
      * @param uploadedByUserId identyfikator autora zdjęcia.
-     * @param hash hash MD5 zawartości zdjęcia.
+     * @param photoHash hash MD5 zawartości zdjęcia.
      */
-    suspend fun addPhotoWithHash(
+    suspend fun addPhotoUrl(
         placeId: String,
         photoUrl: String,
         uploadedByUserId: String,
-        hash: String
+        photoHash: String
     ): OpResult<Unit>
 
     /**

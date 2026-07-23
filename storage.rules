@@ -14,11 +14,13 @@ service firebase.storage {
     }
 
     function isAcceptedImageContentType() {
-      return request.resource.contentType in [
-        'image/jpeg',
-        'image/png',
-        'image/webp'
-      ];
+      return request.resource != null
+        && request.resource.contentType != null
+        && request.resource.contentType in [
+          'image/jpeg',
+          'image/png',
+          'image/webp'
+        ];
     }
 
     function isImageUnder(maxSizeBytes) {

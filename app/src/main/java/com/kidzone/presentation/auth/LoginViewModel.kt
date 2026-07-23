@@ -133,8 +133,16 @@ class LoginViewModel @Inject constructor(
                             message = result.error.toAuthErrorMessage(R.string.error_unknown),
                             isMessageError = true,
                             showResendVerification = isEmailNotVerified,
-                            banMessage = if (isBanned) (result.error as AuthException.AccountBanned).banMessage else null,
-                            banReason = if (isBanned) (result.error as AuthException.AccountBanned).banReason else null
+                            banMessage = if (isBanned) {
+                                (result.error as AuthException.AccountBanned).banMessage
+                            } else {
+                                null
+                            },
+                            banReason = if (isBanned) {
+                                (result.error as AuthException.AccountBanned).banReason
+                            } else {
+                                null
+                            }
                         )
                     }
                 }
@@ -160,8 +168,16 @@ class LoginViewModel @Inject constructor(
                             isLoading = false,
                             message = result.error.toAuthErrorMessage(R.string.error_unknown),
                             isMessageError = true,
-                            banMessage = if (isBanned) (result.error as AuthException.AccountBanned).banMessage else null,
-                            banReason = if (isBanned) (result.error as AuthException.AccountBanned).banReason else null
+                            banMessage = if (isBanned) {
+                                (result.error as AuthException.AccountBanned).banMessage
+                            } else {
+                                null
+                            },
+                            banReason = if (isBanned) {
+                                (result.error as AuthException.AccountBanned).banReason
+                            } else {
+                                null
+                            }
                         )
                     }
                 }
@@ -171,7 +187,12 @@ class LoginViewModel @Inject constructor(
 
     /** Pokazuje komunikat przekazany przez warstwę UI lub integrację zewnętrzną. */
     fun showInlineMessage(text: String, isError: Boolean = true) {
-        _uiState.update { it.copy(message = UiText.DynamicString(text), isMessageError = isError) }
+        val message = if (isGoogleSignInTechnicalMessage(text)) {
+            UiText.StringResource(R.string.google_sign_in_unavailable)
+        } else {
+            UiText.DynamicString(text)
+        }
+        _uiState.update { it.copy(message = message, isMessageError = isError) }
     }
 
     /** Pokazuje standardowy komunikat braku połączenia. */
@@ -253,5 +274,25 @@ class LoginViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun isGoogleSignInTechnicalMessage(message: String): Boolean {
+        val normalized = message.lowercase()
+        return GOOGLE_SIGN_IN_TECHNICAL_MARKERS.any(normalized::contains)
+    }
+
+    private companion object {
+        val GOOGLE_SIGN_IN_TECHNICAL_MARKERS = listOf(
+            "firebase console",
+            "google-services.json",
+            "missing activity",
+            "unexpected credential type",
+            "could not parse google token",
+            "could not get a token",
+            "google sign-in error",
+            "unknown google sign-in error",
+            "włącz google sign-in",
+            "nie udało się uruchomić logowania google"
+        )
     }
 }

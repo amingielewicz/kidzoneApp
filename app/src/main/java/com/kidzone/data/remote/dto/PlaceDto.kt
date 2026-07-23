@@ -28,6 +28,10 @@ data class PlaceDto(
     val amenities: List<String> = emptyList(),
     val photoUrls: List<String> = emptyList(),
     val photoUploadedBy: Map<String, String> = emptyMap(),
+    /**
+     * `Any?` celowo: stare dokumenty zawierają listę, nowe mapę URL -> hash.
+     * [toDomain] akceptuje wyłącznie nowy, jednoznaczny format.
+     */
     val photoHashes: Any? = emptyMap<String, String>(),
     val createdAtMillis: Long = 0L,
     val geohash: String = ""

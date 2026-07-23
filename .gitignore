@@ -23,6 +23,8 @@ google-services.json
 .firebase/
 firebase-debug.log
 firebase-debug.*.log
+firebase-fixes-backup.patch
+service-account.json
 
 # Android build outputs
 app/debug/

@@ -23,23 +23,6 @@ object OfflinePayload {
 
     /**
      * Stabilny model danych miejsca zapisywany w kolejce offline.
-     *
-     * @property id identyfikator dokumentu miejsca.
-     * @property ownerUserId identyfikator właściciela używany do kontroli ownership.
-     * @property name nazwa miejsca.
-     * @property description opis miejsca.
-     * @property category nazwa wartości [PlaceCategory].
-     * @property latitude szerokość geograficzna miejsca.
-     * @property longitude długość geograficzna miejsca.
-     * @property address adres prezentowany użytkownikowi.
-     * @property averageRating zmaterializowana średnia ocen.
-     * @property reviewsCount liczba opinii używana przez ranking.
-     * @property amenities nazwy wartości [Amenity].
-     * @property photoUrls URL-e zdjęć miejsca.
-     * @property photoUploadedBy mapa URL do identyfikatora autora uploadu.
-     * @property photoHashes hashe używane do wykrywania duplikatów.
-     * @property createdAtMillis czas utworzenia rekordu.
-     * @property updatedAtMillis czas ostatniej zmiany używany przy rozwiązywaniu konfliktów.
      */
     data class PlacePayload(
         val id: String,
@@ -55,7 +38,8 @@ object OfflinePayload {
         val amenities: List<String>,
         val photoUrls: List<String>,
         val photoUploadedBy: Map<String, String>,
-        val photoHashes: Map<String, String>,
+        /** Mapa lub lista (legacy) hashy zdjęć. */
+        val photoHashes: Any?,
         val createdAtMillis: Long,
         val updatedAtMillis: Long
     )
@@ -111,7 +95,7 @@ object OfflinePayload {
             amenities = payload.amenities.mapNotNull(Amenity.Companion::fromKey).toSet(),
             photoUrls = payload.photoUrls,
             photoUploadedBy = payload.photoUploadedBy,
-            photoHashes = payload.photoHashes,
+            photoHashes = payload.photoHashes.toPhotoHashMap(),
             createdAtMillis = payload.createdAtMillis,
             updatedAtMillis = payload.updatedAtMillis
         )
@@ -119,17 +103,6 @@ object OfflinePayload {
 
     /**
      * Stabilny model opinii zapisywany w kolejce offline.
-     *
-     * @property id identyfikator opinii.
-     * @property placeId identyfikator ocenianego miejsca.
-     * @property userId identyfikator autora.
-     * @property authorName publiczna nazwa autora utrwalona przy zapisie.
-     * @property rating ocena liczbowa.
-     * @property comment treść opinii.
-     * @property photoUrls zdjęcia dołączone do opinii.
-     * @property photoHashes hashe zdjęć dla spójnej deduplikacji.
-     * @property createdAtMillis czas utworzenia.
-     * @property updatedAtMillis czas ostatniej aktualizacji.
      */
     data class ReviewPayload(
         val id: String,
@@ -139,7 +112,8 @@ object OfflinePayload {
         val rating: Int,
         val comment: String,
         val photoUrls: List<String>,
-        val photoHashes: Map<String, String>,
+        /** Mapa lub lista (legacy) hashy zdjęć. */
+        val photoHashes: Any?,
         val createdAtMillis: Long,
         val updatedAtMillis: Long
     )
@@ -182,7 +156,7 @@ object OfflinePayload {
             rating = payload.rating,
             comment = payload.comment,
             photoUrls = payload.photoUrls,
-            photoHashes = payload.photoHashes,
+            photoHashes = payload.photoHashes.toPhotoHashMap(),
             createdAtMillis = payload.createdAtMillis,
             updatedAtMillis = payload.updatedAtMillis
         )
@@ -208,4 +182,12 @@ object OfflinePayload {
         )
         return map["id"].orEmpty()
     }
+
+    private fun Any?.toPhotoHashMap(): Map<String, String> =
+        (this as? Map<*, *>)
+            ?.mapNotNull { (url, hash) ->
+                if (url is String && hash is String) url to hash else null
+            }
+            ?.toMap()
+            .orEmpty()
 }

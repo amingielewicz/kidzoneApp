@@ -14,21 +14,43 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn()
         && (
-          (request.auth.token.keys().hasAny(['admin'])
-            && request.auth.token.admin == true)
+          (
+            request.auth.token.keys().hasAny(['admin'])
+            && request.auth.token.admin == true
+          )
           || (
-            exists(/databases/$(database)/documents/users/$(request.auth.uid))
-            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+            exists(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            )
+            && get(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            ).data.role == 'admin'
           )
         );
     }
 
     function isNotUpdating(fields) {
-      return !(request.resource.data.diff(resource.data).affectedKeys().hasAny(fields));
+      return !request.resource.data
+        .diff(resource.data)
+        .affectedKeys()
+        .hasAny(fields);
     }
 
     function isValidRating(rating) {
-      return rating is number && rating >= 1 && rating <= 5;
+      return rating is number
+        && rating >= 1
+        && rating <= 5;
+    }
+
+    function hasValidPhotoHashes() {
+      let data = request.resource.data;
+      let photoHashes = data.get('photoHashes', {});
+      let photoUrls = data.get('photoUrls', []);
+      return photoHashes is map
+          && photoHashes.size() <= 5
+          && photoUrls is list
+          && photoHashes.keys().hasOnly(photoUrls)
+          && photoHashes.size() == photoUrls.size();
     }
 
     function hasNoPrivateUserFields() {
@@ -46,17 +68,141 @@ service cloud.firestore {
     }
 
     function isDeletingOnlyLegacyFcmTokens() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmTokens'])
+      return request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly(['fcmTokens'])
         && !request.resource.data.keys().hasAny(['fcmTokens']);
     }
 
-    function isReportCollection(collectionName) {
-      return collectionName in [
-        'place_reports',
-        'review_reports',
-        'photo_reports',
-        'place_change_requests'
-      ];
+    function isOnlyAddingPhotos() {
+      let data = request.resource.data;
+      let oldData = resource.data;
+      let affected = data.diff(oldData).affectedKeys();
+
+      // Tylko pola zdjęć mogą być zmieniane
+      let isPhotoField = affected.hasOnly(['photoUrls', 'photoUploadedBy', 'photoHashes']);
+
+      // Zabezpieczenie dla gości: mogą dodawać, ale nie mogą usuwać cudzych zdjęć
+      let currentUrls = data.get('photoUrls', []).toSet();
+      let oldUrls = oldData.get('photoUrls', []).toSet();
+      let noDeletion = currentUrls.hasAll(oldUrls);
+
+      return isPhotoField && noDeletion;
+    }
+
+    function isValidPlaceReport() {
+      let data = request.resource.data;
+      let reason = data.get('reason', null);
+      let comment = data.get('comment', null);
+      let status = data.get('status', null);
+
+      return data.keys().hasAll(['placeId', 'reporterId'])
+        && data.reporterId == request.auth.uid
+        && data.placeId is string
+        && (reason == null || (reason is string && reason in [
+          'INCORRECT_INFORMATION',
+          'CLOSED_OR_MISSING',
+          'DUPLICATE',
+          'INAPPROPRIATE_CONTENT',
+          'INAPPROPRIATE',
+          'OTHER'
+        ]))
+        && (comment == null || (comment is string && comment.size() <= 1000))
+        && (status == null || status == 'pending');
+    }
+
+    function isValidReviewReport() {
+      let data = request.resource.data;
+      let reason = data.get('reason', null);
+      let comment = data.get('comment', null);
+      let status = data.get('status', null);
+
+      return data.keys().hasAll(['reviewId', 'reporterId'])
+        && data.reporterId == request.auth.uid
+        && data.reviewId is string
+        && (reason == null || (reason is string && reason in [
+          'SPAM',
+          'OFFENSIVE',
+          'FALSE_INFO',
+          'NOT_RELEVANT',
+          'OTHER'
+        ]))
+        && (comment == null || (comment is string && comment.size() <= 1000))
+        && (status == null || status == 'pending');
+    }
+
+    function isValidPhotoReport() {
+      let data = request.resource.data;
+      let reason = data.get('reason', null);
+      let comment = data.get('comment', null);
+      let status = data.get('status', null);
+
+      return data.keys().hasAll(['photoUrl', 'reporterId'])
+        && data.reporterId == request.auth.uid
+        && data.photoUrl is string
+        && (reason == null || (reason is string && reason in [
+          'INAPPROPRIATE',
+          'NOT_RELEVANT',
+          'COPYRIGHT',
+          'OFFENSIVE',
+          'OTHER'
+        ]))
+        && (comment == null || (comment is string && comment.size() <= 1000))
+        && (status == null || status == 'pending');
+    }
+
+    function isValidPlaceChangeRequest() {
+      return request.resource.data.keys().hasAll([
+          'placeId',
+          'requesterId',
+          'reporterId',
+          'changes',
+          'comment',
+          'type',
+          'createdAtMillis',
+          'status'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'placeId',
+          'requesterId',
+          'reporterId',
+          'changes',
+          'comment',
+          'type',
+          'createdAtMillis',
+          'status'
+        ])
+        && request.resource.data.placeId is string
+        && request.resource.data.placeId.size() > 0
+        && request.resource.data.placeId.size() <= 128
+
+        && request.resource.data.requesterId is string
+        && request.resource.data.requesterId == request.auth.uid
+
+        && request.resource.data.reporterId is string
+        && request.resource.data.reporterId == request.auth.uid
+
+        && request.resource.data.changes is map
+        && request.resource.data.changes.size() > 0
+
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() <= 500
+
+        && request.resource.data.type is string
+        && request.resource.data.type in [
+          'EDIT'
+        ]
+
+        && request.resource.data.status is string
+        && request.resource.data.status == 'pending'
+
+        && request.resource.data.createdAtMillis is int
+        && request.resource.data.createdAtMillis > 0
+
+        && exists(
+          /databases/$(database)/documents/places/$(request.resource.data.placeId)
+        );
     }
 
     function isValidContactMessage() {
@@ -75,10 +221,15 @@ service cloud.firestore {
 
     function isValidSupportMail() {
       return isSignedIn()
-        && request.resource.data.to == ['bonoboczemunie@gmail.com']
+        && request.resource.data.to == [
+          'bonoboczemunie@gmail.com'
+        ]
+        && request.resource.data.message is map
         && request.resource.data.message.subject is string
         && request.resource.data.message.text is string
+        && request.resource.data.message.subject.size() > 0
         && request.resource.data.message.subject.size() <= 120
+        && request.resource.data.message.text.size() > 0
         && request.resource.data.message.text.size() <= 2000;
     }
 
@@ -91,7 +242,8 @@ service cloud.firestore {
         && request.resource.data.reviewsCount == 0
         && hasNoPrivateUserFields();
 
-      allow update: if (isOwner(userId)
+      allow update: if (
+          isOwner(userId)
           && isNotUpdating([
             'role',
             'bannedUntilMillis',
@@ -102,19 +254,20 @@ service cloud.firestore {
             'lastName',
             'emailNotificationsEnabled',
             'fcmTokens'
-          ]))
-          || (isOwner(userId) && isDeletingOnlyLegacyFcmTokens())
-          || isAdmin();
+          ])
+        )
+        || (
+          isOwner(userId)
+          && isDeletingOnlyLegacyFcmTokens()
+        )
+        || isAdmin();
 
       allow delete: if isAdmin();
 
       match /private/profile {
         allow read: if isOwner(userId) || isAdmin();
-
         allow create: if isOwner(userId);
-
         allow update: if isOwner(userId) || isAdmin();
-
         allow delete: if isAdmin();
       }
 
@@ -122,11 +275,14 @@ service cloud.firestore {
         allow read: if isOwner(userId) || isAdmin();
 
         allow create: if isOwner(userId)
+          && request.resource.data.userId is string
           && request.resource.data.userId == userId;
 
-        allow update: if (isOwner(userId)
+        allow update: if (
+            isOwner(userId)
             && resource.data.userId == userId
-            && request.resource.data.userId == userId)
+            && request.resource.data.userId == userId
+          )
           || isAdmin();
 
         allow delete: if isOwner(userId) || isAdmin();
@@ -137,57 +293,140 @@ service cloud.firestore {
       allow read: if true;
 
       allow create: if isSignedIn()
+        && request.resource.data.ownerUserId is string
         && request.resource.data.ownerUserId == request.auth.uid
+        && request.resource.data.averageRating is number
         && request.resource.data.averageRating == 0
-        && request.resource.data.reviewsCount == 0;
+        && request.resource.data.reviewsCount is int
+        && request.resource.data.reviewsCount == 0
+        && hasValidPhotoHashes();
 
-      allow update: if isAdmin()
-        || (isSignedIn()
+      allow update: if hasValidPhotoHashes()
+        && (
+          isAdmin()
+          || (
+            isSignedIn()
+            && (
+              // Właściciel miejsca może zmieniać wszystko poza licznikami (w tym USUWAĆ zdjęcia)
+              (resource.data.ownerUserId == request.auth.uid && isNotUpdating([
+                'averageRating',
+                'reviewsCount',
+                'ownerUserId'
+              ]))
+              // Osoby trzecie mogą tylko DODAWAC zdjęcia
+              || isOnlyAddingPhotos()
+            )
+          )
+        );
+
+      allow delete: if isAdmin()
+        || (
+          isSignedIn()
           && resource.data.ownerUserId == request.auth.uid
-          && isNotUpdating(['averageRating', 'reviewsCount', 'ownerUserId']));
-
-      allow delete: if isAdmin() || (isSignedIn() && resource.data.ownerUserId == request.auth.uid);
+        );
     }
 
     match /reviews/{reviewId} {
       allow read: if true;
 
       allow create: if isSignedIn()
+        && request.resource.data.userId is string
         && request.resource.data.userId == request.auth.uid
+        && request.resource.data.placeId is string
         && isValidRating(request.resource.data.rating)
-        && exists(/databases/$(database)/documents/places/$(request.resource.data.placeId))
-        && get(/databases/$(database)/documents/places/$(request.resource.data.placeId)).data.ownerUserId != request.auth.uid;
+        && exists(
+          /databases/$(database)/documents/places/$(request.resource.data.placeId)
+        )
+        && get(
+          /databases/$(database)/documents/places/$(request.resource.data.placeId)
+        ).data.ownerUserId != request.auth.uid;
 
       allow update: if isAdmin()
-        || (isOwner(resource.data.userId)
-          && isNotUpdating(['userId', 'placeId', 'createdAtMillis'])
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'rating',
-            'comment',
-            'photoUrls',
-            'updatedAtMillis'
+        || (
+          isOwner(resource.data.userId)
+          && isNotUpdating([
+            'userId',
+            'placeId',
+            'createdAtMillis'
           ])
-          && isValidRating(request.resource.data.rating));
+          && request.resource.data
+            .diff(resource.data)
+            .affectedKeys()
+            .hasOnly([
+              'rating',
+              'comment',
+              'photoUrls',
+              'photoHashes',
+              'updatedAtMillis'
+            ])
+          && isValidRating(request.resource.data.rating)
+        );
 
-      allow delete: if isAdmin() || isOwner(resource.data.userId);
+      allow delete: if isAdmin()
+        || isOwner(resource.data.userId);
     }
 
-    match /{reportCollection}/{reportId} {
-      allow create: if isReportCollection(reportCollection)
-        && isSignedIn()
-        && request.resource.data.reporterId == request.auth.uid;
-      allow read: if isReportCollection(reportCollection)
-        && (isAdmin() || (isSignedIn() && resource.data.reporterId == request.auth.uid));
-      allow update, delete: if isReportCollection(reportCollection) && isAdmin();
+    match /place_reports/{reportId} {
+      allow create: if isSignedIn()
+        && isValidPlaceReport();
 
-      match /placeholder {
-        allow read: if isReportCollection(reportCollection);
-      }
+      allow read: if isAdmin()
+        || (
+          isSignedIn()
+          && resource.data.reporterId == request.auth.uid
+        );
+
+      allow update, delete: if isAdmin();
+    }
+
+   match /review_reports/{reportId} {
+     allow create: if isSignedIn()
+       && isValidReviewReport();
+
+     allow read: if isAdmin()
+       || (
+         isSignedIn()
+         && resource.data.reporterId == request.auth.uid
+       );
+
+     allow update, delete: if isAdmin();
+   }
+
+    match /photo_reports/{reportId} {
+      allow create: if isSignedIn()
+        && isValidPhotoReport();
+
+      allow read: if isAdmin()
+        || (
+          isSignedIn()
+          && resource.data.reporterId == request.auth.uid
+        );
+
+      allow update, delete: if isAdmin();
+    }
+
+    match /place_change_requests/{requestId} {
+      allow create: if isSignedIn()
+        && isValidPlaceChangeRequest();
+
+      allow read: if isAdmin()
+        || (
+          isSignedIn()
+          && resource.data.reporterId == request.auth.uid
+        );
+
+      allow update, delete: if isAdmin();
     }
 
     match /contact_messages/{messageId} {
       allow create: if isValidContactMessage();
-      allow read: if isAdmin() || (isSignedIn() && resource.data.reporterId == request.auth.uid);
+
+      allow read: if isAdmin()
+        || (
+          isSignedIn()
+          && resource.data.reporterId == request.auth.uid
+        );
+
       allow update, delete: if isAdmin();
     }
 

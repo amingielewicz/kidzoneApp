@@ -1,4 +1,9 @@
-@file:Suppress("LargeClass", "LongParameterList", "ReturnCount")
+@file:Suppress(
+    "LargeClass",
+    "LongParameterList",
+    "ReturnCount",
+    "TooGenericExceptionCaught"
+)
 
 package com.kidzone.presentation.place.details
 
@@ -8,6 +13,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.R
+import com.kidzone.analytics.AnalyticsHelper
+import com.kidzone.analytics.PlaceReportReason
+import com.kidzone.analytics.ReviewReportReason
+import com.kidzone.analytics.PhotoReportReason
 import com.kidzone.data.repository.FirestoreReviewRepository
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.Review
@@ -21,6 +30,7 @@ import com.kidzone.navigation.Route
 import com.kidzone.presentation.place.add.PLACE_NAME_MAX_LENGTH
 import com.kidzone.review.InAppReviewManager
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.PhotoHasher
 import com.kidzone.utils.PhotoUploader
 import com.kidzone.utils.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -33,49 +43,23 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.CancellationException
+import java.util.UUID
 import java.util.concurrent.TimeoutException
 import javax.inject.Inject
+import timber.log.Timber
 
 private const val TOP_RANKING_POOL = 100
 private const val MAX_PLACE_PHOTOS_ON_DETAILS = 5
 private const val TOP_RANKING_BADGE_LIMIT = 10
+private const val PLACE_PHOTO_UPLOAD_TIMEOUT_MS = 30_000L
 
 /**
  * 🎯 Odpowiedzialności:
  * - Zarządzanie stanem wyświetlania szczegółów miejsca i jego opinii.
  * - Obsługa akcji użytkownika (dodawanie/edycja opinii, zgłaszanie, usuwanie).
  * - Obliczanie agregatów ocen i statusu rankingowego na poziomie UI.
- *
- * 🚫 Poza zakresem:
- * - Brak decyzji o offline queue (obsługiwane przez Repository).
- * - Brak retry logiki dla operacji sieciowych.
- * - Brak zarządzania sesją użytkownika.
- *
- * 📥 Wejście:
- * - [SavedStateHandle] z wymaganym ID miejsca.
- * - Strumienie danych o miejscu i opiniach z repozytoriów.
- *
- * 📤 Wyjście:
- * - Stan UI zawierający szczegóły miejsca, autora i listę opinii.
- * - Stan formularza opinii i status operacji (usuwanie, zgłaszanie).
- *
- * ✅ Gwarancje:
- * - Spójność między nowo dodaną opinią a lokalnym stanem miejsca.
- *
- * 🔌 Offline:
- * - Wspiera odczyt danych z cache Room i synchronizację zmian po powrocie sieci.
- *
- * 🧵 Wątki:
- * - viewModelScope dla wszystkich operacji asynchronicznych.
- * - Brak blokujących operacji na wątku Main.
- *
- * 🧪 Testowalność:
- * - Pełne DI.
- * - Brak zależności od singletonów.
- * - Deterministyczne zachowanie stanu na podstawie danych z repozytoriów.
- *
- * 🧼 Lifecycle:
- * - Reaktywne śledzenie zmian w miejscu i opiniach przez cały czas życia ekranu.
  */
 @HiltViewModel
 class PlaceDetailsViewModel @Inject constructor(
@@ -86,7 +70,9 @@ class PlaceDetailsViewModel @Inject constructor(
     private val locationProvider: LocationProvider,
     private val photoUploader: PhotoUploader,
     private val imageCompressor: ImageCompressorPort,
-    private val inAppReviewManager: InAppReviewManager
+    private val photoHasher: PhotoHasher,
+    private val inAppReviewManager: InAppReviewManager,
+    private val analyticsHelper: AnalyticsHelper
 ) : ViewModel() {
 
     data class UiState(
@@ -202,7 +188,7 @@ class PlaceDetailsViewModel @Inject constructor(
                     }
                     loadAuthor(result.data.ownerUserId)
                     loadTopRank()
-                    seedPlacePhotoHashes(result.data.photoHashes)
+                    seedPlacePhotoHashes(result.data.photoHashes.values)
                     loadUserReports()
                 }
 
@@ -435,40 +421,39 @@ class PlaceDetailsViewModel @Inject constructor(
         comment: String,
         photoUris: List<android.net.Uri>
     ) {
+        val targetReviewId = UUID.randomUUID().toString()
         val uploadedPhotoUrls = mutableListOf<String>()
-        val uploadedHashes = mutableMapOf<String, String>()
-        val currentHashes = mutableSetOf<String>() // to avoid duplicates in same upload batch
-        
+        val photoHashesMap = mutableMapOf<String, String>()
+        val seenHashes = mutableSetOf<String>()
+
         for (uri in photoUris) {
             val bytes = imageCompressor.compressToWebp(uri)
             if (bytes != null) {
-                val hash = java.security.MessageDigest.getInstance("MD5")
-                    .digest(bytes)
-                    .joinToString("") { "%02x".format(it) }
-                if (hash in currentHashes) continue
-                currentHashes.add(hash)
+                val hash = photoHasher.computeHash(bytes)
+                if (photoHasher.isDuplicate(hash, seenHashes)) continue
+                seenHashes.add(hash)
                 try {
                     val url = photoUploader.uploadReviewPhoto(
                         ownerUserId = user.id,
-                        reviewId = "pending_${System.currentTimeMillis()}",
+                        reviewId = targetReviewId,
                         imageBytes = bytes
                     )
                     uploadedPhotoUrls.add(url)
-                    uploadedHashes[url] = hash
+                    photoHashesMap[url] = hash
                 } catch (_: Exception) {
                 }
             }
         }
 
         val review = Review(
-            id = "",
+            id = targetReviewId,
             placeId = place.id,
             userId = user.id,
             authorName = user.name,
             rating = rating,
             comment = comment.trim(),
             photoUrls = uploadedPhotoUrls,
-            photoHashes = uploadedHashes,
+            photoHashes = photoHashesMap,
             createdAtMillis = System.currentTimeMillis()
         )
 
@@ -512,24 +497,28 @@ class PlaceDetailsViewModel @Inject constructor(
         photoUris: List<android.net.Uri>,
         retainedPhotoUrls: List<String>
     ) {
-        val existingHashes = existing.photoHashes
-            .filterKeys { it in retainedPhotoUrls }
-            .toMutableMap()
-        val allExistingMD5s = existing.photoHashes.values.toSet()
+        val finalHashesMap = mutableMapOf<String, String>()
+        val seenHashes = mutableSetOf<String>()
+
+        for (url in retainedPhotoUrls) {
+            existing.photoHashes[url]?.let { hash ->
+                finalHashesMap[url] = hash
+                seenHashes.add(hash)
+            }
+        }
 
         val newUploadedUrls = mutableListOf<String>()
-        val newUploadedHashes = mutableMapOf<String, String>()
         var reviewDuplicatesSkipped = 0
+
         for (uri in photoUris) {
             val bytes = imageCompressor.compressToWebp(uri)
             if (bytes != null) {
-                val hash = java.security.MessageDigest.getInstance("MD5")
-                    .digest(bytes)
-                    .joinToString("") { "%02x".format(it) }
-                if (hash in allExistingMD5s) {
+                val hash = photoHasher.computeHash(bytes)
+                if (photoHasher.isDuplicate(hash, seenHashes)) {
                     reviewDuplicatesSkipped++
                     continue
                 }
+                seenHashes.add(hash)
                 try {
                     val url = photoUploader.uploadReviewPhoto(
                         ownerUserId = existing.userId,
@@ -537,7 +526,7 @@ class PlaceDetailsViewModel @Inject constructor(
                         imageBytes = bytes
                     )
                     newUploadedUrls.add(url)
-                    newUploadedHashes[url] = hash
+                    finalHashesMap[url] = hash
                 } catch (_: Exception) {
                 }
             }
@@ -558,26 +547,26 @@ class PlaceDetailsViewModel @Inject constructor(
         }
 
         val finalPhotoUrls = retainedPhotoUrls + newUploadedUrls
-        val finalPhotoHashes = existingHashes + newUploadedHashes
-
         val removedUrls = existing.photoUrls.filter { it !in retainedPhotoUrls }
-        for (url in removedUrls) {
-            try {
-                photoUploader.deletePhoto(url)
-            } catch (_: Exception) {
-            }
-        }
 
         val updated = existing.copy(
             rating = rating,
             comment = comment.trim(),
             photoUrls = finalPhotoUrls,
-            photoHashes = finalPhotoHashes,
+            photoHashes = finalHashesMap,
             updatedAtMillis = System.currentTimeMillis()
         )
 
         when (val result = reviewRepository.updateReview(updated)) {
             is OpResult.Success -> {
+                for (url in removedUrls) {
+                    try {
+                        photoUploader.deletePhoto(url)
+                    } catch (e: Exception) {
+                        Timber.e(e, "Could not delete review photo: $url")
+                    }
+                }
+
                 val count = place.reviewsCount
                 val oldAvg = place.averageRating
                 val oldRating = existing.rating
@@ -624,47 +613,50 @@ class PlaceDetailsViewModel @Inject constructor(
         }
     }
 
-    fun reportPlace(reason: String, comment: String = "") {
+    fun reportPlace(reason: PlaceReportReason, comment: String = "") {
         val place = _uiState.value.place ?: return
         val user = currentUser.value ?: return
         viewModelScope.launch {
             val result = placeRepository.reportPlace(
                 placeId = place.id,
                 reporterId = user.id,
-                reason = reason,
+                reason = reason.name,
                 comment = comment
             )
             if (result is OpResult.Success) {
+                analyticsHelper.logReportPlace(reason)
                 _uiState.update { it.copy(isPlaceReported = true) }
             }
         }
     }
 
-    fun reportReview(reviewId: String, reason: String, comment: String = "") {
+    fun reportReview(reviewId: String, reason: ReviewReportReason, comment: String = "") {
         val user = currentUser.value ?: return
         viewModelScope.launch {
             val result = reviewRepository.reportReviewAsSpam(
                 reviewId = reviewId,
                 reporterId = user.id,
-                reason = reason,
+                reason = reason.name,
                 comment = comment
             )
             if (result is OpResult.Success) {
+                analyticsHelper.logReportReview(reason)
                 _uiState.update { it.copy(reportedReviewIds = it.reportedReviewIds + reviewId) }
             }
         }
     }
 
-    fun reportPhoto(photoUrl: String, reason: String, comment: String = "") {
+    fun reportPhoto(photoUrl: String, reason: PhotoReportReason, comment: String = "") {
         val user = currentUser.value ?: return
         viewModelScope.launch {
             val result = placeRepository.reportPhoto(
                 photoUrl = photoUrl,
                 reporterId = user.id,
-                reason = reason,
+                reason = reason.name,
                 comment = comment
             )
             if (result is OpResult.Success) {
+                analyticsHelper.logReportPhoto(reason)
                 _uiState.update { it.copy(reportedPhotoUrls = it.reportedPhotoUrls + photoUrl) }
             }
         }
@@ -691,19 +683,27 @@ class PlaceDetailsViewModel @Inject constructor(
     }
 
     fun addPhotosToPlace(photoUris: List<android.net.Uri>) {
-        if (photoUris.isEmpty()) {
-            return
-        }
+        if (photoUris.isEmpty()) return
         val user = currentUser.value ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isUploadingPlacePhoto = true) }
-            val duplicateSkipped = uploadPickedPlacePhotos(photoUris, user.id)
-
-            _uiState.update {
-                it.copy(
-                    isUploadingPlacePhoto = false,
-                    placePhotoDuplicateEvent = it.placePhotoDuplicateEvent || duplicateSkipped
-                )
+            var duplicateSkipped = false
+            try {
+                val result = withTimeoutOrNull(PLACE_PHOTO_UPLOAD_TIMEOUT_MS) {
+                    uploadPickedPlacePhotos(photoUris, user.id)
+                }
+                duplicateSkipped = result ?: false
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Could not add photos to place")
+            } finally {
+                _uiState.update {
+                    it.copy(
+                        isUploadingPlacePhoto = false,
+                        placePhotoDuplicateEvent = it.placePhotoDuplicateEvent || duplicateSkipped
+                    )
+                }
             }
         }
     }
@@ -731,11 +731,9 @@ class PlaceDetailsViewModel @Inject constructor(
     ): PlacePhotoUploadResult {
         val newBytes = imageCompressor.compressToWebp(photoUri)
             ?: return PlacePhotoUploadResult.SKIPPED
-        val newHash = java.security.MessageDigest.getInstance("MD5")
-            .digest(newBytes)
-            .joinToString("") { "%02x".format(it) }
+        val newHash = photoHasher.computeHash(newBytes)
 
-        if (newHash in placePhotoHashes) {
+        if (photoHasher.isDuplicate(newHash, placePhotoHashes)) {
             return PlacePhotoUploadResult.DUPLICATE
         }
 
@@ -745,7 +743,7 @@ class PlaceDetailsViewModel @Inject constructor(
                 placeId = place.id,
                 imageBytes = newBytes
             )
-            when (placeRepository.addPhotoWithHash(place.id, url, userId, newHash)) {
+            when (placeRepository.addPhotoUrl(place.id, url, userId, newHash)) {
                 is OpResult.Success -> {
                     addUploadedPlacePhoto(url, userId, newHash)
                     PlacePhotoUploadResult.ADDED
@@ -753,7 +751,10 @@ class PlaceDetailsViewModel @Inject constructor(
 
                 is OpResult.Failure -> PlacePhotoUploadResult.SKIPPED
             }
-        } catch (_: Exception) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e, "Could not upload place photo")
             PlacePhotoUploadResult.SKIPPED
         }
     }
@@ -772,7 +773,8 @@ class PlaceDetailsViewModel @Inject constructor(
                 state.copy(
                     place = place.copy(
                         photoUrls = place.photoUrls + url,
-                        photoUploadedBy = place.photoUploadedBy + (url to userId)
+                        photoUploadedBy = place.photoUploadedBy + (url to userId),
+                        photoHashes = place.photoHashes + (url to hash)
                     )
                 )
             }
@@ -806,7 +808,7 @@ class PlaceDetailsViewModel @Inject constructor(
                             isUploadingPlacePhoto = false
                         )
                     }
-                    seedPlacePhotoHashes((_uiState.value.place?.photoHashes).orEmpty())
+                    seedPlacePhotoHashes((_uiState.value.place?.photoHashes?.values).orEmpty())
                 }
 
                 is OpResult.Failure -> {
@@ -846,9 +848,9 @@ class PlaceDetailsViewModel @Inject constructor(
         }
     }
 
-    private fun seedPlacePhotoHashes(hashes: Map<String, String>) {
+    private fun seedPlacePhotoHashes(hashes: Collection<String>) {
         placePhotoHashes.clear()
-        placePhotoHashes.addAll(hashes.values)
+        placePhotoHashes.addAll(hashes)
     }
 
     fun submitSuggestedEdit(

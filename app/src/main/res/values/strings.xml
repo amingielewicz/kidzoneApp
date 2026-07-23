@@ -397,6 +397,8 @@
     <string name="maintenance_title">Przerwa techniczna</string>
     <string name="maintenance_message">Aplikacja jest chwilowo niedostępna. Spróbuj ponownie później.</string>
     <string name="retry">Spróbuj ponownie</string>
+    <string name="profile_load_error">Nie udało się wczytać profilu.</string>
+    <string name="screen_load_error">Nie udało się wczytać danych.</string>
     <string name="uploading_photo">Przesyłanie zdjęcia...</string>
     <string name="gallery">Galeria</string>
     <string name="gallery_with_count">Galeria (%1$d/5)</string>

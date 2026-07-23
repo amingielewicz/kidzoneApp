@@ -52,3 +52,11 @@ data class ReviewDto(
         )
     }
 }
+
+private fun Any?.toPhotoHashMap(): Map<String, String> =
+    (this as? Map<*, *>)
+        ?.mapNotNull { (url, hash) ->
+            if (url is String && hash is String) url to hash else null
+        }
+        ?.toMap()
+        .orEmpty()

@@ -116,11 +116,14 @@ class FirestoreReviewRepository @Inject constructor(
             "Review.comment exceeds the ${AppConfig.REVIEW_COMMENT_MAX_LENGTH} character limit"
         }
 
-        val reviewRef = reviewsCollection().document()
-        val reviewWithId = review.copy(id = reviewRef.id)
+        val reviewId = review.id.ifBlank {
+            reviewsCollection().document().id
+        }
+
+        val reviewWithId = review.copy(id = reviewId)
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
-            reviewsCollection().document(reviewRef.id)
+            reviewsCollection().document(reviewId)
                 .set(ReviewDto.fromDomain(reviewWithId))
                 .await()
             true

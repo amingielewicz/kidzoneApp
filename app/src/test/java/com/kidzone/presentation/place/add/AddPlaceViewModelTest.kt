@@ -2,6 +2,7 @@ package com.kidzone.presentation.place.add
 
 import androidx.lifecycle.SavedStateHandle
 import com.kidzone.domain.model.Amenity
+import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
@@ -11,11 +12,13 @@ import com.kidzone.review.InAppReviewManager
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.PhotoHasher
 import com.kidzone.utils.PhotoUploader
 import com.kidzone.utils.UiText
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -62,6 +65,7 @@ class AddPlaceViewModelTest {
     private lateinit var authRepository: AuthRepository
     private lateinit var photoUploader: PhotoUploader
     private lateinit var imageCompressor: ImageCompressorPort
+    private lateinit var photoHasher: PhotoHasher
     private lateinit var inAppReviewManager: InAppReviewManager
 
     private val currentUserFlow = MutableStateFlow(TestFixtures.user())
@@ -73,6 +77,7 @@ class AddPlaceViewModelTest {
         authRepository = mockk(relaxed = true)
         photoUploader = mockk(relaxed = true)
         imageCompressor = mockk(relaxed = true)
+        photoHasher = PhotoHasher()
         inAppReviewManager = mockk(relaxed = true)
 
         every { authRepository.currentUser } returns currentUserFlow
@@ -90,6 +95,7 @@ class AddPlaceViewModelTest {
             authRepository,
             photoUploader,
             imageCompressor,
+            photoHasher,
             inAppReviewManager
         )
     }
@@ -309,6 +315,36 @@ class AddPlaceViewModelTest {
             advanceUntilIdle()
 
             assertTrue(viewModel.uiState.value.isSaved)
+        }
+
+        @Test
+        fun `saving one photo persists URL uploader and hash map`() = runTest {
+            val uri = mockk<android.net.Uri>()
+            val bytes = "photo-content".encodeToByteArray()
+            val photoUrl = "https://example.com/place-photo.webp"
+            val expectedHash = java.security.MessageDigest.getInstance("MD5")
+                .digest(bytes)
+                .joinToString("") { "%02x".format(it) }
+            val placeSlot = slot<Place>()
+            coEvery { imageCompressor.compressToWebp(uri) } returns bytes
+            coEvery { photoUploader.uploadPlacePhoto(any(), any(), bytes) } returns photoUrl
+            coEvery { placeRepository.addPlace(capture(placeSlot)) } answers {
+                OpResult.success(placeSlot.captured.copy(id = "place-1"))
+            }
+            coEvery { placeRepository.getPlacesNear(any(), any(), any()) } returns
+                OpResult.success(emptyList())
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.onNameChange("New Place")
+            viewModel.onLocationFetched(52.5, 21.5, "Test Address")
+            viewModel.addPhotos(listOf(uri))
+            viewModel.save()
+            advanceUntilIdle()
+
+            assertEquals(listOf(photoUrl), placeSlot.captured.photoUrls)
+            assertEquals(mapOf(photoUrl to currentUserFlow.value.id), placeSlot.captured.photoUploadedBy)
+            assertEquals(mapOf(photoUrl to expectedHash), placeSlot.captured.photoHashes)
         }
 
         @Test
