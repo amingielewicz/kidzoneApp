@@ -134,9 +134,7 @@ class ProfileViewModel @Inject constructor(
         .flatMapLatest {
             authRepository.currentUser.flatMapLatest { current ->
                 if (current == null) {
-                    // Jeśli użytkownik jest null, oznacza to że się wylogował lub sesja wygasła.
-                    // Nie pokazujemy błędu, tylko stan ładowania, bo i tak zaraz nastąpi nawigacja.
-                    flowOf(ScreenState.Loading)
+                    flowOf(ScreenState.Error(UiText.StringResource(R.string.error_unauthorized)))
                 } else {
                     authRepository.observeUser(current.id)
                         .map { user ->
