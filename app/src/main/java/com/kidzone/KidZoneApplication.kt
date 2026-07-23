@@ -62,7 +62,7 @@ class KidZoneApplication : Application() {
         super.onCreate()
 
         initTimber()
-        configureFirebaseEmulators()
+        // configureFirebaseEmulators() // Wyłączone, aby telefon łączył się z bazą online
         coldStartTrace.start()
         initDebugTools()
         initAppCheck()

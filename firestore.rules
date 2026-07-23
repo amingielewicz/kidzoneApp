@@ -44,15 +44,14 @@ service cloud.firestore {
 
     function hasValidPhotoHashes() {
       let data = request.resource.data;
-      let hasHashes = 'photoHashes' in data.keys();
-      let hasUrls = 'photoUrls' in data.keys();
-      return !hasHashes || (
-          data.photoHashes is map
-          && data.photoHashes.size() <= 5
-          && hasUrls
-          && data.photoUrls is list
-          && data.photoHashes.keys().hasOnly(data.photoUrls)
-          && data.photoHashes.size() == data.photoUrls.size()
+      let photoHashes = data.get('photoHashes', null);
+      let photoUrls = data.get('photoUrls', null);
+      return photoHashes == null || (
+          photoHashes is map
+          && photoHashes.size() <= 5
+          && photoUrls is list
+          && photoHashes.keys().hasOnly(photoUrls)
+          && photoHashes.size() == photoUrls.size()
         );
     }
 
@@ -99,10 +98,14 @@ service cloud.firestore {
 
     function isValidPlaceReport() {
       let data = request.resource.data;
+      let reason = data.get('reason', null);
+      let comment = data.get('comment', null);
+      let status = data.get('status', null);
+
       return data.keys().hasAll(['placeId', 'reporterId'])
         && data.reporterId == request.auth.uid
         && data.placeId is string
-        && (!('reason' in data) || (data.reason is string && data.reason in [
+        && (reason == null || (reason is string && reason in [
           'INCORRECT_INFORMATION',
           'CLOSED_OR_MISSING',
           'DUPLICATE',
@@ -110,40 +113,48 @@ service cloud.firestore {
           'INAPPROPRIATE',
           'OTHER'
         ]))
-        && (!('comment' in data) || (data.comment is string && data.comment.size() <= 1000))
-        && (!('status' in data) || data.status == 'pending');
+        && (comment == null || (comment is string && comment.size() <= 1000))
+        && (status == null || status == 'pending');
     }
 
     function isValidReviewReport() {
       let data = request.resource.data;
+      let reason = data.get('reason', null);
+      let comment = data.get('comment', null);
+      let status = data.get('status', null);
+
       return data.keys().hasAll(['reviewId', 'reporterId'])
         && data.reporterId == request.auth.uid
         && data.reviewId is string
-        && (!('reason' in data) || (data.reason is string && data.reason in [
+        && (reason == null || (reason is string && reason in [
           'SPAM',
           'OFFENSIVE',
           'FALSE_INFO',
           'NOT_RELEVANT',
           'OTHER'
         ]))
-        && (!('comment' in data) || (data.comment is string && data.comment.size() <= 1000))
-        && (!('status' in data) || data.status == 'pending');
+        && (comment == null || (comment is string && comment.size() <= 1000))
+        && (status == null || status == 'pending');
     }
 
     function isValidPhotoReport() {
       let data = request.resource.data;
+      let reason = data.get('reason', null);
+      let comment = data.get('comment', null);
+      let status = data.get('status', null);
+
       return data.keys().hasAll(['photoUrl', 'reporterId'])
         && data.reporterId == request.auth.uid
         && data.photoUrl is string
-        && (!('reason' in data) || (data.reason is string && data.reason in [
+        && (reason == null || (reason is string && reason in [
           'INAPPROPRIATE',
           'NOT_RELEVANT',
           'COPYRIGHT',
           'OFFENSIVE',
           'OTHER'
         ]))
-        && (!('comment' in data) || (data.comment is string && data.comment.size() <= 1000))
-        && (!('status' in data) || data.status == 'pending');
+        && (comment == null || (comment is string && comment.size() <= 1000))
+        && (status == null || status == 'pending');
     }
 
     function isValidPlaceChangeRequest() {
