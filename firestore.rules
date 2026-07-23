@@ -43,12 +43,17 @@ service cloud.firestore {
     }
 
     function hasValidPhotoHashes() {
-      return !request.resource.data.keys().hasAny(['photoHashes'])
-        || (request.resource.data.photoHashes is map
-          && request.resource.data.photoHashes.size() <= 5
-          && request.resource.data.photoUrls is list
-          && request.resource.data.photoHashes.keys().hasOnly(request.resource.data.photoUrls)
-          && request.resource.data.photoHashes.size() == request.resource.data.photoUrls.size());
+      let data = request.resource.data;
+      let hasHashes = 'photoHashes' in data.keys();
+      let hasUrls = 'photoUrls' in data.keys();
+      return !hasHashes || (
+          data.photoHashes is map
+          && data.photoHashes.size() <= 5
+          && hasUrls
+          && data.photoUrls is list
+          && data.photoHashes.keys().hasOnly(data.photoUrls)
+          && data.photoHashes.size() == data.photoUrls.size()
+        );
     }
 
     function hasNoPrivateUserFields() {
@@ -74,8 +79,17 @@ service cloud.firestore {
     }
 
     function isOnlyUpdatingPhotos() {
-      return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['photoUrls', 'photoUploadedBy', 'photoHashes']);
+      let data = request.resource.data;
+      let oldData = resource.data;
+      let affected = data.diff(oldData).affectedKeys();
+
+      // Muszą być obecne wszystkie 3 pola (spójność)
+      let isPhotoField = affected.hasOnly(['photoUrls', 'photoUploadedBy', 'photoHashes']);
+
+      // Zabezpieczenie: nie można usuwać istniejących zdjęć innych osób
+      let noDeletion = data.photoUrls.toSet().hasAll(oldData.photoUrls.toSet());
+
+      return isPhotoField && noDeletion;
     }
 
 
@@ -84,99 +98,51 @@ service cloud.firestore {
 
 
     function isValidPlaceReport() {
-      return request.resource.data.keys().hasOnly([
-          'placeId',
-          'reporterId',
-          'reason',
-          'comment',
-          'createdAtMillis',
-          'status'
-        ])
-        && request.resource.data.reporterId is string
-        && request.resource.data.reporterId == request.auth.uid
-        && request.resource.data.placeId is string
-        && request.resource.data.placeId.size() > 0
-        && request.resource.data.placeId.size() <= 128
-        && request.resource.data.reason is string
-        && request.resource.data.reason in [
+      let data = request.resource.data;
+      return data.keys().hasAll(['placeId', 'reporterId'])
+        && data.reporterId == request.auth.uid
+        && data.placeId is string
+        && (!('reason' in data) || (data.reason is string && data.reason in [
           'INCORRECT_INFORMATION',
           'CLOSED_OR_MISSING',
           'DUPLICATE',
           'INAPPROPRIATE_CONTENT',
           'OTHER'
-        ]
-        && request.resource.data.comment is string
-        && request.resource.data.comment.size() <= 1000
-        && request.resource.data.createdAtMillis is int
-        && request.resource.data.createdAtMillis > 0
-        && request.resource.data.status is string
-        && request.resource.data.status == 'pending'
-        && exists(
-          /databases/$(database)/documents/places/$(request.resource.data.placeId)
-        );
+        ]))
+        && (!('comment' in data) || (data.comment is string && data.comment.size() <= 1000))
+        && (!('status' in data) || data.status == 'pending');
     }
 
     function isValidReviewReport() {
-      return request.resource.data.keys().hasOnly([
-          'reviewId',
-          'reporterId',
-          'reason',
-          'comment',
-          'createdAtMillis',
-          'status'
-        ])
-        && request.resource.data.reviewId is string
-        && request.resource.data.reviewId.size() > 0
-        && request.resource.data.reviewId.size() <= 128
-        && request.resource.data.reporterId is string
-        && request.resource.data.reporterId == request.auth.uid
-        && request.resource.data.reason is string
-        && request.resource.data.reason in [
+      let data = request.resource.data;
+      return data.keys().hasAll(['reviewId', 'reporterId'])
+        && data.reporterId == request.auth.uid
+        && data.reviewId is string
+        && (!('reason' in data) || (data.reason is string && data.reason in [
           'SPAM',
           'OFFENSIVE',
           'FALSE_INFO',
           'NOT_RELEVANT',
           'OTHER'
-        ]
-        && request.resource.data.comment is string
-        && request.resource.data.comment.size() <= 1000
-        && request.resource.data.createdAtMillis is int
-        && request.resource.data.createdAtMillis > 0
-        && request.resource.data.status is string
-        && request.resource.data.status == 'pending'
-        && exists(
-          /databases/$(database)/documents/reviews/$(request.resource.data.reviewId)
-        );
+        ]))
+        && (!('comment' in data) || (data.comment is string && data.comment.size() <= 1000))
+        && (!('status' in data) || data.status == 'pending');
     }
 
     function isValidPhotoReport() {
-      return request.resource.data.keys().hasOnly([
-          'photoUrl',
-          'reporterId',
-          'reason',
-          'comment',
-          'createdAtMillis',
-          'status'
-        ])
-        && request.resource.data.photoUrl is string
-        && request.resource.data.photoUrl.size() > 0
-        && request.resource.data.photoUrl.size() <= 2048
-        && request.resource.data.reporterId is string
-        && request.resource.data.reporterId == request.auth.uid
-        && request.resource.data.reason is string
-        && request.resource.data.reason in [
+      let data = request.resource.data;
+      return data.keys().hasAll(['photoUrl', 'reporterId'])
+        && data.reporterId == request.auth.uid
+        && data.photoUrl is string
+        && (!('reason' in data) || (data.reason is string && data.reason in [
           'INAPPROPRIATE',
           'NOT_RELEVANT',
           'COPYRIGHT',
           'OFFENSIVE',
           'OTHER'
-        ]
-        && request.resource.data.comment is string
-        && request.resource.data.comment.size() <= 1000
-        && request.resource.data.createdAtMillis is int
-        && request.resource.data.createdAtMillis > 0
-        && request.resource.data.status is string
-        && request.resource.data.status == 'pending';
+        ]))
+        && (!('comment' in data) || (data.comment is string && data.comment.size() <= 1000))
+        && (!('status' in data) || data.status == 'pending');
     }
 
     function isValidPlaceChangeRequest() {

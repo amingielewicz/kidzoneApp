@@ -25,7 +25,7 @@ service firebase.storage {
 
     function isImageUnder(maxSizeBytes) {
       return request.resource != null
-        && request.resource.size <= maxSizeBytes
+        && request.resource.size < maxSizeBytes
         && isAcceptedImageContentType();
     }
 
