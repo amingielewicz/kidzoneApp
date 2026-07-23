@@ -107,6 +107,7 @@ service cloud.firestore {
           'CLOSED_OR_MISSING',
           'DUPLICATE',
           'INAPPROPRIATE_CONTENT',
+          'INAPPROPRIATE',
           'OTHER'
         ]))
         && (!('comment' in data) || (data.comment is string && data.comment.size() <= 1000))
