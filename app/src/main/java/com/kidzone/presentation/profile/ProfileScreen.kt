@@ -103,6 +103,7 @@ import com.kidzone.presentation.common.ModalTextButton
 import com.kidzone.presentation.common.NotificationPromptReason
 import com.kidzone.presentation.common.NotificationSoftPromptDialog
 import com.kidzone.presentation.common.RankBadge
+import com.kidzone.presentation.common.ScreenStateContent
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.rememberHapticFeedback
 import com.kidzone.presentation.common.rememberReducedMotionEnabled
@@ -146,6 +147,7 @@ fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val user by viewModel.user.collectAsState()
+    val profileState by viewModel.profileState.collectAsState()
     val ui by viewModel.uiState.collectAsState()
 
     val context = LocalContext.current
@@ -193,11 +195,15 @@ fun ProfileScreen(
             onRefresh = { viewModel.refreshProfile() },
             modifier = Modifier.fillMaxSize(),
         ) {
-            if (user == null) {
-                ProfileSkeleton()
-            } else {
-                ProfileContent(
-                    user = user!!,
+            ScreenStateContent(
+                state = profileState,
+                onRetry = viewModel::retryProfile,
+                loading = { ProfileSkeleton() },
+                fallbackActionLabel = stringResource(R.string.sign_out),
+                onFallbackAction = { viewModel.signOut(onSignOut) },
+                content = { loadedUser ->
+                    ProfileContent(
+                    user = loadedUser,
                     signInProvider = ui.signInProvider,
                     obtainedBadges = ui.obtainedBadges,
                     userRank = ui.userRank,
@@ -216,8 +222,9 @@ fun ProfileScreen(
                     selectedLanguage = ui.selectedLanguage,
                     onLanguageSettings = viewModel::openLanguageDialog,
                     onSignOut = { viewModel.signOut(onSignOut) },
-                )
-            }
+                    )
+                },
+            )
         }
 
         SnackbarHost(
@@ -237,6 +244,7 @@ fun ProfileScreen(
             initialLastName = user!!.lastName,
             currentAvatarUrl = user!!.avatarUrl,
             isSaving = ui.isSaving,
+            isOffline = isOffline,
             errorMessage = ui.saveError,
             onDismiss = viewModel::dismissEditSheet,
             onSave = { displayName, firstName, lastName, newAvatarUri ->
@@ -1087,7 +1095,7 @@ private fun AccountSecurityCard(
     }
 }
 
-@Suppress("FunctionNaming", "LongParameterList")
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 @Composable
 private fun SettingsCard(
     onTermsOfService: () -> Unit,

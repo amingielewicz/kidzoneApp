@@ -87,6 +87,7 @@ fun AddReviewSheet(
     initialRating: Int = 0,
     initialComment: String = "",
     initialPhotoUrls: List<String> = emptyList(),
+    initialPhotoHashes: Map<String, String> = emptyMap(),
     isEditing: Boolean = false
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -100,13 +101,16 @@ fun AddReviewSheet(
     var existingPhotoUrls by rememberSaveable(initialPhotoUrls) {
         mutableStateOf(initialPhotoUrls)
     }
-    var photoHashList by rememberSaveable { mutableStateOf(listOf<String>()) }
-    var hashesReady by remember { mutableStateOf(initialPhotoUrls.isEmpty()) }
+    var photoHashList by rememberSaveable { 
+        mutableStateOf(initialPhotoHashes.values.toList()) 
+    }
+    var hashesReady by remember { mutableStateOf(initialPhotoUrls.isEmpty() || initialPhotoHashes.isNotEmpty()) }
 
-    androidx.compose.runtime.LaunchedEffect(initialPhotoUrls) {
+    androidx.compose.runtime.LaunchedEffect(initialPhotoUrls, initialPhotoHashes) {
         if (initialPhotoUrls.isNotEmpty() && photoHashList.isEmpty()) {
             val hashes = mutableListOf<String>()
             for (url in initialPhotoUrls) {
+                // Fallback: jeśli nie mamy hashy w modelu, musimy je dociągnąć (stare dane)
                 val hash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     computeRemotePhotoContentHash(url)
                 }

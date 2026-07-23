@@ -130,8 +130,6 @@ private const val SPIDERFY_RADIUS_DEGREES = 0.00012
 private const val SPIDERFY_RADIUS_STEP_DEGREES = 0.000015
 private const val SPIDERFY_MAX_EXTRA = 8
 private val MAP_TOP_OVERLAY_SPACING = 8.dp
-private const val LOCATION_PERMISSION_PREFS = "location_permission_preferences"
-private const val LOCATION_PERMISSION_REQUESTED_KEY = "fine_location_requested"
 
 @SuppressLint("MissingPermission")
 @OptIn(

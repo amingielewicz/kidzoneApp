@@ -12,6 +12,7 @@ import com.kidzone.domain.usecase.NotificationPrefsUseCase
 import com.kidzone.i18n.AppLanguage
 import com.kidzone.i18n.LanguagePreferences
 import com.kidzone.presentation.common.UserBadge
+import com.kidzone.presentation.common.ScreenState
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.AuthException
@@ -25,7 +26,9 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -75,6 +78,7 @@ class ProfileViewModelTest {
         every { authRepository.currentUser } returns currentUserFlow
         coEvery { authRepository.getCurrentSignInProvider() } returns SignInProvider.EMAIL_PASSWORD
         every { authRepository.observeUser(any()) } returns currentUserFlow
+        coEvery { authRepository.refreshUser() } returns OpResult.success(Unit)
         coEvery { placeRepository.getTopPlaces(any()) } returns OpResult.success(emptyList())
         coEvery { authRepository.getTopUsers(any()) } returns OpResult.success(emptyList())
         coEvery { notificationPrefsUseCase.load() } returns NotificationPrefs()
@@ -153,6 +157,28 @@ class ProfileViewModelTest {
 
             assertEquals("uid-1", viewModel.user.value?.id)
             assertEquals("Jan", viewModel.user.value?.name)
+            assertTrue(viewModel.profileState.value is ScreenState.Content)
+        }
+
+        @Test
+        fun `missing profile is exposed as error instead of endless loading`() = runTest {
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.profileState.value is ScreenState.Error)
+        }
+
+        @Test
+        fun `retry transitions profile from error to content`() = runTest {
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+            assertTrue(viewModel.profileState.value is ScreenState.Error)
+
+            currentUserFlow.value = TestFixtures.user(id = "uid-retry")
+            viewModel.retryProfile()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.profileState.value is ScreenState.Content)
         }
     }
 
@@ -675,6 +701,27 @@ class ProfileViewModelTest {
             viewModel.refreshProfile()
             advanceUntilIdle()
 
+            assertFalse(viewModel.uiState.value.isRefreshing)
+            coVerify { authRepository.refreshUser() }
+        }
+
+        @Test
+        fun `retry shows loading while waiting after profile error`() = runTest {
+            val testUser = TestFixtures.user(id = "uid-retry")
+            currentUserFlow.value = testUser
+            every { authRepository.observeUser(testUser.id) } returnsMany listOf(
+                flow { throw IllegalStateException("offline") },
+                flow { awaitCancellation() }
+            )
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+            assertTrue(viewModel.profileState.value is ScreenState.Error)
+
+            viewModel.retryProfile()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.profileState.value is ScreenState.Loading)
             assertFalse(viewModel.uiState.value.isRefreshing)
             coVerify { authRepository.refreshUser() }
         }

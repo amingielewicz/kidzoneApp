@@ -214,12 +214,25 @@ class FirestorePlaceRepository @Inject constructor(
     override suspend fun addPlace(place: Place): OpResult<Place> =
         performanceTraces.measureResult(PerformanceTraces.ADD_PLACE) {
             try {
-                val doc = placesCollection().document()
-                val p = place.copy(id = doc.id)
-                placesCollection().document(p.id).set(PlaceDto.fromDomain(p)).await()
-                placeDao.upsert(PlaceEntity.fromDomain(p))
-                OpResult.success(p)
-            } catch (e: Exception) { OpResult.failure(e) }
+                val placeId = place.id.ifBlank {
+                    placesCollection().document().id
+                }
+
+                val placeWithId = place.copy(id = placeId)
+
+                placesCollection()
+                    .document(placeId)
+                    .set(PlaceDto.fromDomain(placeWithId))
+                    .await()
+
+                placeDao.upsert(
+                    PlaceEntity.fromDomain(placeWithId)
+                )
+
+                OpResult.success(placeWithId)
+            } catch (e: Exception) {
+                OpResult.failure(e)
+            }
         }
 
     override suspend fun updatePlace(place: Place): OpResult<Place> = try {
@@ -276,6 +289,7 @@ class FirestorePlaceRepository @Inject constructor(
         OpResult.failure(e)
     }
 
+    @Suppress("LongMethod")
     override suspend fun submitChangeRequest(
         placeId: String,
         requesterId: String,
@@ -283,19 +297,63 @@ class FirestorePlaceRepository @Inject constructor(
         type: String,
         comment: String
     ): OpResult<Unit> = try {
-        require(placeId.isNotBlank()) { "placeId nie może być puste" }
-        require(requesterId.isNotBlank()) { "requesterId nie może być puste" }
-        require(changes.isNotEmpty()) { "changes nie może być puste" }
+        require(placeId.isNotBlank()) {
+            "placeId nie może być puste"
+        }
+        require(requesterId.isNotBlank()) {
+            "requesterId nie może być puste"
+        }
+        require(changes.isNotEmpty()) {
+            "changes nie może być puste"
+        }
+
         val sanitizedComment = comment
             .trim()
             .take(CHANGE_REQUEST_COMMENT_MAX_LENGTH)
 
         if (type == "EDIT") {
-            require(sanitizedComment.isNotBlank()) { "comment nie może być pusty" }
+            require(sanitizedComment.isNotBlank()) {
+                "comment nie może być pusty"
+            }
         }
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
-            firestore.collection(FirestoreCollections.PLACE_CHANGE_REQUESTS)
+            /*
+             * Filtrujemy po reporterId, ponieważ reguły Firestore pozwalają
+             * użytkownikowi czytać tylko dokumenty, w których:
+             *
+             * resource.data.reporterId == request.auth.uid
+             */
+            val existingRequests = firestore
+                .collection(FirestoreCollections.PLACE_CHANGE_REQUESTS)
+                .whereEqualTo("reporterId", requesterId)
+                .get()
+                .await()
+
+            /*
+             * Pozostałe warunki sprawdzamy lokalnie.
+             * Dzięki temu nie potrzebujemy rozbudowanego indeksu Firestore.
+             */
+            val duplicateExists = existingRequests.documents.any { document ->
+                val existingPlaceId = document.getString("placeId")
+                val existingType = document.getString("type")
+                val existingStatus = document.getString("status")
+                val existingChanges = document.get("changes") as? Map<*, *>
+
+                existingPlaceId == placeId &&
+                        existingType == type &&
+                        existingStatus == "pending" &&
+                        existingChanges == changes
+            }
+
+            if (duplicateExists) {
+                throw AlreadyReportedException(
+                    "Taka propozycja zmiany już oczekuje na rozpatrzenie"
+                )
+            }
+
+            firestore
+                .collection(FirestoreCollections.PLACE_CHANGE_REQUESTS)
                 .add(
                     mapOf(
                         "placeId" to placeId,
@@ -309,10 +367,16 @@ class FirestorePlaceRepository @Inject constructor(
                     )
                 )
                 .await()
+
             true
         }
+
         if (completed == null) {
-            OpResult.failure(TimeoutException("Przekroczono czas oczekiwania na zapis propozycji zmiany"))
+            OpResult.failure(
+                TimeoutException(
+                    "Przekroczono czas oczekiwania na zapis propozycji zmiany"
+                )
+            )
         } else {
             OpResult.success(Unit)
         }

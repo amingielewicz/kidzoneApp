@@ -13,6 +13,11 @@ data class ReviewDto(
     val rating: Int = 0,
     val comment: String = "",
     val photoUrls: List<String> = emptyList(),
+    /**
+     * `Any?` celowo: stare dokumenty zawierają listę, nowe mapę URL -> hash.
+     * [toDomain] akceptuje wyłącznie nowy, jednoznaczny format.
+     */
+    val photoHashes: Any? = emptyMap<String, String>(),
     val createdAtMillis: Long = 0L,
     val updatedAtMillis: Long = 0L,
     val reportedAsSpam: Boolean = false
@@ -25,6 +30,7 @@ data class ReviewDto(
         rating = rating,
         comment = comment,
         photoUrls = photoUrls,
+        photoHashes = photoHashes.toPhotoHashMap(),
         createdAtMillis = createdAtMillis,
         updatedAtMillis = updatedAtMillis
     )
@@ -38,8 +44,17 @@ data class ReviewDto(
             rating = review.rating,
             comment = review.comment,
             photoUrls = review.photoUrls,
+            photoHashes = review.photoHashes,
             createdAtMillis = review.createdAtMillis,
             updatedAtMillis = review.updatedAtMillis
         )
     }
 }
+
+private fun Any?.toPhotoHashMap(): Map<String, String> =
+    (this as? Map<*, *>)
+        ?.mapNotNull { (url, hash) ->
+            if (url is String && hash is String) url to hash else null
+        }
+        ?.toMap()
+        .orEmpty()

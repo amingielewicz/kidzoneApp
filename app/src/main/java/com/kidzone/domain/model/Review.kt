@@ -17,6 +17,8 @@ data class Review(
     val rating: Int, // 1..5
     val comment: String,
     val photoUrls: List<String> = emptyList(),
+    /** Mapowanie URL zdjęcia -> MD5 skompresowanych bajtów. */
+    val photoHashes: Map<String, String> = emptyMap(),
     val createdAtMillis: Long = 0L,
     val updatedAtMillis: Long = 0L
 )

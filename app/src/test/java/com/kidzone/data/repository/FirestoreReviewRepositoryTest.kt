@@ -116,7 +116,10 @@ class FirestoreReviewRepositoryTest {
         @Test
         fun `accepts review with comment at exactly max length`() = runTest {
             val exactComment = "a".repeat(500)
-            val review = TestFixtures.review(comment = exactComment)
+            val review = TestFixtures.review(
+                id = "",
+                comment = exactComment
+            )
 
             val docRef = mockk<DocumentReference>(relaxed = true)
             every { docRef.id } returns "new-review-id"
@@ -164,7 +167,7 @@ class FirestoreReviewRepositoryTest {
 
         @Test
         fun `persists to local cache on success`() = runTest {
-            val review = TestFixtures.review()
+            val review = TestFixtures.review(id = "")
 
             val docRef = mockk<DocumentReference>(relaxed = true)
             every { docRef.id } returns "new-id"

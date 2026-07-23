@@ -14,6 +14,7 @@ import com.kidzone.domain.usecase.NotificationPrefsUseCase
 import com.kidzone.i18n.AppLanguage
 import com.kidzone.i18n.LanguagePreferences
 import com.kidzone.presentation.common.BadgeContext
+import com.kidzone.presentation.common.ScreenState
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.computeBadges
 import com.kidzone.utils.AuthException
@@ -32,6 +33,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -43,6 +45,7 @@ private const val FLOW_SUBSCRIPTION_TIMEOUT_MS = 5000L
 private const val CONTACT_SUBJECT_MIN_LENGTH = 3
 private const val CONTACT_MESSAGE_MIN_LENGTH = 10
 private const val CONTACT_MESSAGE_FUNCTION = "submitContactMessage"
+private const val REFRESH_DELAY_MS = 300L
 
 /**
  * ViewModel profilu użytkownika.
@@ -88,31 +91,78 @@ class ProfileViewModel @Inject constructor(
     private var pendingSeenBadgesUserId: String? = null
     private var pendingSeenBadgeNames: Set<String> = emptySet()
     private var pendingNewBadgeNames: Set<String> = emptySet()
+    private val profileReload = MutableStateFlow(0)
 
-    private val richUser = authRepository.currentUser
-        .flatMapLatest { current ->
-            if (current == null) flowOf(null) else authRepository.observeUser(current.id)
+    val profileState: StateFlow<ScreenState<User>> = profileReload
+        .flatMapLatest {
+            authRepository.currentUser.flatMapLatest { current ->
+                if (current == null) {
+                    // Jeśli użytkownik jest null, oznacza to że się wylogował lub sesja wygasła.
+                    // Nie pokazujemy błędu, tylko stan ładowania, bo i tak zaraz nastąpi nawigacja.
+                    flowOf(ScreenState.Loading)
+                } else {
+                    authRepository.observeUser(current.id)
+                        .map { user ->
+                            if (user == null) {
+                                ScreenState.Error(
+                                    UiText.StringResource(
+                                        R.string.profile_load_error
+                                    )
+                                )
+                            } else {
+                                ScreenState.Content(user)
+                            }
+                        }
+                }
+            }.onStart {
+                emit(ScreenState.Loading)
+            }.catch {
+                emit(ScreenState.Error(UiText.StringResource(R.string.profile_load_error)))
+            }
         }
-        .catch { emit(null) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ScreenState.Loading)
 
-    private val userContext = richUser.map { user ->
-        if (user == null) return@map null to BadgeContext()
+    private val userContext = profileState.map { state ->
+        val user = (state as? ScreenState.Content)?.data
+            ?: return@map null to BadgeContext()
 
         coroutineScope {
-            val placesTask = async { placeRepository.getTopPlaces(RANKING_LIMIT) }
-            val usersTask = async { authRepository.getTopUsers(RANKING_LIMIT) }
+            val placesTask = async {
+                placeRepository.getTopPlaces(RANKING_LIMIT)
+            }
 
-            val topPlaces = (placesTask.await() as? OpResult.Success)?.data.orEmpty()
-            val topUsers = (usersTask.await() as? OpResult.Success)?.data.orEmpty()
+            val usersTask = async {
+                authRepository.getTopUsers(RANKING_LIMIT)
+            }
+
+            val topPlaces = (placesTask.await() as? OpResult.Success)
+                ?.data
+                .orEmpty()
+
+            val topUsers = (usersTask.await() as? OpResult.Success)
+                ?.data
+                .orEmpty()
 
             val myRank = topUsers.indexOfFirst { it.id == user.id }
-                .takeIf { it != -1 }?.let { it + 1 }
-            val myBestPlaceRank = topPlaces.indexOfFirst { it.ownerUserId == user.id }
-                .takeIf { it != -1 }?.let { it + 1 }
+                .takeIf { it != -1 }
+                ?.let { it + 1 }
 
-            user to BadgeContext(userRank = myRank, bestPlaceRank = myBestPlaceRank)
+            val myBestPlaceRank = topPlaces.indexOfFirst {
+                it.ownerUserId == user.id
+            }
+                .takeIf { it != -1 }
+                ?.let { it + 1 }
+
+            user to BadgeContext(
+                userRank = myRank,
+                bestPlaceRank = myBestPlaceRank
+            )
         }
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        null
+    )
 
     val user: StateFlow<User?> = userContext.map { it?.first }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(FLOW_SUBSCRIPTION_TIMEOUT_MS), null)
@@ -146,9 +196,15 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
             authRepository.refreshUser()
+            profileReload.update { it + 1 }
+            // Czekamy chwilę, żeby flow zdążyło wyemitować stan ładowania
+            // i animacja pull-to-refresh nie zniknęła natychmiast.
+            kotlinx.coroutines.delay(REFRESH_DELAY_MS)
             _uiState.update { it.copy(isRefreshing = false) }
         }
     }
+
+    fun retryProfile() = refreshProfile()
 
     fun signOut(onSignedOut: () -> Unit) {
         viewModelScope.launch {
