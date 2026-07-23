@@ -12,6 +12,7 @@ import com.kidzone.review.InAppReviewManager
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.PhotoHasher
 import com.kidzone.utils.PhotoUploader
 import com.kidzone.utils.UiText
 import io.mockk.coEvery
@@ -48,6 +49,7 @@ class AddPlaceViewModelTest {
     private lateinit var authRepository: AuthRepository
     private lateinit var photoUploader: PhotoUploader
     private lateinit var imageCompressor: ImageCompressorPort
+    private lateinit var photoHasher: PhotoHasher
     private lateinit var inAppReviewManager: InAppReviewManager
 
     private val currentUserFlow = MutableStateFlow(TestFixtures.user())
@@ -59,6 +61,7 @@ class AddPlaceViewModelTest {
         authRepository = mockk(relaxed = true)
         photoUploader = mockk(relaxed = true)
         imageCompressor = mockk(relaxed = true)
+        photoHasher = PhotoHasher()
         inAppReviewManager = mockk(relaxed = true)
 
         every { authRepository.currentUser } returns currentUserFlow
@@ -76,6 +79,7 @@ class AddPlaceViewModelTest {
             authRepository,
             photoUploader,
             imageCompressor,
+            photoHasher,
             inAppReviewManager
         )
     }

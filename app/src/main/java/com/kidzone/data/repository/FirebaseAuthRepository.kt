@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 import java.util.Locale
 import javax.inject.Inject
@@ -244,21 +245,34 @@ class FirebaseAuthRepository @Inject constructor(
     }
 
     override suspend fun signOut() {
-        // Usuń FCM token PRZED wylogowaniem (po signOut uid = null)
         val uid = firebaseAuth.currentUser?.uid
+        
+        // 1. Próbujemy usunąć token FCM w tle. 
+        // NIE używamy .await() na pobieraniu tokena, bo w trybie offline 
+        // i przy wyczyszczonym cache (Scenariusz E) może to zawiesić metodę.
         if (uid != null) {
+            // Używamy GlobalScope lub po prostu nie czekamy na wynik, 
+            // bo za chwilę ten ViewModel i tak zniknie.
             try {
-                val token = com.google.firebase.messaging.FirebaseMessaging.getInstance()
-                    .token.await()
-                firestore.collection(FirestoreCollections.USERS)
-                    .document(uid)
-                    .collection("private")
-                    .document("messaging")
-                    .update("fcmTokens", com.google.firebase.firestore.FieldValue.arrayRemove(token))
-                    .await()
-            } catch (_: Exception) { /* best-effort */ }
+                com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                    .addOnSuccessListener { token ->
+                        // Jeśli uda się pobrać token, wysyłamy prośbę o usunięcie do Firestore.
+                        // SDK Firestore samo obsłuży kolejkę offline.
+                        firestore.collection(FirestoreCollections.USERS)
+                            .document(uid)
+                            .collection("private")
+                            .document("messaging")
+                            .update("fcmTokens", com.google.firebase.firestore.FieldValue.arrayRemove(token))
+                    }
+            } catch (_: Exception) { }
         }
-        signOutAndClearLocalSessionState()
+
+        // 2. Lokalny logout – to musi być natychmiastowe i bezwarunkowe.
+        try {
+            signOutAndClearLocalSessionState()
+        } catch (e: Exception) {
+            Timber.w(e, "Error during local sign out cleanup")
+        }
     }
 
     override suspend fun refreshUser(): OpResult<Unit> = runFirebase {

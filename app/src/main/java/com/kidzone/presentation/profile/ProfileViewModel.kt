@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -44,6 +45,7 @@ private const val FLOW_SUBSCRIPTION_TIMEOUT_MS = 5000L
 private const val CONTACT_SUBJECT_MIN_LENGTH = 3
 private const val CONTACT_MESSAGE_MIN_LENGTH = 10
 private const val CONTACT_MESSAGE_FUNCTION = "submitContactMessage"
+private const val REFRESH_DELAY_MS = 300L
 
 /**
  * ViewModel profilu użytkownika.
@@ -116,6 +118,8 @@ class ProfileViewModel @Inject constructor(
                             }
                         }
                 }
+            }.onStart {
+                emit(ScreenState.Loading)
             }.catch {
                 emit(ScreenState.Error(UiText.StringResource(R.string.profile_load_error)))
             }
@@ -197,6 +201,9 @@ class ProfileViewModel @Inject constructor(
             _uiState.update { it.copy(isRefreshing = true) }
             authRepository.refreshUser()
             profileReload.update { it + 1 }
+            // Czekamy chwilę, żeby flow zdążyło wyemitować stan ładowania
+            // i animacja pull-to-refresh nie zniknęła natychmiast.
+            kotlinx.coroutines.delay(REFRESH_DELAY_MS)
             _uiState.update { it.copy(isRefreshing = false) }
         }
     }

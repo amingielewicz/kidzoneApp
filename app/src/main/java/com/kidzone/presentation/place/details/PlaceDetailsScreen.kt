@@ -654,6 +654,7 @@ fun PlaceDetailsScreen(
             initialRating = editing?.rating ?: 0,
             initialComment = editing?.comment.orEmpty(),
             initialPhotoUrls = editing?.photoUrls.orEmpty(),
+            initialPhotoHashes = editing?.photoHashes.orEmpty(),
             isEditing = editing != null
         )
     }

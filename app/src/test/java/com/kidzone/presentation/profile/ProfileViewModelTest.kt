@@ -710,7 +710,7 @@ class ProfileViewModelTest {
             val testUser = TestFixtures.user(id = "uid-retry")
             currentUserFlow.value = testUser
             every { authRepository.observeUser(testUser.id) } returnsMany listOf(
-                flow { throw RuntimeException("offline") },
+                flow { throw IllegalStateException("offline") },
                 flow { awaitCancellation() }
             )
 

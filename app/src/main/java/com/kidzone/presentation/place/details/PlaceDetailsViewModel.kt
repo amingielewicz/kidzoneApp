@@ -30,6 +30,7 @@ import com.kidzone.navigation.Route
 import com.kidzone.presentation.place.add.PLACE_NAME_MAX_LENGTH
 import com.kidzone.review.InAppReviewManager
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.PhotoHasher
 import com.kidzone.utils.PhotoUploader
 import com.kidzone.utils.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -66,6 +67,7 @@ class PlaceDetailsViewModel @Inject constructor(
     private val locationProvider: LocationProvider,
     private val photoUploader: PhotoUploader,
     private val imageCompressor: ImageCompressorPort,
+    private val photoHasher: PhotoHasher,
     private val inAppReviewManager: InAppReviewManager,
     private val analyticsHelper: AnalyticsHelper
 ) : ViewModel() {
@@ -418,16 +420,15 @@ class PlaceDetailsViewModel @Inject constructor(
     ) {
         val targetReviewId = UUID.randomUUID().toString()
         val uploadedPhotoUrls = mutableListOf<String>()
-        val newHashes = mutableSetOf<String>()
+        val photoHashesMap = mutableMapOf<String, String>()
+        val seenHashes = mutableSetOf<String>()
 
         for (uri in photoUris) {
             val bytes = imageCompressor.compressToWebp(uri)
             if (bytes != null) {
-                val hash = java.security.MessageDigest.getInstance("MD5")
-                    .digest(bytes)
-                    .joinToString("") { "%02x".format(it) }
-                if (hash in newHashes) continue
-                newHashes.add(hash)
+                val hash = photoHasher.computeHash(bytes)
+                if (photoHasher.isDuplicate(hash, seenHashes)) continue
+                seenHashes.add(hash)
                 try {
                     val url = photoUploader.uploadReviewPhoto(
                         ownerUserId = user.id,
@@ -435,6 +436,7 @@ class PlaceDetailsViewModel @Inject constructor(
                         imageBytes = bytes
                     )
                     uploadedPhotoUrls.add(url)
+                    photoHashesMap[url] = hash
                 } catch (_: Exception) {
                 }
             }
@@ -448,6 +450,7 @@ class PlaceDetailsViewModel @Inject constructor(
             rating = rating,
             comment = comment.trim(),
             photoUrls = uploadedPhotoUrls,
+            photoHashes = photoHashesMap,
             createdAtMillis = System.currentTimeMillis()
         )
 
@@ -491,36 +494,30 @@ class PlaceDetailsViewModel @Inject constructor(
         photoUris: List<android.net.Uri>,
         retainedPhotoUrls: List<String>
     ) {
-        val existingHashes = mutableSetOf<String>()
+        val finalHashesMap = mutableMapOf<String, String>()
+        val seenHashes = mutableSetOf<String>()
+
+        // 1. Zachowaj hashe dla URLi, które pozostały
         for (url in retainedPhotoUrls) {
-            try {
-                val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    val conn = java.net.URL(url).openConnection()
-                    conn.connectTimeout = 10_000
-                    conn.readTimeout = 10_000
-                    conn.getInputStream().readBytes()
-                }
-                val hash = java.security.MessageDigest.getInstance("MD5")
-                    .digest(bytes)
-                    .joinToString("") { "%02x".format(it) }
-                existingHashes.add(hash)
-            } catch (_: Exception) {
+            existing.photoHashes[url]?.let { hash ->
+                finalHashesMap[url] = hash
+                seenHashes.add(hash)
             }
         }
 
         val newUploadedUrls = mutableListOf<String>()
         var reviewDuplicatesSkipped = 0
+
+        // 2. Upload nowych zdjęć i zbieranie ich hashy
         for (uri in photoUris) {
             val bytes = imageCompressor.compressToWebp(uri)
             if (bytes != null) {
-                val hash = java.security.MessageDigest.getInstance("MD5")
-                    .digest(bytes)
-                    .joinToString("") { "%02x".format(it) }
-                if (hash in existingHashes) {
+                val hash = photoHasher.computeHash(bytes)
+                if (photoHasher.isDuplicate(hash, seenHashes)) {
                     reviewDuplicatesSkipped++
                     continue
                 }
-                existingHashes.add(hash)
+                seenHashes.add(hash)
                 try {
                     val url = photoUploader.uploadReviewPhoto(
                         ownerUserId = existing.userId,
@@ -528,6 +525,7 @@ class PlaceDetailsViewModel @Inject constructor(
                         imageBytes = bytes
                     )
                     newUploadedUrls.add(url)
+                    finalHashesMap[url] = hash
                 } catch (_: Exception) {
                 }
             }
@@ -556,7 +554,9 @@ class PlaceDetailsViewModel @Inject constructor(
         val updated = existing.copy(
             rating = rating,
             comment = comment.trim(),
-            photoUrls = finalPhotoUrls
+            photoUrls = finalPhotoUrls,
+            photoHashes = finalHashesMap,
+            updatedAtMillis = System.currentTimeMillis()
         )
 
         when (val result = reviewRepository.updateReview(updated)) {
@@ -781,11 +781,9 @@ class PlaceDetailsViewModel @Inject constructor(
     ): PlacePhotoUploadResult {
         val newBytes = imageCompressor.compressToWebp(photoUri)
             ?: return PlacePhotoUploadResult.SKIPPED
-        val newHash = java.security.MessageDigest.getInstance("MD5")
-            .digest(newBytes)
-            .joinToString("") { "%02x".format(it) }
+        val newHash = photoHasher.computeHash(newBytes)
 
-        if (newHash in placePhotoHashes) {
+        if (photoHasher.isDuplicate(newHash, placePhotoHashes)) {
             return PlacePhotoUploadResult.DUPLICATE
         }
 

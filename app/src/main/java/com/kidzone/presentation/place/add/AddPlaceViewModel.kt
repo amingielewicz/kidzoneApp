@@ -15,6 +15,7 @@ import com.kidzone.domain.service.ImageCompressorPort
 import com.kidzone.navigation.Route
 import com.kidzone.review.InAppReviewManager
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.PhotoHasher
 import com.kidzone.utils.PhotoUploader
 import com.kidzone.utils.TextNormalization
 import com.kidzone.utils.UiText
@@ -42,12 +43,13 @@ import java.util.UUID
  *    (id, ownerUserId, createdAtMillis, averageRating, reviewsCount).
  */
 @HiltViewModel
-class AddPlaceViewModel @Inject constructor(
+class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
     private val savedStateHandle: SavedStateHandle,
     private val placeRepository: PlaceRepository,
     private val authRepository: AuthRepository,
     private val photoUploader: PhotoUploader,
     private val imageCompressor: ImageCompressorPort,
+    private val photoHasher: PhotoHasher,
     private val inAppReviewManager: InAppReviewManager
 ) : ViewModel() {
 
@@ -494,11 +496,8 @@ class AddPlaceViewModel @Inject constructor(
                 for (uri in state.photoUris) {
                     val bytes = imageCompressor.compressToWebp(uri)
                     if (bytes != null) {
-                        // Dedup check na bazie hash skompresowanych bajtów
-                        val hash = java.security.MessageDigest.getInstance("MD5")
-                            .digest(bytes)
-                            .joinToString("") { "%02x".format(it) }
-                        if (hash in selectedPhotoHashes) {
+                        val hash = photoHasher.computeHash(bytes)
+                        if (photoHasher.isDuplicate(hash, selectedPhotoHashes)) {
                             duplicatesSkipped++
                             continue
                         }
