@@ -932,7 +932,7 @@ private fun BadgeEarnedDialog(
                     val congratsText = if (badges.size == 1) {
                         stringResource(R.string.congratulations)
                     } else {
-                        "${stringResource(R.string.congratulations)} (${badges.size})"
+                        stringResource(R.string.congratulations_with_count, badges.size)
                     }
                     Text(
                         text = congratsText,

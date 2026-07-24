@@ -53,6 +53,7 @@ import javax.inject.Inject
  * 🧼 Lifecycle:
  * - Operacje wiązane z viewModelScope (anulowane automatycznie).
  */
+@Suppress("TooManyFunctions")
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val authRepository: AuthRepository
@@ -79,8 +80,8 @@ class LoginViewModel @Inject constructor(
         val isMessageError: Boolean = true,
         val isSignedIn: Boolean = false,
         val showResendVerification: Boolean = false,
-        val banMessage: String? = null,
-        val banReason: String? = null
+        val banMessage: UiText? = null,
+        val banReason: UiText? = null
     ) {
         /** Czy oba wymagane pola formularza są niepuste. */
         val isFormValid: Boolean
@@ -130,16 +131,20 @@ class LoginViewModel @Inject constructor(
                         val isEmailNotVerified = result.error is AuthException.EmailNotVerified
                         it.copy(
                             isLoading = false,
-                            message = result.error.toAuthErrorMessage(R.string.error_unknown),
+                            message = if (isBanned) null else mapError(result.error),
                             isMessageError = true,
                             showResendVerification = isEmailNotVerified,
                             banMessage = if (isBanned) {
-                                (result.error as AuthException.AccountBanned).banMessage
+                                mapError(result.error)
                             } else {
                                 null
                             },
                             banReason = if (isBanned) {
-                                (result.error as AuthException.AccountBanned).banReason
+                                val banError = result.error as AuthException.AccountBanned
+                                UiText.StringResource(
+                                    R.string.ban_reason_prefix,
+                                    UiText.StringResource(banError.banReasonRes)
+                                )
                             } else {
                                 null
                             }
@@ -166,15 +171,19 @@ class LoginViewModel @Inject constructor(
                         val isBanned = result.error is AuthException.AccountBanned
                         it.copy(
                             isLoading = false,
-                            message = result.error.toAuthErrorMessage(R.string.error_unknown),
+                            message = if (isBanned) null else mapError(result.error),
                             isMessageError = true,
                             banMessage = if (isBanned) {
-                                (result.error as AuthException.AccountBanned).banMessage
+                                mapError(result.error)
                             } else {
                                 null
                             },
                             banReason = if (isBanned) {
-                                (result.error as AuthException.AccountBanned).banReason
+                                val banError = result.error as AuthException.AccountBanned
+                                UiText.StringResource(
+                                    R.string.ban_reason_prefix,
+                                    UiText.StringResource(banError.banReasonRes)
+                                )
                             } else {
                                 null
                             }
@@ -185,14 +194,14 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    /** Pokazuje komunikat przekazany przez warstwę UI lub integrację zewnętrzną. */
-    fun showInlineMessage(text: String, isError: Boolean = true) {
-        val message = if (isGoogleSignInTechnicalMessage(text)) {
-            UiText.StringResource(R.string.google_sign_in_unavailable)
-        } else {
-            UiText.DynamicString(text)
-        }
-        _uiState.update { it.copy(message = message, isMessageError = isError) }
+    /** Pokazuje błąd przekazany jako UiText. */
+    fun showErrorMessage(message: UiText) {
+        _uiState.update { it.copy(message = message, isMessageError = true) }
+    }
+
+    /** Pokazuje informację przekazaną jako UiText. */
+    fun showInfoMessage(message: UiText) {
+        _uiState.update { it.copy(message = message, isMessageError = false) }
     }
 
     /** Pokazuje standardowy komunikat braku połączenia. */
@@ -247,6 +256,13 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    @Suppress("SpreadOperator")
+    private fun mapError(throwable: Throwable): UiText = when (throwable) {
+        is AuthException.Network -> UiText.StringResource(R.string.error_no_internet)
+        is AuthException -> UiText.StringResource(throwable.messageRes, *throwable.args)
+        else -> UiText.StringResource(R.string.error_unknown)
+    }
+
     /**
      * Ponownie wysyła wiadomość weryfikacyjną dla danych wpisanych w formularzu.
      *
@@ -274,25 +290,5 @@ class LoginViewModel @Inject constructor(
                 }
             }
         }
-    }
-
-    private fun isGoogleSignInTechnicalMessage(message: String): Boolean {
-        val normalized = message.lowercase()
-        return GOOGLE_SIGN_IN_TECHNICAL_MARKERS.any(normalized::contains)
-    }
-
-    private companion object {
-        val GOOGLE_SIGN_IN_TECHNICAL_MARKERS = listOf(
-            "firebase console",
-            "google-services.json",
-            "missing activity",
-            "unexpected credential type",
-            "could not parse google token",
-            "could not get a token",
-            "google sign-in error",
-            "unknown google sign-in error",
-            "włącz google sign-in",
-            "nie udało się uruchomić logowania google"
-        )
     }
 }

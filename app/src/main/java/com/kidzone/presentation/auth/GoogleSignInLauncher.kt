@@ -27,7 +27,13 @@ sealed class GoogleSignInResult {
     data class Success(val idToken: String) : GoogleSignInResult()
     data object Cancelled : GoogleSignInResult()
     data object NoMatchingGoogleCredential : GoogleSignInResult()
-    data class Error(val message: String) : GoogleSignInResult()
+
+    sealed class Error : GoogleSignInResult() {
+        data class ConfigurationError(val technicalMessage: String) : Error()
+        data class TokenError(val technicalMessage: String) : Error()
+        data class ServiceError(val code: Int, val technicalMessage: String) : Error()
+        data class UnknownError(val technicalMessage: String) : Error()
+    }
 
     /**
      * Credential Manager zawiódł – UI powinno uruchomić fallback
@@ -88,7 +94,7 @@ suspend fun launchGoogleSignIn(
             val googleCredential = GoogleIdTokenCredential.createFrom(credential.data)
             GoogleSignInResult.Success(googleCredential.idToken)
         } else {
-            GoogleSignInResult.Error("Unexpected credential type: ${credential.type}")
+            GoogleSignInResult.Error.UnknownError("Unexpected credential type: ${credential.type}")
         }
     } catch (e: GetCredentialCancellationException) {
         GoogleSignInResult.Cancelled
@@ -97,14 +103,14 @@ suspend fun launchGoogleSignIn(
         Timber.w(e, "NoCredentialException – falling back to legacy GoogleSignIn")
         GoogleSignInResult.FallbackToLegacy
     } catch (e: GoogleIdTokenParsingException) {
-        GoogleSignInResult.Error(e.message ?: "Could not parse Google token")
+        GoogleSignInResult.Error.TokenError(e.message ?: "Could not parse Google token")
     } catch (e: GetCredentialException) {
         // Ogólny błąd Credential Manager – fallback na legacy
         Timber.w(e, "GetCredentialException – falling back to legacy GoogleSignIn")
         GoogleSignInResult.FallbackToLegacy
     } catch (e: Exception) {
         Timber.e(e, "Unexpected error in Credential Manager")
-        GoogleSignInResult.FallbackToLegacy
+        GoogleSignInResult.Error.UnknownError(e.message ?: "Unknown error")
     }
 }
 
@@ -142,18 +148,18 @@ fun parseLegacyGoogleSignInResult(data: Intent?): GoogleSignInResult {
         if (idToken != null) {
             GoogleSignInResult.Success(idToken)
         } else {
-            GoogleSignInResult.Error("Could not get a token from the Google account")
+            GoogleSignInResult.Error.TokenError("Could not get a token from the Google account")
         }
     } catch (e: ApiException) {
         when (e.statusCode) {
             12501 -> GoogleSignInResult.Cancelled // user cancelled
             else -> {
                 Timber.e(e, "Legacy GoogleSignIn ApiException: ${e.statusCode}")
-                GoogleSignInResult.Error("Google sign-in error (code: ${e.statusCode})")
+                GoogleSignInResult.Error.ServiceError(e.statusCode, "Google sign-in API error")
             }
         }
     } catch (e: Exception) {
-        GoogleSignInResult.Error(e.message ?: "Unknown Google sign-in error")
+        GoogleSignInResult.Error.UnknownError(e.message ?: "Unknown Google sign-in error")
     }
 }
 

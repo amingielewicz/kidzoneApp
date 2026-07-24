@@ -307,7 +307,7 @@ private fun PlaceRow(
             horizontalAlignment = Alignment.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            PlaceRatingStatus(place = place)
+            PlaceRatingStatus(context = context, place = place)
 
             val distanceText = place.distanceText(context)
             if (distanceText.isNotBlank()) {
@@ -326,7 +326,7 @@ private fun PlaceRow(
 }
 
 @Composable
-private fun PlaceRatingStatus(place: WidgetPlace) {
+private fun PlaceRatingStatus(context: Context, place: WidgetPlace) {
     when {
         place.reviewsCount > 0 -> RatingRow(
             text = "%.1f (%d)".format(place.averageRating, place.reviewsCount),
@@ -339,7 +339,7 @@ private fun PlaceRatingStatus(place: WidgetPlace) {
             reviewsCount = place.reviewsCount,
             createdAtMillis = place.createdAtMillis
         ) -> Text(
-            text = "Nowe",
+            text = context.getString(R.string.place_status_new),
             modifier = GlanceModifier
                 .background(WidgetNewBackground)
                 .cornerRadius(12.dp)
@@ -353,7 +353,7 @@ private fun PlaceRatingStatus(place: WidgetPlace) {
         )
 
         else -> RatingRow(
-            text = "Brak ocen",
+            text = context.getString(R.string.no_ratings),
             fontSize = 11,
             starColor = WidgetTextSecondary,
             textColor = WidgetTextSecondary

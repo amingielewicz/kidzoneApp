@@ -6,7 +6,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import com.kidzone.R
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 /**
  * Composable helper zwracający lambda do uruchomienia Google Sign-In
@@ -43,8 +45,11 @@ fun rememberGoogleSignInLauncher(
             when (val result = parseLegacyGoogleSignInResult(activityResult.data)) {
                 is GoogleSignInResult.Success -> onTokenReceived(result.idToken)
                 is GoogleSignInResult.Cancelled -> { /* user cancelled */ }
-                is GoogleSignInResult.Error -> onError(result.message)
-                else -> onError("Unexpected Google sign-in result")
+                is GoogleSignInResult.Error -> {
+                    Timber.w("Google Reauth Error (legacy): $result")
+                    onError(context.getString(R.string.google_sign_in_unavailable))
+                }
+                else -> onError(context.getString(R.string.error_unknown))
             }
         }
     }
@@ -52,7 +57,7 @@ fun rememberGoogleSignInLauncher(
     return {
         val currentActivity = activity
         if (currentActivity == null) {
-            onError("Could not start Google sign-in (missing Activity)")
+            onError(context.getString(R.string.google_sign_in_missing_activity))
         } else {
             scope.launch {
                 when (val result = launchGoogleSignIn(currentActivity, webClientId)) {
@@ -62,7 +67,10 @@ fun rememberGoogleSignInLauncher(
                         val intent = buildLegacyGoogleSignInIntent(context, webClientId)
                         legacyLauncher.launch(intent)
                     }
-                    is GoogleSignInResult.Error -> onError(result.message)
+                    is GoogleSignInResult.Error -> {
+                        Timber.w("Google Reauth Error: $result")
+                        onError(context.getString(R.string.google_sign_in_unavailable))
+                    }
                     is GoogleSignInResult.NoMatchingGoogleCredential -> {
                         val intent = buildLegacyGoogleSignInIntent(context, webClientId)
                         legacyLauncher.launch(intent)

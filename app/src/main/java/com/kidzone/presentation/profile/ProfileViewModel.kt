@@ -18,7 +18,6 @@ import com.kidzone.presentation.common.ScreenState
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.computeBadges
 import com.kidzone.utils.AppConfig
-import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.UiText
 import com.kidzone.utils.toAuthErrorMessage

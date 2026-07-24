@@ -3,6 +3,7 @@ package com.kidzone.data.repository
 import android.content.Context
 import android.net.Uri
 import androidx.glance.appwidget.updateAll
+import com.kidzone.R
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
@@ -503,11 +504,7 @@ class FirebaseAuthRepository @Inject constructor(
         val email = user.email
         val isPasswordUser = user.providerData.any { it.providerId == EmailAuthProvider.PROVIDER_ID }
         if (email == null || !isPasswordUser) {
-            error(
-                "Account deletion is available only for email/password sign-in. " +
-                    "For Google sign-in, delete the account from your Google account " +
-                    "or email us with a deletion request."
-            )
+            throw AuthException.AccountDeletionUnsupported
         }
 
         val credential = EmailAuthProvider.getCredential(email, currentPassword)
@@ -925,15 +922,12 @@ class FirebaseAuthRepository @Inject constructor(
 
             val isBanned = bannedUntil == -1L || bannedUntil > System.currentTimeMillis()
             if (isBanned) {
-                val reason = snap.getString("banReason") ?: "Terms violation"
-                val message = if (bannedUntil == -1L) {
-                    "Twoje konto zostało zablokowane na stałe."
-                } else {
-                    val date = DateUtils.formatDateWithTime(bannedUntil)
-                    "Twoje konto jest zablokowane do $date."
-                }
+                val reasonCode = snap.getString("banReason") ?: "OTHER"
+                val reasonRes = mapBanReasonCode(reasonCode)
+                val banException = createBanException(bannedUntil, reasonRes)
+
                 signOutAndClearLocalSessionState()
-                throw AuthException.AccountBanned(message, reason)
+                throw banException
             }
         } catch (e: AuthException.AccountBanned) {
             throw e
@@ -943,6 +937,31 @@ class FirebaseAuthRepository @Inject constructor(
             // Wyjątek: pozwalamy tylko na błąd braku dokumentu (nowy user).
             if (e.message?.contains("NOT_FOUND") == true) return
             throw AuthException.Network(e)
+        }
+    }
+
+    private fun mapBanReasonCode(code: String): Int = when (code.uppercase()) {
+        "SPAM" -> R.string.ban_reason_spam
+        "ABUSE" -> R.string.ban_reason_abuse
+        "FRAUD" -> R.string.ban_reason_fraud
+        "TERMS_VIOLATION" -> R.string.ban_reason_terms_violation
+        else -> R.string.ban_reason_other
+    }
+
+    private fun createBanException(bannedUntil: Long, reasonRes: Int): AuthException.AccountBanned {
+        return if (bannedUntil == -1L) {
+            AuthException.AccountBanned(
+                resId = R.string.ban_permanent,
+                banReasonRes = reasonRes
+            )
+        } else {
+            val date = java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.getDefault())
+                .format(java.util.Date(bannedUntil))
+            AuthException.AccountBanned(
+                resId = R.string.ban_temporary,
+                banArgs = arrayOf(date),
+                banReasonRes = reasonRes
+            )
         }
     }
 

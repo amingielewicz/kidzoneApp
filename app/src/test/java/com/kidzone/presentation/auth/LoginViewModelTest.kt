@@ -104,7 +104,7 @@ class LoginViewModelTest {
 
         @Test
         fun `changing email clears previous message`() {
-            viewModel.showInlineMessage("Error occurred")
+            viewModel.showErrorMessage(UiText.DynamicString("Error occurred"))
             assertNotNull(viewModel.uiState.value.message)
 
             viewModel.onEmailChange("new@email.com")
@@ -113,7 +113,7 @@ class LoginViewModelTest {
 
         @Test
         fun `changing password clears previous message`() {
-            viewModel.showInlineMessage("Error occurred")
+            viewModel.showErrorMessage(UiText.DynamicString("Error occurred"))
             viewModel.onPasswordChange("newpass")
             assertNull(viewModel.uiState.value.message)
         }
@@ -216,7 +216,12 @@ class LoginViewModelTest {
         @Test
         fun `account banned sets ban message and reason`() = runTest {
             coEvery { authRepository.signInWithEmail(any(), any()) } returns
-                OpResult.failure(AuthException.AccountBanned("Konto zablokowane", "Spam"))
+                OpResult.failure(
+                    AuthException.AccountBanned(
+                        resId = R.string.ban_permanent,
+                        banReasonRes = R.string.ban_reason_spam
+                    )
+                )
 
             viewModel.onEmailChange("user@test.com")
             viewModel.onPasswordChange("password123")
@@ -224,8 +229,11 @@ class LoginViewModelTest {
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertEquals("Konto zablokowane", state.banMessage)
-            assertEquals("Spam", state.banReason)
+            assertTrue(state.banMessage is UiText.StringResource)
+            assertEquals(R.string.ban_permanent, (state.banMessage as UiText.StringResource).resId)
+            assertTrue(state.banReason is UiText.StringResource)
+            assertEquals(R.string.ban_reason_prefix, (state.banReason as UiText.StringResource).resId)
+            assertNull(state.message) // Ban message should not be in the snackbar message
             assertFalse(state.isSignedIn)
         }
 
@@ -284,14 +292,22 @@ class LoginViewModelTest {
         @Test
         fun `banned account via Google shows ban info`() = runTest {
             coEvery { authRepository.signInWithGoogle(any()) } returns
-                OpResult.failure(AuthException.AccountBanned("Zablokowane", "Naruszenie"))
+                OpResult.failure(
+                    AuthException.AccountBanned(
+                        resId = R.string.ban_permanent,
+                        banReasonRes = R.string.ban_reason_abuse
+                    )
+                )
 
             viewModel.signInWithGoogle("fake-token")
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertEquals("Zablokowane", state.banMessage)
-            assertEquals("Naruszenie", state.banReason)
+            assertTrue(state.banMessage is UiText.StringResource)
+            assertEquals(R.string.ban_permanent, (state.banMessage as UiText.StringResource).resId)
+            assertTrue(state.banReason is UiText.StringResource)
+            assertEquals(R.string.ban_reason_prefix, (state.banReason as UiText.StringResource).resId)
+            assertNull(state.message)
         }
     }
 
@@ -417,17 +433,20 @@ class LoginViewModelTest {
     }
 
     // =========================================================================
-    // showInlineMessage
+    // showErrorMessage / showInfoMessage
     // =========================================================================
 
     @Test
-    fun `showInlineMessage sets message and isError flag`() {
-        viewModel.showInlineMessage("Test error", isError = true)
+    fun `showErrorMessage sets message and isError flag`() {
+        viewModel.showErrorMessage(UiText.DynamicString("Test error"))
         assertTrue(viewModel.uiState.value.message is UiText.DynamicString)
         assertEquals("Test error", (viewModel.uiState.value.message as UiText.DynamicString).value)
         assertTrue(viewModel.uiState.value.isMessageError)
+    }
 
-        viewModel.showInlineMessage("Test info", isError = false)
+    @Test
+    fun `showInfoMessage sets message and isError flag`() {
+        viewModel.showInfoMessage(UiText.DynamicString("Test info"))
         assertTrue(viewModel.uiState.value.message is UiText.DynamicString)
         assertEquals("Test info", (viewModel.uiState.value.message as UiText.DynamicString).value)
         assertFalse(viewModel.uiState.value.isMessageError)

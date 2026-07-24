@@ -5,7 +5,10 @@ import com.kidzone.R
 /**
  * Typowane błędy uwierzytelniania.
  */
-sealed class AuthException(val messageRes: Int) : Exception() {
+sealed class AuthException(
+    val messageRes: Int,
+    val args: Array<out Any> = emptyArray()
+) : Exception() {
 
     /** Konto z podanym e-mailem nie istnieje. */
     data object UserNotFound : AuthException(R.string.error_user_not_found)
@@ -32,12 +35,16 @@ sealed class AuthException(val messageRes: Int) : Exception() {
     /** Adres e-mail nie został potwierdzony. */
     data object EmailNotVerified : AuthException(R.string.error_email_not_verified)
 
+    /** Usuwanie konta przez Google nie jest bezpośrednio wspierane w tym kanale. */
+    data object AccountDeletionUnsupported : AuthException(R.string.error_delete_account_google_unsupported)
+
     /** Brak Internetu, timeout, błąd po stronie Firebase. */
     data class Network(val networkCause: Throwable) : AuthException(R.string.error_network)
 
     /** Konto użytkownika zostało zablokowane przez administratora. */
-    data class AccountBanned(
-        val banMessage: String,
-        val banReason: String
-    ) : AuthException(R.string.error_account_banned)
+    class AccountBanned(
+        @androidx.annotation.StringRes resId: Int = R.string.error_account_banned,
+        banArgs: Array<out Any> = emptyArray(),
+        val banReasonRes: Int = R.string.ban_reason_other
+    ) : AuthException(resId, banArgs)
 }

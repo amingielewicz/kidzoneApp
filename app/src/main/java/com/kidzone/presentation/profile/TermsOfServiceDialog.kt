@@ -132,7 +132,7 @@ private fun SectionTitle2(text: String) {
 private fun BulletPoint2(text: String) {
     val linkColor = MaterialTheme.colorScheme.primary
     Text(
-        text = "  \u2022  $text".linkified(linkColor),
+        text = stringResource(R.string.bullet_point, text).linkified(linkColor),
         style = MaterialTheme.typography.bodySmall
     )
 }

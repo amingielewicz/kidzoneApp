@@ -4,10 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.R
 import com.kidzone.domain.repository.AuthRepository
+import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.PasswordPolicy
 import com.kidzone.utils.UiText
-import com.kidzone.utils.toAuthErrorMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -176,11 +176,17 @@ class RegisterViewModel @Inject constructor(
                     )
                     is OpResult.Failure -> it.copy(
                         isLoading = false,
-                        errorMessage = result.error.toAuthErrorMessage(R.string.error_unknown)
+                        errorMessage = mapError(result.error)
                     )
                 }
             }
         }
     }
 
+    @Suppress("SpreadOperator")
+    private fun mapError(throwable: Throwable): UiText = when (throwable) {
+        is AuthException.Network -> UiText.StringResource(R.string.error_network)
+        is AuthException -> UiText.StringResource(throwable.messageRes, *throwable.args)
+        else -> UiText.StringResource(R.string.error_unknown)
+    }
 }

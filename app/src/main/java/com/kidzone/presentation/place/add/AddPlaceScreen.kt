@@ -825,7 +825,7 @@ private fun LocationSection(
         if (latitude != null && longitude != null) {
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "GPS: ${GeoUtils.formatCoordinates(latitude, longitude)}",
+                text = stringResource(R.string.gps_coordinates_format, latitude, longitude),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

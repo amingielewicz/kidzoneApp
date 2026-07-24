@@ -77,6 +77,7 @@ class ProfileViewModelTest {
     private lateinit var viewModel: ProfileViewModel
 
     private val currentUserFlow = MutableStateFlow<User?>(null)
+    private val observeUserFlow = MutableStateFlow<User?>(null)
 
     @BeforeEach
     fun setUp() {
@@ -93,7 +94,7 @@ class ProfileViewModelTest {
 
         every { authRepository.currentUser } returns currentUserFlow
         coEvery { authRepository.getCurrentSignInProvider() } returns SignInProvider.EMAIL_PASSWORD
-        every { authRepository.observeUser(any()) } returns currentUserFlow
+        every { authRepository.observeUser(any()) } returns observeUserFlow
         coEvery { authRepository.refreshUser() } returns OpResult.success(Unit)
         coEvery { placeRepository.getTopPlaces(any()) } returns OpResult.success(emptyList())
         coEvery { authRepository.getTopUsers(any()) } returns OpResult.success(emptyList())
@@ -144,7 +145,9 @@ class ProfileViewModelTest {
 
         @Test
         fun `fetches sign in provider on init`() = runTest {
-            currentUserFlow.value = TestFixtures.user()
+            val testUser = TestFixtures.user()
+            currentUserFlow.value = testUser
+            observeUserFlow.value = testUser
             coEvery { authRepository.getCurrentSignInProvider() } returns SignInProvider.GOOGLE
 
             viewModel = createAndObserve()
@@ -169,6 +172,7 @@ class ProfileViewModelTest {
             advanceUntilIdle()
 
             currentUserFlow.value = testUser
+            observeUserFlow.value = testUser
             advanceUntilIdle()
 
             assertEquals("uid-1", viewModel.user.value?.id)
@@ -178,6 +182,8 @@ class ProfileViewModelTest {
 
         @Test
         fun `missing profile is exposed as error instead of endless loading`() = runTest {
+            currentUserFlow.value = TestFixtures.user()
+            observeUserFlow.value = null
             viewModel = createAndObserve()
             advanceUntilIdle()
 
@@ -186,11 +192,15 @@ class ProfileViewModelTest {
 
         @Test
         fun `retry transitions profile from error to content`() = runTest {
+            currentUserFlow.value = TestFixtures.user()
+            observeUserFlow.value = null
             viewModel = createAndObserve()
             advanceUntilIdle()
             assertTrue(viewModel.profileState.value is ScreenState.Error)
 
-            currentUserFlow.value = TestFixtures.user(id = "uid-retry")
+            val testUser = TestFixtures.user(id = "uid-retry")
+            currentUserFlow.value = testUser
+            observeUserFlow.value = testUser
             viewModel.retryProfile()
             advanceUntilIdle()
 
@@ -252,6 +262,7 @@ class ProfileViewModelTest {
         fun `saveProfile skips upload when no new avatar`() = runTest {
             val testUser = TestFixtures.user(id = "uid-1", avatarUrl = "http://existing.url")
             currentUserFlow.value = testUser
+            observeUserFlow.value = testUser
             coEvery { authRepository.updateUserProfile(any(), any(), any(), any()) } returns
                 OpResult.success(testUser)
 
@@ -572,6 +583,7 @@ class ProfileViewModelTest {
             advanceUntilIdle()
 
             currentUserFlow.value = userWithBadge
+            observeUserFlow.value = userWithBadge
             advanceUntilIdle()
 
             assertEquals(
@@ -581,6 +593,7 @@ class ProfileViewModelTest {
             verify(exactly = 0) { badgePreferences.setSeenBadges("uid-1", any()) }
 
             currentUserFlow.value = userWithBadge.copy(name = "Jan po odświeżeniu")
+            observeUserFlow.value = userWithBadge.copy(name = "Jan po odświeżeniu")
             advanceUntilIdle()
 
             assertEquals(
@@ -603,7 +616,9 @@ class ProfileViewModelTest {
             viewModel = createAndObserve()
             advanceUntilIdle()
 
-            currentUserFlow.value = TestFixtures.user(id = "uid-1", placesAddedCount = 0, reviewsCount = 0)
+            val testUser = TestFixtures.user(id = "uid-1", placesAddedCount = 0, reviewsCount = 0)
+            currentUserFlow.value = testUser
+            observeUserFlow.value = testUser
             advanceUntilIdle()
 
             coVerify { authRepository.revokeBadges(listOf("FIRST_PLACE")) }

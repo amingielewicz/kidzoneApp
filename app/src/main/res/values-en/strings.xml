@@ -17,12 +17,12 @@
     <string name="auth_divider_or">or</string>
     <string name="show_password">Show password</string>
     <string name="hide_password">Hide password</string>
-    <string name="google_sign_in_not_configured">Enable Google Sign-In in Firebase Console and download a new google-services.json to app/</string>
-    <string name="google_sign_in_missing_activity">Could not start Google sign-in (missing Activity)</string>
+    <string name="google_sign_in_not_configured">Google sign-in is currently unavailable in this version of the app. Please use email and password.</string>
+    <string name="google_sign_in_missing_activity">An error occurred while starting Google sign-in. Please try again or use email login.</string>
     <string name="register_title">Create account</string>
     <string name="register_subtitle">Join the kidZone community and start discovering kid-friendly places</string>
     <string name="username">Username</string>
-    <string name="username_helper">Visible in reviews, places, and ranking</string>
+    <string name="username_helper">Visible in reviews, places, and leaderboard</string>
     <string name="invalid_email_format">Invalid email format</string>
     <string name="register_success_title">Account created!</string>
     <string name="register_success_message">We sent a verification link to the email address you provided. Click the link in the email to verify your account and sign in.</string>
@@ -71,28 +71,28 @@
     <string name="pending_changes">Pending changes</string>
     <string name="login_validation_empty">Please fill in both email and password</string>
     <string name="forgot_password_hint">Enter email above to reset password</string>
-    <string name="password_reset_sent">We sent a password reset link to %1$s. If you signed in via Google, use the „Sign in with Google” button below.</string>
+    <string name="password_reset_sent">We sent a password reset link to %1$s. If you signed in with Google, use the “Sign in with Google” button below.</string>
     <string name="verification_email_sent">Verification link resent. Check your inbox.</string>
     <string name="verification_email_error">Failed to send verification link</string>
-    <string name="error_enter_username">Enter username</string>
-    <string name="error_enter_email">Enter email address</string>
-    <string name="error_enter_password">Enter password</string>
+    <string name="error_enter_username">Please enter a username</string>
+    <string name="error_enter_email">Please enter an email address</string>
+    <string name="error_enter_password">Please enter a password</string>
     <string name="cancel">Cancel</string>
 
     <!-- Navigation -->
     <string name="nav_home">Home</string>
     <string name="nav_map">Map</string>
     <string name="nav_list">List</string>
-    <string name="nav_ranking">Ranking</string>
+    <string name="nav_ranking">Rank</string>
     <string name="nav_profile">Profile</string>
 
     <!-- Home -->
     <string name="home_welcome">Hi!</string>
-    <string name="home_intro_title">Welcome to kidZone!</string>
-    <string name="home_find_nearby">Find attractions nearby</string>
-    <string name="home_find_nearby_description">Welcome to kidZone! Find attractions nearby.</string>
+    <string name="home_intro_title">Find kid-friendly spots!</string>
+    <string name="home_find_nearby">Find nearby attractions</string>
+    <string name="home_find_nearby_description">Discover the best kid-friendly spots around you.</string>
     <string name="home_recent_nearby_places">Recently added nearby</string>
-    <string name="home_top_places">TOP near you</string>
+    <string name="home_top_places">Top places near you</string>
     <string name="home_nearby_places">Near you</string>
     <string name="home_open_map">Open map</string>
     <string name="home_open_map_subtitle">See all nearby places</string>
@@ -107,7 +107,7 @@
     <string name="home_manual_city_short">Choose city manually</string>
     <string name="home_gps_status_message">We can\'t see your location. Turn on GPS to see attractions nearby.</string>
     <string name="home_gps_empty_message">Enable location to see what other parents recommend.</string>
-    <string name="home_checking_gps">Checking...</string>
+    <string name="home_checking_gps">Finding location...</string>
     <string name="home_nearby_section_title">📍 Nearby</string>
     <string name="home_top_section_title">🏆 Most popular</string>
     <string name="home_recent_section_title">🆕 New nearby</string>
@@ -118,20 +118,20 @@
     <!-- Map -->
     <string name="map_my_location">My location</string>
     <string name="view_on_google_maps">View on Google Maps</string>
-    <string name="map_list_button">List of places (%1$s)</string>
+    <string name="map_list_button">Places (%1$s)</string>
     <string name="map_place_count_capped">&gt; %1$d</string>
-    <string name="map_places_list_title">Places on the map</string>
-    <string name="map_places_list_subtitle">List shows currently loaded places from the map.</string>
+    <string name="map_places_list_title">Map results</string>
+    <string name="map_places_list_subtitle">Showing places visible in the current area.</string>
     <string name="map_no_places_to_display">No places to display.</string>
     <string name="map_open_place_details_label">Open place details</string>
-    <string name="map_place_rating_count_label">Rating %1$.1f, review count: %2$d</string>
+    <string name="map_place_rating_count_label">Rating %1$.1f, %2$d reviews</string>
     <string name="map_no_reviews">No reviews</string>
     <string name="map_location_banner_text">Enable location to see yourself on the map</string>
     <string name="allow">Allow</string>
     <string name="category_all">All</string>
     <string name="filter_top_rated">Top rated</string>
     <string name="filter_added_by_me">Added by you</string>
-    <string name="see_details">See details</string>
+    <string name="see_details">View details</string>
     <string name="map_loading_places">Loading places on the map</string>
     <string name="map_zoom_in">Zoom in</string>
     <string name="map_zoom_out">Zoom out</string>
@@ -142,7 +142,7 @@
     <string name="rating">Rating</string>
     <string name="reviews">Reviews</string>
     <string name="clear_filters">Clear filters</string>
-    <string name="search_placeholder">Search place\u2026</string>
+    <string name="search_placeholder">Search for a place\u2026</string>
     <string name="clear_search">Clear search</string>
     <string name="filters">Filters</string>
     <string name="active_filters_count">Active filters: %1$d</string>
@@ -156,30 +156,37 @@
     <string name="sort_worst_rated">Worst rated</string>
 
     <!-- Place List Empty States -->
-    <string name="empty_added_by_me_logged_out">Sign in to see places added by you.</string>
+    <string name="empty_added_by_me_logged_out">Sign in to see the places you\'ve added.</string>
     <string name="empty_added_by_me_logged_in">When you add a place, it will appear here with its status and reviews.</string>
-    <string name="empty_search_query">Try a shorter phrase or clear filters to return to the full list.</string>
+    <string name="empty_search_query">Try a shorter search term or clear the filters to return to the full list.</string>
     <string name="empty_filters">Change category or amenities if you want to broaden the results.</string>
     <string name="empty_default">Add your first place from the home screen or check back later.</string>
     <string name="empty_title_added_by_me_logged_out">Sign in to see your places</string>
     <string name="empty_title_added_by_me_logged_in">You haven\'t added any places yet</string>
     <string name="empty_title_search">No search results</string>
     <string name="empty_title_filters">No places for selected filters</string>
-    <string name="empty_title_default">No places found</string>
+    <string name="empty_title_default">We couldn\'t find any places</string>
 
     <!-- Place Card -->
     <string name="distance_away">%1$s away from you</string>
-    <string name="address_prefix">address: %1$s</string>
+    <string name="address_prefix">Address: %1$s</string>
     <string name="distance_m">%1$d m</string>
     <string name="distance_km">%1$.1f km</string>
     <string name="distance_km_integer">%1$d km</string>
-    <string name="rating_accessibility_label">rating %1$.1f, review count %2$d</string>
+    <string name="rating_accessibility_label">rating %1$.1f, %2$d reviews</string>
     <string name="new_place_no_reviews">new place without reviews</string>
+    <string name="place_status_new">New</string>
 
     <!-- Error Messages -->
     <string name="error_fetch_places">Could not load places on the map</string>
-    <string name="error_fetch_list">Could not load list of places</string>
+    <string name="error_fetch_list">Could not load the list of places</string>
     <string name="error_fetch_more">Could not load more places</string>
+    <string name="error_already_reported_place">You have already reported this place</string>
+    <string name="error_already_reported_photo">You have already reported this photo</string>
+    <string name="error_already_reported_review">You have already reported this review</string>
+    <string name="error_duplicate_change_request">This change suggestion is already pending review</string>
+    <string name="error_timeout_report_place">Timed out while saving the report</string>
+    <string name="error_offline_sync_disabled">Could not save the review offline. Check your connection and try again.</string>
     <string name="location_sorting_rationale">Enable location to sort places by distance.</string>
     <string name="no_internet_banner">No internet connection. Waiting for network…</string>
     <string name="gps_disabled_banner">We can\'t see where you are. Turn on location to see places in your area.</string>
@@ -203,7 +210,7 @@
     <string name="onboarding_title_2">Discover on the map</string>
     <string name="onboarding_desc_2">Browse places on an interactive map. Filter by category, distance, and other parents\' ratings.</string>
     <string name="onboarding_title_3">Compare places</string>
-    <string name="onboarding_desc_3">Use the list when you want to quickly filter results. The ranking will show the top-rated places and the most active users.</string>
+    <string name="onboarding_desc_3">Use the list when you want to quickly filter results. The leaderboard will show the top-rated places and the most active users.</string>
     <string name="onboarding_title_4">Share reviews</string>
     <string name="onboarding_desc_4">Add places, post reviews and help other parents choose. Earn badges for activity!</string>
     <string name="onboarding_button_start">Let\'s start!</string>
@@ -212,13 +219,13 @@
     <string name="pp_section_1_title">1. Data controller</string>
     <string name="pp_section_1_body">The controller of your personal data is %1$s. For matters relating to the processing of your data, please contact us at e-mail: %2$s.</string>
     <string name="pp_section_2_title">2. What data we collect</string>
-    <string name="pp_section_2_body">"• Email address and account name (login) provided during registration.\n• First name, last name and avatar – only if you add them yourself in your profile.\n• Content you create in the app: added places, reviews, ratings, photos, reports and the approximate location of those places.\n• Google login data (if you choose to log in via Google) – we only receive your ID, email and avatar from Google.\n• Current location of your device – only when you consciously use the „Fetch my location” function when adding a place or viewing nearby places. We do not save location history.\n• Technical data: notification tokens, installation IDs, crash logs, diagnostic data, performance data and basic analytical events."</string>
+    <string name="pp_section_2_body">"• Email address and account name (login) provided during registration.\n• First name, last name and avatar – only if you add them yourself in your profile.\n• Content you create in the app: added places, reviews, ratings, photos, reports and the approximate location of those places.\n• Google login data (if you choose to log in with Google) – we only receive your ID, email and avatar from Google.\n• Current location of your device – only when you consciously use the “Fetch my location” function when adding a place or viewing nearby places. We do not save location history.\n• Technical data: notification tokens, installation IDs, crash logs, diagnostic data, performance data and basic analytical events."</string>
     <string name="pp_section_3_title">3. For what purpose</string>
-    <string name="pp_section_3_body">We use the data only for the operation of the app: logging in, displaying a map of kid-friendly places, presenting reviews from other parents, notifications, handling reports, fault diagnostics, performance improvement and the ranking of the most active users. We do not use your data for advertising or profiling.</string>
+    <string name="pp_section_3_body">We use the data only for the operation of the app: logging in, displaying a map of kid-friendly places, presenting reviews from other parents, notifications, handling reports, fault diagnostics, performance improvement and the leaderboard of the most active users. We do not use your data for advertising or profiling.</string>
     <string name="pp_section_4_title">4. Who we share data with</string>
     <string name="pp_section_4_body">"• Google Firebase: Authentication, Firestore, Storage, Crashlytics, Analytics, Performance Monitoring, Cloud Messaging, App Check and Remote Config – as technical services needed for the account, database, photos, notifications, security, diagnostics and quality of the app.\n• Google Maps Platform and Google Play Services – for the map, location, Google login and system functions.\nGoogle servers may be located outside the European Economic Area; Google ensures an adequate level of protection within the mechanisms provided for by GDPR.\n• Other users of the app – see your login, avatar and content that you publish publicly (places, reviews). Your first and last name remain private."</string>
     <string name="pp_section_5_title">5. Your rights</string>
-    <string name="pp_section_5_body">"You have the right to access your data, rectify it, delete it („the right to be forgotten”), restrict processing, portability and object. You can make most changes yourself from the Profile tab – including data editing and permanent account deletion along with reviews and places (the „Delete account” button).\n\nA public account deletion manual is available at https://playground-705e7162.web.app/account-deletion.\n\nIf for any reason you cannot perform these operations yourself – write to %1$s and we will help."</string>
+    <string name="pp_section_5_body">"You have the right to access your data, rectify it, delete it (“the right to be forgotten”), restrict processing, portability and object. You can make most changes yourself from the Profile tab – including data editing and permanent account deletion along with reviews and places (the “Delete account” button).\n\nA public account deletion manual is available at https://playground-705e7162.web.app/account-deletion.\n\nIf for any reason you cannot perform these operations yourself – write to %1$s and we will help."</string>
     <string name="pp_section_6_title">6. Storage period</string>
     <string name="pp_section_6_body">Account data is stored until the account is deleted. Public content (places, reviews) may be retained in anonymized form if its removal would hinder the operation of the app for other users. Notification tokens are deleted or deactivated after logging out, account deletion or expiry. Diagnostic and performance data are stored only for the time needed for analysis of errors, security and quality.</string>
     <string name="pp_section_7_title">7. Security</string>
@@ -323,8 +330,8 @@
     <string name="enable_notifications">Enable notifications</string>
     <string name="notification_prompt_first_place">Nice, you added a place! Enable notifications to see when others add photos or reviews to it.</string>
     <string name="notification_prompt_first_badge">Congrats, you earned your first badge! Enable notifications so you don\'t miss your next kidZone achievements.</string>
-    <string name="notification_prompt_top10">You\'re in the TOP 10! Enable notifications to know when you reach the podium or keep your ranking position.</string>
-    <string name="notification_prompt_podium">You reached the podium! Enable notifications to follow your ranking position.</string>
+    <string name="notification_prompt_top10">You\'re in the TOP 10! Enable notifications to know when you reach the podium or keep your leaderboard position.</string>
+    <string name="notification_prompt_podium">You reached the podium! Enable notifications to follow your leaderboard position.</string>
     <string name="location_permission_title">Share location</string>
     <string name="location_permission_message">We\'ll show you places near you, distances on Home, and center the map more conveniently.</string>
     <string name="location_permission_action">Allow location</string>
@@ -342,12 +349,12 @@
     <string name="amenity_section_attraction">Attraction</string>
     <string name="ranking_tab_places">Places</string>
     <string name="ranking_tab_users">Users</string>
-    <string name="ranking_empty_places_title">Places ranking is still empty</string>
+    <string name="ranking_empty_places_title">Places leaderboard is still empty</string>
     <string name="ranking_empty_places_message">Add a review to a place, and the top-rated locations will appear here.</string>
-    <string name="ranking_empty_users_title">Users ranking is still empty</string>
+    <string name="ranking_empty_users_title">Authors leaderboard is still empty</string>
     <string name="ranking_empty_users_message">Activity will appear after adding first places, reviews, or photos.</string>
-    <string name="ranking_badges_hint">Hold a badge icon to see its name. All badges to earn can be found in Profile \u2192 Badges \u2192 \u201E?\u201D</string>
-    <string name="ranking_place_content_description">Position %1$d, %2$s, %3$s%4$s, rating %5$.1f, review count %6$d</string>
+    <string name="ranking_badges_hint">Hold a badge icon to see its name. All badges to earn can be found in Profile → Badges → “?”</string>
+    <string name="ranking_place_content_description">Position %1$d, %2$s, %3$s%4$s, rating %5$.1f, %6$d reviews</string>
     <string name="reviews_count_label">%1$d reviews</string>
     <string name="default_user_name">User</string>
     <string name="no_badges">no badges</string>
@@ -368,11 +375,12 @@
     <string name="my_reviews">My reviews</string>
     <string name="badges_title">Badges</string>
     <string name="how_to_earn_badges">How to earn badges?</string>
-    <string name="no_badges_message">You don\'t have any badges yet. Click „?” next to the title to see how to earn them.</string>
+    <string name="no_badges_message">You don\'t have any badges yet. Click “?” next to the title to see how to earn them.</string>
     <string name="badges_info_title">How to earn badges?</string>
     <string name="badges_info_body">App activity is rewarded with badges. The more places and reviews you add, the more badges you earn.</string>
     <string name="i_understand">I understand</string>
     <string name="congratulations">Congratulations!</string>
+    <string name="congratulations_with_count">Congratulations! (%1$d)</string>
     <string name="earned_new_badge">You earned a new badge:</string>
     <string name="earned_new_badges">You earned new badges:</string>
     <string name="great">Great!</string>
@@ -430,7 +438,7 @@
     <string name="error_invalid_rating">Choose a rating from 1 to 5</string>
     <string name="star_count_label">%1$d stars</string>
     <string name="delete_place_title">Delete place?</string>
-    <string name="delete_place_confirmation">\"%1$s\" will be permanently deleted. Are you sure you want to continue?</string>
+    <string name="delete_place_confirmation">“%1$s” will be permanently deleted. Are you sure you want to continue?</string>
     <string name="delete_place_confirmation_generic">The place will be permanently deleted. Are you sure you want to continue?</string>
     <string name="thank_you_report">Thank you for your report!</string>
     <string name="thank_you_suggest_edit">Thank you! Your suggestion has been sent for verification.</string>
@@ -477,9 +485,11 @@
     <string name="fetch_location_action">Fetch my location *</string>
     <string name="category_label">Category</string>
     <string name="nearby_places_label">Nearby places:</string>
-    <string name="duplicate_warning_message">There is already a place „%2$s” (%3$s) nearby (~%1$dm). Are you sure you want to add a new one?</string>
+    <string name="duplicate_warning_message">There is already a place “%2$s” (%3$s) nearby (~%1$dm). Are you sure you want to add a new one?</string>
     <string name="photo_thumbnail_description">Photo thumbnail</string>
     <string name="remove_photo_description">Remove photo</string>
+    <string name="gps_coordinates_format">GPS: %1$.5f, %2$.5f</string>
+    <string name="character_counter_format">%1$d / %2$d</string>
     <string name="report_reason_not_exists">Place does not exist / closed</string>
     <string name="report_reason_inappropriate">Inappropriate content</string>
     <string name="report_reason_duplicate">Duplicate of another place</string>
@@ -497,7 +507,13 @@
     <string name="report_submit">Send report</string>
     <string name="ban_permanent">Your account has been permanently blocked.</string>
     <string name="ban_temporary">Your account is blocked until %1$s.</string>
-    <string name="report_review_context">You are reporting user %1$s\'s review.</string>
+    <string name="ban_reason_prefix">Reason: %1$s</string>
+    <string name="ban_reason_spam">Spreading spam or unwanted content</string>
+    <string name="ban_reason_abuse">Violation of community rules or harassment</string>
+    <string name="ban_reason_fraud">Suspicious activity or fraud</string>
+    <string name="ban_reason_terms_violation">Violation of terms of service</string>
+    <string name="ban_reason_other">Other violations</string>
+    <string name="report_review_context">You are reporting user %1$s’s review.</string>
     <!-- Badges -->
     <string name="badge_first_place_label">First Trace</string>
     <string name="badge_first_place_desc">Add your first place on the map</string>
@@ -520,15 +536,15 @@
     <string name="badge_family_expert_label">Family Expert</string>
     <string name="badge_family_expert_desc">Add 10+ places and 20+ reviews</string>
     <string name="badge_leader_bronze_label">Bronze Leader</string>
-    <string name="badge_leader_bronze_desc">Rank 3rd in the users ranking</string>
+    <string name="badge_leader_bronze_desc">Rank 3rd in the authors leaderboard</string>
     <string name="badge_leader_silver_label">Silver Leader</string>
-    <string name="badge_leader_silver_desc">Rank 2nd in the users ranking</string>
+    <string name="badge_leader_silver_desc">Rank 2nd in the authors leaderboard</string>
     <string name="badge_leader_gold_label">Gold Leader</string>
-    <string name="badge_leader_gold_desc">Rank 1st in the users ranking</string>
+    <string name="badge_leader_gold_desc">Rank 1st in the authors leaderboard</string>
     <string name="badge_place_top3_label">Local Favorite</string>
     <string name="badge_place_top3_desc">Your place reached TOP 3 top rated</string>
     <string name="badge_place_top1_label">Fun Architect</string>
-    <string name="badge_place_top1_desc">Your place is #1 in the top rated ranking</string>
+    <string name="badge_place_top1_desc">Your place is #1 in the top rated leaderboard</string>
     <string name="tos_section_1_title">1. General rules</string>
     <string name="tos_section_1_body">The kidZone application is used to share information about kid-friendly places. By using it, you agree to comply with these Terms of Service.</string>
     <string name="tos_section_2_title">2. Account</string>
@@ -540,7 +556,7 @@
     <string name="tos_section_3_bullet_3">Respecting other users</string>
     <string name="tos_section_3_bullet_4">Not publishing offensive content, spam or advertisements</string>
     <string name="tos_section_3_bullet_5">Not adding inappropriate photos</string>
-    <string name="tos_section_3_bullet_6">Not manipulating rankings and badges</string>
+    <string name="tos_section_3_bullet_6">Not manipulating leaderboards and badges</string>
     <string name="tos_section_4_title">4. Account block</string>
     <string name="tos_section_4_body">Violation of the Terms of Service may result in account block. The block can be temporary (for a certain number of days) or irreversible (permanent). A blocked user cannot log in to the application. You will be informed of the block by email with the reason.</string>
     <string name="tos_section_4_intro">A block may occur in particular for:</string>
@@ -559,7 +575,7 @@
     <string name="tos_section_8_body">kidZone is not responsible for content published by users and does not guarantee its timeliness.</string>
     <string name="tos_section_9_title">9. Changes to Terms</string>
     <string name="tos_section_9_body">You will be informed of significant changes to the Terms of Service in the application or by email. Continued use of the application means acceptance of the new terms.</string>
-    <string name="rate_place_title">Rate „%1$s”</string>
+    <string name="rate_place_title">Rate “%1$s”</string>
     <string name="save_changes">Save changes</string>
     <string name="publish_review">Publish review</string>
     <string name="review_placeholder">What do you think about this place?</string>
@@ -570,7 +586,7 @@
     <string name="location_correction_subtitle">Fetch current GPS location to suggest the correct position of this place on the map.</string>
     <string name="fetch_location">Fetch location</string>
     <string name="submit_correction">Send correction</string>
-    <string name="empty_my_places_subtitle">Use the „Add place” button on the home screen to add your first location.</string>
+    <string name="empty_my_places_subtitle">Use the “Add place” button on the home screen to add your first location.</string>
     <string name="notifications_title">Notifications</string>
     <string name="push_notifications_section">Push notifications</string>
     <string name="notification_preferences_subtitle">Choose what you want to be notified about:</string>
@@ -580,8 +596,8 @@
     <string name="pref_new_badge_desc">You earned or lost a badge</string>
     <string name="pref_new_photo_title">Photos in my place</string>
     <string name="pref_new_photo_desc">Someone added or removed a photo from a place you added</string>
-    <string name="pref_rankings_title">Rankings</string>
-    <string name="pref_rankings_desc">You reach TOP 10 / TOP 3 / podium in the ranking</string>
+    <string name="pref_rankings_title">Leaderboards</string>
+    <string name="pref_rankings_desc">You reach TOP 10 / TOP 3 / podium on the leaderboard</string>
     <string name="email_notifications_section">Email notifications</string>
     <string name="pref_email_notifs_desc">Receive emails about account block, deletion of reviews, places, and photos</string>
     <string name="click_to_change_avatar">Click avatar to change photo</string>
@@ -598,7 +614,7 @@
     <string name="delete_account_confirm_password">Enter your current password to confirm:</string>
     <string name="delete_account_reviews_prefix">Your reviews</string>
     <string name="delete_account_places_prefix">Your places</string>
-    <string name="confirm_google_button">Confirm via Google</string>
+    <string name="confirm_google_button">Confirm with Google</string>
     <string name="change_email_title">Change email address</string>
     <string name="current_email_label">Current address: %1$s</string>
     <string name="new_email_label">New email address</string>
@@ -611,6 +627,7 @@
     <string name="change_email_verification_sent">Verification link sent to %1$s. Click it to confirm the address change.</string>
     <string name="account_action_failed">Failed to complete action</string>
     <string name="delete_account_failed">Failed to delete account</string>
+    <string name="error_delete_account_google_unsupported">Account deletion is available only for email/password sign-in. For Google sign-in, delete the account from your Google account or contact us.</string>
     <string name="delete_account_offline_action">Delete when online</string>
     <string name="error_unauthorized">You do not have permission to perform this action</string>
     <string name="empty_my_reviews_title">You don\'t have any reviews yet</string>
@@ -621,5 +638,6 @@
     <string name="delete_review_confirmation">Your review will be permanently deleted. The average rating of the place will be recalculated.</string>
     <string name="added_date">Added %1$s</string>
     <string name="edited_date">Edited %1$s</string>
+    <string name="bullet_point">  \u2022  %1$s</string>
     <string name="suppi_support_description">Give us a high five and support kidZone</string>
 </resources>

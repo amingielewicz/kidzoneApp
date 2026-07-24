@@ -14,27 +14,29 @@ import java.io.IOException
  * - Zawsze zwraca czytelny komunikat, korzystając z domyślnego fallbacku w razie nieznanego błędu.
  * - Prawidłowo identyfikuje błędy braku sieci ([IOException]).
  */
+@Suppress("SpreadOperator")
 fun Throwable.toAuthErrorMessage(fallbackRes: Int = R.string.error_unknown): UiText =
     when (this) {
-        is AuthException.AccountBanned -> UiText.DynamicString(banMessage)
-        is AuthException -> UiText.StringResource(messageRes.takeIf { it != 0 } ?: fallbackRes)
+        is AuthException -> UiText.StringResource(
+            messageRes.takeIf { it != 0 } ?: fallbackRes,
+            *args
+        )
         else -> if (hasCause<IOException>()) {
             UiText.StringResource(R.string.error_no_internet)
         } else {
             UiText.StringResource(fallbackRes)
         }
     }
-
+@Suppress("SpreadOperator")
 fun Throwable.toPlacesErrorMessage(fallback: UiText): UiText {
     val firestoreError = findCause<FirebaseFirestoreException>()
-    if (firestoreError != null) {
-        return firestoreError.toFirestoreMessage(fallback)
-    }
 
-    return if (hasCause<IOException>()) {
-        UiText.StringResource(R.string.error_no_internet)
-    } else {
-        fallback
+    return when {
+        this is RepositoryException -> UiText.StringResource(this.messageRes)
+        this is AuthException -> UiText.StringResource(this.messageRes, *this.args)
+        firestoreError != null -> firestoreError.toFirestoreMessage(fallback)
+        hasCause<IOException>() -> UiText.StringResource(R.string.error_no_internet)
+        else -> fallback
     }
 }
 
