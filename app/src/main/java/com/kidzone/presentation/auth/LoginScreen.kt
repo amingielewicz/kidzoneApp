@@ -73,7 +73,9 @@ import com.kidzone.presentation.common.SystemStatusIcons
 import com.kidzone.R
 import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.rememberNetworkStatus
+import com.kidzone.utils.UiText
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 /**
  * Ekran logowania - e-mail/hasło + Google + reset hasła.
@@ -122,7 +124,16 @@ fun LoginScreen(
         when (result) {
             is GoogleSignInResult.Success -> viewModel.signInWithGoogle(result.idToken)
             GoogleSignInResult.Cancelled -> Unit
-            is GoogleSignInResult.Error -> viewModel.showInlineMessage(result.message)
+            is GoogleSignInResult.Error -> {
+                val technical = when(result) {
+                    is GoogleSignInResult.Error.ConfigurationError -> result.technicalMessage
+                    is GoogleSignInResult.Error.TokenError -> result.technicalMessage
+                    is GoogleSignInResult.Error.ServiceError -> "(${result.code}) ${result.technicalMessage}"
+                    is GoogleSignInResult.Error.UnknownError -> result.technicalMessage
+                }
+                Timber.w("Google Sign-In Error (legacy): $technical")
+                viewModel.showErrorMessage(UiText.StringResource(R.string.google_sign_in_unavailable))
+            }
             else -> Unit
         }
     }
@@ -330,15 +341,28 @@ fun LoginScreen(
                             }
                         }
 
-                        // Komunikat (błąd lub info, np. po "zapomniałem hasła").
-                        state.message?.let { msg ->
-                            if (!state.isMessageError) {
-                                Spacer(Modifier.height(4.dp))
-                                MessageBanner(
-                                    text = msg.asString(),
-                                    isError = false
-                                )
-                            }
+                        // Komunikat informacyjny (np. po "zapomniałem hasła") lub błąd blokady
+                        val infoMessage = state.message?.takeIf { !state.isMessageError }
+                        val banMessage = state.banMessage
+                        
+                        if (infoMessage != null || banMessage != null) {
+                            Spacer(Modifier.height(4.dp))
+                            MessageBanner(
+                                text = (infoMessage ?: banMessage)!!.asString(),
+                                isError = banMessage != null
+                            )
+                        }
+
+                        // Szczegółowy powód blokady
+                        val banReason = state.banReason
+                        if (banMessage != null && banReason != null) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = banReason.asString(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
                         }
 
                         // Przycisk "Wyślij ponownie" link weryfikacyjny
@@ -416,16 +440,18 @@ fun LoginScreen(
                                     }
 
                                     if (webClientId.isBlank()) {
-                                        viewModel.showInlineMessage(
-                                            context.getString(R.string.google_sign_in_not_configured)
+                                        Timber.e("Google Sign-In Error: Web Client ID is missing in strings.xml")
+                                        viewModel.showErrorMessage(
+                                            UiText.StringResource(R.string.google_sign_in_not_configured)
                                         )
                                         return@launch
                                     }
 
                                     when (val result = launchGoogleSignIn(
                                         activity ?: run {
-                                            viewModel.showInlineMessage(
-                                                context.getString(R.string.google_sign_in_missing_activity)
+                                            Timber.e("Google Sign-In Error: Activity context is missing")
+                                            viewModel.showErrorMessage(
+                                                UiText.StringResource(R.string.google_sign_in_missing_activity)
                                             )
                                             return@launch
                                         },
@@ -441,8 +467,25 @@ fun LoginScreen(
                                             val intent = buildLegacyGoogleSignInIntent(context, webClientId)
                                             legacyGoogleSignInLauncher.launch(intent)
                                         }
-                                        is GoogleSignInResult.Error ->
-                                            viewModel.showInlineMessage(result.message)
+                                        is GoogleSignInResult.Error -> {
+                                            val details = when (result) {
+                                                is GoogleSignInResult.Error.ConfigurationError ->
+                                                    "Config: ${result.technicalMessage}"
+
+                                                is GoogleSignInResult.Error.TokenError ->
+                                                    "Token: ${result.technicalMessage}"
+
+                                                is GoogleSignInResult.Error.ServiceError ->
+                                                    "Service (${result.code}): ${result.technicalMessage}"
+
+                                                is GoogleSignInResult.Error.UnknownError ->
+                                                    "Unknown: ${result.technicalMessage}"
+                                            }
+                                            Timber.w("Google Sign-In Error: $details")
+                                            viewModel.showErrorMessage(
+                                                UiText.StringResource(R.string.google_sign_in_unavailable)
+                                            )
+                                        }
                                     }
                                 }
                             },

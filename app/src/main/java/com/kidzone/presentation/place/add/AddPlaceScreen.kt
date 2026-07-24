@@ -824,7 +824,7 @@ private fun LocationSection(
         if (latitude != null && longitude != null) {
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "GPS: %.5f, %.5f".format(latitude, longitude),
+                text = stringResource(R.string.gps_coordinates_format, latitude, longitude),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

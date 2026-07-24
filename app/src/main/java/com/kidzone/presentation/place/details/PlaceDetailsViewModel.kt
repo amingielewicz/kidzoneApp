@@ -17,7 +17,6 @@ import com.kidzone.analytics.AnalyticsHelper
 import com.kidzone.analytics.PlaceReportReason
 import com.kidzone.analytics.ReviewReportReason
 import com.kidzone.analytics.PhotoReportReason
-import com.kidzone.data.repository.FirestoreReviewRepository
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.model.User
@@ -32,6 +31,7 @@ import com.kidzone.review.InAppReviewManager
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.PhotoHasher
 import com.kidzone.utils.PhotoUploader
+import com.kidzone.utils.RepositoryException
 import com.kidzone.utils.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -948,11 +948,8 @@ class PlaceDetailsViewModel @Inject constructor(
     }
 
     private fun mapReviewError(e: Throwable): UiText = when (e) {
-        is FirestoreReviewRepository.OfflineReviewSyncDisabledException ->
-            UiText.StringResource(R.string.error_offline_sync)
-
-        is FirestoreReviewRepository.AlreadyReportedException ->
-            UiText.StringResource(R.string.error_already_reported)
+        is RepositoryException ->
+            UiText.StringResource(e.messageRes)
 
         is TimeoutException ->
             UiText.StringResource(R.string.error_timeout)

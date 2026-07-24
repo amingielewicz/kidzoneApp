@@ -7,9 +7,11 @@ import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.ReviewDto
 import com.kidzone.domain.model.Review
 import com.kidzone.domain.repository.ReviewRepository
+import com.kidzone.R
 import com.kidzone.sync.NetworkUtils
 import com.kidzone.utils.AppConfig
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.RepositoryException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -180,7 +182,7 @@ class FirestoreReviewRepository @Inject constructor(
             .get()
             .await()
         if (existing.documents.isNotEmpty()) {
-            throw AlreadyReportedException()
+            throw RepositoryException.AlreadyReported(R.string.error_already_reported_review)
         }
 
         val reportData = mapOf(
@@ -198,7 +200,7 @@ class FirestoreReviewRepository @Inject constructor(
             true
         }
         if (completed == null) {
-            OpResult.failure(java.util.concurrent.TimeoutException("Timed out while saving the report"))
+            OpResult.failure(RepositoryException.Timeout(R.string.error_timeout_report_place))
         } else {
             OpResult.success(Unit)
         }
@@ -240,10 +242,5 @@ class FirestoreReviewRepository @Inject constructor(
     private fun reviewsCollection() = firestore.collection(FirestoreCollections.REVIEWS)
 
     private fun <T> offlineSyncDisabledFailure(): OpResult<T> =
-        OpResult.failure(OfflineReviewSyncDisabledException())
-
-    class OfflineReviewSyncDisabledException : IllegalStateException(
-            "Could not save the review offline. Check your connection and try again."
-    )
-class AlreadyReportedException : IllegalStateException("You have already reported this review")
+        OpResult.failure(RepositoryException.OfflineSyncDisabled(R.string.error_offline_sync_disabled))
 }

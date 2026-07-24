@@ -5,16 +5,16 @@ import com.google.firebase.storage.StorageException
 import com.kidzone.R
 import java.io.IOException
 
+@Suppress("SpreadOperator")
 fun Throwable.toPlacesErrorMessage(fallback: UiText): UiText {
     val firestoreError = findCause<FirebaseFirestoreException>()
-    if (firestoreError != null) {
-        return firestoreError.toFirestoreMessage(fallback)
-    }
 
-    return if (hasCause<IOException>()) {
-        UiText.StringResource(R.string.error_no_internet)
-    } else {
-        fallback
+    return when {
+        this is RepositoryException -> UiText.StringResource(this.messageRes)
+        this is AuthException -> UiText.StringResource(this.messageRes, *this.args)
+        firestoreError != null -> firestoreError.toFirestoreMessage(fallback)
+        hasCause<IOException>() -> UiText.StringResource(R.string.error_no_internet)
+        else -> fallback
     }
 }
 

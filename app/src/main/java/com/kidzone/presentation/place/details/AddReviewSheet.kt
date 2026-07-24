@@ -284,7 +284,11 @@ fun AddReviewSheet(
                 enabled = !isSubmitting,
                 supportingText = {
                     Text(
-                        text = "${comment.length} / $COMMENT_MAX_LENGTH",
+                        text = stringResource(
+                            R.string.character_counter_format,
+                            comment.length,
+                            COMMENT_MAX_LENGTH
+                        ),
                         style = MaterialTheme.typography.labelSmall,
                         color = if (comment.length >= COMMENT_MAX_LENGTH) {
                             MaterialTheme.colorScheme.error

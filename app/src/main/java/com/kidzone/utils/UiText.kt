@@ -23,7 +23,12 @@ sealed class UiText {
     fun asString(): String {
         return when (this) {
             is DynamicString -> value
-            is StringResource -> stringResource(resId, *args)
+            is StringResource -> {
+                val resolvedArgs = args.map {
+                    if (it is UiText) it.asString() else it
+                }.toTypedArray()
+                stringResource(resId, *resolvedArgs)
+            }
         }
     }
 
@@ -31,7 +36,12 @@ sealed class UiText {
     fun asString(context: Context): String {
         return when (this) {
             is DynamicString -> value
-            is StringResource -> context.getString(resId, *args)
+            is StringResource -> {
+                val resolvedArgs = args.map {
+                    if (it is UiText) it.asString(context) else it
+                }.toTypedArray()
+                context.getString(resId, *resolvedArgs)
+            }
         }
     }
 }

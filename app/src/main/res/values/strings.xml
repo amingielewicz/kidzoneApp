@@ -17,8 +17,8 @@
     <string name="auth_divider_or">lub</string>
     <string name="show_password">Pokaż hasło</string>
     <string name="hide_password">Ukryj hasło</string>
-    <string name="google_sign_in_not_configured">Włącz Google Sign-In w Firebase Console i pobierz nowy google-services.json do app/</string>
-    <string name="google_sign_in_missing_activity">Nie udało się uruchomić logowania Google (brak Activity)</string>
+    <string name="google_sign_in_not_configured">Logowanie przez Google jest chwilowo niedostępne w tej wersji aplikacji. Użyj e-maila i hasła.</string>
+    <string name="google_sign_in_missing_activity">Wystąpił błąd podczas uruchamiania logowania Google. Spróbuj ponownie lub użyj logowania e-mail.</string>
     <string name="register_title">Stwórz konto</string>
     <string name="register_subtitle">Dołącz do społeczności kidZone i zacznij odkrywać miejsca przyjazne dzieciom</string>
     <string name="username">Nazwa użytkownika</string>
@@ -176,11 +176,18 @@
     <string name="distance_km_integer">%1$d km</string>
     <string name="rating_accessibility_label">ocena %1$.1f, liczba opinii %2$d</string>
     <string name="new_place_no_reviews">nowe miejsce bez opinii</string>
+    <string name="place_status_new">Nowe</string>
 
     <!-- Error Messages -->
     <string name="error_fetch_places">Nie udało się wczytać miejsc na mapie</string>
     <string name="error_fetch_list">Nie udało się wczytać listy miejsc</string>
     <string name="error_fetch_more">Nie udało się doładować kolejnych miejsc</string>
+    <string name="error_already_reported_place">Już zgłosiłeś to miejsce</string>
+    <string name="error_already_reported_photo">Już zgłosiłeś to zdjęcie</string>
+    <string name="error_already_reported_review">Już zgłosiłeś tę opinię</string>
+    <string name="error_duplicate_change_request">Taka propozycja zmiany już oczekuje na rozpatrzenie</string>
+    <string name="error_timeout_report_place">Przekroczono czas oczekiwania na zapis zgłoszenia</string>
+    <string name="error_offline_sync_disabled">Nie udało się zapisać opinii w trybie offline. Sprawdź połączenie i spróbuj ponownie.</string>
     <string name="location_sorting_rationale">Włącz lokalizację, by sortować miejsca po odległości.</string>
     <string name="no_internet_banner">Brak połączenia z internetem. Oczekiwanie na sieć…</string>
     <string name="gps_disabled_banner">Nie widzimy, gdzie jesteś. Włącz lokalizację, aby zobaczyć miejsca w Twojej okolicy.</string>
@@ -374,6 +381,7 @@
     <string name="badges_info_body">Aktywność w aplikacji nagradzamy odznakami. Im więcej miejsc i opinii dodasz, tym więcej odznak zdobędziesz.</string>
     <string name="i_understand">Rozumiem</string>
     <string name="congratulations">Gratulacje!</string>
+    <string name="congratulations_with_count">Gratulacje! (%1$d)</string>
     <string name="earned_new_badge">Zdobyła\u015B/e\u015B now\u0105 odznak\u0119:</string>
     <string name="earned_new_badges">Zdobyła\u015B/e\u015B nowe odznaki:</string>
     <string name="great">Super!</string>
@@ -484,6 +492,8 @@
     <string name="duplicate_warning_message">W pobliżu (~%1$dm) istnieje już miejsce „%2$s” (%3$s). Czy na pewno chcesz dodać nowe?</string>
     <string name="photo_thumbnail_description">Miniatura zdjęcia</string>
     <string name="remove_photo_description">Usuń zdjęcie</string>
+    <string name="gps_coordinates_format">GPS: %1$.5f, %2$.5f</string>
+    <string name="character_counter_format">%1$d / %2$d</string>
     <string name="report_reason_not_exists">Miejsce nie istnieje / zamknięte</string>
     <string name="report_reason_inappropriate">Nieodpowiednia treść</string>
     <string name="report_reason_duplicate">Duplikat innego miejsca</string>
@@ -501,6 +511,12 @@
     <string name="report_submit">Wyślij zgłoszenie</string>
     <string name="ban_permanent">Twoje konto zostało zablokowane bezpowrotnie.</string>
     <string name="ban_temporary">Twoje konto jest zablokowane do %1$s.</string>
+    <string name="ban_reason_prefix">Powód: %1$s</string>
+    <string name="ban_reason_spam">Rozsyłanie spamu lub niechcianych treści</string>
+    <string name="ban_reason_abuse">Naruszenie zasad społeczności lub nękanie</string>
+    <string name="ban_reason_fraud"> Podejrzana aktywność lub oszustwo</string>
+    <string name="ban_reason_terms_violation">Naruszenie regulaminu użytkowania</string>
+    <string name="ban_reason_other">Inne naruszenia</string>
     <string name="report_review_context">Zgłaszasz opinię użytkownika %1$s.</string>
     <!-- Badges -->
     <string name="badge_first_place_label">Pierwszy ślad</string>
@@ -614,6 +630,7 @@
     <string name="change_email_verification_sent">Wysłaliśmy link weryfikacyjny na: %1$s. Kliknij w niego, by potwierdzić zmianę adresu.</string>
     <string name="account_action_failed">Nie udało się wykonać akcji</string>
     <string name="delete_account_failed">Nie udało się usunąć konta</string>
+    <string name="error_delete_account_google_unsupported">Usuwanie konta jest dostępne tylko dla logowania e-mail/hasło. W przypadku logowania przez Google, usuń konto w ustawieniach konta Google lub skontaktuj się z nami.</string>
     <string name="error_unauthorized">Nie masz uprawnień do wykonania tej akcji</string>
     <string name="empty_my_reviews_title">Nie masz jeszcze opinii</string>
     <string name="empty_my_reviews_subtitle">Otwórz dowolne miejsce z listy lub mapy i dodaj swoją pierwszą opinię.</string>
@@ -623,6 +640,7 @@
     <string name="delete_review_confirmation">Twoja opinia zostanie trwale usunięta. Średnia ocena miejsca przeliczy się na nowo.</string>
     <string name="added_date">Dodano %1$s</string>
     <string name="edited_date">Edytowano %1$s</string>
+    <string name="bullet_point">  \u2022  %1$s</string>
     <string name="suppi_support_description">Przybij piątkę i wesprzyj rozwój kidZone</string>
 
 </resources>

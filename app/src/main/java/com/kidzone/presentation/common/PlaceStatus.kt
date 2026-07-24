@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.kidzone.R
 import com.kidzone.domain.model.Place
 
 private const val NEW_PLACE_WINDOW_DAYS = 30L
@@ -50,7 +51,7 @@ fun NewPlaceBadge(modifier: Modifier = Modifier) {
         contentColor = NewPlaceContentColor
     ) {
         Text(
-            text = "Nowe",
+            text = androidx.compose.ui.res.stringResource(R.string.place_status_new),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp)

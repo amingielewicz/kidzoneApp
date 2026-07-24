@@ -120,9 +120,10 @@ class RegisterViewModel @Inject constructor(
         }
     }
 
+    @Suppress("SpreadOperator")
     private fun mapError(throwable: Throwable): UiText = when (throwable) {
         is AuthException.Network -> UiText.StringResource(R.string.error_network)
-        is AuthException -> UiText.StringResource(throwable.messageRes)
+        is AuthException -> UiText.StringResource(throwable.messageRes, *throwable.args)
         else -> UiText.StringResource(R.string.error_unknown)
     }
 }

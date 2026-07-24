@@ -16,6 +16,7 @@ import com.kidzone.domain.model.Review
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.OpResult
+import com.kidzone.utils.RepositoryException
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -380,8 +381,7 @@ class FirestoreReviewRepositoryTest {
 
             assertTrue(result is OpResult.Failure)
             val error = (result as OpResult.Failure).error
-            assertTrue(error is IllegalStateException)
-            assertTrue(error.message!!.contains("already reported"))
+            assertTrue(error is RepositoryException.AlreadyReported)
         }
     }
 

@@ -14,31 +14,32 @@ class LoginLocalizationTest {
     private val viewModel = LoginViewModel(mockk<AuthRepository>(relaxed = true))
 
     @Test
-    fun `technical Google sign-in error is replaced with localized message`() {
-        viewModel.showInlineMessage("Google sign-in error (code: 10)")
+    fun `error message is correctly set in state`() {
+        val error = UiText.StringResource(R.string.google_sign_in_unavailable)
+        viewModel.showErrorMessage(error)
 
         val message = viewModel.uiState.value.message
         assertTrue(message is UiText.StringResource)
-        assertEquals(
-            R.string.google_sign_in_unavailable,
-            (message as UiText.StringResource).resId
-        )
+        assertEquals(R.string.google_sign_in_unavailable, (message as UiText.StringResource).resId)
+        assertTrue(viewModel.uiState.value.isMessageError)
     }
 
     @Test
-    fun `ordinary dynamic message remains unchanged`() {
-        viewModel.showInlineMessage("Test error")
+    fun `info message is correctly set in state`() {
+        val info = UiText.DynamicString("Info message")
+        viewModel.showInfoMessage(info)
 
         val message = viewModel.uiState.value.message
         assertTrue(message is UiText.DynamicString)
-        assertEquals("Test error", (message as UiText.DynamicString).value)
+        assertEquals("Info message", (message as UiText.DynamicString).value)
+        assertTrue(!viewModel.uiState.value.isMessageError)
     }
 
     @Test
     fun `account ban exposes localized fallback resource`() {
         val error = AuthException.AccountBanned(
-            banMessage = "Konto zablokowane",
-            banReason = "Spam"
+            resId = R.string.error_account_banned,
+            banReasonRes = R.string.ban_reason_spam
         )
 
         assertEquals(R.string.error_account_banned, error.messageRes)

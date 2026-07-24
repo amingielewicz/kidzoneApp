@@ -3,7 +3,6 @@ package com.kidzone
 import android.app.Application
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.MemoryCacheSettings
@@ -29,10 +28,6 @@ import javax.inject.Inject
  * (zamknięte miejsca, zmienione opisy itp.).
  */
 private const val CACHE_TTL_MS = 7L * 24 * 60 * 60 * 1000
-private const val FIREBASE_EMULATOR_HOST = "10.0.2.2"
-private const val AUTH_EMULATOR_PORT = 9099
-private const val FIRESTORE_EMULATOR_PORT = 8080
-private const val STORAGE_EMULATOR_PORT = 9199
 
 /**
  * Klasa [Application] uruchamiająca Hilt jako kontener DI dla całej aplikacji.
@@ -62,40 +57,12 @@ class KidZoneApplication : Application() {
         super.onCreate()
 
         initTimber()
-        // configureFirebaseEmulators() // Wyłączone, aby telefon łączył się z bazą online
         coldStartTrace.start()
         initDebugTools()
         initAppCheck()
         initRemoteConfig()
         cleanStaleCache()
         com.kidzone.messaging.KidZoneMessagingService.registerCurrentToken(this)
-    }
-
-    private fun configureFirebaseEmulators() {
-        if (!BuildConfig.DEBUG) return
-
-        FirebaseAuth.getInstance()
-            .useEmulator(FIREBASE_EMULATOR_HOST, AUTH_EMULATOR_PORT)
-
-        FirebaseFirestore.getInstance().apply {
-            useEmulator(FIREBASE_EMULATOR_HOST, FIRESTORE_EMULATOR_PORT)
-
-            firestoreSettings = FirebaseFirestoreSettings.Builder()
-                .setLocalCacheSettings(
-                    MemoryCacheSettings.newBuilder().build()
-                )
-                .build()
-        }
-
-        FirebaseStorage.getInstance()
-            .useEmulator(FIREBASE_EMULATOR_HOST, STORAGE_EMULATOR_PORT)
-
-        Timber.d(
-            "Firebase emulators configured: " +
-                    "Auth=$FIREBASE_EMULATOR_HOST:$AUTH_EMULATOR_PORT, " +
-                    "Firestore=$FIREBASE_EMULATOR_HOST:$FIRESTORE_EMULATOR_PORT, " +
-                    "Storage=$FIREBASE_EMULATOR_HOST:$STORAGE_EMULATOR_PORT"
-        )
     }
 
     /**

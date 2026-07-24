@@ -529,10 +529,10 @@ class ProfileViewModel @Inject constructor(
         _uiState.update { it.copy(accountActionInfo = null) }
     }
 
+    @Suppress("SpreadOperator")
     private fun Throwable.toAuthUiText(fallbackRes: Int): UiText =
         when (this) {
-            is AuthException.AccountBanned -> UiText.DynamicString(banMessage)
-            is AuthException -> UiText.StringResource(messageRes.takeIf { it != 0 } ?: fallbackRes)
+            is AuthException -> UiText.StringResource(messageRes.takeIf { it != 0 } ?: fallbackRes, *args)
             else -> UiText.StringResource(fallbackRes)
         }
 }
