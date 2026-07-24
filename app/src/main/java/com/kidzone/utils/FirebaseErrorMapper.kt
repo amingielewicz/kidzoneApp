@@ -27,6 +27,7 @@ fun Throwable.toAuthErrorMessage(fallbackRes: Int = R.string.error_unknown): UiT
             UiText.StringResource(fallbackRes)
         }
     }
+@Suppress("SpreadOperator")
 fun Throwable.toPlacesErrorMessage(fallback: UiText): UiText {
     val firestoreError = findCause<FirebaseFirestoreException>()
 
