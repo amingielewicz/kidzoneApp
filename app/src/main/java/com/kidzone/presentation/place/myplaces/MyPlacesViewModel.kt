@@ -7,7 +7,6 @@ import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
@@ -19,14 +18,39 @@ import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 /**
- * ViewModel ekranu "Moje miejsca" – lista miejsc dodanych przez aktualnie
- * zalogowanego użytkownika.
+ * 🎯 Odpowiedzialności:
+ * - Udostępnianie listy miejsc należących wyłącznie do zalogowanego użytkownika.
+ * - Reagowanie na zmiany w sesji użytkownika (anulowanie strumieni po wylogowaniu).
+ * - Zarządzanie stanami ładowania, sukcesu i błędu dla widoku "Moje miejsca".
  *
- * Łączymy auth state z [PlaceRepository.observePlacesByOwner] przez
- * `flatMapLatest`: gdy user się wyloguje (np. zaraz po deleteAccount),
- * stary listener jest unsubscribowany, a nowy nie jest tworzony – ekran
- * zobaczy pustą listę / loading, NavGraph i tak za chwilę przerzuci
- * usera na Login.
+ * 🚫 Poza zakresem:
+ * - Brak decyzji o offline queue.
+ * - Brak retry logiki dla operacji sieciowych.
+ * - Brak bezpośredniego zarządzania sesją (delegowane do [AuthRepository]).
+ *
+ * 📥 Wejście:
+ * - Strumień aktualnego użytkownika z [AuthRepository].
+ *
+ * 📤 Wyjście:
+ * - Stan ekranu "Moje miejsca" ([UiState]).
+ *
+ * ✅ Gwarancje:
+ * - Automatyczne czyszczenie danych prywatnych z UI po zakończeniu sesji.
+ * - Spójność danych dzięki reaktywnemu połączeniu z bazą danych (Firestore listeners).
+ *
+ * 🔌 Offline:
+ * - Wspiera odczyt własnych miejsc z cache lokalnego Room.
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla reaktywnych strumieni danych.
+ * - Brak blokujących operacji na wątku Main.
+ *
+ * 🧪 Testowalność:
+ * - Pełne DI.
+ * - Deterministyczne mapowanie stanów sesji na zawartość listy miejsc.
+ *
+ * 🧼 Lifecycle:
+ * - Automatyczne zamykanie listenerów Firestore przy zmianie użytkownika.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -35,25 +59,43 @@ class MyPlacesViewModel @Inject constructor(
     placeRepository: PlaceRepository
 ) : ViewModel() {
 
+    /**
+     * Stan ekranu „Moje miejsca”.
+     */
     sealed interface UiState {
+        /** Trwa pierwsze ładowanie danych właściciela. */
         data object Loading : UiState
+
+        /**
+         * Dane zostały załadowane.
+         *
+         * @property places miejsca należące do aktualnego użytkownika; pusta lista oznacza empty state.
+         */
         data class Ready(val places: List<Place>) : UiState
+
+        /**
+         * Nie udało się odczytać listy.
+         *
+         * @property message zmapowany komunikat błędu przeznaczony dla UI.
+         */
         data class Error(val message: String) : UiState
     }
 
+    /**
+     * Stan obserwowany przez ekran Compose.
+     *
+     * Brak aktywnej sesji jest reprezentowany przez `Ready(emptyList())`, a nie nieskończony loading.
+     */
     val uiState: StateFlow<UiState> = authRepository.currentUser
         .flatMapLatest { current ->
             if (current == null) {
-                // Brak usera → pusta lista jako Ready, żeby UI pokazało
-                // "empty state" zamiast wieczystego spinnera (NavGraph
-                // i tak zaraz przerzuci na Login).
                 flowOf<UiState>(UiState.Ready(emptyList()))
             } else {
                 placeRepository.observePlacesByOwner(current.id)
                     .map<List<Place>, UiState> { UiState.Ready(it) }
                     .onStart { emit(UiState.Loading) }
-                    .catch { e ->
-                        emit(UiState.Error(e.message ?: "Could not load your places"))
+                    .catch { error ->
+                        emit(UiState.Error(error.message ?: "Could not load your places"))
                     }
             }
         }

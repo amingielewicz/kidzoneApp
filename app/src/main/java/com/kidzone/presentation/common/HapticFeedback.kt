@@ -7,27 +7,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalView
 
 /**
- * Haptic feedback utility for kidZone.
+ * 🎯 Odpowiedzialności:
+ * - Dostarczanie ustandaryzowanych wzorców wibracji (haptic feedback) dla kluczowych akcji UX.
+ * - Mapowanie scenariuszy (sukces, błąd, nagroda) na natywne stałe [HapticFeedbackConstants].
  *
- * Provides predefined vibration patterns for common UX scenarios:
- * - [success] – positive confirmation (dodanie miejsca, zdobycie odznaki)
- * - [click] – delikatne kliknięcie (reakcja na tap)
- * - [error] – ostrzegawcza wibracja (błąd, odrzucenie)
- * - [reward] – nagroda / achievement (odznaka, TOP ranking)
+ * ⚙️ Techniczne:
+ * - Obsługuje fallbacki dla starszych wersji systemu Android (pre-API 30).
+ * - Działa w oparciu o bieżący [View] z kompozycji Jetpack Compose.
  *
- * Usage in Composable:
- * ```
- * val haptic = rememberHapticFeedback()
- * Button(onClick = { haptic.success(); doAction() }) { ... }
- * ```
- *
- * Usage with LaunchedEffect (np. po asynchronicznej akcji):
- * ```
- * val haptic = rememberHapticFeedback()
- * LaunchedEffect(placeAdded) {
- *     if (placeAdded) haptic.success()
- * }
- * ```
+ * ✅ Gwarancje:
+ * - Brak opóźnień (wibracje wyzwalane natychmiastowo).
+ * - Spójność haptyczna w całej aplikacji (te same wibracje dla tych samych typów zdarzeń).
  */
 class KidZoneHaptic(private val view: View) {
 

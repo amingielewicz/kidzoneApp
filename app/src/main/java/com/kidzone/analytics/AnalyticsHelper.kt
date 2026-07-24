@@ -7,7 +7,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Zamkniety zestaw powodow zgloszenia wysylanych do Firebase Analytics.
+ * Zamknięty zestaw powodów zgłoszenia wysyłanych do Firebase Analytics.
  *
  * Do Analytics trafia wyłącznie stabilny kod techniczny, nigdy tekst wpisany
  * przez użytkownika. Szczegółowy opis zgłoszenia może być przechowywany w
@@ -38,12 +38,18 @@ enum class PhotoReportReason(val analyticsCode: String) {
 }
 
 /**
- * Centralna klasa do logowania eventow Firebase Analytics w aplikacji kidZone.
+ * 🎯 Odpowiedzialności:
+ * - Centralizacja logowania zdarzeń Firebase Analytics.
+ * - Ujednolicanie nazw zdarzeń i kluczy parametrów (latwy audyt).
+ * - Lokalny debug log zdarzeń do konsoli Timber.
  *
- * Kazdy ekran i interakcja usera przechodzi przez ten helper – dzieki temu:
- *  - unikamy rozrzuconych FirebaseAnalytics.getInstance() po calym kodzie,
- *  - event names i param keys sa w jednym miejscu (latwo audytowac),
- *  - Timber loguje lokalnie kazdy event (widoczny w Logcat podczas dev).
+ * 🛡️ Bezpieczeństwo i Prywatność:
+ * - Zabrania się przesyłania danych PII (email, nazwisko, komentarze) jako parametrów.
+ * - Przesyła wyłącznie techniczne kody zdarzeń i anonimowe identyfikatory zasobów.
+ *
+ * ⚡ Wydajność i Zasoby:
+ * - Korzysta z natywnego mechanizmu Firebase Analytics (batching zdarzeń w tle).
+ * - Minimalny wpływ na wydajność wątku głównego.
  */
 @Singleton
 class AnalyticsHelper @Inject constructor(

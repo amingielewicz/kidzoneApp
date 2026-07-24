@@ -3,10 +3,6 @@ package com.kidzone
 import android.app.Application
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FirebaseFirestoreSettings
-import com.google.firebase.firestore.MemoryCacheSettings
-import com.google.firebase.storage.FirebaseStorage
 import com.kidzone.analytics.ColdStartTrace
 import com.kidzone.data.local.PlaceDao
 import com.kidzone.data.remote.RemoteConfigService

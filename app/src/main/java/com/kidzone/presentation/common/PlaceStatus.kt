@@ -22,6 +22,17 @@ private const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
 private val NewPlaceContainerColor = Color(0xFFE3F2FD)
 private val NewPlaceContentColor = Color(0xFF0D47A1)
 
+/**
+ * Sprawdza, czy miejsce powinno otrzymać status „Nowe”.
+ *
+ * Status jest przyznawany wyłącznie miejscom bez opinii, utworzonym nie wcześniej niż 30 dni temu.
+ * Przyszły timestamp, brak daty albo istniejąca opinia wyłączają status.
+ *
+ * @param reviewsCount liczba opinii miejsca.
+ * @param createdAtMillis czas utworzenia miejsca.
+ * @param nowMillis punkt odniesienia, domyślnie bieżący czas urządzenia.
+ * @return `true`, gdy miejsce spełnia warunki statusu „Nowe”.
+ */
 fun isNewWithoutReviews(
     reviewsCount: Int,
     createdAtMillis: Long,
@@ -33,6 +44,9 @@ fun isNewWithoutReviews(
     return ageMillis in 0..(NEW_PLACE_WINDOW_DAYS * MILLIS_PER_DAY)
 }
 
+/**
+ * Wygodna wersja [isNewWithoutReviews] dla modelu [Place].
+ */
 fun Place.isNewWithoutReviews(nowMillis: Long = System.currentTimeMillis()): Boolean =
     isNewWithoutReviews(
         reviewsCount = reviewsCount,
@@ -40,6 +54,12 @@ fun Place.isNewWithoutReviews(nowMillis: Long = System.currentTimeMillis()): Boo
         nowMillis = nowMillis
     )
 
+/**
+ * Renderuje dostępny wizualnie badge „Nowe” dla miejsca bez opinii.
+ *
+ * Komponent nie decyduje samodzielnie o statusie miejsca. Warstwa wywołująca powinna użyć
+ * [Place.isNewWithoutReviews] i zadbać o semantykę całej karty.
+ */
 @Composable
 fun NewPlaceBadge(modifier: Modifier = Modifier) {
     Surface(

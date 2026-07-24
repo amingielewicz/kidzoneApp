@@ -1,30 +1,23 @@
 # v1.0.0 manual release gates
 
-Powiazane issue: #269, #210, #272, #274, #275
+Powiązane issue: #269, #210, #272, #274, #275, #303
 
-Ostatnia aktualizacja: 2026-06-29
+Ostatnia aktualizacja: 2026-07-13
 
 ## Cel
 
-Ten dokument zbiera ostatnie reczne bramki przed zamknieciem milestone `v1.0.0`.
-Kod i dokumenty w repo sa przygotowane, ale ponizsze punkty wymagaja realnego
-sprawdzenia poza samym repozytorium: aplikacja na urzadzeniu, Firebase Console,
-Firebase Hosting i Google Play Console.
+Dokument zbiera ręczne bramki wymagane przed wydaniem `v1.0.0`. Część kontroli wymaga aplikacji na urządzeniu oraz dostępu do Firebase Hosting, Firebase Console i Google Play Console.
 
-## Kolejnosc zamykania
+## Kolejność
 
-Rekomendowana kolejnosc:
+1. Wdróż Firebase Hosting i sprawdź publiczne adresy.
+2. Wykonaj test usuwania konta.
+3. Wykonaj test runtime permissions.
+4. Uzupełnij Google Play Data Safety.
+5. Wykonaj finalny przegląd prawny i produktowy.
+6. Zamknij parent release blocker.
 
-1. Wdrozyc Firebase Hosting i sprawdzic publiczne URL-e.
-2. Wykonac account deletion QA z #210.
-3. Wykonac Android permissions QA z #274.
-4. Przepisac Google Play Data Safety z #272.
-5. Wykonac final legal review z #275.
-6. Zamknac parent release blocker #269.
-
-## Evidence format
-
-Do kazdego issue dopisz komentarz w tym formacie:
+## Format dowodu
 
 ```markdown
 ## Manual gate result
@@ -32,179 +25,188 @@ Do kazdego issue dopisz komentarz w tym formacie:
 - Data:
 - Tester:
 - Commit / build:
-- Urzadzenie:
+- Urządzenie:
+- Android:
 - Wynik: PASS / FAIL / BLOCKED
 
 ### Co sprawdzono
 - ...
 
 ### Dowody
-- screenshot/log/link:
+- screenshot / nagranie / log / link:
 
 ### Follow-up issue
 - brak / #...
 ```
 
-Nie zamykac issue z wynikiem `FAIL` albo `BLOCKED`.
+Nie zamykaj bramki z wynikiem `FAIL` albo `BLOCKED` bez follow-up issue.
 
-## Gate 1: publiczne URL-e
+## Gate 1: publiczne adresy
 
-Powiazane issue: #269, #275
+Powiązane issue: #269, #275
 
-Po deployu Firebase Hosting sprawdzic bez logowania, w trybie prywatnym/incognito:
+Sprawdź bez logowania, najlepiej w trybie incognito:
 
 | URL | Oczekiwany wynik |
 | --- | --- |
-| `https://playground-705e7162.web.app/privacy-policy` | Polityka prywatnosci laduje sie publicznie. |
-| `https://playground-705e7162.web.app/privacy-policy.html` | Polityka prywatnosci laduje sie publicznie. |
-| `https://playground-705e7162.web.app/terms-of-service` | Regulamin laduje sie publicznie. |
-| `https://playground-705e7162.web.app/terms-of-service.html` | Regulamin laduje sie publicznie. |
-| `https://playground-705e7162.web.app/account-deletion` | Instrukcja usuwania konta laduje sie publicznie. |
-| `https://playground-705e7162.web.app/account-deletion.html` | Instrukcja usuwania konta laduje sie publicznie. |
+| `https://playground-705e7162.web.app/privacy-policy` | polityka prywatności ładuje się publicznie |
+| `https://playground-705e7162.web.app/terms-of-service` | regulamin ładuje się publicznie |
+| `https://playground-705e7162.web.app/account-deletion` | instrukcja usuwania konta ładuje się publicznie |
 
 PASS:
 
-- wszystkie URL-e dzialaja po HTTPS,
-- strony nie wymagaja logowania,
-- kontakt e-mail jest widoczny,
-- strony linkuja miedzy soba,
-- daty dokumentow sa aktualne dla release.
+- HTTPS działa,
+- strony nie wymagają logowania,
+- kontakt jest widoczny,
+- linki między dokumentami działają,
+- daty i treść odpowiadają wersji release.
 
-## Gate 2: account deletion QA
+## Gate 2: usuwanie konta
 
-Powiazane issue: #210
+Powiązane issue: #210
 
-Dokument szczegolowy:
-
-```text
-docs/legal/account-deletion-test-checklist.md
-```
+Dokument szczegółowy: `docs/legal/account-deletion-test-checklist.md`.
 
 Minimalny test:
 
-1. Utworz konto testowe.
-2. Ustaw nazwe uzytkownika, opcjonalne dane profilu i avatar.
-3. Dodaj miejsce.
-4. Dodaj opinie.
-5. Dodaj zdjecie do miejsca albo opinii.
-6. Zapisz UID i e-mail konta.
-7. Usun konto w aplikacji: `Profil -> Konto i bezpieczenstwo -> Usun konto`.
-8. Sprawdz Firebase Authentication.
-9. Sprawdz Firestore: `users/{uid}` oraz `users/{uid}/private/*`.
-10. Sprawdz Firebase Storage dla avatara i zdjec.
-11. Sprawdz ponowne logowanie starym kontem.
-12. Sprawdz, czy aplikacja nie pokazuje prywatnych danych w cache po restarcie.
+1. Utwórz konto testowe.
+2. Dodaj profil, miejsce, opinię i zdjęcie.
+3. Zapisz UID i adres e-mail.
+4. Usuń konto przez `Profil → Konto i bezpieczeństwo → Usuń konto`.
+5. Sprawdź Authentication, Firestore i Storage.
+6. Spróbuj zalogować się ponownie.
+7. Sprawdź widok treści użytkownika z innego konta.
+8. Uruchom aplikację ponownie i sprawdź lokalny cache.
 
 PASS:
 
-- konto nie pozwala sie zalogowac po usunieciu,
-- prywatne dane sa usuniete albo zanonimizowane,
-- tokeny FCM nie zostaja publicznie dostepne,
-- publiczne tresci nie pokazuja e-maila, imienia ani nazwiska,
-- aplikacja nie crashuje po usunieciu konta.
+- stare konto nie pozwala się zalogować,
+- dane prywatne są usunięte albo zanonimizowane,
+- publiczne treści nie ujawniają danych identyfikujących,
+- aplikacja nie crashuje,
+- publiczna instrukcja usuwania konta odpowiada zachowaniu aplikacji.
 
-## Gate 3: Android permissions QA
+## Gate 3: Android permissions
 
-Powiazane issue: #274
+Powiązane issue: #274, #303
 
-Dokument szczegolowy:
+Dokumenty:
 
-```text
-docs/legal/android-permissions-play-compliance.md
-docs/qa/android-permissions-device-matrix.md
-```
+- `docs/legal/android-permissions-play-compliance.md`,
+- `docs/qa/android-permissions-device-matrix.md`.
 
-Sprawdzic na Androidzie 13+ lub 14+:
+Sprawdź na Androidzie 13, 14 i 15, a na Androidzie 16, jeśli jest dostępny.
 
-| Obszar | Scenariusze |
-| --- | --- |
-| Lokalizacja | deny, approximate, precise, ponowna proba po odmowie. |
-| Kamera | allow, deny, dzialanie bez kamery przy wyborze z galerii. |
-| Powiadomienia | allow, deny, ustawienia po odmowie. |
-| Zdjecia | avatar, zdjecia miejsca, zdjecia opinii, szczegoly miejsca. |
+### Lokalizacja
+
+- pierwsza odmowa,
+- kolejna odmowa,
+- trwała odmowa,
+- przekierowanie do ustawień aplikacji,
+- powrót po nadaniu zgody,
+- approximate i precise,
+- GPS wyłączony przy nadanym uprawnieniu.
+
+Punkty wejścia:
+
+- Start: „Włącz lokalizację”,
+- Lista: sortowanie „Od najbliższych”,
+- Mapa: „Moja lokalizacja”,
+- dodawanie i korekta lokalizacji miejsca.
+
+### Kamera
+
+- allow,
+- deny,
+- trwała odmowa,
+- przekierowanie do ustawień,
+- Photo Picker działa bez kamery.
+
+### Zdjęcia
+
+- avatar,
+- zdjęcia miejsca,
+- zdjęcia opinii,
+- zdjęcie ze szczegółów miejsca,
+- brak szerokiego dialogu dostępu do galerii.
+
+### Powiadomienia
+
+- allow i deny na Androidzie 13+,
+- aplikacja działa poprawnie bez zgody.
 
 PASS:
 
-- aplikacja nie deklaruje `ACCESS_BACKGROUND_LOCATION`,
-- aplikacja nie deklaruje `READ_MEDIA_IMAGES`,
-- Photo Picker nie pokazuje systemowego dialogu o szerokim dostepie do galerii,
-- funkcje zdjec dzialaja przez wybor konkretnych plikow,
-- aplikacja dziala bez lokalizacji i bez powiadomien.
+- brak `ACCESS_BACKGROUND_LOCATION`,
+- brak `READ_MEDIA_IMAGES` i `READ_EXTERNAL_STORAGE`,
+- Photo Picker wybiera konkretne pliki,
+- po trwałej odmowie akcje prowadzą do ustawień aplikacji,
+- żaden przycisk nie staje się martwy po kolejnych odmowach,
+- aplikacja działa bez lokalizacji, kamery i powiadomień.
 
 ## Gate 4: Google Play Data Safety
 
-Powiazane issue: #272
+Powiązane issue: #272
 
-Dokument z odpowiedziami roboczymi:
+Dokument roboczy: `docs/legal/google-play-data-safety-draft.md`.
 
-```text
-docs/legal/google-play-data-safety-draft.md
-```
+Potwierdź w Google Play Console:
 
-W Google Play Console wpisac i potwierdzic:
-
-- aplikacja zbiera dane uzytkownika: tak,
-- dane sa szyfrowane w transmisji: tak,
-- uzytkownik moze zadac usuniecia danych: tak,
-- Privacy Policy URL: `https://playground-705e7162.web.app/privacy-policy`,
-- Account deletion URL: `https://playground-705e7162.web.app/account-deletion`,
-- lokalizacja: tylko podczas uzywania aplikacji,
+- aplikacja zbiera dane użytkownika,
+- dane są szyfrowane podczas transmisji,
+- użytkownik może zażądać usunięcia danych,
+- lokalizacja jest używana tylko podczas korzystania z aplikacji,
 - brak background location,
-- zdjecia: wybierane przez uzytkownika, opcjonalne,
-- crash logs / diagnostics / performance: Firebase Crashlytics i Performance,
-- analytics / app activity: Firebase Analytics,
-- device or other IDs: Firebase/Google Play Services/FCM.
+- zdjęcia są wybierane przez użytkownika i są opcjonalne,
+- diagnostyka obejmuje używane usługi Firebase,
+- deklaracje odpowiadają manifestowi, polityce prywatności i realnej konfiguracji SDK.
 
 PASS:
 
-- formularz zapisany w Google Play Console,
-- odpowiedzi zgadzaja sie z `public/privacy-policy.html`,
-- odpowiedzi zgadzaja sie z aktualnym manifestem,
-- screenshot albo notatka z finalnych odpowiedzi jest dodana do #272.
+- formularz jest zapisany,
+- odpowiedzi odpowiadają aplikacji,
+- dowód finalnych odpowiedzi został dodany do #272.
 
-## Gate 5: final legal release review
+## Gate 5: finalny przegląd prawny i produktowy
 
-Powiazane issue: #275
+Powiązane issue: #275
 
-Sprawdzic:
+Sprawdź:
 
-- publiczne URL-e,
-- daty dokumentow,
-- kontakt e-mail,
+- publiczne adresy i daty dokumentów,
+- dane operatora oraz kontakt,
+- regulamin i politykę prywatności,
 - opis usuwania konta,
-- zgodnosc Privacy Policy z Firebase SDK,
-- zgodnosc Terms z funkcjami aplikacji,
-- czy aplikacja w Profilu pokazuje: Regulamin, Polityka prywatnosci, Kontakt, Usun konto,
-- czy Google Play Data Safety zostala przepisana i zapisana.
+- listę aktywnych usług Firebase,
+- zgodność Data Safety,
+- linki dostępne z aplikacji,
+- ostrzeżenia dotyczące publikowania zdjęć dzieci i osób trzecich.
 
 PASS:
 
-- dokumenty sa kompletne i publiczne,
-- dokumenty sa zgodne z aplikacja,
-- nie ma rozjazdu miedzy Play Console, Privacy Policy i realnym manifestem,
-- finalny komentarz PASS jest wpisany do #275.
+- dokumenty są publiczne i kompletne,
+- treść odpowiada aplikacji,
+- nie ma rozjazdu między manifestem, Google Play Console i polityką prywatności.
 
 ## Gate 6: parent release blocker
 
-Powiazane issue: #269
+Powiązane issue: #269
 
-Zamknac dopiero, gdy:
+Zamknij dopiero, gdy:
 
-- #210 ma PASS albo ma osobne follow-up issue dla brakow,
-- #272 ma PASS w Google Play Console,
-- #274 ma PASS na urzadzeniu i w Play Console,
-- #275 ma finalny PASS,
-- wszystkie PR-e powiazane z legal/release sa zmergowane.
-
-Komentarz do #269:
+- #210 ma PASS,
+- #272 ma PASS,
+- #274 i #303 mają PASS,
+- #275 ma PASS,
+- wszystkie poprawki wykryte podczas testów są zmergowane.
 
 ```markdown
 ## Legal & Google Play release blocker result
 
-- Publiczne URL-e: PASS / FAIL
+- Publiczne URL-e: PASS / FAIL / BLOCKED
 - Account deletion QA (#210): PASS / FAIL / BLOCKED
-- Runtime permissions QA (#274): PASS / FAIL / BLOCKED
+- Runtime permissions QA (#274, #303): PASS / FAIL / BLOCKED
 - Google Play Data Safety (#272): PASS / FAIL / BLOCKED
 - Final legal review (#275): PASS / FAIL / BLOCKED
-- Wynik ogolny: PASS / FAIL / BLOCKED
+- Wynik ogólny: PASS / FAIL / BLOCKED
 ```

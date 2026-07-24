@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
@@ -29,12 +28,12 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Para review + nazwa miejsca, którego dotyczy.
+ * Łączy opinię użytkownika z minimalnymi danymi miejsca potrzebnymi do prezentacji.
  *
- * Trzymamy [placeName] zamiast pełnego [com.kidzone.domain.model.Place], żeby
- * UI nie pokazywało nieaktualnych danych miejsca (np. starego adresu).
- * Jeśli miejsce zostało usunięte, [placeName] = null – UI pokazuje wtedy
- * "Miejsce niedostępne".
+ * @property review opinia należąca do aktualnego użytkownika.
+ * @property placeName aktualna nazwa miejsca albo `null`, gdy miejsce zostało usunięte lub jest
+ * niedostępne.
+ * @property placeCategory aktualna kategoria miejsca albo `null`, gdy danych nie można pobrać.
  */
 data class MyReviewItem(
     val review: Review,
@@ -43,24 +42,39 @@ data class MyReviewItem(
 )
 
 /**
- * ViewModel ekranu "Moje opinie".
+ * 🎯 Odpowiedzialności:
+ * - Udostępnianie listy opinii należących do aktualnie zalogowanego użytkownika.
+ * - Łączenie danych opinii z podstawowymi informacjami o miejscach (nazwa, kategoria).
+ * - Obsługa usuwania opinii i odświeżania stanu powiązanego.
  *
- * Pipeline danych:
- *  1. [AuthRepository.currentUser] – uid (lub null gdy wylogowany).
- *  2. `flatMapLatest` na [ReviewRepository.observeReviewsByUser] – snapshot
- *     listener live aktualizuje listę po dodaniu / edycji / skasowaniu.
- *  3. `transformLatest` po zmianie listy: dla unikalnych `placeId`
- *     wykonujemy równoległe `getPlace(id)` (max N round-tripów Firestore,
- *     gdzie N = liczba unikalnych placów). Wynik składamy w [MyReviewItem].
+ * 🚫 Poza zakresem:
+ * - Brak decyzji o offline queue.
+ * - Brak retry logiki dla operacji sieciowych.
+ * - Brak bezpośredniego zarządzania sesją (delegowane do [AuthRepository]).
  *
- * Nazwy miejsc są pobierane jednorazowo dla danej snapshot opinii. Gdy
- * place się zmieni (rzadko), kolejny emit listy opinii i tak wymusi nowe
- * fetche – akceptowalny trade-off (alternatywa: drugi snapshot listener
- * na każde miejsce – więcej połączeń, drożej).
+ * 📥 Wejście:
+ * - Strumień aktualnego użytkownika z [AuthRepository].
  *
- * Akcja [deleteReview] wykonuje cascade-aware delete (przelicza
- * averageRating miejsca + decrement userReviewsCount – patrz
- * [ReviewRepository.deleteReview]).
+ * 📤 Wyjście:
+ * - Stan ekranu "Moje opinie" ([UiState]) zawierający listę elementów [MyReviewItem].
+ *
+ * ✅ Gwarancje:
+ * - Automatyczne czyszczenie danych prywatnych po zakończeniu sesji.
+ * - Deterministyczne łączenie opinii z danymi miejsc.
+ *
+ * 🔌 Offline:
+ * - Wspiera odczyt własnych opinii z cache lokalnego Room.
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla reaktywnych strumieni danych i usuwania opinii.
+ * - Wykorzystanie [async]/[awaitAll] do wydajnego dociągania danych miejsc.
+ *
+ * 🧪 Testowalność:
+ * - Pełne DI.
+ * - Deterministyczne mapowanie stanów bazy na listę UI.
+ *
+ * 🧼 Lifecycle:
+ * - Zarządzanie równoległym dociąganiem danych przy zmianie sesji.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -70,17 +84,32 @@ class MyReviewsViewModel @Inject constructor(
     private val placeRepository: PlaceRepository
 ) : ViewModel() {
 
+    /** Stan ekranu „Moje opinie”. */
     sealed interface UiState {
+        /** Trwa pierwsze ładowanie danych. */
         data object Loading : UiState
+
+        /**
+         * Lista została przygotowana.
+         *
+         * @property items opinie wraz z nazwami i kategoriami miejsc.
+         */
         data class Ready(val items: List<MyReviewItem>) : UiState
+
+        /**
+         * Nie udało się odczytać listy.
+         *
+         * @property message komunikat przeznaczony dla UI.
+         */
         data class Error(val message: String) : UiState
     }
 
     /**
-     * @property pendingDeleteReviewId opinia, dla której user kliknął "Usuń" –
-     *   pokazujemy dialog potwierdzenia. null = brak otwartego dialogu.
-     * @property isDeleting spinner na przycisku potwierdzenia w dialogu
-     * @property deleteError błąd z ostatniej próby usunięcia
+     * Stan dialogu potwierdzającego usunięcie opinii.
+     *
+     * @property pendingDeleteReviewId identyfikator opinii oczekującej na potwierdzenie.
+     * @property isDeleting czy trwa usuwanie i dialog nie powinien zostać zamknięty.
+     * @property deleteError komunikat ostatniego błędu usuwania.
      */
     data class DialogState(
         val pendingDeleteReviewId: String? = null,
@@ -89,8 +118,16 @@ class MyReviewsViewModel @Inject constructor(
     )
 
     private val _dialogState = MutableStateFlow(DialogState())
+
+    /** Stan dialogu obserwowany przez ekran Compose. */
     val dialogState: StateFlow<DialogState> = _dialogState.asStateFlow()
 
+    /**
+     * Stan listy opinii obserwowany przez ekran Compose.
+     *
+     * Przy zmianie listy zachowuje poprzednią treść do czasu pobrania danych miejsc, aby ograniczyć
+     * miganie interfejsu. Brak sesji jest reprezentowany przez `Ready(emptyList())`.
+     */
     val uiState: StateFlow<UiState> = authRepository.currentUser
         .flatMapLatest { current ->
             if (current == null) {
@@ -98,7 +135,6 @@ class MyReviewsViewModel @Inject constructor(
             } else {
                 reviewRepository.observeReviewsByUser(current.id)
                     .transformLatest<List<Review>, UiState> { reviews ->
-                        // Zachowaj poprzednią listę, jeśli istnieje, aby uniknąć mignięcia
                         val currentItems = (uiState.value as? UiState.Ready)?.items ?: emptyList()
                         if (currentItems.isEmpty()) {
                             emit(UiState.Loading)
@@ -111,8 +147,8 @@ class MyReviewsViewModel @Inject constructor(
                             coroutineScope {
                                 placeIds.map { id ->
                                     async {
-                                        when (val r = placeRepository.getPlace(id)) {
-                                            is OpResult.Success -> id to (r.data.name to r.data.category)
+                                        when (val result = placeRepository.getPlace(id)) {
+                                            is OpResult.Success -> id to (result.data.name to result.data.category)
                                             is OpResult.Failure -> id to null
                                         }
                                     }
@@ -133,8 +169,8 @@ class MyReviewsViewModel @Inject constructor(
                         emit(UiState.Ready(items))
                     }
                     .onStart { emit(UiState.Loading) }
-                    .catch { e ->
-                        emit(UiState.Error(e.message ?: "Could not load your reviews"))
+                    .catch { error ->
+                        emit(UiState.Error(error.message ?: "Could not load your reviews"))
                     }
             }
         }
@@ -144,12 +180,18 @@ class MyReviewsViewModel @Inject constructor(
             initialValue = UiState.Loading
         )
 
+    /**
+     * Otwiera dialog usuwania dla wskazanej opinii.
+     *
+     * @param reviewId identyfikator opinii należącej do aktualnego użytkownika.
+     */
     fun openDeleteDialog(reviewId: String) {
         _dialogState.update {
             it.copy(pendingDeleteReviewId = reviewId, deleteError = null)
         }
     }
 
+    /** Zamyka dialog, o ile operacja usuwania nie jest aktualnie wykonywana. */
     fun dismissDeleteDialog() {
         if (_dialogState.value.isDeleting) return
         _dialogState.update {
@@ -157,11 +199,17 @@ class MyReviewsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Usuwa opinię wskazaną w [DialogState.pendingDeleteReviewId].
+     *
+     * Repository odpowiada również za aktualizację agregatów miejsca i użytkownika. Dialog jest
+     * zamykany dopiero po potwierdzonym sukcesie backendu.
+     */
     fun confirmDelete() {
         val id = _dialogState.value.pendingDeleteReviewId ?: return
         viewModelScope.launch {
             _dialogState.update { it.copy(isDeleting = true, deleteError = null) }
-            when (val r = reviewRepository.deleteReview(id)) {
+            when (val result = reviewRepository.deleteReview(id)) {
                 is OpResult.Success -> _dialogState.update {
                     it.copy(
                         pendingDeleteReviewId = null,
@@ -172,7 +220,7 @@ class MyReviewsViewModel @Inject constructor(
                 is OpResult.Failure -> _dialogState.update {
                     it.copy(
                         isDeleting = false,
-                        deleteError = r.error.message ?: "Could not delete the review"
+                        deleteError = result.error.message ?: "Could not delete the review"
                     )
                 }
             }

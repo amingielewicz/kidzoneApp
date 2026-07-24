@@ -1,107 +1,125 @@
 # Firebase Handbook
 
+Ostatnia aktualizacja: 2026-07-13
+
 ## Cel
 
-Dokument opisuje zasady korzystania z Firebase w KidZone.
+Zasady korzystania z Firebase w kidZone z uwzględnieniem bezpieczeństwa, kosztów, prywatności, synchronizacji i procesu release.
 
 ## Używane usługi
 
-- Firebase Authentication.
-- Firestore.
-- Storage.
-- Cloud Functions.
-- Crashlytics.
-- Analytics.
-- Performance Monitoring.
-- Remote Config.
-- App Check.
+- Firebase Authentication,
+- Cloud Firestore,
+- Firebase Storage,
+- Cloud Functions,
+- Crashlytics,
+- Analytics,
+- Performance Monitoring,
+- Remote Config,
+- App Check,
 - Cloud Messaging.
 
 ## Authentication
 
-Zasady:
-
-- Operacje zależne od użytkownika muszą wymagać zalogowania.
-- UID użytkownika jest podstawowym identyfikatorem właściciela danych.
-- Dane publiczne i prywatne muszą być rozdzielone.
-- Usunięcie konta musi obsłużyć dane zależne od użytkownika zgodnie z polityką prywatności.
+- operacje zależne od użytkownika wymagają zalogowania,
+- UID jest identyfikatorem właściciela danych,
+- dane publiczne i prywatne są rozdzielone,
+- reauthentication jest obsłużone dla operacji wrażliwych,
+- account deletion obejmuje Auth, dane, pliki, tokeny i lokalny stan.
 
 ## Firestore
 
-Zasady:
-
-- Nie pobieramy całych kolekcji bez limitu.
-- Zapytania list i rankingów muszą mieć limit.
-- Zapytania sortowane muszą mieć indeksy.
-- Pola rankingowe i licznikowe powinny być denormalizowane, jeśli poprawia to koszt i wydajność.
-- Publiczne dokumenty użytkownika nie powinny zawierać PII.
+- nie pobieramy całych kolekcji bez limitu,
+- listy i rankingi mają limity oraz indeksy,
+- pola agregowane są denormalizowane, gdy zmniejsza to koszt,
+- publiczny profil nie zawiera PII,
+- retry zapisów jest idempotentne,
+- reguły blokują zmianę pól administracyjnych,
+- zmiana schematu wymaga planu migracji i zgodności cache.
 
 ## Storage
 
-Zasady:
-
-- Upload zdjęć ma walidację typu i rozmiaru.
-- Zdjęcia są kompresowane przed wysłaniem.
-- EXIF/GPS powinny być usuwane, jeśli nie są potrzebne.
-- Storage Rules muszą weryfikować właściciela i kontekst operacji.
+- upload waliduje MIME, rozmiar i ownership,
+- zdjęcia są kompresowane,
+- EXIF i GPS są usuwane, jeśli nie są potrzebne,
+- ścieżki są właścicielskie,
+- cleanup jest zgodny z account deletion,
+- aplikacja wybiera zdjęcia przez Android Photo Picker,
+- brak `READ_MEDIA_IMAGES` i `READ_EXTERNAL_STORAGE`.
 
 ## Cloud Functions
 
-Zasady:
-
-- Każda funkcja modyfikująca dane ma auth check.
-- Funkcje admina nie ufają danym z klienta.
-- Funkcje powinny logować metryki, nie dane wrażliwe.
-- Operacje kosztowne powinny mieć limity i walidację.
+- funkcje modyfikujące dane sprawdzają auth i rolę,
+- dane z klienta nie są zaufane,
+- operacje kosztowne mają limity,
+- funkcje są odporne na retry i duplikaty,
+- logi nie zawierają PII,
+- błędy częściowe są monitorowane,
+- scheduled functions obsługują nieaktywne konta i wygasłe tokeny.
 
 ## App Check
 
-Przed publicznym release:
-
-- [ ] App Check działa na release buildzie.
-- [ ] Debug provider nie działa w release.
-- [ ] Enforcement jest świadomie włączony dla właściwych usług.
-- [ ] Błędy App Check są monitorowane.
+- debug provider tylko dla debug buildów,
+- release używa Play Integrity,
+- enforcement jest włączany świadomie,
+- błędy są monitorowane,
+- prawidłowe buildy nie mogą być blokowane przez błędną konfigurację,
+- debug tokeny nie trafiają do repo ani logów.
 
 ## Remote Config
 
-Remote Config może sterować:
+Może sterować:
 
-- limitami listy,
-- limitem markerów,
-- debounce wyszukiwarki,
-- debounce mapy,
+- limitami listy i mapy,
+- debounce,
 - maintenance mode,
 - feature flags,
-- A/B testingiem.
+- limitami zdjęć i uploadu,
+- eksperymentami UX.
 
-## Crashlytics
+Parametr krytyczny powinien mieć wartość domyślną, opis, właściciela i możliwość rollbacku.
 
-Wymagania:
+## Crashlytics i Performance
 
-- testowy crash widoczny przed release,
-- release build raportuje błędy,
-- logi nie zawierają danych wrażliwych,
-- krytyczne crashe tworzą follow-up issue.
+- testowy crash jest widoczny przed release,
+- custom keys i breadcrumbs nie zawierają PII,
+- surowe wyjątki zawierające dane użytkownika nie są raportowane,
+- trace mają neutralne nazwy,
+- aktywne SDK są zgodne z Data Safety.
 
-## Performance
+## Analytics
 
-Trace powinny obejmować:
+- eventy nie zawierają e-maili, treści opinii, dokładnej lokalizacji ani URI zdjęć,
+- nazwy i parametry są stabilne,
+- user properties są ograniczone,
+- zakres zbierania odpowiada polityce prywatności.
 
-- cold start,
-- ładowanie miejsc,
-- mapę,
-- ranking,
-- wyszukiwarkę,
-- dodawanie miejsca,
-- upload zdjęcia.
+## Cloud Messaging
 
-## Checklist
+- tokeny FCM są prywatne,
+- logout i delete account usuwają lub unieważniają token,
+- nieprawidłowe tokeny są sprzątane,
+- odmowa `POST_NOTIFICATIONS` nie blokuje aplikacji,
+- deep linki z powiadomień są walidowane.
 
-- [ ] Firestore Rules sprawdzone.
-- [ ] Storage Rules sprawdzone.
-- [ ] App Check zweryfikowany.
-- [ ] Crashlytics zweryfikowany.
-- [ ] Remote Config ma wartości produkcyjne.
-- [ ] Nie ma sekretów w repo.
-- [ ] Zapytania mają limity.
+## Koszty i limity
+
+- zapytania mają limity,
+- mapy i listy nie pobierają pełnych kolekcji,
+- upload ma limit liczby i rozmiaru plików,
+- billing i alerty są skonfigurowane,
+- kosztowne funkcje mają rate limiting,
+- anomalie usage są monitorowane.
+
+## Checklista
+
+- [ ] Firestore Rules wdrożone i przetestowane,
+- [ ] Storage Rules wdrożone i przetestowane,
+- [ ] App Check zweryfikowany,
+- [ ] Crashlytics, Analytics i Performance zgodne z Data Safety,
+- [ ] Remote Config ma wartości produkcyjne,
+- [ ] FCM tokeny są prywatne,
+- [ ] account deletion czyści zależne dane,
+- [ ] brak sekretów w repo,
+- [ ] zapytania i uploady mają limity,
+- [ ] alerty kosztowe działają.

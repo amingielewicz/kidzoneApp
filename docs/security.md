@@ -1,125 +1,81 @@
 # Security documentation
 
-Powiązane issue: #166  
-Parent: #159
+Powiązane issue: #159, #166, #290, #291, #292, #293, #294, #298
+
+Ostatnia aktualizacja: 2026-07-13
 
 ## Cel
 
-Ten dokument opisuje podstawowe zasady bezpieczeństwa projektu kidZone.
-
-Dokument nie zastępuje audytu bezpieczeństwa. Jest checklistą operacyjną dla developmentu, testów i release.
-
-## Zakres
-
-Dokument obejmuje:
-
-- ochronę sekretów,
-- Firebase Security Rules,
-- Storage Security Rules,
-- App Check,
-- abuse protection i rate limiting,
-- audyt publicznych profili użytkowników,
-- logowanie i diagnostykę,
-- dane użytkownika,
-- keystore,
-- zależności,
-- procedurę reakcji na incydent.
+Dokument opisuje podstawowe zasady bezpieczeństwa kidZone dla developmentu, testów i release. Nie zastępuje niezależnego audytu bezpieczeństwa.
 
 ## Powiązane dokumenty
 
-- `docs/app-check.md` - konfiguracja i smoke test App Check.
-- `docs/abuse-rate-limiting.md` - strategia ograniczania spamu, nadużyć i kosztów.
-- `docs/qa/public-user-profile-audit.md` - ręczna weryfikacja publicznych profili użytkowników.
+- `docs/app-check.md`
+- `docs/abuse-rate-limiting.md`
+- `docs/firebase-security-plan.md`
+- `docs/qa/google-play-security-checklist.md`
+- `docs/operations/INCIDENT_RESPONSE.md`
 
-## Zasady ogólne
+## Zasady nadrzędne
 
-- Nie commitujemy sekretów.
-- Nie commitujemy keystore.
-- Nie logujemy danych osobowych.
-- Nie trzymamy prywatnych danych użytkownika w publicznych dokumentach Firestore.
-- Nie otwieramy reguł Firebase na `allow read, write: if true`.
-- Nie zakładamy, że debugowa konfiguracja jest bezpieczna dla release.
-- Każda zmiana reguł Firebase powinna mieć osobny PR albo wyraźny opis w PR.
+- Nie commitujemy sekretów ani keystore.
+- Nie logujemy danych osobowych, tokenów ani dokładnej lokalizacji.
+- Dane prywatne nie trafiają do publicznych dokumentów Firestore.
+- Reguły Firebase nie używają `allow read, write: if true` poza lokalnym emulatorem.
+- Debug provider i debug konfiguracja nie mogą działać w release.
+- Każda zmiana danych, reguł lub uprawnień wymaga aktualizacji testów i dokumentacji.
 
 ## Dane użytkownika
 
-Dane użytkownika dzielimy na publiczne i prywatne.
-
-### Dane publiczne
-
-Przykłady:
+### Publiczne
 
 - nazwa użytkownika,
-- avatar, jeśli aplikacja pokazuje go publicznie,
-- publiczne opinie,
-- publiczne miejsca,
-- publiczne oceny,
-- publiczne zdjęcia miejsc.
+- avatar, jeśli UI pokazuje go publicznie,
+- miejsca, opinie, oceny i publiczne zdjęcia.
 
-### Dane prywatne
-
-Przykłady:
+### Prywatne
 
 - e-mail,
 - imię i nazwisko,
-- ustawienia powiadomień,
-- dane administracyjne,
+- ustawienia konta,
 - tokeny FCM,
-- dane związane z blokadą konta.
+- informacje o blokadzie,
+- dane administracyjne.
 
-Docelowo prywatne dane użytkownika powinny trafiać do struktury podobnej do:
+Docelowe ścieżki:
 
 ```text
 users/{uid}/private/profile
 users/{uid}/private/messaging
 ```
 
-Dostęp do prywatnych dokumentów powinien mieć tylko właściciel konta albo administrator.
+Dostęp powinien mieć właściciel konta albo autoryzowany administrator.
 
 ## Firebase Authentication
 
-Zasady:
-
-- operacje zależne od użytkownika wymagają zalogowania,
-- operacje właścicielskie muszą sprawdzać `request.auth.uid`,
-- operacje administracyjne muszą sprawdzać rolę admina,
-- usuwanie konta wymaga osobnej procedury weryfikacji,
-- nie zakładamy, że sam UID przesłany z klienta jest zaufany.
+- operacje użytkownika wymagają zalogowania,
+- własność sprawdzamy przez `request.auth.uid`,
+- rola admina jest weryfikowana po stronie zaufanej,
+- nie ufamy UID przesłanemu przez klienta,
+- usuwanie konta obsługuje `requires-recent-login`,
+- anulowany reauth nie może powodować częściowego usunięcia danych.
 
 ## Firestore Security Rules
 
-Każda kolekcja powinna mieć jawne reguły.
+Każda kolekcja ma jawne reguły. Kontrolujemy odczyt, tworzenie, aktualizację, usuwanie, ownership, pola administracyjne, eskalację uprawnień oraz rozdzielenie danych publicznych i prywatnych.
 
-Minimalne zasady:
+Reguły powinny mieć testy emulatorowe dla scenariuszy pozytywnych i negatywnych.
 
-- publiczne odczyty tylko tam, gdzie są potrzebne,
-- zapis tylko dla zalogowanych użytkowników,
-- aktualizacja tylko przez właściciela albo admina,
-- pola systemowe nie mogą być dowolnie zmieniane przez klienta,
-- role, ban, liczniki i statusy administracyjne nie powinny być edytowalne przez zwykłego użytkownika.
+## Storage Security Rules
 
-Przy zmianie reguł trzeba sprawdzić:
+- zapis tylko do dozwolonych ścieżek właścicielskich,
+- brak nadpisywania cudzych plików,
+- walidacja MIME i rozmiaru,
+- kontrola usuwania,
+- zgodność z account deletion,
+- legacy paths bez otwartego zapisu.
 
-- [ ] kto może czytać dane,
-- [ ] kto może tworzyć dane,
-- [ ] kto może edytować dane,
-- [ ] kto może usuwać dane,
-- [ ] czy użytkownik może zmienić cudze dane,
-- [ ] czy użytkownik może podnieść sobie uprawnienia,
-- [ ] czy użytkownik może zmienić pola administracyjne,
-- [ ] czy dane prywatne są oddzielone od publicznych.
-
-## Firebase Storage Rules
-
-Zasady:
-
-- zdjęcia powinny być zapisywane w ścieżkach właścicielskich,
-- właściciel może dodawać swoje pliki,
-- właściciel nie powinien móc nadpisywać cudzych plików,
-- legacy ścieżki powinny być tylko do odczytu albo wyłączone z zapisu,
-- usuwanie zdjęć powinno być zgodne z flow usuwania konta.
-
-Przykładowa logika ścieżek:
+Przykładowe ścieżki:
 
 ```text
 places/{ownerUserId}/{placeId}/photos/{fileName}
@@ -127,248 +83,127 @@ reviews/{ownerUserId}/{reviewId}/photos/{fileName}
 users/{ownerUserId}/avatar/{fileName}
 ```
 
-## Firebase App Check
+## App Check
 
-Cel App Check:
+- Debug provider tylko w debug buildach.
+- Release używa Play Integrity.
+- Debug tokeny nie trafiają do repo ani logów.
+- Enforcement włączamy po obserwacji metryk i smoke teście.
+- Prawidłowe buildy nie mogą być blokowane przez błędną konfigurację.
 
-- ograniczyć nadużycia,
-- utrudnić używanie Firebase spoza prawdziwej aplikacji,
-- chronić Firestore, Storage i inne zasoby.
+## Sekrety i klucze
 
-Zasady:
+Sekretami są między innymi:
 
-- debug provider tylko dla debug buildów,
-- Play Integrity dla release,
-- przed enforcement sprawdzić logi i kompatybilność,
-- nie zostawiać debug tokenów w repo,
-- dokumentować, gdzie App Check jest włączone.
+- keystore i hasła,
+- service account JSON,
+- tokeny GitHub,
+- dane Firebase Admin,
+- dane konta Google Play,
+- nieograniczone klucze API.
 
-Checklist:
+Klucz Google Maps musi być ograniczony do właściwego package name i SHA-1/SHA-256. Należy ograniczyć listę aktywnych API oraz ustawić limity i alerty kosztowe.
 
-- [ ] debug provider nie działa w release,
-- [ ] release używa Play Integrity,
-- [ ] debug tokeny nie są zapisane w repo,
-- [ ] Firebase Console ma świadomie ustawiony monitoring albo enforcement,
-- [ ] wymuszenie App Check nie blokuje prawdziwych użytkowników.
+## GitHub Actions
 
-## Sekrety i konfiguracja
-
-Sekrety nie mogą być commitowane.
-
-Przykłady sekretów:
-
-```text
-keystore
-hasła do keystore
-API keys z ograniczeniami
-service account JSON
-GitHub tokens
-Firebase admin credentials
-Google Play service account
-```
-
-Dopuszczalne są tylko pliki i wartości, które są bezpieczne dla klienta mobilnego albo odpowiednio ograniczone.
-
-## Klucze API
-
-Klucze API używane w aplikacji mobilnej powinny być ograniczone.
-
-Dla Google Maps API należy sprawdzić:
-
-- [ ] ograniczenie do Android apps,
-- [ ] poprawny package name,
-- [ ] poprawny SHA-1 / SHA-256,
-- [ ] brak niepotrzebnych API,
-- [ ] limity i alerty kosztowe.
-
-## GitHub Secrets
-
-Sekrety do CI/CD powinny być trzymane w GitHub Secrets.
-
-Przykłady:
-
-```text
-ANDROID_KEYSTORE_BASE64
-ANDROID_KEYSTORE_PASSWORD
-ANDROID_KEY_ALIAS
-ANDROID_KEY_PASSWORD
-MAPS_API_KEY
-GOOGLE_SERVICES_JSON
-```
-
-Zasady:
-
-- nie wypisywać sekretów w logach,
-- nie przekazywać sekretów do pull requestów z niezaufanych branchy,
-- regularnie sprawdzać listę sekretów,
-- po wycieku natychmiast obrócić sekret.
+- sekrety przechowujemy w GitHub Secrets,
+- nie wypisujemy sekretów w logach,
+- workflow z niezaufanego PR nie dostaje sekretów,
+- Gitleaks blokuje wykryte sekrety,
+- uprawnienia workflow ustawiamy według zasady najmniejszych uprawnień,
+- po podejrzeniu wycieku sekret natychmiast rotujemy.
 
 ## Keystore
 
-Keystore produkcyjny jest krytycznym zasobem.
-
-Zasady:
-
-- nie commitować keystore,
-- trzymać kopię zapasową w bezpiecznym miejscu,
-- znać procedurę odzyskania albo rotacji,
-- ograniczyć dostęp,
-- dokumentować, kto ma dostęp,
-- nie wysyłać keystore przez komunikatory bez szyfrowania.
-
-Minimalny plan przechowywania:
-
-```text
-1. Keystore lokalnie poza repo.
-2. Kopia backup w bezpiecznym menedżerze haseł albo zaszyfrowanym archiwum.
-3. Hasła w menedżerze haseł.
-4. W CI tylko przez GitHub Secrets.
-```
+- nie trafia do repo,
+- ma zaszyfrowaną kopię zapasową,
+- hasła są w menedżerze haseł,
+- dostęp jest ograniczony i udokumentowany,
+- tag release wskazuje commit podpisanego builda.
 
 ## Logowanie i Crashlytics
 
-Zasady:
+Nie logujemy:
 
-- nie logować haseł,
-- nie logować tokenów FCM,
-- nie logować pełnych e-maili, jeśli nie jest to potrzebne,
-- nie logować danych prywatnych profilu,
-- nie logować dokładnej lokalizacji użytkownika,
-- w release ograniczać logi do ostrzeżeń i błędów,
-- Crashlytics może zbierać dane diagnostyczne i musi być uwzględnione w Data Safety.
+- haseł,
+- tokenów sesji i FCM,
+- pełnych e-maili,
+- prywatnych danych profilu,
+- dokładnych współrzędnych użytkownika,
+- treści formularzy zawierających dane osobowe.
 
-## Analytics i Performance Monitoring
+Crashlytics:
 
-Jeśli Analytics zostaje w aplikacji, Data Safety musi to uwzględniać.
+- nie dostaje surowych danych wyjątków pochodzących z treści użytkownika,
+- custom keys i breadcrumbs nie zawierają PII,
+- identyfikator użytkownika jest wyłączony albo pseudonimizowany zgodnie z decyzją prywatności,
+- zakres zbierania odpowiada Data Safety.
 
-Jeśli Performance Monitoring zostaje w aplikacji, Data Safety musi uwzględniać:
+## Analytics i Performance
 
-- diagnostics,
-- performance data,
-- device/app info.
+- event parameters nie zawierają e-maili, nazwisk, pełnych adresów ani dokładnej lokalizacji,
+- eventy mają neutralne nazwy,
+- user properties są ograniczone do minimum,
+- custom traces nie zawierają danych użytkownika,
+- aktywne usługi są opisane w polityce prywatności i Data Safety.
 
-Zasady:
+## FCM
 
-- nie wysyłać danych osobowych jako event parameters,
-- nie wysyłać e-maili w eventach,
-- nie wysyłać pełnych adresów ani dokładnej lokalizacji jako eventów,
-- custom eventy powinny mieć neutralne nazwy,
-- koszt i limity Performance Monitoring trzeba potwierdzić przed release.
+- tokeny są przechowywane prywatnie,
+- nie są logowane ani publicznie czytelne,
+- są usuwane lub unieważniane przy logout i delete account,
+- odmowa `POST_NOTIFICATIONS` nie blokuje aplikacji.
 
-## Firebase Cloud Messaging
+## Android permissions
 
-Jeżeli aplikacja używa FCM:
+Aplikacja używa tylko foreground location, opcjonalnej kamery i opcjonalnych powiadomień.
 
-- tokeny FCM traktujemy jako dane techniczne powiązane z użytkownikiem,
-- tokeny zapisujemy w prywatnej części profilu,
-- tokeny nie powinny być publicznie odczytywalne,
-- użytkownik powinien mieć kontrolę nad powiadomieniami,
-- Android 13+ wymaga `POST_NOTIFICATIONS`.
+Nie deklaruje:
 
-Checklist:
+- `ACCESS_BACKGROUND_LOCATION`,
+- `READ_MEDIA_IMAGES`,
+- `READ_EXTERNAL_STORAGE`,
+- `QUERY_ALL_PACKAGES`.
 
-- [ ] tokeny FCM są zapisane w prywatnym dokumencie,
-- [ ] tokeny nie są logowane,
-- [ ] tokeny są usuwane albo dezaktywowane przy wylogowaniu/usunięciu konta,
-- [ ] aplikacja działa po odmowie powiadomień,
-- [ ] Data Safety uwzględnia FCM, jeśli funkcja zostaje.
+Zdjęcia są wybierane przez Android Photo Picker. Po trwałej odmowie lokalizacji lub kamery aplikacja otwiera ustawienia aplikacji. Żaden punkt wejścia nie może stać się martwy po kolejnych odmowach.
 
 ## Zależności
 
-Przed release trzeba sprawdzać zależności.
-
-Minimalna procedura:
+Przed release:
 
 ```powershell
-.\gradlew dependencyUpdates
 .\gradlew detekt
 .\gradlew lint
+.\gradlew testDebugUnitTest
 ```
 
-Jeżeli projekt ma OWASP Dependency Check:
-
-```powershell
-.\gradlew dependencyCheckAnalyze
-```
-
-Zasady:
-
-- nie aktualizować wielu krytycznych bibliotek naraz bez testów,
-- priorytetowo traktować podatności security,
-- po aktualizacji Firebase sprawdzić Data Safety,
-- po aktualizacji Compose/Android Gradle Plugin wykonać smoke test UI.
+Dodatkowo przeglądamy aktualizacje i podatności zależności. Aktualizacje krytycznych bibliotek wykonujemy pojedynczo lub w kontrolowanych grupach z regresją.
 
 ## Backup i odzyskiwanie
 
-Elementy wymagające backupu:
+Backup obejmuje keystore, konfigurację i listę nazw sekretów, dokumentację release, politykę prywatności, regulamin i procedury operacyjne.
 
-- keystore,
-- hasła keystore,
-- konfiguracja Firebase,
-- GitHub Secrets lista nazw,
-- dokumentacja release,
-- polityka prywatności i regulamin.
+Sekretów nie przechowujemy w plain text.
 
-Nie backupujemy sekretów w plain text.
+## Reakcja na incydent
 
-## Incydent bezpieczeństwa
+1. Zatrzymaj wdrożenia lub rollout.
+2. Określ zakres i wpływ.
+3. Obróć ujawnione sekrety.
+4. Popraw i wdróż reguły lub konfigurację.
+5. Sprawdź logi Firebase, GCP i GitHub.
+6. Oceń obowiązek poinformowania użytkowników.
+7. Utwórz raport incydentu i follow-up issues.
+8. Dodaj test lub kontrolę zapobiegającą powtórce.
 
-Przykłady incydentów:
+## Checklista dla PR
 
-- wyciek keystore,
-- wyciek service account,
-- publiczne reguły Firebase,
-- możliwość odczytu prywatnych danych użytkownika,
-- nieautoryzowany zapis do Firestore/Storage,
-- błędna publikacja danych osobowych,
-- kosztowy abuse Firebase/GCP.
+Przy zmianie danych, Firebase, uprawnień lub logowania sprawdź:
 
-Procedura:
-
-1. Zatrzymać dalsze wdrożenia.
-2. Zidentyfikować zakres problemu.
-3. Jeżeli wyciekł sekret — obrócić sekret.
-4. Jeżeli problem dotyczy Firebase Rules — wdrożyć poprawione reguły.
-5. Sprawdzić logi Firebase/GCP.
-6. Ocenić, czy trzeba poinformować użytkowników.
-7. Utworzyć issue z opisem incydentu.
-8. Dodać test albo checklistę, która zapobiegnie powtórce.
-
-## Czego nie robić
-
-- Nie używać `allow read, write: if true` poza lokalnym emulatorem.
-- Nie trzymać haseł w repo.
-- Nie dodawać service account JSON do aplikacji mobilnej.
-- Nie używać admin SDK w aplikacji Android.
-- Nie ufać danym przesłanym przez klienta bez sprawdzenia reguł.
-- Nie publikować release bez aktualnej polityki prywatności.
-- Nie zostawiać debugowych obejść w release.
-
-## Security checklist dla PR
-
-Przy PR dotykającym danych, Firebase albo uprawnień sprawdzić:
-
-- [ ] czy zmiana dotyka danych użytkownika,
-- [ ] czy zmiana wymaga aktualizacji Firebase Rules,
-- [ ] czy zmiana wymaga aktualizacji Storage Rules,
-- [ ] czy zmiana wpływa na Data Safety,
-- [ ] czy zmiana dodaje nowe uprawnienie Androida,
-- [ ] czy zmiana dodaje nową usługę Firebase,
-- [ ] czy zmiana loguje dane prywatne,
-- [ ] czy zmiana wymaga migracji danych,
-- [ ] czy zmiana wymaga aktualizacji polityki prywatności.
-
-## Kryteria bezpieczeństwa przed release
-
-Release można traktować jako gotowy bezpieczeństwowo, gdy:
-
-- Firebase Rules są wdrożone,
-- Storage Rules są wdrożone,
-- App Check jest świadomie skonfigurowany,
-- keystore jest bezpiecznie przechowywany,
-- GitHub Secrets są aktualne,
-- Data Safety jest zgodne z kodem,
-- logi release nie ujawniają danych prywatnych,
-- użytkownik może usunąć konto albo ma jasną procedurę żądania usunięcia danych,
-- nie ma znanych krytycznych podatności w zależnościach,
-- [Google Play security release checklist](qa/google-play-security-checklist.md) ma uzupełnione statusy i decyzję GO / NO-GO.
+- [ ] wpływ na dane użytkownika,
+- [ ] potrzebę aktualizacji Rules,
+- [ ] wpływ na Data Safety i politykę prywatności,
+- [ ] ryzyko logowania PII,
+- [ ] zachowanie dla odmów uprawnień,
+- [ ] testy negatywne,
+- [ ] rollback i obserwowalność.

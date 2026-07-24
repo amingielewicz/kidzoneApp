@@ -7,6 +7,7 @@ import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.UiText
+import com.kidzone.utils.toAuthErrorMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +17,41 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * ViewModel ekranu logowania.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie formularzem logowania, resetem hasła i ponowną wysyłką weryfikacji.
+ * - Mapowanie błędów autoryzacji na bezpieczne komunikaty UI.
+ * - Rozróżnianie stanów konta (niezweryfikowane, zablokowane).
+ *
+ * 🚫 Poza zakresem:
+ * - Brak bezpośredniego zarządzania sesją (delegowane do [AuthRepository]).
+ * - Brak retry logiki dla operacji sieciowych.
+ * - Brak przechowywania haseł w pamięci trwałej.
+ *
+ * 📥 Wejście:
+ * - Interakcje użytkownika z polami formularza (email, hasło).
+ * - Żądania logowania (E-mail/Password, Google).
+ *
+ * 📤 Wyjście:
+ * - Stan ekranu logowania ([UiState]).
+ * - Flaga sukcesu zalogowania ([isSignedIn]).
+ *
+ * ✅ Gwarancje:
+ * - Brak logowania wrażliwych danych (hasła, tokeny).
+ * - Bezpieczne mapowanie technicznych błędów Firebase na zrozumiały język.
+ *
+ * 🔌 Offline:
+ * - Nie wspiera operacji w trybie offline (wymagana łączność z serwerami Auth).
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla wszystkich operacji autoryzacji.
+ * - Brak blokujących operacji na wątku Main.
+ *
+ * 🧪 Testowalność:
+ * - Pełne DI (mockowanie repozytorium autoryzacji).
+ * - Deterministyczne zmiany stanu w odpowiedzi na błędy i sukcesy.
+ *
+ * 🧼 Lifecycle:
+ * - Operacje wiązane z viewModelScope (anulowane automatycznie).
  */
 @Suppress("TooManyFunctions")
 @HiltViewModel
@@ -25,7 +60,17 @@ class LoginViewModel @Inject constructor(
 ) : ViewModel() {
 
     /**
-     * Stan UI logowania.
+     * Niezmienny stan ekranu logowania.
+     *
+     * @property email bieżąca wartość pola e-mail.
+     * @property password bieżąca wartość pola hasła.
+     * @property isLoading czy trwa operacja uwierzytelniania lub wysyłki wiadomości.
+     * @property message komunikat przeznaczony do jednorazowego pokazania w UI.
+     * @property isMessageError czy [message] reprezentuje błąd.
+     * @property isSignedIn czy ostatnia próba logowania zakończyła się sukcesem.
+     * @property showResendVerification czy należy pokazać akcję ponownej wysyłki weryfikacji.
+     * @property banMessage komunikat o blokadzie zwrócony przez warstwę domenową.
+     * @property banReason opcjonalny powód blokady.
      */
     data class UiState(
         val email: String = "",
@@ -38,21 +83,32 @@ class LoginViewModel @Inject constructor(
         val banMessage: UiText? = null,
         val banReason: UiText? = null
     ) {
+        /** Czy oba wymagane pola formularza są niepuste. */
         val isFormValid: Boolean
             get() = email.isNotBlank() && password.isNotBlank()
     }
 
     private val _uiState = MutableStateFlow(UiState())
+
+    /** Stan obserwowany przez ekran Compose. */
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
+    /** Aktualizuje e-mail i czyści poprzedni komunikat formularza. */
     fun onEmailChange(value: String) {
         _uiState.update { it.copy(email = value, message = null) }
     }
 
+    /** Aktualizuje hasło i czyści poprzedni komunikat formularza. */
     fun onPasswordChange(value: String) {
         _uiState.update { it.copy(password = value, message = null) }
     }
 
+    /**
+     * Próbuje zalogować użytkownika danymi e-mail/hasło.
+     *
+     * Puste pola kończą się lokalnym błędem walidacji. Sukces ustawia [UiState.isSignedIn], a błąd
+     * jest mapowany bez ujawniania surowego komunikatu Firebase.
+     */
     fun signIn() {
         val state = _uiState.value
         if (state.email.isBlank() || state.password.isBlank()) {
@@ -99,6 +155,11 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Loguje użytkownika poświadczeniem Google.
+     *
+     * @param idToken krótkotrwały token ID uzyskany przez Credential Manager; nie może być logowany.
+     */
     fun signInWithGoogle(idToken: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, message = null, banMessage = null) }
@@ -133,14 +194,17 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    /** Pokazuje błąd przekazany jako UiText. */
     fun showErrorMessage(message: UiText) {
         _uiState.update { it.copy(message = message, isMessageError = true) }
     }
 
+    /** Pokazuje informację przekazaną jako UiText. */
     fun showInfoMessage(message: UiText) {
         _uiState.update { it.copy(message = message, isMessageError = false) }
     }
 
+    /** Pokazuje standardowy komunikat braku połączenia. */
     fun showConnectionError() {
         _uiState.update {
             it.copy(
@@ -150,10 +214,17 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    /** Oznacza aktualny komunikat jako obsłużony. */
     fun consumeMessage() {
         _uiState.update { it.copy(message = null) }
     }
 
+    /**
+     * Wysyła wiadomość resetującą hasło na adres wpisany w formularzu.
+     *
+     * Brak adresu kończy się lokalnym komunikatem. Szczegóły o istnieniu konta nie powinny być
+     * ujawniane użytkownikowi.
+     */
     fun forgotPassword() {
         val email = _uiState.value.email.trim()
         if (email.isBlank()) {
@@ -177,7 +248,7 @@ class LoginViewModel @Inject constructor(
                     )
                     is OpResult.Failure -> it.copy(
                         isLoading = false,
-                        message = mapError(result.error),
+                        message = result.error.toAuthErrorMessage(R.string.error_unknown),
                         isMessageError = true
                     )
                 }
@@ -192,6 +263,11 @@ class LoginViewModel @Inject constructor(
         else -> UiText.StringResource(R.string.error_unknown)
     }
 
+    /**
+     * Ponownie wysyła wiadomość weryfikacyjną dla danych wpisanych w formularzu.
+     *
+     * Metoda wymaga e-maila i hasła, ponieważ repository może wykonać reautoryzację przed wysyłką.
+     */
     fun resendVerificationEmail() {
         val state = _uiState.value
         if (state.email.isBlank() || state.password.isBlank()) return

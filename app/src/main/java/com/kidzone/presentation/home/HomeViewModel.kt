@@ -8,6 +8,7 @@ import com.kidzone.data.remote.PerformanceConfigProvider
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.service.LocationProvider
+import com.kidzone.utils.GeoUtils
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.UiText
 import com.kidzone.utils.toPlacesErrorMessage
@@ -21,29 +22,48 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
 
-/** Zakres czasu dla sekcji "Ostatnio dodane w okolicy". */
+/** Okno czasowe używane przez sekcję ostatnio dodanych miejsc. */
 private const val RECENTLY_ADDED_WINDOW_MILLIS = 14L * 24L * 60L * 60L * 1000L
 private const val LOCATION_RETRY_DELAY_MS = 3_000L
 private const val LOCATION_RETRY_COUNT = 3
 private const val ONE_MINUTE_MILLIS = 60_000L
 
 /**
- * ViewModel ekranu Home (zakładka "Start" w bottom navigation).
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie sekcjami lokalizacyjnymi ekranu Start.
+ * - Budowanie sekcji (najlepiej oceniane, najbliższe, nowości) z jednego zestawu danych.
  *
- * Trzyma zestawy danych zależne od aktualnej lokalizacji:
- *  - **Ostatnio dodane w okolicy** – nowe miejsca z ostatnich 14 dni.
- *  - **Top miejsca** – 20 najlepiej ocenianych miejsc w promieniu
- *    z Remote Config od użytkownika (lokalny ranking).
- *  - **Blisko Ciebie** – 20 najbliższych miejsc, bez względu na ocenę i liczbę
- *    opinii.
+ * 🚫 Poza zakresem:
+ * - Brak decyzji o offline queue (obsługiwane przez Repository).
+ * - Brak retry logiki (delegowane do mechanizmów niższego poziomu).
+ * - Brak zarządzania sesją użytkownika.
  *
- * Sekcje korzystają z jednego pobrania lokalizacji i jednego fetcha miejsc,
- * żeby nie dublować pracy FusedLocationProviderClient / Firestore.
+ * 📥 Wejście:
+ * - Strumień lokalizacji z [LocationProvider].
+ * - Dane o miejscach z [PlaceRepository].
+ *
+ * 📤 Wyjście:
+ * - Stan UI zawierający posegregowane listy miejsc.
+ *
+ * ✅ Gwarancje:
+ * - Spójność danych między sekcjami.
+ * - Użycie ostatniej poprawnej lokalizacji przy błędach odczytu.
+ *
+ * 🔌 Offline:
+ * - Wspiera odczyt z cache Room, gdy Firestore jest niedostępny.
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla operacji asynchronicznych.
+ * - Brak blokujących operacji na wątku Main.
+ *
+ * 🧪 Testowalność:
+ * - Pełne wstrzykiwanie zależności (DI).
+ * - Brak ukrytych singletonów.
+ * - Deterministyczne zachowanie stanu.
+ *
+ * 🧼 Lifecycle:
+ * - Odświeżanie danych przy starcie ekranu (wykrywanie powrotu online).
  */
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -53,6 +73,12 @@ class HomeViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
+    /**
+     * Miejsce połączone z odległością od pozycji użytej do budowy sekcji.
+     *
+     * @property place model miejsca.
+     * @property distanceKm odległość w kilometrach obliczona formułą haversine.
+     */
     data class PlaceWithDistance(
         val place: Place,
         val distanceKm: Double
@@ -65,18 +91,21 @@ class HomeViewModel @Inject constructor(
     )
 
     /**
-     * @property topPlaces lokalny ranking najlepiej ocenianych miejsc w pobliżu
-     * @property nearbyPlaces lista najbliższych miejsc bez względu na ocenę
-     * @property recentlyAddedPlaces nowe miejsca w okolicy z ostatnich 14 dni
-     * @property isTopLoading true do zakończenia pierwszego fetcha topu
-     * @property isNearbyLoading true gdy lecimy fetchem "blisko Ciebie"
-     * @property isRecentlyAddedLoading true gdy ładujemy sekcję nowych miejsc
-     * @property isRefreshing true podczas pull-to-refresh (kręci spinner)
-     * @property locationGranted true gdy user nadał ACCESS_*_LOCATION
-     * @property errorMessage błąd ostatniego fetcha (top lub nearby)
-     * @property isUsingStaleLocation true gdy pokazujemy dane z ostatniej poprawnej pozycji
-     * @property staleLocationAgeMinutes wiek ostatniej znanej pozycji w minutach
-     * @property hasWeakGpsSignal true gdy GPS jest włączony, ale nie udało się złapać fixa
+     * Niezmienny stan ekranu Start.
+     *
+     * @property topPlaces lokalny ranking najlepiej ocenianych miejsc w pobliżu.
+     * @property nearbyPlaces miejsca najbliższe pozycji użytkownika.
+     * @property recentlyAddedPlaces miejsca dodane w ciągu ostatnich 14 dni.
+     * @property isTopLoading czy trwa ładowanie sekcji top.
+     * @property isNearbyLoading czy trwa ładowanie sekcji najbliższych miejsc.
+     * @property isRecentlyAddedLoading czy trwa ładowanie sekcji nowych miejsc.
+     * @property isRefreshing czy trwa jawne odświeżenie użytkownika.
+     * @property locationGranted czy aplikacja ma co najmniej przybliżone uprawnienie lokalizacji.
+     * @property errorMessage zmapowany komunikat ostatniego błędu pobierania.
+     * @property isAcquiringLocation czy trwa ponawianie próby uzyskania fixa lokalizacji.
+     * @property isUsingStaleLocation czy sekcje zostały obliczone z ostatniej znanej pozycji.
+     * @property staleLocationAgeMinutes wiek użytej pozycji w pełnych minutach.
+     * @property hasWeakGpsSignal czy usługa jest dostępna, ale nie udało się uzyskać nowego fixa.
      */
     data class UiState(
         val topPlaces: List<PlaceWithDistance> = emptyList(),
@@ -88,7 +117,6 @@ class HomeViewModel @Inject constructor(
         val isRefreshing: Boolean = false,
         val locationGranted: Boolean = false,
         val errorMessage: UiText? = null,
-        /** true gdy GPS jest włączony ale lokalizacja jeszcze nie ustalona (trwa retry). */
         val isAcquiringLocation: Boolean = false,
         val isUsingStaleLocation: Boolean = false,
         val staleLocationAgeMinutes: Int? = null,
@@ -96,7 +124,10 @@ class HomeViewModel @Inject constructor(
     )
 
     private val _uiState = MutableStateFlow(UiState())
+
+    /** Stan obserwowany przez ekran Compose. */
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
     private var lastKnownLocation: LastKnownLocation? = null
 
     init {
@@ -104,10 +135,10 @@ class HomeViewModel @Inject constructor(
     }
 
     /**
-     * Synchronizuje flagę [UiState.locationGranted] z aktualnym stanem
-     * uprawnień systemowych. Wywoływać przy każdej zmianie cyklu życia
-     * (np. powrót z ekranu ustawień), żeby UI nie został z nieaktualną
-     * informacją.
+     * Synchronizuje stan UI z rzeczywistym stanem uprawnienia lokalizacji.
+     *
+     * Metodę należy wywołać po powrocie ekranu do aktywnego lifecycle, szczególnie po otwarciu
+     * ustawień aplikacji. Cofnięcie zgody zatrzymuje loadery i usuwa oznaczenia stale location.
      */
     fun refreshLocationGranted() {
         val granted = locationProvider.hasPermission()
@@ -126,13 +157,22 @@ class HomeViewModel @Inject constructor(
         if (shouldLoad) loadLocationBasedPlaces()
     }
 
-    /** Wywoływać po pomyślnym requeście permissionsa – uruchamia load obu sekcji. */
+    /**
+     * Informuje ViewModel o pomyślnym zakończeniu systemowego flow uprawnienia lokalizacji.
+     *
+     * UI nadal powinno odświeżyć rzeczywisty stan podczas kolejnego lifecycle eventu.
+     */
     fun onLocationPermissionGranted() {
         _uiState.update { it.copy(locationGranted = true) }
         loadLocationBasedPlaces()
     }
 
-    /** Pull-to-refresh – zawsze przeładowuje dane niezależnie od stanu permission. */
+    /**
+     * Ponownie pobiera lokalizację i dane wszystkich sekcji.
+     *
+     * Brak uprawnienia kończy się krótkim, kontrolowanym stanem refresh bez uruchamiania requestu.
+     * Gdy GPS nie zwróci nowej pozycji, stosowany jest jawny fallback słabego sygnału.
+     */
     fun refresh() {
         if (!locationProvider.hasPermission()) {
             viewModelScope.launch {
@@ -279,7 +319,7 @@ class HomeViewModel @Inject constructor(
         ) {
             is OpResult.Success -> {
                 val placesWithDistance = result.data
-                    .map { it to haversineKm(lat, lng, it.latitude, it.longitude) }
+                    .map { it to GeoUtils.haversineKm(lat, lng, it.latitude, it.longitude) }
 
                 val homeSections = buildHomeSections(placesWithDistance, performanceConfig)
 
@@ -320,8 +360,17 @@ class HomeViewModel @Inject constructor(
         persistLocationForWidget(lat, lng, now)
     }
 
-    /** Persists last known location to SharedPreferences for the Glance widget. */
-    private fun persistLocationForWidget(lat: Double, lng: Double, timestampMillis: Long = System.currentTimeMillis()) {
+    /**
+     * Zapisuje ostatnią poprawną lokalizację dla widgetu Glance.
+     *
+     * Dane są prywatnym stanem urządzenia. Nie mogą trafiać do logów i muszą zostać usunięte przy
+     * zakończeniu sesji użytkownika.
+     */
+    private fun persistLocationForWidget(
+        lat: Double,
+        lng: Double,
+        timestampMillis: Long = System.currentTimeMillis()
+    ) {
         appContext.getSharedPreferences(NearbyPlacesWidget.LOCATION_PREFS, Context.MODE_PRIVATE)
             .edit()
             .putFloat(NearbyPlacesWidget.KEY_LAST_LAT, lat.toFloat())
@@ -334,12 +383,27 @@ class HomeViewModel @Inject constructor(
         ((System.currentTimeMillis() - timestampMillis) / ONE_MINUTE_MILLIS).toInt().coerceAtLeast(0)
 }
 
+/**
+ * Zestaw sekcji przygotowanych dla ekranu Start.
+ *
+ * @property topPlaces najlepiej oceniane miejsca w lokalnym promieniu.
+ * @property nearbyPlaces najbliższe miejsca.
+ * @property recentlyAddedPlaces miejsca dodane w ostatnim oknie czasowym.
+ */
 internal data class HomeSections(
     val topPlaces: List<HomeViewModel.PlaceWithDistance>,
     val nearbyPlaces: List<HomeViewModel.PlaceWithDistance>,
     val recentlyAddedPlaces: List<HomeViewModel.PlaceWithDistance>
 )
 
+/**
+ * Buduje sekcje ekranu Start z jednego zestawu miejsc i ich odległości.
+ *
+ * @param placesWithDistance miejsca połączone z odległością od użytkownika.
+ * @param performanceConfig limity i promienie pobrane z Remote Config.
+ * @param nowMillis czas odniesienia używany do sekcji ostatnio dodanych.
+ * @return gotowe, posortowane i ograniczone sekcje.
+ */
 internal fun buildHomeSections(
     placesWithDistance: List<Pair<Place, Double>>,
     performanceConfig: PerformanceConfig = PerformanceConfig(),
@@ -379,16 +443,4 @@ internal fun buildHomeSections(
         nearbyPlaces = nearby,
         recentlyAddedPlaces = recentlyAdded
     )
-}
-
-/** Odległość w km między dwoma punktami (formuła haversine). */
-private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-    val r = 6371.0
-    val dLat = Math.toRadians(lat2 - lat1)
-    val dLon = Math.toRadians(lon2 - lon1)
-    val a = sin(dLat / 2).let { it * it } +
-        cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
-        sin(dLon / 2).let { it * it }
-    val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-    return r * c
 }

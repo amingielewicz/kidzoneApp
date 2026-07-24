@@ -1,91 +1,109 @@
 # Android permissions and device compatibility matrix
 
-Powiazane issue: #274, #303
+Powiązane issue: #274, #303
 
-Ostatnia aktualizacja: 2026-07-02
+Ostatnia aktualizacja: 2026-07-13
 
 ## Cel
 
-Ten dokument jest robocza macierza manualnego QA dla runtime permissions,
-Photo Pickera i kompatybilnosci urzadzen przed publikacja kidZone w Google Play.
+Macierz służy do ręcznego sprawdzenia runtime permissions, Android Photo Pickera i zachowania aplikacji po odmowie zgód.
 
-Nie zastepuje testu na realnym urzadzeniu. Ma zapewnic, ze wynik PASS/FAIL dla
-#274 i #303 jest zapisany w jednym, powtarzalnym formacie.
+## Dane testu
 
-## Zakres builda
-
-Przed testem zapisz:
-
-| Pole | Wartosc |
+| Pole | Wartość |
 | --- | --- |
 | Commit / tag | |
 | Build type | debug / release / internal |
 | Firebase project | |
-| MAPS_API_KEY | placeholder / produkcyjny |
+| Urządzenie | |
+| Android | |
 | Tester | |
 | Data | |
 
-## Macierz urzadzen
+## Minimalna macierz urządzeń
 
-Minimalna macierz:
-
-| Android | Urzadzenie | Status | Uwagi |
+| Android | Urządzenie | Status | Zakres |
 | --- | --- | --- | --- |
-| 13 | fizyczne lub emulator | TODO | Powiadomienia wymagaja runtime permission. |
-| 14 | fizyczne lub emulator | TODO | Sprawdzic Photo Picker i denial flows. |
-| 15 | fizyczne lub emulator, jesli dostepne | TODO | Smoke test zgodnosci. |
+| 13 | fizyczne lub emulator | TODO | powiadomienia runtime, Photo Picker, odmowy |
+| 14 | fizyczne lub emulator | TODO | Photo Picker, trwałe odmowy, ustawienia aplikacji |
+| 15 | fizyczne lub emulator | TODO | smoke test zgodności |
+| 16 | fizyczne lub emulator, jeśli dostępne | TODO | regresja runtime permissions |
 
-Dodatkowo warto sprawdzic jedno urzadzenie producenta z mocno zmienionym Androidem
-(np. Xiaomi/MIUI), bo systemowe dialogi i ustawienia uprawnien bywaja inne.
+Warto dodać co najmniej jedno urządzenie producenta z mocno zmodyfikowanym Androidem, na przykład Xiaomi, Samsung lub realme.
 
-## Checklist per urzadzenie
+## Lokalizacja
 
-Skopiuj tabele dla kazdego testowanego urzadzenia.
+Każdy punkt wejścia do lokalizacji powinien korzystać ze wspólnego mechanizmu `requestLocationPermissionOrOpenSettings`.
 
-| Obszar | Scenariusz | Oczekiwany wynik | Wynik |
-| --- | --- | --- | --- |
-| Lokalizacja | Deny przy pierwszym pytaniu | Aplikacja nie crashuje, mapa i lista dzialaja w trybie bez lokalizacji. | TODO |
-| Lokalizacja | Allow approximate | Aplikacja pokazuje miejsca w poblizu bez wymagania precise. | TODO |
-| Lokalizacja | Allow precise | Mapa, Start, Lista i AddPlace uzywaja dokladnej lokalizacji. | TODO |
-| Lokalizacja | Ponowna proba po odmowie | UI pozwala ponowic prosbe albo przejsc do ustawien, bez petli dialogow. | TODO |
-| Kamera | Allow | Aparat otwiera sie z AddPlace i szczegolow/opinii, zdjecie wraca do formularza. | TODO |
-| Kamera | Deny | Aplikacja nie crashuje; mozna wybrac zdjecie przez Photo Picker. | TODO |
-| Kamera | Deny + nie pytaj ponownie, jesli system pokazuje | UI nie blokuje formularza i nie crashuje. | TODO |
-| Powiadomienia | Allow na Androidzie 13+ | Aplikacja zapisuje zgode i nie pyta ponownie bez potrzeby. | TODO |
-| Powiadomienia | Deny na Androidzie 13+ | Aplikacja dziala dalej bez powiadomien. | TODO |
-| Photo Picker | Avatar profilu | Otwiera sie systemowy picker bez szerokiego dostepu do galerii. | TODO |
-| Photo Picker | Zdjecia miejsca | Mozna wybrac zdjecia miejsca bez `READ_MEDIA_IMAGES`. | TODO |
-| Photo Picker | Zdjecia opinii | Mozna wybrac zdjecia opinii bez `READ_MEDIA_IMAGES`. | TODO |
-| Photo Picker | Zdjecie w szczegolach miejsca | Mozna wybrac zdjecie bez szerokiego dostepu do galerii. | TODO |
-| Bez lokalizacji | Start / Mapa / Lista / AddPlace | Ekrany pokazuja czytelny stan ograniczony, bez crasha. | TODO |
-| Bez powiadomien | Uruchomienie i glowne zakladki | Aplikacja dziala normalnie, push jest opcjonalny. | TODO |
-| Bez kamery | Dodawanie zdjec | Uzytkownik moze uzyc Photo Pickera. | TODO |
+| Punkt wejścia | Pierwsza odmowa | Kolejna odmowa | Trwała odmowa | Wynik |
+| --- | --- | --- | --- | --- |
+| Start: „Włącz lokalizację” | brak crasha, czytelny komunikat | ponowna obsługa akcji | ustawienia aplikacji | TODO |
+| Lista: sortowanie „Od najbliższych” | brak crasha, lista nadal działa | ponowna obsługa akcji | ustawienia aplikacji | TODO |
+| Mapa: „Moja lokalizacja” | brak crasha, mapa nadal działa | ponowna obsługa akcji | ustawienia aplikacji | TODO |
+| Dodawanie miejsca | formularz pozostaje dostępny | ponowna obsługa akcji | ustawienia aplikacji | TODO |
+| Korekta lokalizacji | dialog pozostaje stabilny | ponowna obsługa akcji | ustawienia aplikacji | TODO |
 
-## Kontrole statyczne w repo
+Dodatkowe scenariusze:
 
-Na 2026-07-02 manifest deklaruje:
+| Scenariusz | Oczekiwany wynik | Wynik |
+| --- | --- | --- |
+| Allow approximate | funkcje lokalizacji działają bez wymagania precise | TODO |
+| Allow precise | mapa, Start, Lista i formularz używają dokładnej lokalizacji | TODO |
+| Uprawnienie nadane, GPS wyłączony | aplikacja proponuje włączenie usługi lokalizacji | TODO |
+| Powrót z ustawień po nadaniu zgody | ekran odświeża stan i pozwala wykonać akcję | TODO |
+| Brak lokalizacji | główne ekrany działają w trybie ograniczonym | TODO |
 
-- `INTERNET`
-- `ACCESS_NETWORK_STATE`
-- `ACCESS_FINE_LOCATION`
-- `ACCESS_COARSE_LOCATION`
-- `CAMERA`
-- `POST_NOTIFICATIONS`
+## Kamera
 
-Manifest nie deklaruje:
+| Scenariusz | Oczekiwany wynik | Wynik |
+| --- | --- | --- |
+| Allow | aparat otwiera się, a zdjęcie wraca do formularza | TODO |
+| Deny | brak crasha, Photo Picker nadal działa | TODO |
+| Kolejna odmowa | akcja nie staje się martwa | TODO |
+| Trwała odmowa | aplikacja otwiera ustawienia aplikacji | TODO |
+| Powrót z ustawień | po nadaniu zgody aparat działa | TODO |
 
-- `ACCESS_BACKGROUND_LOCATION`
-- `READ_MEDIA_IMAGES`
-- `READ_EXTERNAL_STORAGE`
-- `QUERY_ALL_PACKAGES`
+Sprawdź wszystkie miejsca używające aparatu: dodawanie miejsca, zdjęcie miejsca, opinia i avatar, jeżeli dany ekran udostępnia kamerę.
 
-Flow zdjec w kodzie uzywa `ActivityResultContracts.PickVisualMedia` albo
-`ActivityResultContracts.PickMultipleVisualMedia`, a kamera ma osobne
-runtime permission `CAMERA`.
+## Photo Picker
 
-## Szablon komentarza do issue
+| Obszar | Oczekiwany wynik | Wynik |
+| --- | --- | --- |
+| Avatar | systemowy picker bez szerokiej zgody do galerii | TODO |
+| Zdjęcia miejsca | wybór jednego lub wielu zdjęć bez `READ_MEDIA_IMAGES` | TODO |
+| Zdjęcia opinii | wybór zdjęć bez `READ_MEDIA_IMAGES` | TODO |
+| Szczegóły miejsca | wybór zdjęcia bez szerokiej zgody | TODO |
+| Brak zgody na kamerę | wybór zdjęć nadal działa | TODO |
 
-Wynik dopisz do #274 i #303:
+## Powiadomienia
+
+| Scenariusz | Oczekiwany wynik | Wynik |
+| --- | --- | --- |
+| Allow na Androidzie 13+ | powiadomienia mogą być dostarczane | TODO |
+| Deny na Androidzie 13+ | aplikacja działa bez powiadomień | TODO |
+| Ponowne uruchomienie | brak niepotrzebnej pętli dialogów | TODO |
+
+## Kontrole statyczne
+
+Manifest powinien deklarować:
+
+- `INTERNET`,
+- `ACCESS_NETWORK_STATE`,
+- `ACCESS_FINE_LOCATION`,
+- `ACCESS_COARSE_LOCATION`,
+- `CAMERA`,
+- `POST_NOTIFICATIONS`.
+
+Manifest nie powinien deklarować:
+
+- `ACCESS_BACKGROUND_LOCATION`,
+- `READ_MEDIA_IMAGES`,
+- `READ_EXTERNAL_STORAGE`,
+- `QUERY_ALL_PACKAGES`.
+
+Flow zdjęć powinien używać `PickVisualMedia` albo `PickMultipleVisualMedia`, a kamera osobnego runtime permission `CAMERA`.
+
+## Szablon wyniku
 
 ```markdown
 ## Manual gate result
@@ -93,7 +111,7 @@ Wynik dopisz do #274 i #303:
 - Data:
 - Tester:
 - Commit / build:
-- Urzadzenie:
+- Urządzenie:
 - Android:
 - Wynik: PASS / FAIL / BLOCKED
 
@@ -102,14 +120,13 @@ Wynik dopisz do #274 i #303:
 - Kamera: PASS / FAIL / BLOCKED
 - Powiadomienia: PASS / FAIL / BLOCKED
 - Photo Picker: PASS / FAIL / BLOCKED
-- Dzialanie bez odmowionych uprawnien: PASS / FAIL / BLOCKED
+- Powrót z ustawień aplikacji: PASS / FAIL / BLOCKED
 
 ### Dowody
-- screenshot/log/link:
+- screenshot / nagranie / log / link:
 
 ### Follow-up issue
 - brak / #...
 ```
 
-Nie zamykac #274 ani #303 z wynikiem `FAIL` lub `BLOCKED`, chyba ze kazdy
-problem ma osobne follow-up issue.
+Nie zamykaj #274 ani #303 z wynikiem `FAIL` lub `BLOCKED`, dopóki każdy problem nie ma osobnego follow-up issue.

@@ -1,5 +1,10 @@
 import Mailer from "nodemailer/lib/mailer";
 
+/**
+ * 🎯 Cel: Funkcje pomocnicze dla operacji administracyjnych i powiadomień.
+ * ✅ Gwarancje: Bezpieczne formatowanie HTML, mapowanie technicznych kodów na czytelne etykiety.
+ */
+
 export type HttpRequestHeaders = {
   authorization?: string | string[];
 };

@@ -16,6 +16,20 @@ import com.google.firebase.messaging.RemoteMessage
 import com.kidzone.MainActivity
 import com.kidzone.R
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Odbieranie i wyświetlanie powiadomień push (Firebase Cloud Messaging).
+ * - Zarządzanie cyklem życia tokenów FCM (rejestracja i usuwanie w Firestore).
+ * - Koordynacja Deep Linków z powiadomień do odpowiednich ekranów aplikacji.
+ *
+ * 🛡️ Bezpieczeństwo i Prywatność:
+ * - Tokeny FCM są przechowywane wyłącznie w dokumentach prywatnych użytkownika (`private/messaging`).
+ * - Przesyłane dane powiadomień ograniczają się do technicznych identyfikatorów.
+ *
+ * ✅ Gwarancje:
+ * - Wyświetlanie powiadomień z wysokim priorytetem (NotificationChannel.IMPORTANCE_HIGH).
+ * - Trwałość Deep Linków (zapis do SharedPreferences) zapobiegająca ich utracie przy zimnym starcie aplikacji.
+ */
 class KidZoneMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {

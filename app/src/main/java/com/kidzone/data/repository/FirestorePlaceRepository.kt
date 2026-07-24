@@ -7,7 +7,6 @@ import com.kidzone.data.local.PlaceDao
 import com.kidzone.data.local.PlaceEntity
 import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.PlaceDto
-import com.kidzone.di.ApplicationScope
 import com.kidzone.domain.model.PagedResult
 import com.kidzone.domain.model.GeoBounds
 import com.kidzone.domain.model.Place
@@ -20,10 +19,9 @@ import com.kidzone.utils.OpResult
 import com.kidzone.utils.RepositoryException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeoutException
@@ -31,6 +29,16 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.*
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Implementacja [PlaceRepository] integrująca Firestore z lokalnym cache Room.
+ * - Obsługa zaawansowanych zapytań przestrzennych z wykorzystaniem geohashy.
+ * - Zarządzanie kolejką synchronizacji operacji modyfikujących.
+ *
+ * ⚙️ Techniczne:
+ * - Wykorzystuje ConcurrentHashMap do cache'owania wyników zapytań o geohashe.
+ * - Implementuje logikę "server-wins" poprzez transakcje przy aktualizacji zdjęć.
+ */
 @Singleton
 class FirestorePlaceRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
@@ -40,7 +48,6 @@ class FirestorePlaceRepository @Inject constructor(
 ) : PlaceRepository {
 
     companion object {
-        private const val PAGE_SIZE_SNAPSHOT = 20
         private const val OWNER_PLACES_LIMIT = 100
         private const val GEO_QUERY_LIMIT = 1500
         private const val MAP_GEOHASH_PREFIX_LIMIT = 9 // 3x3 grid (much faster loading)
@@ -312,22 +319,12 @@ class FirestorePlaceRepository @Inject constructor(
         }
 
         val completed = withTimeoutOrNull(AppConfig.WRITE_TIMEOUT_MS) {
-            /*
-             * Filtrujemy po reporterId, ponieważ reguły Firestore pozwalają
-             * użytkownikowi czytać tylko dokumenty, w których:
-             *
-             * resource.data.reporterId == request.auth.uid
-             */
             val existingRequests = firestore
                 .collection(FirestoreCollections.PLACE_CHANGE_REQUESTS)
                 .whereEqualTo("reporterId", requesterId)
                 .get()
                 .await()
 
-            /*
-             * Pozostałe warunki sprawdzamy lokalnie.
-             * Dzięki temu nie potrzebujemy rozbudowanego indeksu Firestore.
-             */
             val duplicateExists = existingRequests.documents.any { document ->
                 val existingPlaceId = document.getString("placeId")
                 val existingType = document.getString("type")

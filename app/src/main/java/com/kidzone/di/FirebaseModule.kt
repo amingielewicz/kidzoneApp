@@ -18,7 +18,11 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Dostarcza singletony klientów Firebase do reszty grafu DI.
+ * 🎯 Odpowiedzialności:
+ * - Dostarczanie oficjalnych klientów SDK Firebase (Auth, Firestore, Storage, Analytics, Functions).
+ *
+ * ✅ Gwarancje:
+ * - Singletony dla wszystkich usług, co zapewnia spójność sesji i cache'owania.
  */
 @Module
 @InstallIn(SingletonComponent::class)

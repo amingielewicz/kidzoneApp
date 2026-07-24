@@ -6,10 +6,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Tracks app cold start from Application.onCreate to the first Compose content.
+ * 🎯 Odpowiedzialności:
+ * - Pomiar czasu pełnego uruchomienia aplikacji (Cold Start).
+ * - Śledzenie przejścia od `Application.onCreate` do pierwszego wyrenderowania treści w Compose.
  *
- * The controller is intentionally idempotent because activity recreation,
- * warm starts, or test harnesses can call the lifecycle hooks more than once.
+ * ✅ Gwarancje:
+ * - Idempotentność: pomiar wykonywany jest tylko raz na proces (odporność na Activity recreation).
+ * - Minimalny narzut na czas startu głównego wątku.
  */
 @Singleton
 class ColdStartTrace @Inject constructor(

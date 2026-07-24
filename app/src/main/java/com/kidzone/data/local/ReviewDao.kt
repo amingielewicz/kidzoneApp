@@ -7,11 +7,16 @@ import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
 /**
- * DAO dla tabeli `reviews` – offline cache opinii.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie lokalnym cache'em opinii użytkowników.
+ * - Udostępnianie reaktywnych strumieni opinii dla konkretnych miejsc i profilu użytkownika.
  *
- * Strategia: Firestore jest source-of-truth, Room to read-cache.
- * Snapshot listener z Firestore upsertuje dane do Room; UI obserwuje
- * Room Flow, dzięki czemu ma natychmiastowy dostęp offline.
+ * 🔌 Strategia Cache:
+ * - Read-Cache zasilany przez Snapshot Listeners z Firestore.
+ * - Pełne wsparcie dla pracy w trybie offline.
+ *
+ * ✅ Gwarancje:
+ * - Automatyczne odświeżanie UI po pobraniu nowych opinii w tle.
  */
 @Dao
 interface ReviewDao {

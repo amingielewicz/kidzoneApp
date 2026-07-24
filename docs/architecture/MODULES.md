@@ -1,12 +1,14 @@
 # Modules
 
+Ostatnia aktualizacja: 2026-07-13
+
 ## Cel
 
-Dokument opisuje logiczny podział projektu KidZone na moduły i pakiety oraz odpowiedzialności każdego obszaru kodu.
+Dokument opisuje aktualny logiczny podział kidZone na warstwy i pakiety oraz zasady rozwoju bez nadmiernego sprzężenia.
 
 ## Aktualny model
 
-Projekt Android jest obecnie utrzymywany jako aplikacja z logicznym podziałem pakietów.
+Projekt jest obecnie pojedynczym modułem Android z logicznym podziałem pakietów:
 
 ```text
 app/
@@ -16,108 +18,96 @@ app/
     data/
     di/
     navigation/
-    utils/
     analytics/
     messaging/
     experiment/
     logging/
+    utils/
 ```
 
 ## presentation
 
-Odpowiada za UI.
-
 Zawiera:
 
 - ekrany Compose,
-- ViewModele,
-- UI state,
+- ViewModel,
+- `UiState` i eventy,
 - komponenty wspólne,
 - obsługę akcji użytkownika.
 
-Nie powinno zawierać:
-
-- bezpośrednich wywołań Firebase,
-- logiki Storage,
-- zapytań SQL/Room,
-- ciężkiej logiki domenowej.
+Nie zawiera bezpośrednich operacji Firebase, Room ani Storage.
 
 ## domain
-
-Odpowiada za reguły biznesowe.
 
 Zawiera:
 
 - modele domenowe,
+- use case'y,
 - interfejsy repozytoriów,
-- use case,
-- interfejsy usług domenowych.
+- porty funkcji platformowych,
+- reguły biznesowe i kontrolowane wyniki.
 
-Nie powinno zależeć od:
-
-- Android SDK,
-- Compose,
-- Firebase,
-- Room,
-- Hilt.
+Nie zależy od Android SDK, Compose, Firebase, Room ani Hilt.
 
 ## data
-
-Odpowiada za dane i integracje.
 
 Zawiera:
 
 - implementacje repozytoriów,
-- DTO,
-- encje Room,
-- DAO,
-- mappery,
-- Remote Config,
-- Firebase integrations.
+- DTO, Entity i mappery,
+- DAO i Room,
+- integracje Firebase,
+- cache, synchronizację i retry,
+- Remote Config.
 
 ## di
 
-Odpowiada za Hilt i składanie zależności.
+Odpowiada za składanie zależności przez Hilt:
 
-Zawiera:
-
-- moduły Hilt,
 - bindy interfejsów,
-- provider methods.
+- provider methods,
+- scope'y,
+- konfigurację implementacji platformowych.
 
 ## navigation
-
-Odpowiada za routing aplikacji.
 
 Zawiera:
 
 - definicje tras,
 - NavGraph,
 - deep linki,
-- argumenty ekranów.
+- argumenty ekranów,
+- zasady czyszczenia back stack po auth i account deletion.
+
+## analytics, logging i messaging
+
+Te pakiety powinny zawierać wyłącznie bezpieczne adaptery techniczne. Nie mogą przyjmować surowych danych użytkownika ani modeli UI.
 
 ## utils
 
-Zawiera pomocnicze narzędzia techniczne.
+`utils` nie może być katalogiem na kod bez właściciela. Dozwolone są małe, niezależne narzędzia, na przykład walidatory i helpery tekstowe. Logika domenowa, telemetryczna i platformowa trafia do właściwego pakietu.
 
-Dozwolone:
+## Wspólne komponenty
 
-- mapowanie błędów,
-- helpery tekstowe,
-- walidatory,
-- utility niezależne od UI.
+Kod współdzielony powinien mieć jasno określoną odpowiedzialność. Przykłady:
 
-Nie powinno stać się śmietnikiem. Jeśli klasa ma właściciela domenowego, powinna trafić do właściwego pakietu feature albo warstwy.
+- `CategoryBadge` dla spójnej prezentacji kategorii,
+- wspólny handler uprawnień lokalizacji i kamery,
+- mappery błędów,
+- komponenty formularzy i stanów loading/empty/error.
 
-## Możliwy przyszły podział na moduły Gradle
+Nie kopiujemy tego samego flow między ekranami.
 
-Docelowo projekt można rozdzielić na moduły:
+## Przyszła modularyzacja Gradle
+
+Możliwy kierunek:
 
 ```text
 :app
 :core:domain
 :core:data
 :core:ui
+:core:platform
 :feature:auth
 :feature:map
 :feature:places
@@ -125,12 +115,15 @@ Docelowo projekt można rozdzielić na moduły:
 :feature:ranking
 ```
 
-Taki podział warto robić dopiero wtedy, gdy projekt zacznie realnie cierpieć przez czas buildu, konflikty w kodzie albo zbyt szerokie zależności.
+Modularyzację wykonujemy dopiero przy realnym problemie z czasem buildu, ownership, zależnościami lub konfliktami w kodzie.
 
-## Checklist PR
+## Checklista PR
 
-- [ ] Nowy kod trafia do właściwego pakietu.
-- [ ] Klasa ma jedną odpowiedzialność.
-- [ ] `utils` nie dostaje logiki biznesowej.
-- [ ] `domain` pozostaje niezależny od frameworków.
-- [ ] Feature nie miesza UI, danych i logiki biznesowej w jednej klasie.
+- [ ] nowy kod trafia do właściwego pakietu,
+- [ ] klasa ma jedną odpowiedzialność,
+- [ ] `utils` nie zawiera logiki biznesowej,
+- [ ] Domain pozostaje niezależny,
+- [ ] UI, dane i logika nie są zmieszane,
+- [ ] wspólna logika nie jest duplikowana,
+- [ ] telemetryczne adaptery nie przyjmują PII,
+- [ ] zależność między pakietami jest zgodna z architekturą.

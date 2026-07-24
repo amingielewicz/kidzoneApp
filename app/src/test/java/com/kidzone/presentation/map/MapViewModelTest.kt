@@ -25,6 +25,21 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 
+/**
+ * 🧪 Cel testu:
+ * - Weryfikacja reaktywnego ładowania miejsc na mapie przez [MapViewModel].
+ * - Sprawdzenie poprawności filtrowania i optymalizacji zapytań (Viewport cache).
+ *
+ * 🛠️ Środowisko:
+ * - Mockowanie warstwy danych ([PlaceRepository], [AuthRepository]).
+ * - [MainDispatcherRule] do kontroli wirtualnego czasu (debounce).
+ *
+ * 🔍 Scenariusze:
+ * - Ładowanie miejsc dla danych granic geograficznych.
+ * - Efektywność cache'owania granic (brak powtórnych zapytań dla podobnych obszarów).
+ * - Działanie filtrów kategorii i "tylko moje miejsca".
+ * - Obsługa błędów pobierania z Firestore.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MapViewModelTest {
 

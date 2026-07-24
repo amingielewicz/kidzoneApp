@@ -24,6 +24,20 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 
+/**
+ * 🧪 Cel testu:
+ * - Weryfikacja procesu rejestracji nowego użytkownika przez [RegisterViewModel].
+ * - Sprawdzenie lokalnej walidacji formularza i obsługi błędów z backendu.
+ *
+ * 🛠️ Środowisko:
+ * - Mockowanie warstwy autoryzacji ([AuthRepository]).
+ * - [MainDispatcherRule] dla deterministycznych testów asynchronicznych.
+ *
+ * 🔍 Scenariusze:
+ * - Poprawna rejestracja konta.
+ * - Walidacja zbyt krótkich nazw i słabych haseł.
+ * - Obsługa konfliktów (zajęty email lub nazwa użytkownika).
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RegisterViewModelTest {
 

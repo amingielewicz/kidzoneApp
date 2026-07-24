@@ -17,10 +17,12 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Hilt module binding domain service interfaces to their Android implementations.
+ * 🎯 Odpowiedzialności:
+ * - Wiązanie (binding) abstrakcji usług domenowych z ich konkretnymi implementacjami platformowymi (Android).
+ * - Izolacja ViewModeli od zależności [Context], co ułatwia testowanie jednostkowe.
  *
- * These abstractions decouple ViewModels from Android Context, enabling
- * straightforward unit testing with MockK/fakes.
+ * ✅ Gwarancje:
+ * - Singletony dla wszystkich dostawców usług systemowych (Lokalizacja, Kompresja, Preferencje).
  */
 @Module
 @InstallIn(SingletonComponent::class)

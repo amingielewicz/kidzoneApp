@@ -2,6 +2,10 @@ package com.kidzone.presentation.common
 
 import com.kidzone.domain.model.Amenity
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Mapowanie technicznych kodów udogodnień ([Amenity]) na ich reprezentacje wizualne (Emoji/Ikony).
+ */
 @Suppress("CyclomaticComplexMethod")
 fun amenityIcon(amenity: Amenity): String = when (amenity) {
     Amenity.FENCED -> "🛡"

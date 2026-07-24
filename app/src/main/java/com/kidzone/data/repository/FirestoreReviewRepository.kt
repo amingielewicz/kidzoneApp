@@ -24,7 +24,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Implementacja [ReviewRepository] oparta o Firestore + Room cache.
+ * 🎯 Odpowiedzialności:
+ * - Implementacja [ReviewRepository] oparta o Firestore + Room cache.
+ * - Reaktywna obserwacja opinii dla miejsc i konkretnych użytkowników.
+ * - Zarządzanie synchronizacją i usuwaniem opinii.
+ *
+ * 🔌 Strategia Cache:
+ * - Wykorzystuje [ReviewDao] do udostępniania danych w trybie offline.
  */
 @Singleton
 class FirestoreReviewRepository @Inject constructor(

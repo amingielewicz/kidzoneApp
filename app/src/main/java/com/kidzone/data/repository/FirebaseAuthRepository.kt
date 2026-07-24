@@ -24,6 +24,7 @@ import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.SignInProvider
 import com.kidzone.utils.AuthException
+import com.kidzone.utils.DateUtils
 import com.kidzone.utils.OpResult
 import com.kidzone.widget.NearbyPlacesWidget
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -41,18 +42,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Implementacja [AuthRepository] oparta o Firebase Authentication + Firestore.
+ * 🎯 Odpowiedzialności:
+ * - Implementacja [AuthRepository] oparta o Firebase Authentication + Firestore.
+ * - Zarządzanie cyklem życia sesji oraz synchronizacja dokumentu profilu.
+ * - Obsługa wylogowania offline i czyszczenia tokenów FCM.
  *
- *  - logowanie i rejestracja e-mail/haslo,
- *  - logowanie Google przez Google Sign-In (token przekazywany z UI),
- *  - reset hasla e-mailem,
- *  - obserwacja aktualnie zalogowanego uzytkownika,
- *  - odczyt publicznych danych innych uzytkownikow (autor miejsca itp.).
- *
- * Po pomyslnej rejestracji tworzymy dokument w kolekcji `users`
- * (zob. [FirestoreCollections.USERS]), zeby reszta aplikacji mogla go
- * bogato odczytywac (avatar, statystyki) bez polegania wylacznie na
- * FirebaseUser.
+ * ⚙️ Techniczne:
+ * - Mapuje kody błędów Firebase na domyślne wyjątki [AuthException].
+ * - Tworzy dokument w kolekcji `users` po pomyślnej rejestracji.
  */
 @Suppress("LargeClass")
 @Singleton

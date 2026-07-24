@@ -17,6 +17,21 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
+/**
+ * 🧪 Cel testu:
+ * - Weryfikacja procesu synchronizacji lokalnej kolejki zapisów (Offline write queue).
+ * - Sprawdzenie logiki rozwiązywania konfliktów (Server-wins).
+ *
+ * 🛠️ Środowisko:
+ * - Mockowanie warstwy danych ([PlaceRepository], [ReviewRepository]) oraz bazy Room ([PendingOperationDao]).
+ * - Wykorzystanie [runTest] do weryfikacji operacji asynchronicznych wewnątrz [SyncWorker].
+ *
+ * 🔍 Scenariusze:
+ * - Przetwarzanie operacji typu ADD (dodawanie miejsc i opinii).
+ * - Proces rozwiązywania konfliktów dla operacji UPDATE (porównywanie timestampów).
+ * - Mechanizm ponowień (Retries) i przenoszenie do kolejki "Dead Letter" po wyczerpaniu limitu.
+ * - Zachowanie przy braku sieci lub błędach serwera.
+ */
 class SyncWorkerTest {
 
     private lateinit var pendingOperationDao: PendingOperationDao

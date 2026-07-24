@@ -1,21 +1,51 @@
 # kidZone documentation
 
-This directory contains architecture, Android, backend, Firebase, release, QA, security, legal and
-product documentation for kidZone.
+Ostatnia aktualizacja: 2026-07-14
+
+Centralny indeks dokumentacji technicznej, produktowej, QA, bezpieczeństwa i procesu wydawniczego projektu kidZone.
+
+## Start tutaj
+
+- [Główny README projektu](../README.md)
+- [Zasady współpracy](../CONTRIBUTING.md)
+- [Architektura systemu](architecture/ARCHITECTURE.md)
+- [Przepływ danych](architecture/DATA_FLOW.md)
+- [Przepływ ekranów Android](android/SCREEN_FLOW.md)
+- [Strategia testów](qa/testing-strategy.md)
+- [Plan testów release](testing/TEST_PLAN.md)
+- [Manualny plan testów release](qa/manual-release-test-plan.md)
+- [Proces wydania](release/RELEASE_PROCESS.md)
+- [Publikacja w Google Play](release/PLAY_STORE_RELEASE.md)
+- [Bezpieczeństwo](security.md)
 
 ## Architecture
 
-- [System architecture](architecture/ARCHITECTURE.md)
+- [Architecture overview](architecture/ARCHITECTURE.md)
+- [Clean Architecture](architecture/CLEAN_ARCHITECTURE.md)
+- [Modules](architecture/MODULES.md)
+- [Dependency rules](architecture/DEPENDENCY_RULES.md)
 - [Data flow](architecture/DATA_FLOW.md)
+- [State management](architecture/STATE_MANAGEMENT.md)
+- [Error handling](architecture/ERROR_HANDLING.md)
+- [Observability](architecture/OBSERVABILITY.md)
 - [Firebase architecture](architecture/FIREBASE.md)
 - [Maps architecture](architecture/MAPS.md)
 
+## Architecture Decision Records
+
+- [ADR-001: Clean Architecture](architecture/ADR/ADR-001-clean-architecture.md)
+- [ADR-002: Compose Navigation](architecture/ADR/ADR-002-compose-navigation.md)
+- [ADR-003: Firebase](architecture/ADR/ADR-003-firebase.md)
+- [ADR-004: StateFlow](architecture/ADR/ADR-004-stateflow.md)
+- [ADR-005: Offline strategy](architecture/ADR/ADR-005-offline-strategy.md)
+
 ## Android
 
-- [Offline mode architecture and implementation](android/OFFLINE_MODE.md)
+- [Offline mode](android/OFFLINE_MODE.md)
 - [Navigation](android/NAVIGATION.md)
 - [Screen flow](android/SCREEN_FLOW.md)
 - [ViewModel guide](android/VIEWMODEL_GUIDE.md)
+- [Android permissions and Google Play compliance](legal/android-permissions-play-compliance.md)
 
 ## Firebase and API
 
@@ -44,42 +74,29 @@ product documentation for kidZone.
 - [UI checklist](product/UI_CHECKLIST.md)
 - [UX checklist](product/UX_CHECKLIST.md)
 
-## Architecture
+## QA and testing
 
-- [Architecture overview](architecture/ARCHITECTURE.md)
-- [Clean Architecture](architecture/CLEAN_ARCHITECTURE.md)
-- [Modules](architecture/MODULES.md)
-- [Dependency rules](architecture/DEPENDENCY_RULES.md)
-- [Data flow](architecture/DATA_FLOW.md)
-- [State management](architecture/STATE_MANAGEMENT.md)
-- [Error handling](architecture/ERROR_HANDLING.md)
-- [Observability](architecture/OBSERVABILITY.md)
-
-## Architecture Decision Records
-
-- [ADR-001: Clean Architecture](architecture/ADR/ADR-001-clean-architecture.md)
-- [ADR-002: Compose Navigation](architecture/ADR/ADR-002-compose-navigation.md)
-- [ADR-003: Firebase](architecture/ADR/ADR-003-firebase.md)
-- [ADR-004: StateFlow](architecture/ADR/ADR-004-stateflow.md)
-- [ADR-005: Offline strategy](architecture/ADR/ADR-005-offline-strategy.md)
-
-## Release and QA
-
-- [Release process](release.md)
-- [Detailed release process](release/RELEASE_PROCESS.md)
-- [Go/No-Go checklist](release/GO_NO_GO_CHECKLIST.md)
-- [Hotfix process](release/HOTFIX_PROCESS.md)
-- [Play Store release guide](release/PLAY_STORE_RELEASE.md)
-- [Release notes template](release/RELEASE_NOTES_TEMPLATE.md)
-- [Versioning guide](release/VERSIONING.md)
 - [Testing strategy](qa/testing-strategy.md)
 - [Manual release test plan](qa/manual-release-test-plan.md)
+- [Android permissions device matrix](qa/android-permissions-device-matrix.md)
 - [Google Play security checklist](qa/google-play-security-checklist.md)
 - [Widget privacy checklist](qa/widget-privacy-checklist.md)
+- [Accessibility and TalkBack checklist](qa/accessibility-talkback-checklist.md)
+- [Performance and load checklist](qa/performance-test-checklist.md)
 - [Test strategy](testing/TEST_STRATEGY.md)
 - [Test plan](testing/TEST_PLAN.md)
 - [Smoke tests](testing/SMOKE_TESTS.md)
 - [Regression testing](testing/REGRESSION.md)
+
+## Release
+
+- [Release overview](release.md)
+- [Detailed release process](release/RELEASE_PROCESS.md)
+- [Play Store release guide](release/PLAY_STORE_RELEASE.md)
+- [Go/No-Go checklist](release/GO_NO_GO_CHECKLIST.md)
+- [Hotfix process](release/HOTFIX_PROCESS.md)
+- [Release notes template](release/RELEASE_NOTES_TEMPLATE.md)
+- [Versioning guide](release/VERSIONING.md)
 
 ## Accessibility
 
@@ -93,11 +110,32 @@ product documentation for kidZone.
 - [Firebase operations](operations/FIREBASE_OPERATIONS.md)
 - [Incident response](operations/INCIDENT_RESPONSE.md)
 - [Backups](operations/BACKUPS.md)
+- [Firebase cost alerts](firebase-cost-alerts.md)
 
 ## Security and compliance
 
 - [Security overview](security.md)
 - [Firebase security plan](firebase-security-plan.md)
+- [Abuse and rate limiting](abuse-rate-limiting.md)
 - [App Check](app-check.md)
 - [Android permissions and Google Play compliance](legal/android-permissions-play-compliance.md)
+- [Account deletion test checklist](legal/account-deletion-test-checklist.md)
+- [Google Play legal review](legal/google-play-legal-review.md)
 - [Google Play Data Safety draft](legal/google-play-data-safety-draft.md)
+- [v1.0.0 manual release gates](legal/v1-release-manual-gates.md)
+
+## Historical audits
+
+- [Detekt security review — historical snapshot](audits/detekt-security-review.md)
+
+Dokumenty w `docs/audits/` są zapisami stanu z określonego dnia. Nie zastępują aktualnych przewodników ani ponownego uruchomienia narzędzi na bieżącym commicie.
+
+## Zasady utrzymania dokumentacji
+
+- Aktualizuj dokument razem ze zmianą kodu, której dotyczy.
+- Nie duplikuj instrukcji w kilku plikach. Wstaw odnośnik do dokumentu źródłowego.
+- Dodawaj nowe dokumenty do tego indeksu.
+- Dla procesów release, bezpieczeństwa i zgodności podawaj datę ostatniej aktualizacji.
+- Odróżniaj aktualne zachowanie od planowanego.
+- Audyty historyczne oznaczaj datą, statusem i bieżącym dokumentem źródłowym.
+- Nazwy klas, ścieżki i komendy zapisuj w backtickach.

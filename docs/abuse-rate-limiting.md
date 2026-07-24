@@ -1,131 +1,172 @@
 # Abuse and rate limiting strategy
 
-Powiazane issue: #281
+Powiązane issue: #281
+
+Ostatnia aktualizacja: 2026-07-13
 
 ## Cel
 
-Ten dokument opisuje strategię MVP dla ograniczania spamu, nadużyć i kosztów
-przy treściach tworzonych przez użytkowników w kidZone.
+Strategia ograniczania spamu, automatyzacji, nadużyć i niekontrolowanych kosztów w kidZone.
 
-Firestore Rules i Storage Rules chronią integralność danych, ale nie są pełnym
-systemem rate limitingu. Limity czasowe, liczniki dzienne i wykrywanie anomalii
-powinny być egzekwowane przez backend, Cloud Functions albo dedykowane procesy
-operacyjne.
+Firestore Rules i Storage Rules chronią integralność danych, ale nie zastępują rate limitingu, detekcji anomalii ani moderacji.
 
 ## Obszary ryzyka
 
-- `places`: spam miejscami i fałszywe lokalizacje.
-- `reviews`: spam opiniami i manipulacja ocenami.
-- `place_reports`, `review_reports`, `photo_reports`: zalew panelu admina.
-- `place_change_requests`: spam zmianami danych miejsca.
-- Storage uploads: koszty transferu i przechowywania.
-- `users/{uid}/private/messaging`: nadmiarowe zapisy tokenów FCM.
+- spam miejscami i fałszywe lokalizacje,
+- spam opiniami i manipulacja ocenami,
+- zalew zgłoszeń i propozycji zmian,
+- masowe uploady zdjęć,
+- nadmiarowe tokeny FCM,
+- automatyzacja callable functions,
+- nadużycia deep linków i powiadomień,
+- kosztowne zapytania mapy, listy i rankingu.
 
-## Limity MVP
+## Limity startowe
 
-Rekomendowane limity startowe per użytkownik:
+Wartości są punktem wyjścia i wymagają walidacji po testach beta.
 
-| Obszar | Limit MVP | Egzekucja |
+| Obszar | Limit startowy | Główna egzekucja |
 | --- | ---: | --- |
-| Nowe miejsca | 10 dziennie | Cloud Function / backend |
-| Opinie | 30 dziennie | Cloud Function / backend |
-| Zgłoszenia | 50 dziennie | Cloud Function / backend |
-| Zdjęcia miejsc i opinii | 40 dziennie | Cloud Function / backend + Storage Rules |
-| Avatar | 10 zmian dziennie | Cloud Function / backend + Storage Rules |
-| Rozmiar zdjęcia miejsca/opinii | < 10 MB | Storage Rules |
-| Rozmiar avatara | < 5 MB | Storage Rules |
+| nowe miejsca | 10 dziennie | backend / Cloud Functions |
+| opinie | 30 dziennie | backend / Cloud Functions |
+| zgłoszenia | 50 dziennie | backend / Cloud Functions |
+| propozycje zmian | 30 dziennie | backend / Cloud Functions |
+| zdjęcia miejsc i opinii | 40 dziennie | backend + Storage Rules |
+| zmiana avatara | 10 dziennie | backend + Storage Rules |
+| zdjęcie miejsca/opinii | poniżej 10 MB | Storage Rules |
+| avatar | poniżej 5 MB | Storage Rules |
 
-Limity powinny być traktowane jako wartości początkowe. Po testach beta należy
-porównać je z realnym użyciem i dostosować, żeby nie blokować aktywnych,
-uczciwych użytkowników.
+Limity mogą być ostrzejsze dla nowych kont, niezweryfikowanych klientów lub wykrytych anomalii, ale nie powinny blokować normalnego użycia bez czytelnego komunikatu.
 
-## Co egzekwują reguły Firebase
+## Co egzekwują Rules
 
 Firestore Rules:
 
-- właściciel może tworzyć dane tylko jako własny `uid`,
-- zwykły użytkownik nie może ustawić sobie roli admina,
-- publiczny profil nie może zawierać prywatnych pól,
-- użytkownik nie może zmieniać cudzych miejsc,
-- użytkownik nie może podmienić zdjęć cudzego miejsca,
-- ocena opinii musi być w zakresie `1..5` przy create i update,
-- zgłoszenie musi mieć `reporterId == request.auth.uid`.
+- ownership przez UID,
+- brak samodzielnej eskalacji roli,
+- brak prywatnych pól w publicznym profilu,
+- ochrona cudzych danych,
+- zakres oceny 1–5,
+- chronione pola moderacyjne i agregaty,
+- walidacja typów, długości i dozwolonych pól.
 
 Storage Rules:
 
-- upload jest dozwolony tylko do własnej ścieżki,
-- dopuszczalne są tylko `image/jpeg`, `image/png`, `image/webp`,
-- zdjęcia miejsc i opinii mają limit < 10 MB,
-- avatary mają limit < 5 MB,
-- legacy paths są read-only dla zwykłych użytkowników,
-- owner albo admin może usuwać pliki w ścieżkach właścicielskich.
+- zapis wyłącznie do dozwolonej ścieżki właściciela,
+- dozwolone MIME,
+- maksymalny rozmiar,
+- kontrola usuwania,
+- brak zapisu do legacy paths,
+- operacje administracyjne wyłącznie dla roli zaufanej.
 
-## Czego reguły nie zrobią dobrze
-
-Reguły Firebase nie powinny być jedynym mechanizmem dla:
+## Czego Rules nie rozwiązują
 
 - limitów dziennych i godzinowych,
-- liczników per użytkownik,
-- wykrywania automatyzacji,
-- banów progresywnych,
+- reputacji konta,
+- wykrywania botów,
+- deduplikacji rozproszonych eventów,
+- progresywnych blokad,
 - alertów kosztowych,
-- analizy reputacji konta,
-- moderacji treści.
+- analizy treści,
+- korelacji nadużyć między urządzeniami i kontami.
 
-Te elementy powinny zostać zrobione osobno, najlepiej w Cloud Functions albo
-warstwie backendowej.
+Te mechanizmy należą do backendu, Cloud Functions i procesów operacyjnych.
+
+## Idempotencja i deduplikacja
+
+- każda kosztowna operacja ma klucz deduplikacji,
+- retry nie tworzy drugiego miejsca, opinii, zgłoszenia ani powiadomienia,
+- event backendowy zakłada możliwość ponownego dostarczenia,
+- podwójne kliknięcie jest blokowane w UI i backendzie,
+- częściowy błąd nie może zostać oznaczony jako sukces.
 
 ## App Check
 
-App Check powinien zostać włączony etapami:
+App Check ogranicza ruch z niezaufanych klientów, ale nie zastępuje auth i limitów.
 
-1. Dodać debug tokeny dla urządzeń deweloperskich.
-2. Zweryfikować debug build na Firestore, Storage i Cloud Functions.
-3. Włączyć enforcement najpierw dla Storage albo Firestore na środowisku testowym.
-4. Sprawdzić logowanie, mapę, listę, dodawanie miejsca, opinii i upload zdjęć.
-5. Dopiero potem rozszerzyć enforcement na produkcję.
+Rollout:
 
-Szczegóły są w `docs/app-check.md`.
+1. debug tokeny dla developmentu,
+2. signed release build z Play Integrity,
+3. monitoring poprawnych i niepoprawnych requestów,
+4. enforcement jednej usługi,
+5. smoke test i obserwacja,
+6. stopniowe rozszerzanie.
 
-## Monitoring i reakcja
+Szczegóły: `docs/app-check.md`.
 
-Minimalny monitoring MVP:
+## Monitoring
 
-- alert kosztowy Google Cloud Billing,
-- regularny przegląd wzrostu kolekcji zgłoszeń,
-- regularny przegląd rozmiaru Storage,
-- logowanie odrzuconych operacji po stronie aplikacji bez danych wrażliwych,
-- ręczna możliwość zablokowania użytkownika (`role`, `bannedUntilMillis`).
+Monitorujemy:
 
-Reakcja admina na spam:
+- liczbę operacji na użytkownika i urządzenie,
+- wzrost kolekcji zgłoszeń,
+- liczbę i rozmiar uploadów,
+- błędy `permission-denied` i rate limit,
+- nieważne tokeny FCM,
+- koszty Firestore, Storage, Functions i Maps,
+- nietypowe skoki ruchu,
+- liczbę zablokowanych i odrzuconych operacji.
 
-1. Zidentyfikować konto i typ nadużycia.
-2. Zablokować konto, jeśli nadużycie jest oczywiste.
-3. Usunąć lub ukryć treści.
-4. Sprawdzić powiązane zdjęcia w Storage.
-5. Dodać test regresji albo limit, jeśli nadużycie wykorzystało lukę.
+Logi nie zawierają treści opinii, pełnych e-maili, dokładnej lokalizacji ani tokenów.
 
-## Testy regresji
+## Reakcja progresywna
 
-Testy emulatora dla reguł znajdują się w `tests/firestore-rules`.
+1. Odrzuć operację z czytelnym komunikatem.
+2. Zastosuj krótki cooldown.
+3. Ogranicz wybrane funkcje konta.
+4. Oznacz konto do weryfikacji.
+5. Zablokuj konto przy potwierdzonym nadużyciu.
+6. Usuń lub ukryj szkodliwe treści.
+7. Sprawdź powiązane pliki i eventy.
+8. Dodaj test, limit lub kontrolę zapobiegawczą.
 
-Komenda:
+Każda blokada powinna mieć powód, właściciela decyzji i możliwość audytu.
+
+## UX
+
+- komunikat nie ujawnia szczegółów mechanizmu ochrony,
+- użytkownik wie, kiedy może spróbować ponownie,
+- błąd nie usuwa danych formularza,
+- limit nie jest przedstawiany jako awaria sieci,
+- retry po cooldownie nie tworzy duplikatu.
+
+## Testy
+
+- przekroczenie limitu,
+- równoległe requesty,
+- double submit,
+- retry tego samego eventu,
+- różne konta na jednym urządzeniu,
+- nieważny App Check,
+- cudza ścieżka Storage,
+- za duży plik i zły MIME,
+- użytkownik zablokowany,
+- alert kosztowy i procedura reakcji.
+
+Testy Rules:
 
 ```powershell
 firebase emulators:exec --only firestore,storage "npm --prefix tests/firestore-rules test"
 ```
 
-Alternatywnie, gdy emulatory już działają:
+## Otwarte decyzje
 
-```powershell
-cd tests/firestore-rules
-npm test
-```
+- sposób przechowywania liczników rate limit,
+- limity dla nowych i zaufanych kont,
+- model reputacji,
+- moderacja zdjęć,
+- panel anomalii dla administratora,
+- retencja danych pomocniczych używanych do ochrony przed nadużyciami.
 
-## Otwarte decyzje po MVP
+## Checklista
 
-- Czy limity egzekwować w Cloud Functions przed zapisem, czy przez zadania
-  kontrolne po zapisie.
-- Czy wprowadzić reputację konta i ostrzejsze limity dla nowych użytkowników.
-- Czy zdjęcia użytkowników powinny przechodzić przez kolejkę moderacji.
-- Czy admin panel ma mieć widok anomalii i nadużyć.
+- [ ] limity są egzekwowane po stronie zaufanej,
+- [ ] Rules chronią ownership i pola,
+- [ ] retry jest idempotentne,
+- [ ] App Check ma kontrolowany rollout,
+- [ ] monitoring kosztów i anomalii działa,
+- [ ] logi nie zawierają PII,
+- [ ] komunikaty są czytelne,
+- [ ] blokady mają audyt i powód,
+- [ ] testy negatywne przechodzą.

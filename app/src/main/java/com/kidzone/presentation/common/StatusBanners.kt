@@ -60,6 +60,12 @@ private val GpsAcquiringContainer = Color(0xFF00796B)
 private val GpsAcquiringContent = Color.White
 private val SystemStatusIconColor = Color(0xFF9E9E9E)
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Dostarczanie reaktywnych stanów łączności sieciowej oraz usług lokalizacji.
+ * - Renderowanie banerów informacyjnych o braku sieci lub wyłączonym GPS.
+ * - Zarządzanie cyklem życia odbiorników systemowych (Broadcast Receivers) wewnątrz kompozycji.
+ */
 @Composable
 fun rememberNetworkStatus(): State<NetworkStatus> {
     val context = LocalContext.current

@@ -102,16 +102,11 @@ import com.kidzone.presentation.common.SortMenuIcon
 import com.kidzone.presentation.common.SortMenuOption
 import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.requestLocationPermissionOrOpenSettings
+import com.kidzone.presentation.common.formatDistance
 import com.kidzone.presentation.common.shimmerEffect
 import com.kidzone.presentation.place.add.hasLocationPermission
+import com.kidzone.utils.GeoUtils
 import kotlinx.coroutines.launch
-
-private const val VERY_CLOSE_DISTANCE_KM = 0.05
-private const val METER_DISTANCE_THRESHOLD_KM = 1.0
-private const val METERS_PER_KILOMETER = 1000
-private const val DISTANCE_ROUNDING_OFFSET_METERS = 25
-private const val DISTANCE_ROUNDING_STEP_METERS = 50
-private const val INTEGER_DISTANCE_THRESHOLD_KM = 100.0
 
 @Suppress("unused")
 private val QUICK_AMENITIES = setOf(
@@ -349,8 +344,8 @@ fun PlaceListScreen(
                             PlaceCard(
                                 place = place,
                                 distanceKm = state.userLocation?.let { (lat, lng) ->
-                                    haversineKm(lat, lng, place.latitude, place.longitude)
-                                },
+                GeoUtils.haversineKm(lat, lng, place.latitude, place.longitude)
+            },
                                 showDistance = state.sortOrder == PlaceListViewModel.SortOrder.NEAREST &&
                                         state.userLocation != null,
                                 staleLocationAgeMinutes = state.staleLocationAgeMinutes.takeIf {
@@ -869,36 +864,6 @@ private fun formatDisplayAddress(address: String): String =
     com.kidzone.utils.AddressUtils.formatDisplayAddress(address)
 
 @Composable
-private fun formatDistance(
-    km: Double,
-    staleLocationAgeMinutes: Int? = null
-): String {
-    val veryCloseDistance = stringResource(R.string.very_close_distance)
-    val distance = when {
-        km < VERY_CLOSE_DISTANCE_KM -> veryCloseDistance
-        km < METER_DISTANCE_THRESHOLD_KM -> {
-            val meters = (km * METERS_PER_KILOMETER).toInt()
-            val rounded = (
-                    (meters + DISTANCE_ROUNDING_OFFSET_METERS) /
-                            DISTANCE_ROUNDING_STEP_METERS
-                    ) * DISTANCE_ROUNDING_STEP_METERS
-            if (rounded == 0) veryCloseDistance else stringResource(R.string.distance_m, rounded)
-        }
-
-        km < INTEGER_DISTANCE_THRESHOLD_KM -> stringResource(R.string.distance_km, km)
-        else -> stringResource(R.string.distance_km_integer, km.toInt())
-    }
-
-    return staleLocationAgeMinutes?.let { "$distance (${staleAgeLabel(it)})" } ?: distance
-}
-
-@Composable
-private fun staleAgeLabel(ageMinutes: Int): String = when {
-    ageMinutes <= 1 -> stringResource(R.string.stale_age_one_minute)
-    else -> stringResource(R.string.stale_age_minutes, ageMinutes)
-}
-
-@Composable
 private fun ListDistanceLabel(
     distanceKm: Double,
     staleLocationAgeMinutes: Int?
@@ -932,17 +897,6 @@ private fun Place.ratingAccessibilityLabel(): String = when {
 
     isNewWithoutReviews() -> stringResource(R.string.new_place_no_reviews)
     else -> stringResource(R.string.map_no_reviews)
-}
-
-private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-    val r = 6371.0
-    val dLat = Math.toRadians(lat2 - lat1)
-    val dLon = Math.toRadians(lon2 - lon1)
-    val a = kotlin.math.sin(dLat / 2).let { it * it } +
-            kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
-            kotlin.math.sin(dLon / 2).let { it * it }
-    val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
-    return r * c
 }
 
 @Composable

@@ -7,6 +7,21 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 
+/**
+ * 🧪 Cel testu:
+ * - Weryfikacja reguł normalizacji tekstu wpisywanego przez użytkownika.
+ * - Sprawdzenie poprawności kapitalizacji dla specyficznych przypadków języka polskiego i nazw własnych.
+ *
+ * 🛠️ Środowisko:
+ * - Czyste testy jednostkowe (Pure Kotlin).
+ * - Testy parametryzowane ([ParameterizedTest]) dla szerokiego zestawu danych wejściowych.
+ *
+ * 🔍 Scenariusze:
+ * - Przekształcanie tekstu do formatu "Title Case" (np. nazwy ulic, miejsc).
+ * - Obsługa specyficznych nazwisk i marek (Mc, O').
+ * - Przekształcanie do formatu "Sentence case" (opisy).
+ * - Usuwanie nadmiarowych białych znaków (trim, collapse whitespace).
+ */
 class TextNormalizationTest {
 
     @Nested

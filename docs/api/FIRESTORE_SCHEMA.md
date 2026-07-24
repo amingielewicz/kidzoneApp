@@ -1,23 +1,27 @@
 # Firestore Schema
 
+Ostatnia aktualizacja: 2026-07-13
+
 ## Cel
 
-Dokument opisuje główne kolekcje Firestore używane przez KidZone, ich odpowiedzialności oraz zasady modelowania danych.
+Dokument opisuje główne kolekcje Firestore używane przez kidZone, ich odpowiedzialności, relacje, ownership, pola systemowe i wpływ na prywatność oraz account deletion.
 
 ## Zasady ogólne
 
-- Dokumenty publiczne nie powinny zawierać danych wrażliwych.
-- Dane prywatne użytkownika powinny być oddzielone od publicznego profilu.
-- Listy i rankingi powinny korzystać z pól denormalizowanych.
-- Zapytania muszą mieć limity.
-- Pola używane do sortowania i filtrowania muszą mieć indeksy.
-- Struktura danych powinna wspierać offline cache po stronie aplikacji.
+- dane publiczne i prywatne są rozdzielone,
+- publiczne dokumenty nie zawierają PII,
+- zapytania listowe mają limity i paginację,
+- pola używane do sortowania i filtrowania mają indeksy,
+- pola agregowane są aktualizowane po stronie zaufanej,
+- klient nie może zmieniać ról, statusów moderacji ani liczników,
+- retry zapisów jest idempotentne,
+- schemat wspiera cache Room i kontrolowaną synchronizację.
 
-## Kolekcje główne
+## Główne kolekcje
 
 ```text
-places
 users
+places
 reviews
 reports
 changeRequests
@@ -26,9 +30,69 @@ notifications
 appConfig
 ```
 
-## places
+Dane prywatne użytkownika:
 
-Reprezentuje miejsce przyjazne dzieciom.
+```text
+users/{uid}/private/profile
+users/{uid}/private/messaging
+users/{uid}/private/preferences
+```
+
+## users
+
+Publiczny profil użytkownika.
+
+Przykładowe pola:
+
+```text
+id: string
+displayName: string
+avatarUrl: string?
+createdAt: timestamp
+updatedAt: timestamp
+placesCount: number
+reviewsCount: number
+badgesCount: number
+rankScore: number
+isBanned: boolean
+status: string
+```
+
+Zasady:
+
+- brak e-maila i tokenów FCM,
+- `isBanned`, `rankScore` i liczniki są chronione,
+- właściciel edytuje tylko dozwolone pola,
+- po account deletion profil jest usuwany lub anonimizowany zgodnie z polityką.
+
+## users/{uid}/private/profile
+
+Przykładowe pola:
+
+```text
+email: string?
+firstName: string?
+lastName: string?
+createdAt: timestamp
+updatedAt: timestamp
+```
+
+Dostęp ma właściciel albo upoważniony administrator. Dokument podlega pełnemu cleanup przy usunięciu konta.
+
+## users/{uid}/private/messaging
+
+Przykładowe pola:
+
+```text
+fcmTokens: map | array
+notificationsEnabled: boolean
+notificationPreferences: map
+updatedAt: timestamp
+```
+
+Tokeny FCM są prywatne, nie są logowane i są usuwane lub unieważniane po logout oraz delete account.
+
+## places
 
 Przykładowe pola:
 
@@ -52,40 +116,15 @@ status: string
 isDeleted: boolean
 ```
 
-### Zasady
+Zasady:
 
-- `ratingAverage` i `reviewsCount` są polami denormalizowanymi.
-- Lista i ranking nie powinny pobierać wszystkich opinii dla każdego miejsca.
-- `status` pozwala obsługiwać moderację.
-- `isDeleted` może wspierać soft delete, jeśli wymagane przez proces.
-
-## users
-
-Reprezentuje publiczny profil użytkownika.
-
-Przykładowe pola:
-
-```text
-id: string
-displayName: string
-avatarUrl: string?
-createdAt: timestamp
-updatedAt: timestamp
-placesCount: number
-reviewsCount: number
-badgesCount: number
-rankScore: number
-isBanned: boolean
-```
-
-### Zasady
-
-- Nie przechowujemy publicznie e-maila, tokenów ani danych prywatnych.
-- Dane prywatne powinny być w oddzielnej strukturze z ostrzejszymi Rules.
+- `createdBy` odpowiada właścicielowi,
+- agregaty i status moderacji są chronione,
+- lista, ranking i mapa używają limitów,
+- usunięcie miejsca uwzględnia opinie, zdjęcia, zgłoszenia i cache,
+- soft delete wymaga jawnego filtra we wszystkich publicznych zapytaniach.
 
 ## reviews
-
-Reprezentuje opinię o miejscu.
 
 Przykładowe pola:
 
@@ -102,15 +141,16 @@ status: string
 isDeleted: boolean
 ```
 
-### Zasady
+Zasady:
 
-- `rating` powinien mieć zakres 1-5.
-- Jedna opinia użytkownika dla jednego miejsca powinna być kontrolowana regułą lub logiką aplikacji.
-- Dodanie opinii powinno aktualizować pola denormalizowane miejsca.
+- `rating` ma zakres 1–5,
+- `userId` odpowiada zalogowanemu użytkownikowi,
+- pola moderacyjne są chronione,
+- zapis aktualizuje agregaty miejsca po stronie zaufanej,
+- duplikaty opinii dla tego samego użytkownika i miejsca są kontrolowane,
+- po account deletion opinia jest usuwana albo anonimizowana zgodnie z polityką.
 
 ## reports
-
-Reprezentuje zgłoszenia naruszeń.
 
 Przykładowe pola:
 
@@ -127,15 +167,15 @@ resolvedBy: string?
 resolvedAt: timestamp?
 ```
 
-### Zasady
+Zasady:
 
-- Zgłoszenia powinny być dostępne dla admina.
-- Użytkownik nie powinien móc czytać cudzych zgłoszeń.
-- Powinna istnieć ochrona przed duplikatem zgłoszenia tego samego targetu przez tego samego użytkownika.
+- autor tworzy zgłoszenie,
+- klient nie ustawia pól rozpatrzenia,
+- cudze zgłoszenia nie są publicznie czytelne,
+- rekord nie powinien kopiować zbędnych danych celu,
+- duplikaty są ograniczane.
 
 ## changeRequests
-
-Reprezentuje propozycję zmiany danych miejsca.
 
 Przykładowe pola:
 
@@ -151,9 +191,9 @@ reviewedAt: timestamp?
 rejectReason: string?
 ```
 
-## badges
+`changes` musi mieć walidowany zakres dozwolonych pól. Status i pola administracyjne są ustawiane po stronie zaufanej.
 
-Reprezentuje odznaki użytkowników.
+## badges
 
 Przykładowe pola:
 
@@ -166,9 +206,9 @@ sourceType: string?
 sourceId: string?
 ```
 
-## notifications
+Odznaki są tworzone przez backend lub kontrolowaną logikę. Klient nie może samodzielnie przyznać odznaki.
 
-Reprezentuje powiadomienia aplikacyjne lub metadane push.
+## notifications
 
 Przykładowe pola:
 
@@ -182,11 +222,18 @@ createdAt: timestamp
 readAt: timestamp?
 targetType: string?
 targetId: string?
+notificationId: string?
 ```
 
-## appConfig
+Zasady:
 
-Konfiguracja aplikacji, jeśli część ustawień nie jest trzymana w Remote Config.
+- dokument jest prywatny dla odbiorcy,
+- payload jest minimalny,
+- pełne dane celu są pobierane po `targetId`,
+- zapis systemowy odbywa się po stronie zaufanej,
+- retencja i cleanup są jawnie określone.
+
+## appConfig
 
 Przykładowe pola:
 
@@ -197,12 +244,52 @@ latestVersion: string
 updatedAt: timestamp
 ```
 
-## Checklist schema review
+Nie przechowujemy tu sekretów, ról ani danych administracyjnych przeznaczonych wyłącznie dla backendu.
 
-- [ ] Każda kolekcja ma właściciela odpowiedzialności.
-- [ ] Pola publiczne i prywatne są rozdzielone.
-- [ ] Pola rankingowe są denormalizowane.
-- [ ] Zapytania list mają limity.
-- [ ] Zapytania sortowane mają indeksy.
-- [ ] Rules walidują typy i ownership.
-- [ ] Dane wrażliwe nie trafiają do publicznych dokumentów.
+## Pola systemowe i agregaty
+
+Pola takie jak:
+
+- `ratingAverage`,
+- `reviewsCount`,
+- `photosCount`,
+- `rankScore`,
+- statusy moderacji,
+- liczniki aktywności,
+
+mają właściciela aktualizacji po stronie backendu lub zaufanej transakcji. Każdy agregat wymaga testów i strategii naprawy niespójności.
+
+## Migracje
+
+Zmiana schematu powinna określać:
+
+- kompatybilność ze starszym buildem,
+- wartości domyślne,
+- kolejność deploy backendu, Rules, indeksów i aplikacji,
+- migrację istniejących dokumentów,
+- wpływ na cache Room,
+- możliwość rollbacku.
+
+## Account deletion
+
+Dla każdej kolekcji należy określić:
+
+- usunięcie,
+- anonimizację,
+- zachowanie z uzasadnionego powodu,
+- cleanup Storage i FCM,
+- aktualizację agregatów,
+- zachowanie po częściowym błędzie,
+- wpływ backupów i retencji.
+
+## Checklista schema review
+
+- [ ] publiczne i prywatne dane są rozdzielone,
+- [ ] pola systemowe są chronione,
+- [ ] ownership odpowiada Rules,
+- [ ] zapytania mają limity i indeksy,
+- [ ] agregaty mają właściciela aktualizacji,
+- [ ] retry nie tworzy duplikatów,
+- [ ] migracja uwzględnia starsze buildy,
+- [ ] account deletion jest opisane,
+- [ ] dane wrażliwe nie trafiają do publicznych dokumentów.

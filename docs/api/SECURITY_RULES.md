@@ -1,51 +1,113 @@
 # Firestore Security Rules
 
+Ostatnia aktualizacja: 2026-07-13
+
 ## Cel
 
-Dokument opisuje zasady projektowania i utrzymania Firestore Security Rules w projekcie KidZone.
+Zasady projektowania, testowania i wdrażania Firestore Security Rules w kidZone.
 
-## Główne zasady
+## Zasady główne
 
-- Domyślnie odmawiaj dostępu (`deny by default`).
-- Dostęp przyznawaj wyłącznie dla jasno określonych przypadków.
-- Waliduj typy i wymagane pola.
-- Sprawdzaj ownership dokumentów.
-- Nie ufaj walidacji po stronie aplikacji.
+- `deny by default`,
+- dostęp tylko dla jawnie opisanych przypadków,
+- brak zaufania do walidacji klienta,
+- ownership sprawdzany przez `request.auth.uid`,
+- role administracyjne pochodzą z zaufanego źródła,
+- typy, zakresy i dozwolone pola są walidowane,
+- klient nie może zmieniać pól administracyjnych ani agregatów,
+- dane publiczne i prywatne są rozdzielone.
 
-## Dostęp do kolekcji
+## Użytkownicy
 
-### users
-- użytkownik odczytuje i edytuje własne dane,
-- administrator ma pełny dostęp.
+Publiczny profil może być czytelny zgodnie z produktem, ale nie zawiera e-maila, tokenów FCM ani danych prywatnych.
 
-### places
-- odczyt publicznych miejsc,
-- tworzenie tylko dla zalogowanych,
-- edycja zgodnie z polityką produktu lub przez administratora.
+Dane prywatne w `users/{uid}/private/*` są dostępne tylko właścicielowi lub upoważnionemu administratorowi.
 
-### reviews
-- tworzenie tylko przez zalogowanych,
-- edycja i usuwanie przez autora lub administratora.
+Użytkownik nie może samodzielnie ustawić między innymi:
 
-### reports
-- zgłoszenie tworzy zalogowany użytkownik,
-- odczyt i obsługa tylko dla administratorów.
+- roli admina,
+- `isBanned`,
+- pól rankingowych,
+- liczników moderacyjnych,
+- danych innego użytkownika.
 
-### changeRequests
-- tworzenie przez użytkowników,
-- akceptacja lub odrzucenie przez administratora.
+## Miejsca
+
+- publiczny odczyt tylko dla dozwolonych statusów,
+- tworzenie przez zalogowanego użytkownika,
+- `createdBy` musi odpowiadać UID,
+- autor edytuje wyłącznie dozwolone pola,
+- status moderacji i pola agregowane są chronione,
+- usuwanie i moderacja zgodnie z rolą i polityką produktu.
+
+## Opinie
+
+- tworzenie przez zalogowanego użytkownika,
+- `userId` odpowiada UID,
+- `rating` ma zakres 1–5,
+- autor zarządza własną opinią,
+- pola moderacyjne i agregaty nie są edytowalne przez klienta,
+- reguły ograniczają niepożądane dodatkowe pola.
+
+## Zgłoszenia i change requests
+
+- użytkownik może utworzyć zgłoszenie lub propozycję zmiany,
+- autor nie może ustawić statusu rozpatrzenia, `resolvedBy`, `reviewedBy` ani pól administracyjnych,
+- odczyt cudzych zgłoszeń jest zabroniony,
+- obsługa kolejki moderacji wymaga roli administratora.
+
+## Powiadomienia i dane prywatne
+
+- użytkownik czyta wyłącznie własne powiadomienia,
+- tokeny FCM nie znajdują się w publicznych dokumentach,
+- klient nie może tworzyć dowolnego powiadomienia dla innego użytkownika,
+- zapis systemowy odbywa się po stronie zaufanej.
 
 ## Walidacja
 
-- wymagane pola nie mogą być puste,
-- ocena w zakresie 1–5,
-- identyfikatory zgodne z właścicielem dokumentu,
-- znaczniki czasu ustawiane przez serwer tam, gdzie to możliwe.
+Rules powinny sprawdzać:
 
-## Checklist
+- wymagane pola,
+- typy,
+- maksymalne długości tekstu,
+- zakresy liczb,
+- dozwolone enumy,
+- ownership,
+- brak dodatkowych niedozwolonych pól,
+- niezmienność pól systemowych,
+- serwerowe znaczniki czasu tam, gdzie to możliwe.
 
-- [ ] Ownership sprawdzony.
-- [ ] Typy pól walidowane.
-- [ ] Brak publicznego dostępu do danych prywatnych.
-- [ ] Rules pokryte testami emulatora.
-- [ ] Zmiany Rules przechodzą review przed wdrożeniem.
+## Testy
+
+Każda zmiana Rules wymaga testów emulatorowych dla:
+
+- dozwolonego odczytu i zapisu,
+- niezalogowanego użytkownika,
+- obcego właściciela,
+- próby eskalacji roli,
+- zmiany chronionego pola,
+- błędnego typu i wartości granicznej,
+- nieznanego dodatkowego pola,
+- administratora,
+- danych prywatnych.
+
+## Wdrożenie
+
+1. Uruchom testy emulatora.
+2. Wykonaj review diffu Rules.
+3. Wdróż do projektu testowego.
+4. Wykonaj smoke aplikacji.
+5. Wdróż do produkcji przed buildem zależnym od nowej reguły.
+6. Monitoruj błędy `permission-denied`.
+
+## Checklista
+
+- [ ] deny by default,
+- [ ] ownership sprawdzony,
+- [ ] role i pola administracyjne chronione,
+- [ ] publiczne dokumenty nie zawierają PII,
+- [ ] prywatne ścieżki mają ograniczony odczyt,
+- [ ] typy, zakresy i dodatkowe pola są walidowane,
+- [ ] testy emulatora przechodzą,
+- [ ] smoke po deployu ma PASS,
+- [ ] rollback lub poprzednia wersja Rules jest dostępna.
