@@ -35,6 +35,22 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 
+/**
+ * 🧪 Cel testu:
+ * - Weryfikacja logiki dodawania i edycji miejsc przez [AddPlaceViewModel].
+ * - Sprawdzenie poprawności walidacji formularza oraz koordynacji mediów (zdjęcia).
+ *
+ * 🛠️ Środowisko:
+ * - MockK dla zależności zewnętrznych (Repozytoria, Uploader).
+ * - [MainDispatcherRule] do kontroli czasu w testach Coroutines.
+ * - [SavedStateHandle] do symulacji parametrów nawigacji.
+ *
+ * 🔍 Scenariusze:
+ * - Stan początkowy (Create vs Edit).
+ * - Walidacja pól formularza i kategorii.
+ * - Proces zapisu z uwzględnieniem uploadu zdjęć i deduplikacji (Hashe).
+ * - Obsługa błędów sieci i komunikatów o duplikatach.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AddPlaceViewModelTest {
 

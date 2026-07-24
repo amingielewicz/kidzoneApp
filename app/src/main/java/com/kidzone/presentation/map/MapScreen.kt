@@ -110,6 +110,7 @@ import com.kidzone.presentation.common.RatingIcon
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.common.requestLocationPermissionOrOpenSettings
+import com.kidzone.utils.NumberUtils
 import com.kidzone.presentation.place.add.fetchCurrentLocation
 import com.kidzone.presentation.place.add.hasLocationPermission
 import com.kidzone.presentation.place.add.isLocationServiceEnabled
@@ -816,7 +817,7 @@ private fun PlacePreviewContent(
                     )
                     Spacer(Modifier.width(2.dp))
                     Text(
-                        text = "%.1f".format(place.averageRating),
+                        text = NumberUtils.formatRating(place.averageRating),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium
                     )

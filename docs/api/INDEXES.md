@@ -1,45 +1,33 @@
 # Firestore Indexes
 
+Ostatnia aktualizacja: 2026-07-13
+
 ## Cel
 
-Dokument opisuje indeksy Firestore potrzebne w KidZone oraz zasady ich utrzymania.
+Dokument opisuje zasady utrzymania indeksów Firestore wymaganych przez zapytania kidZone.
 
 ## Zasady
 
-- Kazde zapytanie z filtrowaniem i sortowaniem moze wymagac indeksu zlozonego.
-- Kazde zapytanie rankingowe powinno miec opisany wymagany indeks.
-- Nie tworzymy indeksow na zapas bez realnego zapytania.
-- Indeksy powinny byc wersjonowane w `firestore.indexes.json`.
-- Brak indeksu na produkcji moze zablokowac flow uzytkownika.
+- indeks wynika z realnego zapytania,
+- nowe zapytanie ma limit i paginację,
+- indeksy są wersjonowane w `firestore.indexes.json`,
+- indeks jest wdrażany przed buildem aplikacji zależnym od zapytania,
+- brak indeksu nie może zostać odkryty dopiero przez użytkowników produkcyjnych,
+- usunięcie indeksu wymaga potwierdzenia, że żaden aktywny build go nie używa.
 
-## Typowe indeksy
+## Typowe zapytania
 
-### Lista miejsc po kategorii i ocenie
-
-Cel:
-
-- ekran listy miejsc,
-- filtrowanie po kategorii,
-- sortowanie po ocenie i liczbie opinii.
-
-Pola:
+### Miejsca według kategorii i oceny
 
 ```text
 places
 category ascending
+status ascending
 ratingAverage descending
 reviewsCount descending
 ```
 
-### Lista miejsc po statusie i czasie utworzenia
-
-Cel:
-
-- najnowsze miejsca,
-- panel administracyjny,
-- moderacja.
-
-Pola:
+### Najnowsze miejsca i moderacja
 
 ```text
 places
@@ -48,13 +36,6 @@ createdAt descending
 ```
 
 ### Ranking miejsc
-
-Cel:
-
-- TOP miejsc,
-- ranking publiczny.
-
-Pola:
 
 ```text
 places
@@ -65,13 +46,6 @@ reviewsCount descending
 
 ### Opinie miejsca
 
-Cel:
-
-- szczegoly miejsca,
-- lista opinii.
-
-Pola:
-
 ```text
 reviews
 placeId ascending
@@ -79,29 +53,16 @@ status ascending
 createdAt descending
 ```
 
-### Opinie uzytkownika
-
-Cel:
-
-- profil uzytkownika,
-- moje opinie.
-
-Pola:
+### Opinie użytkownika
 
 ```text
 reviews
 userId ascending
+status ascending
 createdAt descending
 ```
 
-### Zgloszenia administracyjne
-
-Cel:
-
-- panel admina,
-- kolejka moderacji.
-
-Pola:
+### Zgłoszenia
 
 ```text
 reports
@@ -109,14 +70,9 @@ status ascending
 createdAt descending
 ```
 
+Opcjonalnie także `targetType`, jeśli panel filtruje po typie zasobu.
+
 ### Propozycje zmian
-
-Cel:
-
-- panel admina,
-- moderacja zmian.
-
-Pola:
 
 ```text
 changeRequests
@@ -124,39 +80,72 @@ status ascending
 createdAt descending
 ```
 
+### Powiadomienia użytkownika
+
+```text
+notifications
+userId ascending
+createdAt descending
+```
+
+lub z filtrem statusu przeczytania, jeśli takie zapytanie istnieje.
+
 ## Geo queries
 
-Dla mapy uzywamy podejscia opartego o bounds, promien albo geohash.
+Dla mapy używamy bounds, promienia albo geohash.
 
-Zasady:
+- nie pobieramy całej kolekcji,
+- wynik ma limit,
+- ruch mapy ma debounce,
+- geohash query może wymagać kilku zakresów i deduplikacji wyników,
+- clustering odbywa się po stronie klienta dla ograniczonego zbioru,
+- indeksy muszą odpowiadać faktycznym polom statusu i geohash.
 
-- nie pobieramy calej kolekcji `places`,
-- request jest ograniczony przez bounds albo promien,
-- limit markerow powinien byc sterowany przez Remote Config,
-- clustering jest wymagany przy wiekszej liczbie wynikow.
+## Proces dodania zapytania
 
-## Utrzymanie indeksow
+1. Zapisz cel biznesowy i oczekiwany limit.
+2. Sprawdź query plan i wymagany indeks.
+3. Dodaj indeks do `firestore.indexes.json`.
+4. Wdróż do projektu testowego.
+5. Przetestuj dane puste, małe i większe.
+6. Sprawdź koszt odczytów.
+7. Wdróż indeks do produkcji przed aplikacją.
+8. Zweryfikuj brak błędów `failed-precondition`.
 
-Przy dodaniu nowego zapytania:
+## Koszty
 
-1. Sprawdz, czy wymaga indeksu zlozonego.
-2. Dodaj indeks do `firestore.indexes.json`.
-3. Wdroz indeks na staging.
-4. Przetestuj flow.
-5. Wdroz indeks na produkcje przed releasem aplikacji.
+Indeks nie zastępuje limitów. Zapytania powinny:
 
-## Checklist PR
+- używać selektywnych filtrów,
+- unikać pełnych skanów,
+- pobierać tylko potrzebną stronę,
+- wykorzystywać pola agregowane,
+- nie wykonywać N+1 reads dla kart listy.
 
-- [ ] Nowe zapytanie ma limit.
-- [ ] Nowe zapytanie nie pobiera calej kolekcji.
-- [ ] Indeks zostal dodany do `firestore.indexes.json`, jesli jest wymagany.
-- [ ] Zapytanie dziala na staging.
-- [ ] Release checklist uwzglednia wdrozenie indeksu.
+## Testy
 
-## Checklist release
+- poprawne sortowanie,
+- paginacja bez duplikatów i braków,
+- zmiana filtrów,
+- puste wyniki,
+- brak indeksu w projekcie testowym daje kontrolowany błąd,
+- ranking i panel administracyjny działają po deployu,
+- geo query nie zwraca nieograniczonego zbioru.
 
-- [ ] `firestore.indexes.json` jest aktualny.
-- [ ] Indeksy sa wdrozone na wlasciwy projekt Firebase.
-- [ ] Zapytania list dzialaja bez bledow indeksu.
-- [ ] Ranking dziala bez bledow indeksu.
-- [ ] Panel admina dziala bez bledow indeksu.
+## Checklista PR
+
+- [ ] nowe zapytanie ma limit,
+- [ ] nie pobiera całej kolekcji,
+- [ ] wymagany indeks jest wersjonowany,
+- [ ] paginacja jest stabilna,
+- [ ] koszt został oceniony,
+- [ ] test na projekcie testowym przeszedł,
+- [ ] release uwzględnia kolejność deploy indeksu przed aplikacją.
+
+## Checklista release
+
+- [ ] `firestore.indexes.json` jest aktualny,
+- [ ] indeksy są wdrożone do właściwego projektu,
+- [ ] listy, ranking, mapa i panel admina działają,
+- [ ] brak błędów indeksów w logach,
+- [ ] aktywne buildy nie zależą od usuwanego indeksu.

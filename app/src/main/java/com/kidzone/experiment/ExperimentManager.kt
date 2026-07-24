@@ -8,31 +8,22 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Central manager for A/B test experiments.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie przypisaniem użytkowników do wariantów testów A/B.
+ * - Logowanie ekspozycji (Exposure) do Firebase Analytics dla celów metrycznych.
+ * - Synchronizacja wariantów z właściwościami użytkownika (User Properties).
  *
- * Responsibilities:
- *  - Read variant assignments from Firebase Remote Config
- *  - Log experiment exposures to Firebase Analytics (for A/B Testing metrics)
- *  - Track which experiments have been exposed in this session (deduplicate)
+ * 🛡️ Bezpieczeństwo i Prywatność:
+ * - Nie gromadzi danych PII.
+ * - Używa anonimowych kluczy eksperymentów.
  *
- * ## Usage in ViewModel / Composable:
+ * ⚡ Wydajność i Zasoby:
+ * - Deduplikacja zdarzeń ekspozycji w obrębie sesji (minimalizacja ruchu sieciowego).
+ * - Lekkie operacje odczytu z pamięci podręcznej Remote Config.
  *
- * ```kotlin
- * @Inject lateinit var experimentManager: ExperimentManager
- *
- * val variant = experimentManager.getVariant(ActiveExperiments.HOME_LAYOUT)
- * // Render based on variant...
- *
- * // When user SEES the variant for the first time:
- * experimentManager.logExposure(ActiveExperiments.HOME_LAYOUT)
- * ```
- *
- * ## Important: Exposure vs. Assignment
- *
- * - **Assignment** happens server-side when Remote Config resolves the value.
- * - **Exposure** is logged client-side when the user actually SEES the variant.
- *   This avoids "diluting" experiment results with users who were assigned
- *   but never saw the feature (e.g., didn't open that screen).
+ * ✅ Gwarancje:
+ * - Rozróżnienie między Przypisaniem (serwer) a Ekspozycją (moment zobaczenia przez użytkownika).
+ * - Idempotentność metody [logExposure].
  */
 @Singleton
 class ExperimentManager @Inject constructor(

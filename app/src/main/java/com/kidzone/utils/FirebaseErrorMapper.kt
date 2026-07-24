@@ -5,6 +5,26 @@ import com.google.firebase.storage.StorageException
 import com.kidzone.R
 import java.io.IOException
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Mapowanie wyjątków SDK Firebase (Auth, Firestore, Storage) na zlokalizowane komunikaty UI ([UiText]).
+ * - Wykrywanie przyczyn źródłowych błędów w łańcuchu wyjątków (Exception chain).
+ *
+ * ✅ Gwarancje:
+ * - Zawsze zwraca czytelny komunikat, korzystając z domyślnego fallbacku w razie nieznanego błędu.
+ * - Prawidłowo identyfikuje błędy braku sieci ([IOException]).
+ */
+fun Throwable.toAuthErrorMessage(fallbackRes: Int = R.string.error_unknown): UiText =
+    when (this) {
+        is AuthException.AccountBanned -> UiText.DynamicString(banMessage)
+        is AuthException -> UiText.StringResource(messageRes.takeIf { it != 0 } ?: fallbackRes)
+        else -> if (hasCause<IOException>()) {
+            UiText.StringResource(R.string.error_no_internet)
+        } else {
+            UiText.StringResource(fallbackRes)
+        }
+    }
+
 fun Throwable.toPlacesErrorMessage(fallback: UiText): UiText {
     val firestoreError = findCause<FirebaseFirestoreException>()
     if (firestoreError != null) {

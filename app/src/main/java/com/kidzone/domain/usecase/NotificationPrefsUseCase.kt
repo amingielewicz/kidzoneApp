@@ -9,10 +9,14 @@ import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 /**
- * Ładowanie i zapis preferencji powiadomień użytkownika z/do Firestore.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie preferencjami powiadomień użytkownika (kategorie + zgoda e-mail).
+ * - Koordynacja zapisu między publicznym dokumentem użytkownika a prywatnym profilem.
+ * - Ukrywanie szczegółów technicznych Firestore (Batch, Merge) przed warstwą UI.
  *
- * Wydzielone z ProfileViewModel, żeby VM nie miał bezpośredniej
- * zależności na FirebaseFirestore (łatwiejsze testowanie, SRP).
+ * ✅ Gwarancje:
+ * - Atomowość zapisu (Batch): albo oba dokumenty zostaną zaktualizowane, albo żaden.
+ * - Bezpieczne wartości domyślne przy braku danych w bazie.
  */
 class NotificationPrefsUseCase @Inject constructor(
     private val authRepository: AuthRepository,
@@ -20,9 +24,12 @@ class NotificationPrefsUseCase @Inject constructor(
 ) {
 
     /**
-     * Pobiera aktualne preferencje z `users/{uid}` oraz prywatną zgodę email
-     * z `users/{uid}/private/profile`.
-     * Zwraca domyślne wartości jeśli pole nie istnieje lub fetch padnie.
+     * Pobiera preferencje aktualnie zalogowanego użytkownika.
+     *
+     * Brak sesji, brak dokumentu albo błąd odczytu zwraca wartości domyślne. Metoda nie ujawnia
+     * surowych wyjątków Firestore warstwie prezentacji.
+     *
+     * @return zapisane preferencje albo domyślny zestaw ustawień.
      */
     suspend fun load(): NotificationPrefs {
         val uid = authRepository.currentUser.first()?.id ?: return NotificationPrefs()
@@ -56,8 +63,14 @@ class NotificationPrefsUseCase @Inject constructor(
     }
 
     /**
-     * Zapisuje preferencje do Firestore (merge – nie nadpisuje reszty pól usera).
-     * Fire-and-forget semantyka: zwraca true przy sukcesie, false przy błędzie.
+     * Zapisuje pełny zestaw preferencji aktualnego użytkownika.
+     *
+     * Zapis korzysta z batcha i `merge`, dzięki czemu nie nadpisuje pozostałych pól profilu. Brak
+     * sesji lub błąd któregokolwiek zapisu zwraca `false`; pełny sukces wymaga commitnięcia obu
+     * dokumentów.
+     *
+     * @param prefs kompletny zestaw preferencji do zapisania.
+     * @return `true`, gdy batch został zatwierdzony, w przeciwnym razie `false`.
      */
     suspend fun save(prefs: NotificationPrefs): Boolean {
         val uid = authRepository.currentUser.first()?.id ?: return false

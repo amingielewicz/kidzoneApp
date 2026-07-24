@@ -6,6 +6,11 @@ import android.content.res.Configuration
 import android.os.LocaleList
 import java.util.Locale
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Dynamiczna zmiana ustawień regionalnych (Locale) aplikacji bez restartu urządzenia.
+ * - Synchronizacja ustawień systemowych z preferencjami użytkownika.
+ */
 object LocaleApplier {
     fun apply(context: Context, language: AppLanguage) {
         val locale = language.languageTag?.let(Locale::forLanguageTag)

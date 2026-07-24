@@ -1,56 +1,45 @@
 # Data Flow
 
+Ostatnia aktualizacja: 2026-07-13
+
 ## Cel
 
-<<<<<<< HEAD
-Dokument opisuje przepływ danych w KidZone: od UI, przez ViewModel i warstwę domenową, aż do Room, Firestore, Storage oraz Google Maps.
-=======
-Dokument opisuje przepływ danych w aplikacji KidZone od interakcji użytkownika do źródła danych i z powrotem do UI.
->>>>>>> c171379 (docs: add data flow documentation)
+Dokument opisuje przepływ danych w kidZone od akcji użytkownika, przez ViewModel i warstwę domenową, do Room, Firebase i z powrotem do UI.
 
-## Standardowy przepływ odczytu
+## Odczyt danych
 
 ```text
-<<<<<<< HEAD
-Composable
-  -> ViewModel
-  -> UseCase
-  -> Repository
-  -> Local cache / Remote source
-  -> UiState
-  -> Composable
-=======
 User
-  -> Composable
-  -> ViewModel
-  -> Use Case / Repository Interface
-  -> Repository Implementation
-  -> Firebase / Room
-  -> Mapper
-  -> Domain Model
-  -> UI State
-  -> Compose UI
->>>>>>> c171379 (docs: add data flow documentation)
+  → Composable
+  → ViewModel
+  → Use Case
+  → Repository Interface
+  → Repository Implementation
+  → Room / Firestore / Storage
+  → Mapper
+  → Domain Model
+  → UiState
+  → Compose UI
 ```
 
-## Standardowy przepływ zapisu
+## Zapis danych
 
 ```text
 User action
-<<<<<<< HEAD
-  -> ViewModel
-  -> UseCase
-  -> Repository
-  -> Validation
-  -> Local pending state
-  -> Firestore / Storage
-  -> Sync result
-  -> UiState update
+  → Composable event
+  → ViewModel action
+  → Validation
+  → Use Case
+  → Repository
+  → Local pending state
+  → Firestore / Storage
+  → Sync result
+  → UiState / UI event
 ```
 
 ## UiState
 
-Każdy ekran powinien mieć jawny stan:
+Złożony ekran powinien mieć spójny model stanu obejmujący odpowiednie warianty:
 
 ```text
 Idle
@@ -62,134 +51,126 @@ Offline
 PermissionRequired
 ```
 
-Nie mieszamy flag typu `isLoading`, `errorMessage`, `data` bez spójnego modelu stanu, jeśli ekran robi się złożony.
-
-## Cache
-
-Zasady:
-
-- Repository decyduje, czy dane pochodzą z Room, Firestore czy pamięci.
-- ViewModel nie powinien znać strategii cache.
-- Cache powinien mieć jasny moment odświeżania.
-- Pull-to-refresh wymusza odświeżenie.
-- Przełączenie zakładki nie powinno automatycznie pobierać całej bazy.
-
-## Lista miejsc
-
-Lista miejsc powinna:
-
-- ładować pierwszą paczkę danych,
-- używać paginacji,
-- wspierać filtry i sortowanie poza Composable,
-- nie pobierać opinii dla każdej karty,
-- korzystać z gotowych pól `ratingAverage` i `reviewsCount`.
-
-## Mapa
-
-Mapa powinna:
-
-- pobierać dane dla bounds albo promienia,
-- mieć limit markerów,
-- mieć debounce/throttle dla ruchu mapy,
-- nie pobierać całej kolekcji miejsc,
-- mieć fallback w postaci listy.
-
-## Ranking
-
-Ranking powinien:
-
-- korzystać z gotowych pól rankingowych,
-- nie liczyć średnich ocen przez pobieranie wszystkich opinii,
-- mieć limit wyników,
-- być odporny na pustą bazę.
-
-## Checklist
-
-- [ ] Dane nie są pobierane wielokrotnie bez potrzeby.
-- [ ] Repository ukrywa źródło danych.
-- [ ] ViewModel wystawia jeden spójny `UiState`.
-- [ ] Cache jest używany świadomie.
-- [ ] Listy mają limity i paginację.
-- [ ] Mapa używa bounds/promienia.
-- [ ] Ranking nie liczy się dynamicznie z pełnej bazy opinii.
-=======
-  -> Composable event
-  -> ViewModel action
-  -> Validation
-  -> Use Case / Repository
-  -> Firebase / Room
-  -> Result
-  -> UI State / UI Event
-```
+Nie należy utrzymywać wielu nieskoordynowanych flag, gdy ekran ma rozbudowany lifecycle danych.
 
 ## UI
 
-UI powinno:
+UI:
 
-- emitować akcje użytkownika do ViewModelu,
-- obserwować UI state,
-- renderować stany loading, success, empty, error,
-- nie wykonywać bezpośrednich operacji na Firebase albo Room.
+- emituje akcje użytkownika,
+- obserwuje `StateFlow`,
+- renderuje stan,
+- nie wykonuje operacji na Firebase ani Room,
+- nie mapuje wyjątków technicznych,
+- nie decyduje o źródle danych.
 
 ## ViewModel
 
-ViewModel powinien:
+ViewModel:
 
-- przyjmować akcje z UI,
-- uruchamiać use case albo repozytorium,
-- mapować wyniki na UI state,
-- wystawiać StateFlow,
-- wystawiać eventy jednorazowe, jeśli są potrzebne.
+- przyjmuje akcje z UI,
+- uruchamia use case'y,
+- mapuje wyniki na `UiState`,
+- wystawia eventy jednorazowe, gdy są potrzebne,
+- nie zna strategii cache ani szczegółów Firebase.
 
 ## Repository
 
-Repository powinno:
+Repository:
 
-- ukrywać szczegóły źródła danych,
-- łączyć dane z Firebase i Room,
-- mapować DTO/Entity na modele domenowe,
-- zwracać wynik w kontrolowanej formie.
+- ukrywa źródło danych,
+- łączy Room i Firebase,
+- realizuje cache i synchronizację,
+- stosuje limity i paginację,
+- mapuje DTO i Entity na modele domenowe,
+- zwraca kontrolowany wynik.
 
 ## Mappery
 
-Mappery odpowiadają za konwersję:
-
 ```text
-Firestore DTO -> Domain Model
-Room Entity -> Domain Model
-Domain Model -> DTO / Entity
+Firestore DTO → Domain Model
+Room Entity → Domain Model
+Domain Model → DTO / Entity
 ```
 
-Mapper nie powinien zawierać logiki UI.
+Mapper nie zawiera logiki UI.
+
+## Cache i offline-first
+
+Preferowany przepływ dla ekranów listowych:
+
+```text
+Room cache → UI
+Firebase snapshot → Room update → UI refresh
+```
+
+Zasady:
+
+- repository decyduje o źródle danych,
+- cache ma jawny czas i sposób odświeżania,
+- pull-to-refresh wymusza odświeżenie,
+- przełączanie zakładek nie pobiera całej bazy,
+- operacje oczekujące mają status synchronizacji,
+- retry nie tworzy duplikatów.
+
+## Lista miejsc
+
+- pierwsza paczka danych zamiast pełnej kolekcji,
+- paginacja i limity,
+- filtry oraz sortowanie poza Composable,
+- brak osobnego pobierania opinii dla każdej karty,
+- użycie pól agregowanych, takich jak `ratingAverage` i `reviewsCount`.
+
+## Mapa
+
+- pobieranie danych dla bounds lub promienia,
+- limit markerów,
+- clustering,
+- debounce lub throttle ruchu mapy,
+- brak pobierania całej kolekcji,
+- lista jako fallback.
+
+## Ranking
+
+- gotowe pola rankingowe,
+- limit wyników,
+- brak liczenia średnich przez pobieranie wszystkich opinii,
+- obsługa pustego zbioru.
 
 ## Obsługa błędów
 
-Błąd techniczny powinien przejść przez mapowanie:
-
 ```text
-Firebase Exception
-  -> Error Mapper
-  -> Domain/Error Result
-  -> UiText / UI State
-  -> komunikat dla użytkownika
+Firebase / Room / Android exception
+  → Error Mapper
+  → Domain Result
+  → UiText / UiState
+  → komunikat dla użytkownika
 ```
 
-## Offline-first
+Surowe wyjątki nie trafiają do UI ani telemetrycznych pól zawierających dane użytkownika.
 
-Dla ekranów listowych preferowany przepływ:
+## Uprawnienia i funkcje platformowe
+
+Przepływ funkcji platformowej powinien być współdzielony:
 
 ```text
-Room cache -> UI
-Firebase snapshot -> Room update -> UI refresh
+UI action
+  → shared permission handler
+  → system dialog albo app settings
+  → result
+  → ViewModel / UI state refresh
 ```
 
-Dzięki temu UI może działać na ostatnich znanych danych nawet przy słabym połączeniu.
+Dotyczy to lokalizacji, kamery i powiadomień. Kolejne odmowy nie mogą pozostawiać martwej akcji.
 
-## Checklist
+## Checklista
 
-- [ ] UI nie zna Firebase ani Room.
-- [ ] ViewModel nie zwraca DTO.
-- [ ] Repository mapuje dane do Domain Model.
-- [ ] Błędy są mapowane przed pokazaniem użytkownikowi.
-- [ ] Flow danych jest jednokierunkowy i przewidywalny.
->>>>>>> c171379 (docs: add data flow documentation)
+- [ ] przepływ jest jednokierunkowy,
+- [ ] UI nie zna Firebase ani Room,
+- [ ] ViewModel nie zwraca DTO,
+- [ ] repository ukrywa źródła danych,
+- [ ] mappery oddzielają modele,
+- [ ] błędy są mapowane,
+- [ ] cache i retry są kontrolowane,
+- [ ] listy i mapy mają limity,
+- [ ] wspólne flow uprawnień nie jest duplikowane.

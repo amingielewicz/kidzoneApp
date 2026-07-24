@@ -215,7 +215,13 @@ async function getReviewInfo(reviewId: string): Promise<ReviewInfo> {
   }
 }
 
-// --- Callable: zapis formularza kontaktowego ---
+/**
+ * 🎯 Cel: Bezpieczny zapis wiadomości z formularza kontaktowego aplikacji.
+ * ⚡ Wyzwalacz (Trigger): Callable Function (onCall).
+ * 📥 Wejście: { subject: string, message: string }.
+ * ✅ Efekty uboczne: Zapis do kolekcji `contact_messages` (wyzwala onContactMessage).
+ * 🛡️ Bezpieczeństwo: Wymaga uwierzytelnienia. Walidacja długości tekstu.
+ */
 export const submitContactMessage = onCall(
   async (request) => {
     const uid = request.auth?.uid;
@@ -870,7 +876,16 @@ export const updateUserStatsOnPlaceDelete = onDocumentDeleted(
 );
 
 
-// --- HTTP Endpoint: Admin usuwa opinię i wysyła email do autora ---
+/**
+ * 🎯 Cel: Administracyjne usunięcie opinii z powiadomieniem autora.
+ * ⚡ Wyzwalacz: Request HTTP (onRequest).
+ * 📥 Parametry URL: ?reviewId=...&reason=...
+ * ✅ Efekty uboczne:
+ * - Usunięcie dokumentu z Firestore.
+ * - Log audytowy w `audit_logs`.
+ * - E-mail do autora opinii z powodem usunięcia.
+ * 🛡️ Bezpieczeństwo: Wymaga tokena Admina (verifyAdminRequest).
+ */
 export const adminDeleteReview = onRequest(
   {secrets: [gmailEmail, gmailPassword], cors: true},
   async (req, res) => {
@@ -2202,15 +2217,16 @@ export const checkRateLimit = onRequest(
 // =============================================================================
 
 /**
- * Scheduled Cloud Function: runs daily at 03:00 Warsaw time.
+ * 🎯 Cel: Automatyczne sprzątanie bazy danych i plików Storage.
  *
- * Tasks:
- *  1. Expired bans: unban users whose `bannedUntilMillis` has passed
- *  2. Orphaned photos: find Storage photos not referenced by any place/review
- *  3. Stale pending operations: clean dead-letter entries older than 30 days
- *  4. Dismissed reports: delete reports in 'dismissed' status older than 90 days
+ * ⚡ Wyzwalacz (Trigger): Harmonogram (onSchedule) - codziennie o 03:00.
  *
- * Designed to be idempotent — safe to re-run manually via Firebase Console.
+ * ✅ Efekty uboczne:
+ * - Usuwanie wygasłych blokad użytkowników (bans).
+ * - Usuwanie osieroconych zdjęć z Firebase Storage.
+ * - Czyszczenie starych, odrzuconych raportów (>90 dni).
+ *
+ * ✅ Gwarancje: Idempotentność (bezpieczne do wielokrotnego uruchomienia).
  */
 export const dailyCleanup = onSchedule(
   {

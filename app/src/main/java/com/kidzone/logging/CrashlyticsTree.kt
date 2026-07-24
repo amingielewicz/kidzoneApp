@@ -5,20 +5,16 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import timber.log.Timber
 
 /**
- * Timber Tree dla buildow release – przekazuje logi WARN+ do Crashlytics.
+ * 🎯 Odpowiedzialności:
+ * - Przekazywanie istotnych logów (WARN+) do Firebase Crashlytics jako "breadcrumbs".
+ * - Redagowanie (redakcja) danych wrażliwych (E-maile, Tokeny) przed wysyłką do chmury.
  *
- * W release nie chcemy Logcat output (dlatego nie uzywamy DebugTree),
- * ale chcemy zeby zredagowane ostrzezenia i bledy trafialy jako breadcrumbs
- * do Crashlytics – ulatwiaja debugowanie crash-reportsow.
+ * 🛡️ Bezpieczeństwo i Prywatność:
+ * - Automatycznie usuwa wzorce e-maili i długich tokenów z treści logów.
+ * - Celowo nie wysyła pełnych obiektów [Throwable], aby uniknąć wycieku danych z komunikatów systemowych.
  *
- * Logika:
- *  - priority >= WARN  → Crashlytics.log() (breadcrumb)
- *  - throwable         → celowo ignorowany, aby nie wysylac surowych danych z wyjatku
- *  - komunikaty sa redagowane z podstawowych danych wrazliwych
- *  - priority < WARN   → ignorowane (nie zasmiecamy Crashlytics)
- *
- * Wyjatki wymagajace raportowania jako non-fatal powinny byc wysylane jawnie
- * w miejscu, w ktorym mozna zagwarantowac, ze nie zawieraja danych wrazliwych.
+ * ✅ Gwarancje:
+ * - Nie generuje wyjścia do standardowego Logcata (bezpieczne dla buildów produkcyjnych).
  */
 class CrashlyticsTree(
     private val crashlyticsSink: CrashlyticsSink = FirebaseCrashlyticsSink()

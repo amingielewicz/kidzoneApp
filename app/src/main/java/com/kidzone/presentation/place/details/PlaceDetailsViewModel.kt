@@ -56,7 +56,10 @@ private const val TOP_RANKING_BADGE_LIMIT = 10
 private const val PLACE_PHOTO_UPLOAD_TIMEOUT_MS = 30_000L
 
 /**
- * ViewModel ekranu szczegółów miejsca.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie stanem wyświetlania szczegółów miejsca i jego opinii.
+ * - Obsługa akcji użytkownika (dodawanie/edycja opinii, zgłaszanie, usuwanie).
+ * - Obliczanie agregatów ocen i statusu rankingowego na poziomie UI.
  */
 @HiltViewModel
 class PlaceDetailsViewModel @Inject constructor(
@@ -124,7 +127,7 @@ class PlaceDetailsViewModel @Inject constructor(
         fun getLabel(): String = stringResource(labelRes)
     }
 
-    enum class      ReviewActionEvent { ADDED, UPDATED }
+    enum class ReviewActionEvent { ADDED, UPDATED }
 
     private val placeId: String =
         savedStateHandle.get<String>(Route.PlaceDetails.ARG_PLACE_ID).orEmpty()
@@ -497,7 +500,6 @@ class PlaceDetailsViewModel @Inject constructor(
         val finalHashesMap = mutableMapOf<String, String>()
         val seenHashes = mutableSetOf<String>()
 
-        // 1. Zachowaj hashe dla URLi, które pozostały
         for (url in retainedPhotoUrls) {
             existing.photoHashes[url]?.let { hash ->
                 finalHashesMap[url] = hash
@@ -508,7 +510,6 @@ class PlaceDetailsViewModel @Inject constructor(
         val newUploadedUrls = mutableListOf<String>()
         var reviewDuplicatesSkipped = 0
 
-        // 2. Upload nowych zdjęć i zbieranie ich hashy
         for (uri in photoUris) {
             val bytes = imageCompressor.compressToWebp(uri)
             if (bytes != null) {
@@ -546,10 +547,7 @@ class PlaceDetailsViewModel @Inject constructor(
         }
 
         val finalPhotoUrls = retainedPhotoUrls + newUploadedUrls
-
-        val removedUrls = existing.photoUrls.filter {
-            it !in retainedPhotoUrls
-        }
+        val removedUrls = existing.photoUrls.filter { it !in retainedPhotoUrls }
 
         val updated = existing.copy(
             rating = rating,
@@ -615,13 +613,9 @@ class PlaceDetailsViewModel @Inject constructor(
         }
     }
 
-    fun reportPlace(
-        reason: PlaceReportReason,
-        comment: String = ""
-    ) {
+    fun reportPlace(reason: PlaceReportReason, comment: String = "") {
         val place = _uiState.value.place ?: return
         val user = currentUser.value ?: return
-
         viewModelScope.launch {
             val result = placeRepository.reportPlace(
                 placeId = place.id,
@@ -629,24 +623,15 @@ class PlaceDetailsViewModel @Inject constructor(
                 reason = reason.name,
                 comment = comment
             )
-
             if (result is OpResult.Success) {
                 analyticsHelper.logReportPlace(reason)
-
-                _uiState.update {
-                    it.copy(isPlaceReported = true)
-                }
+                _uiState.update { it.copy(isPlaceReported = true) }
             }
         }
     }
 
-    fun reportReview(
-        reviewId: String,
-        reason: ReviewReportReason,
-        comment: String = ""
-    ) {
+    fun reportReview(reviewId: String, reason: ReviewReportReason, comment: String = "") {
         val user = currentUser.value ?: return
-
         viewModelScope.launch {
             val result = reviewRepository.reportReviewAsSpam(
                 reviewId = reviewId,
@@ -654,26 +639,15 @@ class PlaceDetailsViewModel @Inject constructor(
                 reason = reason.name,
                 comment = comment
             )
-
             if (result is OpResult.Success) {
                 analyticsHelper.logReportReview(reason)
-
-                _uiState.update {
-                    it.copy(
-                        reportedReviewIds = it.reportedReviewIds + reviewId
-                    )
-                }
+                _uiState.update { it.copy(reportedReviewIds = it.reportedReviewIds + reviewId) }
             }
         }
     }
 
-    fun reportPhoto(
-        photoUrl: String,
-        reason: PhotoReportReason,
-        comment: String = ""
-    ) {
+    fun reportPhoto(photoUrl: String, reason: PhotoReportReason, comment: String = "") {
         val user = currentUser.value ?: return
-
         viewModelScope.launch {
             val result = placeRepository.reportPhoto(
                 photoUrl = photoUrl,
@@ -681,15 +655,9 @@ class PlaceDetailsViewModel @Inject constructor(
                 reason = reason.name,
                 comment = comment
             )
-
             if (result is OpResult.Success) {
                 analyticsHelper.logReportPhoto(reason)
-
-                _uiState.update {
-                    it.copy(
-                        reportedPhotoUrls = it.reportedPhotoUrls + photoUrl
-                    )
-                }
+                _uiState.update { it.copy(reportedPhotoUrls = it.reportedPhotoUrls + photoUrl) }
             }
         }
     }
@@ -714,32 +682,17 @@ class PlaceDetailsViewModel @Inject constructor(
         addPhotosToPlace(listOf(photoUri))
     }
 
-
     fun addPhotosToPlace(photoUris: List<android.net.Uri>) {
         if (photoUris.isEmpty()) return
-
         val user = currentUser.value ?: return
-
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(isUploadingPlacePhoto = true)
-            }
-
+            _uiState.update { it.copy(isUploadingPlacePhoto = true) }
             var duplicateSkipped = false
-
             try {
                 val result = withTimeoutOrNull(PLACE_PHOTO_UPLOAD_TIMEOUT_MS) {
-                    uploadPickedPlacePhotos(
-                        photoUris = photoUris,
-                        userId = user.id
-                    )
+                    uploadPickedPlacePhotos(photoUris, user.id)
                 }
-
-                if (result == null) {
-                    Timber.e("Place photo upload timed out")
-                } else {
-                    duplicateSkipped = result
-                }
+                duplicateSkipped = result ?: false
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -748,8 +701,7 @@ class PlaceDetailsViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isUploadingPlacePhoto = false,
-                        placePhotoDuplicateEvent =
-                            it.placePhotoDuplicateEvent || duplicateSkipped
+                        placePhotoDuplicateEvent = it.placePhotoDuplicateEvent || duplicateSkipped
                     )
                 }
             }
@@ -771,8 +723,6 @@ class PlaceDetailsViewModel @Inject constructor(
         }
         return duplicateSkipped
     }
-
-    @Suppress("TooGenericExceptionCaught")
 
     private suspend fun uploadPickedPlacePhoto(
         photoUri: android.net.Uri,
@@ -873,7 +823,10 @@ class PlaceDetailsViewModel @Inject constructor(
         if (review.userId != user.id || photoUrl !in review.photoUrls) return
 
         viewModelScope.launch {
-            val updated = review.copy(photoUrls = review.photoUrls - photoUrl)
+            val updated = review.copy(
+                photoUrls = review.photoUrls - photoUrl,
+                photoHashes = review.photoHashes - photoUrl
+            )
             when (reviewRepository.updateReview(updated)) {
                 is OpResult.Success -> {
                     try {

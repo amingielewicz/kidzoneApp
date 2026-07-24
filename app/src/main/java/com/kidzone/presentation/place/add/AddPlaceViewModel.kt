@@ -14,6 +14,7 @@ import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.service.ImageCompressorPort
 import com.kidzone.navigation.Route
 import com.kidzone.review.InAppReviewManager
+import com.kidzone.utils.GeoUtils
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.PhotoHasher
 import com.kidzone.utils.PhotoUploader
@@ -33,14 +34,42 @@ import javax.inject.Inject
 import java.util.UUID
 
 /**
- * ViewModel ekranu dodawania / edycji miejsca.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie stanem formularza dodawania i edycji miejsca.
+ * - Walidacja pól (nazwa, opis, adres, udogodnienia) przed zapisem.
+ * - Koordynacja kompresji i uploadu zdjęć.
  *
- * Działa w dwóch trybach:
- *  - **create** (placeId = null) – formularz pusty, `save()` wola
- *    `addPlace()`.
- *  - **edit** (placeId z nawigacji) – pre-filluje stan z `getPlace()` i
- *    `save()` woła `updatePlace()` zachowując immutowalne pola
- *    (id, ownerUserId, createdAtMillis, averageRating, reviewsCount).
+ * 🚫 Poza zakresem:
+ * - Brak decyzji o offline queue (obsługiwane przez Repository).
+ * - Brak retry logiki dla operacji sieciowych.
+ * - Brak zarządzania sesją użytkownika.
+ *
+ * 📥 Wejście:
+ * - [SavedStateHandle] z opcjonalnym ID edytowanego miejsca.
+ * - Interakcje użytkownika z polami formularza.
+ *
+ * 📤 Wyjście:
+ * - Stan formularza ([UiState]).
+ * - Status zapisu i ewentualne zdarzenia nawigacji.
+ *
+ * ✅ Gwarancje:
+ * - Zachowanie pól immutowalnych (id, ownerId, counters) przy edycji.
+ * - Normalizacja tekstu przed zapisem do bazy.
+ *
+ * 🔌 Offline:
+ * - Wspiera odczyt danych edytowanego miejsca z cache lokalnego.
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla wszystkich operacji asynchronicznych (zapis, upload).
+ * - Brak blokujących operacji na wątku Main.
+ *
+ * 🧪 Testowalność:
+ * - Pełne DI.
+ * - Brak zależności od singletonów.
+ * - Deterministyczność stanu formularza.
+ *
+ * 🧼 Lifecycle:
+ * - Pre-fillowanie stanu przy startu (tryb edycji) na podstawie SavedStateHandle.
  */
 @HiltViewModel
 class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
@@ -53,22 +82,6 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
     private val inAppReviewManager: InAppReviewManager
 ) : ViewModel() {
 
-    /**
-     * Stan UI ekranu "Dodaj / edytuj miejsce".
-     *
-     * @property isEditMode true gdy ładujemy istniejące miejsce (placeId != null)
-     * @property editingPlaceId id edytowanego miejsca, null w trybie create
-     * @property latitude współrzędna geograficzna – null gdy nie pobrano
-     * @property longitude współrzędna geograficzna – null gdy nie pobrano
-     * @property isFetchingLocation true podczas pobierania GPS
-     * @property isLoadingPlace true gdy ładujemy istniejące miejsce do edycji
-     * @property isSaving true podczas zapisu do Firestore
-     * @property errorMessage komunikat błędu (np. brak GPS, błąd zapisu)
-     * @property isSaved true po pomyślnym zapisie – sygnał do nawigacji
-     * @property savedNewLatitude współrzędne nowo utworzonego miejsca (tylko create);
-     *           pozwalają wyświetlić mapę wycentrowaną na pinie po popBackStack
-     * @property savedNewLongitude jak wyżej
-     */
     /**
      * Miejsce znalezione w pobliżu aktualnej lokalizacji (potencjalny duplikat).
      */
@@ -98,12 +111,7 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
         val savedNewLongitude: Double? = null,
         /**
          * Mapa: udogodnienie -> liczba istniejących miejsc, w których jest
-         * zaznaczone. Używana przez UI do sortowania chipów udogodnień
-         * od najczęściej do najrzadziej używanych.
-         *
-         * Pusta mapa = jeszcze nie wczytane (lub fetch padł). UI w tym
-         * stanie pokazuje udogodnienia w kolejności z enuma (logiczne
-         * grupowanie wg PlaceCategory) - to bezpieczny fallback.
+         * zaznaczone. Używana przez UI do sortowania chipów udogodnień.
          */
         val amenityFrequency: Map<Amenity, Int> = emptyMap(),
         /** Miejsca w promieniu 200m od pobranej lokalizacji GPS. */
@@ -138,9 +146,7 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     /**
-     * Pełen oryginalny obiekt edytowanego miejsca – trzymamy go po stronie
-     * VM, żeby przy save w trybie edit móc skopiować immutowalne pola
-     * (ownerUserId, createdAtMillis, ratingi) bez wystawiania ich w UiState.
+     * Pełen oryginalny obiekt edytowanego miejsca.
      */
     private var editingOriginal: Place? = null
 
@@ -152,25 +158,7 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
         loadAmenityFrequency()
     }
 
-    /**
-     * Liczy częstość występowania każdego udogodnienia we wszystkich
-     * miejscach w bazie - jednorazowo, na początku ekranu.
-     *
-     * Cache: wyniki trzymane w companion object z TTL ([FREQUENCY_CACHE_TTL_MS]).
-     * Dzięki temu wielokrotne wejścia na ekran "Dodaj / Edytuj" nie
-     * generują powtórnych full-scanów. Cache jest invalidowany po TTL
-     * (5 minut - wystarczające przy MVP; nowe miejsca nie pojawiają się
-     * co sekundę).
-     *
-     * Limit: pobieramy max [FREQUENCY_SAMPLE_LIMIT] miejsc (200). Przy
-     * większej bazie wynik dalej będzie statystycznie sensowny, a unikamy
-     * transferu tysięcy dokumentów na jednym snapshot.
-     *
-     * Best-effort - błąd / brak miejsc = pusta mapa, UI fallbackuje wtedy
-     * na kolejność z enuma.
-     */
     private fun loadAmenityFrequency() {
-        // Fast path: use cached value if still fresh
         val cached = cachedAmenityFrequency
         val age = System.currentTimeMillis() - cachedAmenityFrequencyTimestamp
         if (cached != null && age < FREQUENCY_CACHE_TTL_MS) {
@@ -191,7 +179,6 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
                 counts.toMap()
             }.getOrElse { emptyMap() }
 
-            // Persist to companion cache
             cachedAmenityFrequency = frequency
             cachedAmenityFrequencyTimestamp = System.currentTimeMillis()
 
@@ -226,9 +213,7 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
                             errorMessage = null
                         )
                     }
-
                     selectedPhotoHashes.addAll(result.data.photoHashes.values)
-
                 }
                 is OpResult.Failure -> {
                     _uiState.update {
@@ -254,9 +239,6 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
 
     fun onCategoryChange(category: PlaceCategory) {
         _uiState.update { state ->
-            // Po zmianie kategorii pruneujemy wybrane udogodnienia, żeby nie
-            // zostawić zaznaczonych takich, które nie pasują do nowej kategorii
-            // (są wtedy poza widokiem usera, ale nadal w state.amenities).
             val pruned = state.amenities
                 .filter { category in it.applicableCategories }
                 .toSet()
@@ -282,14 +264,6 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
         _uiState.update { it.copy(isFetchingLocation = true, errorMessage = null) }
     }
 
-    /**
-     * Po udanym pobraniu GPS (i ewentualnym reverse geocodingu) zapisuje
-     * współrzędne i nadpisuje pole adresu jeśli geocoder coś zwrócił. Jeśli
-     * [address] jest null/puste, zachowujemy to, co użytkownik wpisał ręcznie.
-     *
-     * Dodatkowo uruchamia fetch miejsc w promieniu 200m, żeby user widział
-     * co już jest dodane w okolicy (ochrona przed duplikatami).
-     */
     fun onLocationFetched(latitude: Double, longitude: Double, address: String? = null) {
         _uiState.update {
             it.copy(
@@ -303,22 +277,17 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
         loadNearbyPlaces(latitude, longitude)
     }
 
-    /**
-     * Ładuje miejsca w promieniu [NEARBY_RADIUS_KM] od podanych współrzędnych.
-     * Wynik zapisywany do [UiState.nearbyPlaces] — UI może pokazać mini-listę
-     * istniejących miejsc pod przyciskiem GPS, żeby user sam zauważył duplikaty.
-     */
     private fun loadNearbyPlaces(latitude: Double, longitude: Double) {
         viewModelScope.launch {
             val nearby = runCatching {
                 when (val result = placeRepository.getPlacesNear(latitude, longitude, NEARBY_RADIUS_KM)) {
                     is OpResult.Success -> result.data
-                        .filter { it.id != _uiState.value.editingPlaceId } // nie pokazuj edytowanego
+                        .filter { it.id != _uiState.value.editingPlaceId }
                         .map { place ->
-                            val distMeters = (haversineKm(
+                            val distMeters = GeoUtils.haversineMeters(
                                 latitude, longitude,
                                 place.latitude, place.longitude
-                            ) * 1000).toInt()
+                            )
                             NearbyPlace(
                                 id = place.id,
                                 name = place.name,
@@ -328,7 +297,6 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
                         }
                         .filter { it.distanceMeters <= NEARBY_RADIUS_METERS }
                         .sortedWith(
-                            // Priorytet: 1) podobna nazwa na górze, 2) bliskość
                             compareByDescending<NearbyPlace> { nearby ->
                                 val input = _uiState.value.name.trim().lowercase()
                                 if (input.isNotEmpty() &&
@@ -348,11 +316,6 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
         _uiState.update { it.copy(isFetchingLocation = false, errorMessage = message) }
     }
 
-    /**
-     * Próba zapisu. Jeśli wykryty potencjalny duplikat (ta sama kategoria
-     * w promieniu [DUPLICATE_RADIUS_METERS]) — zamiast od razu zapisywać,
-     * ustawiamy [UiState.showDuplicateWarning] = true. User musi potwierdzić.
-     */
     fun save(isOffline: Boolean = false) {
         val state = _uiState.value
 
@@ -376,11 +339,6 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
             return
         }
 
-        // Sprawdź potencjalne duplikaty:
-        //  1. Ta sama kategoria w promieniu 100m
-        //  2. Podobna nazwa (case-insensitive contains) w promieniu 200m,
-        //     niezależnie od kategorii — ktoś mógł dodać to samo miejsce
-        //     pod inną kategorią.
         if (!state.isEditMode && !state.showDuplicateWarning) {
             val inputName = state.name.trim().lowercase()
             val duplicate = state.nearbyPlaces.firstOrNull { nearby ->
@@ -402,13 +360,11 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
         performSave()
     }
 
-    /** User potwierdził "Dodaj mimo to" w dialogu duplikatów. */
     fun confirmSaveDespiteDuplicate() {
         _uiState.update { it.copy(showDuplicateWarning = false, duplicateCandidate = null) }
         performSave()
     }
 
-    /** User anulował dialog duplikatów. */
     fun dismissDuplicateWarning() {
         _uiState.update { it.copy(showDuplicateWarning = false, duplicateCandidate = null) }
     }
@@ -422,7 +378,8 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
     }
 
     // --- Zarządzanie zdjęciami ---
-    /** Dodaje zdjęcia z photo pickera (respektuje limit MAX_PLACE_PHOTOS). */
+
+    /** Dodaje zdjęcia z photo pickera. */
     fun addPhotos(uris: List<Uri>) {
         _uiState.update { state ->
             val currentTotal = state.photoUris.size + state.existingPhotoUrls.size
@@ -434,14 +391,14 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
 
     private val selectedPhotoHashes = mutableSetOf<String>()
 
-    /** Usuwa nowe (jeszcze nie-uploadowane) zdjęcie po indeksie. */
+    /** Usuwa nowe zdjęcie po indeksie. */
     fun removeNewPhoto(index: Int) {
         _uiState.update { state ->
             state.copy(photoUris = state.photoUris.toMutableList().apply { removeAt(index) })
         }
     }
 
-    /** URL-e zdjęć usuniętych przez usera (do skasowania z Storage przy save). */
+    /** URL-e zdjęć usuniętych przez usera. */
     private val removedPhotoUrls: MutableList<String> =
         (savedStateHandle.get<List<String>>("removedPhotos") ?: emptyList()).toMutableList()
 
@@ -449,10 +406,9 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
         savedStateHandle["removedPhotos"] = removedPhotoUrls.toList()
     }
 
-    /** Usuwa istniejące (już uploadowane) zdjęcie po indeksie. */
+    /** Usuwa istniejące zdjęcie po indeksie. */
     fun removeExistingPhoto(index: Int) {
         _uiState.update { state ->
-
             val removedUrl = state.existingPhotoUrls.getOrNull(index)
                 ?: return@update state
 
@@ -461,8 +417,7 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
 
             persistRemovedPhotos()
             state.copy(
-                existingPhotoUrls = state.existingPhotoUrls
-                    .filterNot { it == removedUrl }
+                existingPhotoUrls = state.existingPhotoUrls.filterNot { it == removedUrl }
             )
         }
     }
@@ -484,10 +439,9 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
                 return@launch
             }
 
-            val targetPlaceId = state.editingPlaceId
-                ?: UUID.randomUUID().toString()
+            val targetPlaceId = state.editingPlaceId ?: UUID.randomUUID().toString()
 
-            // Upload nowych zdjęć (kompresja + Firebase Storage + dedup)
+            // Upload nowych zdjęć
             val uploadedUrls = mutableListOf<String>()
             val uploadedHashes = mutableMapOf<String, String>()
             var duplicatesSkipped = 0
@@ -507,12 +461,9 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
                                 placeId = targetPlaceId,
                                 imageBytes = bytes
                             )
-
                             uploadedUrls.add(url)
-
                             selectedPhotoHashes.add(hash)
                             uploadedHashes[url] = hash
-
                         } catch (e: Exception) {
                             _uiState.update {
                                 it.copy(
@@ -528,9 +479,7 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
                 _uiState.update { it.copy(isUploadingPhotos = false) }
             }
 
-            // Komunikat o duplikatach
             if (duplicatesSkipped > 0 && uploadedUrls.isEmpty() && state.existingPhotoUrls.isNotEmpty()) {
-                // Wszystkie nowe zdjęcia to duplikaty – nie zapisujemy, pokazujemy błąd
                 _uiState.update {
                     it.copy(
                         isSaving = false,
@@ -539,45 +488,27 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
                 }
                 return@launch
             } else if (duplicatesSkipped > 0) {
-                // Część zdjęć pominięta – kontynuujemy zapis z resztą
                 _uiState.update {
-                    it.copy(
-                        photoDuplicateMessage = UiText.StringResource(R.string.duplicate_photo_error)
-                    )
+                    it.copy(photoDuplicateMessage = UiText.StringResource(R.string.duplicate_photo_error))
                 }
             }
 
-            // Łączymy istniejące URL-e (edycja) + nowo uploadowane
             val allPhotoUrls = state.existingPhotoUrls + uploadedUrls
-
-            // Budujemy mapę photoUploadedBy: zachowujemy istniejącą (edycja)
-            // + dodajemy nowo-uploadowane URL-e z bieżącym userId
-
             val retainedExistingUrls = state.existingPhotoUrls.toSet()
 
-            val existingUploadedBy = editingOriginal
-                ?.photoUploadedBy
-                .orEmpty()
-                .filterKeys { url ->
-                    url in retainedExistingUrls
-                }
-
-            val newUploadedBy = uploadedUrls.associateWith {
-                currentUser.id
-            }
-            
+            val existingUploadedBy = editingOriginal?.photoUploadedBy.orEmpty()
+                .filterKeys { it in retainedExistingUrls }
+            val newUploadedBy = uploadedUrls.associateWith { currentUser.id }
             val allPhotoUploadedBy = existingUploadedBy + newUploadedBy
 
-            // Persist all known hashes for future dedup (no more downloading images)
             val existingPhotoHashes = editingOriginal?.photoHashes.orEmpty()
-                .filterKeys { it in state.existingPhotoUrls }
+                .filterKeys { it in retainedExistingUrls }
             val allPhotoHashes = existingPhotoHashes + uploadedHashes
 
             val result = if (state.isEditMode && editingOriginal != null) {
                 val original = editingOriginal!!
                 val normalizedName = TextNormalization.toTitleCase(state.name)
-                    .take(PLACE_NAME_MAX_LENGTH)
-                    .trim()
+                    .take(PLACE_NAME_MAX_LENGTH).trim()
                 val updated = original.copy(
                     name = normalizedName,
                     description = TextNormalization.toSentenceCase(state.description)
@@ -594,8 +525,7 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
                 placeRepository.updatePlace(updated)
             } else {
                 val normalizedName = TextNormalization.toTitleCase(state.name)
-                    .take(PLACE_NAME_MAX_LENGTH)
-                    .trim()
+                    .take(PLACE_NAME_MAX_LENGTH).trim()
                 val newPlace = Place(
                     id = targetPlaceId,
                     ownerUserId = currentUser.id,
@@ -617,13 +547,10 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
 
             when (result) {
                 is OpResult.Success -> {
-                    // Firestore jest już zapisany. Teraz sprzątamy pliki w Storage.
                     for (url in removedPhotoUrls.toList()) {
                         try {
                             photoUploader.deletePhoto(url)
-                        } catch (_: Exception) {
-                            // Best-effort: błąd sprzątania nie cofa poprawnego zapisu miejsca.
-                        }
+                        } catch (_: Exception) { }
                     }
                     removedPhotoUrls.clear()
                     persistRemovedPhotos()
@@ -663,16 +590,9 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
     }
 
     private companion object {
-        /** Max places to sample for amenity frequency calculation. */
         const val FREQUENCY_SAMPLE_LIMIT = 200
-
-        /** Cache TTL for amenity frequency map (5 minutes). */
         const val FREQUENCY_CACHE_TTL_MS = 5L * 60 * 1000
 
-        /**
-         * In-memory cache shared across VM instances (companion = class-level).
-         * Cleared when process dies - acceptable for non-critical UX hint.
-         */
         @Volatile
         var cachedAmenityFrequency: Map<Amenity, Int>? = null
 
@@ -681,32 +601,9 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
     }
 }
 
-/** Promień (km) w jakim szukamy istniejących miejsc do wyświetlenia pod GPS. */
 private const val NEARBY_RADIUS_KM = 0.5
-
-/** Promień (metry) do wyświetlenia jako "w pobliżu". */
 private const val NEARBY_RADIUS_METERS = 200
-
-/** Promień (metry) dla wykrywania duplikatów (ta sama kategoria). */
 private const val DUPLICATE_RADIUS_METERS = 100
-
-/** Maksymalna liczba zdjęć na jedno miejsce. */
 const val MAX_PLACE_PHOTOS = 5
-
-/** Maksymalna długość nazwy miejsca widoczna w formularzach i zapisie. */
 const val PLACE_NAME_MAX_LENGTH = 50
-
-/** Maksymalna długość opisu miejsca widoczna w formularzach i zapisie. */
 const val PLACE_DESCRIPTION_MAX_LENGTH = 500
-
-/** Odległość w km między dwoma punktami (formuła haversine). */
-private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-    val r = 6371.0
-    val dLat = Math.toRadians(lat2 - lat1)
-    val dLon = Math.toRadians(lon2 - lon1)
-    val a = kotlin.math.sin(dLat / 2).let { it * it } +
-            kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
-            kotlin.math.sin(dLon / 2).let { it * it }
-    val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
-    return r * c
-}

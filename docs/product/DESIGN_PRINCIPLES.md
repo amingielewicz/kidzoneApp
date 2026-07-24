@@ -1,94 +1,94 @@
 # Design Principles
 
+Ostatnia aktualizacja: 2026-07-13
+
 ## Cel
 
-Dokument opisuje zasady projektowe KidZone. Ma pomagać w podejmowaniu decyzji UI, UX i produktowych.
+Zasady projektowe kidZone wspierają decyzje produktowe, UI i UX. Priorytetem jest szybkie znalezienie miejsca, zaufanie do danych i dostępność.
 
-## 1. Rodzic ma szybko znaleźć miejsce
+## 1. Rodzic szybko znajduje miejsce
 
-Najważniejszy scenariusz aplikacji to szybkie znalezienie miejsca przyjaznego dzieciom.
+Najważniejsze flow to znalezienie miejsca przyjaznego dzieciom.
 
-W praktyce:
+- Start, Mapa i Lista są łatwo dostępne,
+- filtry i sortowanie są zrozumiałe,
+- najważniejsze informacje są widoczne bez wchodzenia w szczegóły,
+- mapa ma pełny fallback w postaci listy,
+- lokalizacja pomaga, ale nie jest warunkiem działania aplikacji.
 
-- mapa i lista muszą być łatwo dostępne,
-- filtry muszą być zrozumiałe,
-- najważniejsze informacje muszą być widoczne bez wchodzenia w szczegóły,
-- aplikacja nie może zmuszać użytkownika do myślenia technicznego.
+## 2. Jeden ekran, jeden główny cel
 
-## 2. Mniej hałasu, więcej informacji
+- główna akcja jest widoczna,
+- akcje drugorzędne nie konkurują z CTA,
+- nie używamy ciężkich belek i nadmiaru kolorów,
+- kategorie korzystają ze wspólnego badge lub ikony,
+- komunikaty i formularze nie przeciążają użytkownika.
 
-KidZone powinien być lekki wizualnie. UI ma pomagać, nie dominować.
+## 3. Każdy stan prowadzi dalej
 
-W praktyce:
+Loading, empty, error, offline i permission state powinny mówić użytkownikowi, co się dzieje i co może zrobić.
 
-- unikamy ciężkich belek i nadmiaru kolorów,
-- kategorie pokazujemy jako badge lub ikonę,
-- informacje drugorzędne nie konkurują z nazwą miejsca,
-- każdy ekran ma jeden główny cel.
+- pusty stan ma sensowne CTA,
+- błąd nie usuwa danych formularza,
+- retry nie tworzy duplikatów,
+- brak internetu nie udaje sukcesu zapisu,
+- odmowa uprawnienia nie tworzy martwej akcji.
 
-## 3. Każdy pusty stan prowadzi dalej
+## 4. Dostępność jest częścią funkcji
 
-Pusty ekran nie może wyglądać jak błąd.
+- cele dotykowe mają odpowiedni rozmiar,
+- elementy interaktywne mają etykiety,
+- duża czcionka nie zasłania akcji,
+- kolor nie jest jedynym nośnikiem informacji,
+- mapa ma alternatywę listową,
+- kolejność fokusu jest logiczna.
 
-W praktyce każdy empty state powinien mieć:
+## 5. Uprawnienia są opcjonalne i zrozumiałe
 
-- prosty nagłówek,
-- krótkie wyjaśnienie,
-- sensowne CTA.
-
-## 4. Dostępność jest częścią UX
-
-Dostępność nie jest dodatkiem na koniec. Jest warunkiem jakości.
-
-W praktyce:
-
-- dbamy o kontrast,
-- dbamy o touch targety,
-- dodajemy opisy ikon,
-- wspieramy większe fonty,
-- mapa ma alternatywę listową.
-
-## 5. Offline i błędy są normalnym stanem
-
-Aplikacja mobilna działa w realnym świecie: słaby internet, brak GPS, zmienne warunki.
-
-W praktyce:
-
-- brak internetu ma osobny komunikat,
-- brak lokalizacji nie blokuje całej aplikacji,
-- cache powinien pomagać w podstawowym korzystaniu,
-- błędy mówią, co można zrobić dalej.
+- prosimy o zgodę w kontekście konkretnej funkcji,
+- wyjaśniamy korzyść przed dialogiem systemowym,
+- trwała odmowa prowadzi do ustawień aplikacji,
+- po powrocie stan jest ponownie sprawdzany,
+- Photo Picker działa bez szerokiego dostępu do galerii,
+- odmowa powiadomień nie blokuje produktu.
 
 ## 6. Zaufanie ważniejsze niż tempo
 
-KidZone operuje na danych społecznościowych i lokalizacji. Zaufanie jest kluczowe.
+- nie logujemy PII, tokenów ani dokładnej lokalizacji,
+- jasno opisujemy sposób użycia danych,
+- zgłoszenia i moderacja są dostępne,
+- account deletion jest widoczne i działa,
+- błędy częściowe nie są ukrywane,
+- dane społecznościowe mają ownership i historię moderacji.
 
-W praktyce:
+## 7. Dane i koszty są częścią UX
 
-- nie logujemy danych wrażliwych,
-- jasno komunikujemy uprawnienia,
-- dbamy o zgłaszanie naruszeń,
-- walidujemy zdjęcia i opinie,
-- nie ukrywamy błędów.
+- listy i mapy mają limity,
+- nie pobieramy całych kolekcji,
+- cache poprawia użyteczność offline,
+- kosztowne operacje mają rate limiting,
+- wolne lub niestabilne funkcje nie blokują całej aplikacji.
 
-## 7. Release bez checklisty nie istnieje
+## 8. Release bez dowodów nie istnieje
 
-Każde wydanie przechodzi przez GO / NO-GO.
+Przed wydaniem wymagane są:
 
-W praktyce:
+- green CI,
+- signed AAB,
+- manual smoke,
+- PASS dla runtime permissions,
+- PASS dla account deletion,
+- zgodna deklaracja Data Safety,
+- zweryfikowane Rules i App Check,
+- monitoring rollout.
 
-- nie wypuszczamy bez smoke testu,
-- nie wypuszczamy bez sprawdzenia Crashlytics,
-- nie wypuszczamy bez sprawdzenia App Check i Rules,
-- nie wypuszczamy, jeśli podstawowe flow nie działa.
+## Checklista decyzji produktowej
 
-## Checklist decyzji produktowej
-
-Przed dodaniem nowej funkcji odpowiedz:
-
-- [ ] Czy pomaga rodzicowi znaleźć lub ocenić miejsce?
-- [ ] Czy upraszcza korzystanie z aplikacji?
-- [ ] Czy nie zwiększa niepotrzebnie złożoności?
-- [ ] Czy da się ją sensownie przetestować?
-- [ ] Czy nie pogarsza dostępności?
-- [ ] Czy nie zwiększa ryzyka privacy/security?
+- [ ] Czy funkcja pomaga znaleźć, ocenić lub bezpiecznie dodać miejsce?
+- [ ] Czy główna wartość jest zrozumiała bez instrukcji?
+- [ ] Czy działa bez zgód opcjonalnych?
+- [ ] Czy ma loading, empty, error i offline state?
+- [ ] Czy jest dostępna z TalkBack i dużą czcionką?
+- [ ] Czy nie zwiększa niepotrzebnie kosztów lub liczby requestów?
+- [ ] Czy ma strategię privacy, security i account deletion?
+- [ ] Czy da się ją automatycznie lub manualnie zweryfikować?

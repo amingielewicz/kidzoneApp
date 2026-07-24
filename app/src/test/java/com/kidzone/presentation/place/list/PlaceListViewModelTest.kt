@@ -30,6 +30,21 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 
+/**
+ * 🧪 Cel testu:
+ * - Weryfikacja wyszukiwania, filtrowania i paginacji listy miejsc w [PlaceListViewModel].
+ * - Sprawdzenie poprawności obliczania dystansów i sortowania wyników.
+ *
+ * 🛠️ Środowisko:
+ * - Mockowanie dostawcy lokalizacji ([LocationProvider]) i repozytoriów.
+ * - [MainDispatcherRule] dla testów asynchronicznych strumieni Flow.
+ *
+ * 🔍 Scenariusze:
+ * - Wyszukiwanie po nazwie i kategorii (w tym normalizacja tekstu).
+ * - Działanie filtrów udogodnień (Amenities).
+ * - Proces paginacji (ładowanie kolejnych stron wyników).
+ * - Obsługa błędów ładowania danych i odświeżanie (Pull-to-refresh).
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlaceListViewModelTest {
 

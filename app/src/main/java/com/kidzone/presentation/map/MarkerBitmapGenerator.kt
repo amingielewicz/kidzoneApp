@@ -29,6 +29,15 @@ private val mapClusterContainerColor = Color(0xFFFFB74D)
 @Suppress("MagicNumber")
 private val mapClusterContentColor = Color(0xFF3E2723)
 
+/**
+ * Tworzy i zapamiętuje bitmapowe ikony markerów używane przez Google Maps.
+ *
+ * Ikony kategorii są renderowane z wektorów Compose do bitmap tylko po zmianie density lub kolorów
+ * motywu. Wyniki trafiają do współdzielonego cache, aby uniknąć kosztownego generowania bitmap przy
+ * każdej recomposition mapy.
+ *
+ * @return cache udostępniający ikony kategorii i klastrów.
+ */
 @Composable
 fun rememberMarkerIcons(): MarkerIconCache {
     val density = LocalDensity.current
@@ -101,7 +110,7 @@ fun rememberMarkerIcons(): MarkerIconCache {
                 }
             }
             canvas.restore()
-            
+
             globalCategoryCache[category] = BitmapDescriptorFactory.fromBitmap(bitmap)
         }
     }
@@ -109,16 +118,35 @@ fun rememberMarkerIcons(): MarkerIconCache {
     return cache
 }
 
+/**
+ * Udostępnia gotowe bitmapy markerów kategorii i klastrów.
+ *
+ * Klasa korzysta ze współdzielonych cache'y, dlatego nie należy przechowywać w niej danych zależnych
+ * od konkretnego ekranu lub użytkownika.
+ */
 class MarkerIconCache(
     private val density: Density,
     private val clusterContainerColor: Int,
     private val clusterContentColor: Int,
     private val surfaceColor: Int
 ) {
+    /**
+     * Pobiera ikonę kategorii.
+     *
+     * @param category kategoria miejsca.
+     * @return wygenerowany descriptor albo domyślny marker, jeśli cache nie jest jeszcze gotowy.
+     */
     fun getCategoryIcon(category: PlaceCategory): BitmapDescriptor {
         return globalCategoryCache[category] ?: BitmapDescriptorFactory.defaultMarker()
     }
 
+    /**
+     * Pobiera lub generuje ikonę klastra dla liczby markerów.
+     *
+     * Liczby są grupowane przez [clusterCountLabel], aby ograniczyć liczbę bitmap w pamięci.
+     *
+     * @param count liczba miejsc w klastrze.
+     */
     fun getClusterIcon(count: Int): BitmapDescriptor {
         val label = clusterCountLabel(count)
         return globalClusterCache.getOrPut(label) {
@@ -161,6 +189,11 @@ class MarkerIconCache(
     }
 }
 
+/**
+ * Normalizuje liczbę elementów klastra do krótkiej etykiety współdzielącej bitmapy.
+ *
+ * @param count liczba markerów; wartości większe od 100 są ograniczane do `100+`.
+ */
 internal fun clusterCountLabel(count: Int): String = when {
     count <= 10 -> count.toString()
     count >= 100 -> "100+"

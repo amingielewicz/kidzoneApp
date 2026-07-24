@@ -1,37 +1,69 @@
 # ADR-004: Use StateFlow for Screen State
 
+Ostatnia aktualizacja: 2026-07-14
+
 ## Status
 
 Accepted
 
 ## Context
 
-KidZone screens need predictable state handling for loading, success, empty, error and refresh states. Compose works best when UI is rendered from immutable state.
+Ekrany kidZone obsługują loading, content, empty, error, refresh, offline i permission states. Compose działa najlepiej, gdy renderuje niezmienny stan pochodzący z jednego źródła prawdy.
 
 ## Decision
 
-KidZone uses `StateFlow` as the primary mechanism for exposing screen state from ViewModels.
+ViewModele udostępniają trwały stan ekranu przez `StateFlow<UiState>`.
 
-One-time events should use a separate event stream, such as `SharedFlow`, instead of being stored as persistent UI state.
-
-## Consequences
-
-Positive:
-
-- predictable UI rendering,
-- single source of truth per screen,
-- easy unit testing of ViewModels,
-- clear separation between persistent state and one-time events.
-
-Trade-offs:
-
-- requires explicit UiState models,
-- careless state updates may cause unnecessary recompositions,
-- one-time events need a separate pattern.
+Jednorazowe efekty, takie jak nawigacja, snackbar lub otwarcie ustawień, korzystają z osobnego mechanizmu efektów, na przykład `SharedFlow` albo kanału konsumowanego jednokrotnie.
 
 ## Rules
 
-- Major screens expose `StateFlow<UiState>`.
-- UiState should be immutable.
-- Compose observes state and sends actions to ViewModel.
-- Snackbar, toast and navigation events are not stored as persistent state.
+- `UiState` jest niezmienny,
+- ekran renderuje się wyłącznie na podstawie stanu,
+- akcje użytkownika trafiają do ViewModel,
+- aktualizacja stanu jest atomowa,
+- event jednorazowy nie jest przechowywany jako trwały boolean,
+- stan permission flow odzwierciedla rzeczywisty stan systemu,
+- offline, error i partial success są rozróżnione,
+- stan nie zawiera `Context`, `NavController` ani typów Firebase,
+- kolekcja flow w Compose respektuje lifecycle.
+
+## Consequences
+
+### Positive
+
+- przewidywalne renderowanie,
+- prostsze testy ViewModeli,
+- jedno źródło prawdy,
+- łatwiejsza obsługa process recreation,
+- czytelne oddzielenie stanu i efektów.
+
+### Trade-offs
+
+- więcej jawnych modeli `UiState`,
+- ryzyko zbyt dużych klas stanu,
+- błędne `combine` może powodować nadmiarowe emisje,
+- efekty jednorazowe wymagają świadomego wzorca,
+- nieuważne porównania mogą zwiększyć recomposition.
+
+## Rejected alternatives
+
+### Wiele niezależnych `LiveData` lub flow dla jednego ekranu
+
+Odrzucone z powodu trudności w utrzymaniu spójnego snapshotu stanu.
+
+### Booleany typu `showSnackbar`
+
+Odrzucone, ponieważ mogą zostać ponownie odtworzone po rotacji lub recomposition.
+
+## Validation
+
+Testy powinny obejmować:
+
+- loading → content,
+- loading → error,
+- refresh z istniejącą treścią,
+- offline z cache i bez cache,
+- jednorazowy efekt bez powtórzenia,
+- równoległe akcje,
+- powrót z ustawień systemowych.

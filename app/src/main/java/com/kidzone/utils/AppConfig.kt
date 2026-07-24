@@ -1,5 +1,7 @@
 package com.kidzone.utils
 
+import com.kidzone.BuildConfig
+
 /**
  * Stałe konfiguracyjne aplikacji – placeholder-y, które właściciel projektu
  * powinien zaktualizować przed publikacją w Google Play.
@@ -33,8 +35,7 @@ object AppConfig {
      * Domyślny komunikat po przekroczeniu timeout Firestore.
      */
     const val TIMEOUT_MESSAGE: String =
-        "Saving is taking too long. Check your internet connection, " +
-            "and if you use an emulator, perform a Cold Boot."
+        "Zapis trwa zbyt długo. Sprawdź połączenie z internetem."
 
     // ========== Review limits ==========
 
@@ -51,12 +52,9 @@ object AppConfig {
 
     /**
      * Pełna nazwa administratora danych osobowych w rozumieniu RODO.
-     *
-     * Dla klauzuli w polityce prywatności. Ustaw przed wdrożeniem na
-     * imię i nazwisko / nazwę firmy / pseudonim deweloperski – cokolwiek,
-     * pod czym konto deweloperskie figuruje w Google Play.
+     * Ładowana z local.properties via BuildConfig.
      */
-    const val ADMINISTRATOR_NAME: String = "Adam Mingielewicz (kidZone)"
+    val ADMINISTRATOR_NAME: String = "${BuildConfig.ADMIN_NAME} (kidZone)"
 
     /**
      * E-mail kontaktowy do spraw RODO i wsparcia użytkownika.
@@ -74,22 +72,28 @@ object AppConfig {
      * przy każdej istotnej zmianie tekstu w [com.kidzone.presentation.profile.PrivacyPolicyDialog].
      */
     const val PRIVACY_POLICY_EFFECTIVE_DATE: String = "29.05.2026"
+
+    /**
+     * Domyślny czas oczekiwania dla subskrypcji Flow (StateFlow).
+     * Zapobiega restartom strumienia przy szybkich zmianach konfiguracji (np. obrót ekranu).
+     */
+    const val FLOW_SUBSCRIPTION_TIMEOUT_MS: Long = 5_000L
 }
 
 /**
- * Helper eliminating repetitive timeout + error-wrapping boilerplate
- * for Firestore writes.
+ * Pomocnik eliminujący powtarzalny kod (boilerplate) obsługi timeoutów i opakowywania błędów
+ * dla operacji zapisu w Firestore.
  *
- * Usage:
+ * Użycie:
  * ```kotlin
  * withFirestoreTimeout {
  *     placesCollection().document(id).set(dto).await()
  * }
  * ```
  *
- * Returns [OpResult.Success] with [Unit] if [block] completes within
- * [AppConfig.WRITE_TIMEOUT_MS], or [OpResult.Failure] with
- * [java.util.concurrent.TimeoutException] otherwise.
+ * Zwraca [OpResult.Success] z [Unit], jeśli [block] zakończy się w czasie
+ * [AppConfig.WRITE_TIMEOUT_MS], lub [OpResult.Failure] z
+ * [java.util.concurrent.TimeoutException] w przeciwnym razie.
  */
 suspend fun withFirestoreTimeout(
     timeoutMs: Long = AppConfig.WRITE_TIMEOUT_MS,

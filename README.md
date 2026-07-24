@@ -1,528 +1,252 @@
 # kidZone 🐻
 
-Społecznościowa aplikacja mobilna dla rodziców — odkrywaj, dodawaj i oceniaj miejsca przyjazne dzieciom.
+Społecznościowa aplikacja mobilna dla rodziców i opiekunów. Ułatwia odkrywanie, dodawanie i ocenianie miejsc przyjaznych dzieciom.
 
-## 📋 Wymagania systemowe
+## Najważniejsze funkcje
+
+### Aplikacja Android
+
+- mapa miejsc z obsługą klastrów i lokalizacji użytkownika,
+- lista miejsc z wyszukiwaniem, sortowaniem i filtrami,
+- kategorie i rozbudowany zestaw udogodnień,
+- dodawanie oraz edycja miejsc,
+- opinie, oceny i zdjęcia,
+- profile użytkowników, odznaki i rankingi,
+- zgłoszenia naruszeń oraz propozycje zmian,
+- powiadomienia push,
+- widget „Miejsca w pobliżu”,
+- tryb offline oparty na Room i WorkManager,
+- deep linki do szczegółów miejsca,
+- In-App Update i In-App Review,
+- A/B Testing oraz maintenance mode przez Firebase Remote Config.
+
+Karty miejsc korzystają ze wspólnego komponentu `CategoryBadge`, dzięki czemu oznaczenia kategorii są spójne na ekranie głównym i liście miejsc.
+
+### Panel administracyjny
+
+- dashboard i statystyki,
+- zarządzanie miejscami i użytkownikami,
+- obsługa zgłoszeń miejsc, opinii i zdjęć,
+- zatwierdzanie oraz odrzucanie propozycji zmian,
+- autoryzacja operacji administracyjnych przez Cloud Functions.
+
+## Wymagania
 
 | Komponent | Wersja |
-|-----------|--------|
-| Android min SDK | **26** (Android 8.0 Oreo) |
-| Android target SDK | **35** (Android 15) |
-| Java / JDK | **17** |
-| Kotlin | **2.0.20** |
-| Gradle | **8.13.2** (AGP) |
-| Node.js (Functions) | **22** |
-| Firebase CLI | najnowsza (`npm i -g firebase-tools`) |
+| --- | --- |
+| Android min SDK | 26 (Android 8.0) |
+| Android target SDK | 35 (Android 15) |
+| JDK | 17 |
+| Kotlin | 2.0.20 |
+| Android Gradle Plugin | 8.13.2 |
+| Node.js dla Cloud Functions | 22 |
 
-## 📱 Funkcje
+## Stack technologiczny
 
-### Dla użytkowników:
-- 🗺️ Mapa miejsc przyjaznych dzieciom w okolicy (Google Maps + custom cluster markery)
-- 📍 Dodawanie nowych miejsc z kategoriami i udogodnieniami
-- ⭐ Opinie i oceny (1-5 gwiazdek + komentarz + zdjęcia)
-- 🏆 System odznak i rankingów (użytkownicy + miejsca)
-- 📷 Galeria zdjęć miejsc
-- 🔔 Powiadomienia push (nowa opinia, nowe zdjęcie, ranking, odznaki)
-- 👤 Profil użytkownika z edycją danych
-- 🔍 Wyszukiwanie miejsc (po nazwie + geobounds na mapie)
-- 📊 Ranking TOP 10 użytkowników i miejsc
-- 🚨 Zgłaszanie naruszeń (miejsca, opinie, zdjęcia)
-- 💡 Propozycje zmian w danych miejsc
-- 📲 Widget "Miejsca w pobliżu" na ekranie głównym (Glance AppWidget)
-- 🔄 In-App Update — automatyczne powiadomienie o nowej wersji
-- ⭐ In-App Review — zachęta do oceny w Google Play
-- 📴 Tryb offline — cache Room + synchronizacja w tle (WorkManager)
-- 🔗 Deep linking (`https://playground-705e7162.web.app/place/{id}` + `kidzone://place/{id}`)
-- 🧪 A/B Testing (Remote Config + Analytics)
-- 🛑 Maintenance mode (Remote Config gate)
+### Android
 
-### Panel administracyjny (React):
-- 📊 Dashboard ze statystykami
-- 🚨 Zarządzanie zgłoszeniami (miejsca, opinie, zdjęcia) — paginacja server-side
-- 📝 Zatwierdzanie/odrzucanie propozycji zmian
-- 🏠 Zarządzanie miejscami (edycja, usuwanie z powodem)
-- 👥 Zarządzanie użytkownikami — paginacja, filtrowanie, blokowanie
-- 🔒 Pełne zabezpieczenie — auth check na Cloud Functions
+- Kotlin i Jetpack Compose,
+- Material Design 3,
+- Hilt,
+- Firebase Auth, Firestore, Storage, FCM, Crashlytics, App Check, Remote Config i Performance,
+- Google Maps SDK,
+- Room i WorkManager,
+- JUnit 5, MockK i Turbine,
+- LeakCanary w buildach debug.
 
-## 🛠️ Tech Stack
+### Panel administracyjny
 
-### Android:
-- **Kotlin** + Jetpack Compose
-- **Hilt** (Dependency Injection)
-- **Firebase** Auth + Firestore + Storage + Crashlytics + FCM + App Check + Remote Config + Performance
-- **Google Maps** SDK
-- **Room** (offline cache)
-- **Material Design 3**
-- **JUnit 5** + MockK + Turbine (testing)
-- **LeakCanary** (debug memory leak detection)
+- React 19 i TypeScript,
+- Vite 6,
+- Material UI 6,
+- Firebase SDK 11,
+- React Router 7,
+- ESLint 9 i Prettier 3.
 
-### Panel admina:
-- **React 19** + TypeScript
-- **Vite 6**
-- **Material UI 6**
-- **Firebase SDK 11**
-- **React Router 7**
-- **ESLint 9** (flat config + typescript-eslint + react-hooks)
-- **Prettier 3** (singleQuote, trailingComma, printWidth:100)
+### Backend i infrastruktura
 
-### Backend:
-- **Firebase Cloud Functions** (Node.js 22 / TypeScript)
-- **Nodemailer** (email notifications)
-- **Firebase Hosting** (SPA + static pages)
+- Firebase Cloud Functions w TypeScript,
+- Firebase Hosting,
+- Firestore i Cloud Storage,
+- GitHub Actions.
 
-### CI/CD (GitHub Actions):
-- **Android CI** — lint + assembleDebug + unit tests + Gitleaks secret scan (JDK 17, Gradle caching)
-- **Android UI Tests** — instrumented tests na emulatorze (API 30)
-- **Release Build** — manual workflow do budowania APK
-- **Signed Release** — signed AAB/APK z keystore z GitHub Secrets
-- **Cloud Functions CI** — ESLint + tsc + build
-- **Admin Panel CI** — ESLint + Prettier + tsc + vite build
-- **Firestore Rules Tests** — vitest + @firebase/rules-unit-testing + emulator
+## Architektura
 
-## 🏷️ Kategorie i udogodnienia
+Projekt stosuje podział na warstwy:
 
-### Kategorie miejsc (7):
-| Enum | Opis |
-|------|------|
-| `PLAYGROUND` | Plac zabaw (outdoor) |
-| `PLAY_ROOM` | Sala zabaw (indoor) |
-| `CAFE` | Kawiarnia |
-| `RESTAURANT` | Restauracja |
-| `PARK` | Park |
-| `ATTRACTION` | Atrakcja (zoo, muzeum, aquapark itp.) |
-| `OTHER` | Inne |
+```text
+Presentation
+    Compose Screens, ViewModels, Navigation
 
-### Udogodnienia (40+):
-Każde udogodnienie jest przypisane do odpowiednich kategorii — UI filtruje listę po wybranej kategorii.
+Domain
+    modele, interfejsy repozytoriów, use case'y i porty usług
 
-| Grupa | Przykłady |
-|-------|-----------|
-| **Uniwersalne** | Przewijak, toaleta, dostęp dla wózka, parking |
-| **Plac zabaw** | Ogrodzenie, miękka nawierzchnia, zadaszone ławki, strefa malucha, strefa bez aut |
-| **Restauracja / Kawiarnia** | Menu dla dzieci, krzesełko, sztućce dla dzieci, szybka obsługa, kącik zabaw widoczny z sali |
-| **Sala zabaw** | Strefy wiekowe, animator, monitoring, dezynfekcja zabawek, strefa rodzica, szafki |
-| **Kawiarnia (specyficzne)** | Miejsce do spokojnego karmienia, mikrofalówka, brak głośnej muzyki, zabawki sensoryczne |
-| **Park** | Strefa piknikowa, bezpieczne ścieżki, woda pitna, miejsce do karmienia piersią, oświetlenie |
-| **Atrakcja** | Wypożyczalnia wózków, strefy odpoczynku, fast-track dla rodzin, pokój matki z dzieckiem, punkt zgubionego dziecka |
-| **Ogólne** | Szerokie drzwi, parking rodzinny, przyjazne oznakowania, WiFi, ciche strefy |
+Data
+    repozytoria Firestore, cache Room, Remote Config i implementacje usług Android
 
-Pełna lista: `domain/model/Amenity.kt` • Kategorie: `domain/model/PlaceCategory.kt`
-
-## 📐 Architektura
-
-```
-┌─────────────────────────────────────────────────────┐
-│                   Presentation                       │
-│  ViewModels → Compose Screens → Navigation          │
-│  (czyste od android.content.Context)                │
-├─────────────────────────────────────────────────────┤
-│                   Domain                             │
-│  Models │ Repository interfaces │ Use Cases          │
-│  Service interfaces (LocationProvider,              │
-│  ImageCompressorPort, BadgePreferences)             │
-├─────────────────────────────────────────────────────┤
-│                   Data                               │
-│  Firestore repos │ Room cache │ Remote Config       │
-│  Android service implementations                    │
-├─────────────────────────────────────────────────────┤
-│                   Framework                          │
-│  Hilt DI │ Firebase SDK │ Google Play Services      │
-└─────────────────────────────────────────────────────┘
+Framework
+    Hilt, Firebase SDK i Google Play Services
 ```
 
-ViewModele nie importują `android.content.Context` — zależą od abstrakcji
-w warstwie domain (`LocationProvider`, `ImageCompressorPort`, `BadgePreferences`).
-Implementacje Android są w `data/service/` i bindowane przez Hilt (`di/ServiceModule`).
+ViewModele nie zależą bezpośrednio od `android.content.Context`. Funkcje platformowe są wystawione przez interfejsy warstwy domain i implementowane w warstwie data.
 
-## 📝 Dokumentacja kodu (KDoc)
+Wszystkie kluczowe komponenty posiadają ustrukturyzowaną dokumentację KDoc (🎯 Odpowiedzialności, 📥 Wejście, 📤 Wyjście, ✅ Gwarancje), co ułatwia onboarding i utrzymanie spójności architektonicznej.
 
-Dokumentacja projektowa i checklisty QA: [`docs/README.md`](docs/README.md).
-Architektura trybu offline: [`docs/android/OFFLINE_MODE.md`](docs/android/OFFLINE_MODE.md).
+Szczegóły:
 
-Projekt używa **KDoc** — kotlinowy odpowiednik Javadoc:
+- [indeks dokumentacji](docs/README.md),
+- [standardy dokumentacji KDoc (Android)](docs/api/VIEWMODEL_KDOC_STANDARD.md),
+- [standardy dokumentacji (Admin Panel)](docs/api/ADMIN_PANEL_DOC_STANDARD.md),
+- [standardy dokumentacji (Cloud Functions)](docs/api/CLOUD_FUNCTIONS_DOC_STANDARD.md),
+- [architektura systemu](docs/architecture/ARCHITECTURE.md),
+- [przepływ danych](docs/architecture/DATA_FLOW.md),
+- [tryb offline](docs/android/OFFLINE_MODE.md),
+- [nawigacja](docs/android/NAVIGATION.md).
 
-```kotlin
-/**
- * Kompresuje zdjęcie z podanego URI do WebP ByteArray.
- *
- * @param uri URI zdjęcia (z photo pickera lub kamery)
- * @return ByteArray skompresowanego WebP, lub null jeśli decode się nie powiódł
- * @throws IllegalArgumentException gdy URI jest nieprawidłowy
- * @see ImageCompressor pełny pipeline kompresji
- */
-fun compressToWebp(uri: Uri): ByteArray?
-```
+## Uprawnienia Android
 
-### Tagi KDoc:
-| Tag | Opis | Przykład |
-|-----|------|---------|
-| `@param` | Parametr funkcji | `@param placeId identyfikator miejsca` |
-| `@return` | Wartość zwracana | `@return lista miejsc lub pusty list` |
-| `@throws` | Wyjątek | `@throws TimeoutException po 30s` |
-| `@property` | Pole data class | `@property name nazwa użytkownika` |
-| `@see` | Odnośnik do innej klasy/metody | `@see PlaceRepository` |
-| `@sample` | Przykład użycia | `@sample com.kidzone.samples.addPlace` |
-| `@since` | Od której wersji | `@since 0.2.0` |
+| Uprawnienie | Zastosowanie | Charakter |
+| --- | --- | --- |
+| `INTERNET` | Firebase, mapy i komunikacja sieciowa | wymagane |
+| `ACCESS_NETWORK_STATE` | wykrywanie stanu sieci i obsługa offline | wymagane |
+| `ACCESS_FINE_LOCATION` | dokładna lokalizacja podczas używania aplikacji | opcjonalne runtime |
+| `ACCESS_COARSE_LOCATION` | lokalizacja przybliżona | opcjonalne runtime |
+| `CAMERA` | wykonanie zdjęcia w aplikacji | opcjonalne runtime |
+| `POST_NOTIFICATIONS` | powiadomienia na Androidzie 13+ | opcjonalne runtime |
 
-### Generowanie HTML:
-```bash
-# Generuj dokumentację HTML (wymaga Dokka plugin)
-./gradlew dokkaHtml
-# Output: app/build/dokka/html/index.html
-```
+Aplikacja nie deklaruje `ACCESS_BACKGROUND_LOCATION`, `READ_MEDIA_IMAGES` ani `READ_EXTERNAL_STORAGE`. Zdjęcia z galerii są wybierane przez systemowy Android Photo Picker.
 
-## 🧪 A/B Testing
+Obsługa odmowy uprawnień jest współdzielona między ekranami. Po trwałej odmowie lokalizacji lub kamery aplikacja kieruje użytkownika do ustawień aplikacji zamiast ponownie wyświetlać nieskuteczny dialog systemowy.
 
-Framework eksperymentowy oparty na Firebase Remote Config + Analytics:
+Pełny opis i macierz QA:
 
-```kotlin
-// W ViewModelu:
-val variant = experimentManager.getVariant(ActiveExperiments.HOME_LAYOUT)
-experimentManager.logExposure(ActiveExperiments.HOME_LAYOUT)
+- [Android permissions i zgodność z Google Play](docs/legal/android-permissions-play-compliance.md),
+- [macierz testów uprawnień](docs/qa/android-permissions-device-matrix.md),
+- [Data Safety](docs/legal/google-play-data-safety-draft.md).
 
-// W Compose:
-ExperimentSwitch(
-    experimentManager = experimentManager,
-    experiment = ActiveExperiments.HOME_LAYOUT,
-    control = { HomeLayoutCurrent() },
-    treatment = { HomeLayoutNew() }
-)
-```
+## Uruchomienie projektu
 
-Aktywne eksperymenty definiowane w `experiment/ActiveExperiments.kt`.
-Szczegóły: patrz `experiment/` package.
+### Android
 
-## 🔢 Wersjonowanie
-
-Wersja aplikacji jest zarządzana w pliku `version.properties` w katalogu głównym:
+1. Skopiuj `google-services.json.template` jako `google-services.json` i uzupełnij konfigurację Firebase.
+2. Dodaj klucz map do `local.properties`:
 
 ```properties
-VERSION_NAME=1.0.0
-VERSION_CODE=1
+MAPS_API_KEY=...
 ```
 
-- **`VERSION_NAME`** — wersja widoczna dla użytkownika (Semantic Versioning: `MAJOR.MINOR.PATCH`)
-- **`VERSION_CODE`** — wewnętrzny numer buildu Android (musi rosnąć przy każdym uploade do Play)
+3. Zbuduj aplikację i uruchom testy:
 
-### Kiedy bumpować:
+```bash
+./gradlew assembleDebug
+./gradlew testDebugUnitTest
+```
 
-| Zmiana | Bump | Przykład |
-|--------|------|---------|
-| Bug fix, drobna poprawka UI | PATCH | `1.0.0` → `1.0.1` |
-| Nowy ekran, filtr, feature | MINOR | `1.0.1` → `1.1.0` |
-| Breaking data migration, redesign | MAJOR | `1.1.0` → `2.0.0` |
+### Panel administracyjny
 
-### Proces release:
-1. Edytuj `version.properties` (bump `VERSION_NAME` + `VERSION_CODE`)
-2. Commit zmiany
-3. Uruchom Android CI (green check)
-4. Uruchom signed release workflow
-
-Szczegóły: [docs/versioning.md](./docs/versioning.md)
-
-## 🚀 Setup
-
-### Android:
-1. Skopiuj `google-services.json.template` do `google-services.json` i uzupełnij
-2. W `local.properties` dodaj: `MAPS_API_KEY=AIza...`
-3. Build: `./gradlew assembleDebug`
-4. Testy: `./gradlew testDebugUnitTest`
-
-### Panel admina:
 ```bash
 cd admin-panel
 npm install
-cp .env.example .env  # uzupełnij klucze Firebase
-npm run dev           # development server
-npm run lint          # ESLint
-npm run format        # Prettier auto-fix
-npm run format:check  # Prettier dry-run
+cp .env.example .env
+npm run dev
 ```
 
-### Cloud Functions:
+Kontrole jakości:
+
+```bash
+npm run lint
+npm run format:check
+npm run build
+```
+
+### Cloud Functions
+
 ```bash
 cd functions
 npm install
 npm run build
 ```
 
-### Firestore Rules Tests:
+### Testy reguł Firestore
+
 ```bash
 cd tests/firestore-rules
 npm install
 firebase emulators:exec --only firestore --project kidzone-rules-test "npx vitest --run"
 ```
 
-### Deploy Firebase:
-```bash
-firebase deploy --only functions,firestore:rules,firestore:indexes,storage,hosting:app
-```
+## CI/CD
 
-### Staging:
-```bash
-firebase use staging    # przełącz na playground-705e7162-staging
-firebase deploy         # deploy na staging
-firebase use default    # wróć na produkcję
-```
+GitHub Actions obejmuje:
 
-Szczegóły: [STAGING.md](./STAGING.md)
+- lint, build i testy jednostkowe Androida,
+- testy instrumentacyjne na emulatorze,
+- skanowanie sekretów przez Gitleaks,
+- budowanie release APK/AAB,
+- kontrolę Cloud Functions,
+- kontrolę panelu administracyjnego,
+- testy reguł Firestore.
 
-## 📱 Uprawnienia (Permissions)
+## Wersjonowanie i release
 
-| Uprawnienie | Cel | Wymagane? |
-|-------------|-----|-----------|
-| `INTERNET` | Komunikacja z Firebase (Auth, Firestore, Storage, FCM) | Tak |
-| `ACCESS_NETWORK_STATE` | Sprawdzenie dostępności sieci (offline mode) | Tak |
-| `ACCESS_FINE_LOCATION` | Lokalizacja użytkownika na mapie, "miejsca w pobliżu" | Tak |
-| `ACCESS_COARSE_LOCATION` | Przybliżona lokalizacja (fallback) | Tak |
-| `CAMERA` | Robienie zdjęć miejsc bezpośrednio z appki | Nie (`required=false`) |
-| `READ_MEDIA_IMAGES` | Wybór zdjęć z galerii (Android 13+) | Tak |
-| `POST_NOTIFICATIONS` | Powiadomienia push (FCM) — Android 13+ wymaga runtime permission | Tak |
+Wersja aplikacji znajduje się w `version.properties`:
 
-### Hardware features (opcjonalne):
-- `android.hardware.camera` — `required=false` (appka działa bez kamery)
-- `android.hardware.camera.autofocus` — `required=false`
-- `android.hardware.location` — `required=false` (użytkownik może przeglądać bez GPS)
-
-## 🔒 Bezpieczeństwo
-
-- Firebase App Check (Play Integrity + reCAPTCHA Enterprise)
-- Auth verification na wszystkich admin Cloud Functions
-- Input sanitization (escapeHtml) w emailach
-- Firestore Security Rules z walidacją typów i ownershipem
-- Storage Rules z limitami rozmiaru i MIME
-- Content Security Policy (CSP) headers na hostingu
-- ProGuard/R8 w release (zawężone -keep reguły + dontwarn dla wewnętrznych klas play-services)
-- Gitleaks secret scanning w CI (blokuje merge przy wykryciu sekretu)
-- Deep link input validation (`NavigationArgumentValidator`)
-- allowBackup=false
-- Network Security Config (no cleartext)
-- Release signing config (keystore z local.properties / env vars / GitHub Secrets)
-- 1 zgłoszenie per user per target (duplicate prevention)
-
-Szczegóły: [SECURITY_REVIEW.md](./SECURITY_REVIEW.md) • [docs/firebase-security-plan.md](./docs/firebase-security-plan.md)
-
-## 📁 Struktura projektu
-
-```
-├── app/                          # Android app (Kotlin/Compose)
-│   ├── src/main/java/com/kidzone/
-│   │   ├── analytics/            # Firebase Analytics helper
-│   │   ├── data/
-│   │   │   ├── local/            # Room database, DAOs, entities
-│   │   │   ├── remote/           # RemoteConfigService, DTOs
-│   │   │   ├── repository/       # Firestore implementations
-│   │   │   └── service/          # Android implementations (Location, Image, Prefs)
-│   │   ├── di/                   # Hilt modules (ServiceModule, DatabaseModule)
-│   │   ├── domain/
-│   │   │   ├── model/            # Domain models (Place, Review, User)
-│   │   │   ├── repository/       # Repository interfaces
-│   │   │   ├── service/          # Domain service interfaces
-│   │   │   └── usecase/          # Use cases (ComputeBadges, NotificationPrefs)
-│   │   ├── experiment/           # A/B Testing framework
-│   │   ├── messaging/            # FCM push service
-│   │   ├── navigation/           # NavGraph, Routes
-│   │   ├── presentation/         # Compose screens + ViewModels
-│   │   │   ├── auth/             # Login, Register
-│   │   │   ├── home/             # Home screen
-│   │   │   ├── maintenance/      # Maintenance mode screen
-│   │   │   ├── map/              # Map screen
-│   │   │   ├── onboarding/       # Onboarding
-│   │   │   ├── place/            # Add/Edit/Details/List/MyPlaces
-│   │   │   ├── profile/          # Profile, badges, notifications
-│   │   │   ├── ranking/          # Rankings
-│   │   │   ├── review/           # MyReviews
-│   │   │   └── splash/           # Splash screen
-│   │   ├── logging/              # CrashlyticsTree
-│   │   └── utils/                # AppConfig, ImageCompressor, TextNormalization
-│   ├── src/test/                 # Unit tests (JUnit 5 + MockK + Turbine)
-│   ├── build.gradle.kts
-│   └── proguard-rules.pro
-├── admin-panel/                  # React admin panel
-│   ├── src/
-│   │   ├── pages/                # Dashboard, Reports, Places, Users, ChangeRequests
-│   │   │   └── reports/          # Decomposed table components
-│   │   ├── components/           # Layout
-│   │   ├── hooks/                # useAuth
-│   │   ├── services/             # firebase, api, cloudFunctions
-│   │   └── types/                # TypeScript interfaces
-│   ├── eslint.config.js          # ESLint flat config
-│   ├── .prettierrc               # Prettier config
-│   └── package.json
-├── functions/                    # Cloud Functions (Node 22/TypeScript)
-│   └── src/index.ts
-├── tests/
-│   └── firestore-rules/          # Firestore rules unit tests (vitest)
-├── .github/workflows/            # CI/CD
-│   ├── android.yml               # Lint + build + test + Gitleaks
-│   ├── android-ui-tests.yml      # Instrumented tests (emulator)
-│   ├── release-build.yml         # Manual APK build
-│   ├── signed-release.yml        # Signed release AAB/APK
-│   ├── functions.yml
-│   ├── admin-panel.yml
-│   └── firestore-rules.yml
-├── gradle/libs.versions.toml     # Version catalog (all deps in one place)
-├── version.properties            # VERSION_NAME + VERSION_CODE
-├── detekt.yml                    # Static analysis config
-├── docs/                         # Dokumentacja dodatkowa
-│   ├── versioning.md             # Szczegóły systemu wersjonowania
-│   ├── firebase-security-plan.md # Plan bezpieczeństwa Firebase
-│   └── milestones/               # Dokumentacja kamieni milowych
-├── firestore.rules
-├── firestore.indexes.json
-├── storage.rules
-├── firebase.json
-├── .firebaserc                   # Project aliases (default + staging)
-├── CHANGELOG.md                  # Historia zmian (Keep a Changelog)
-├── CONTRIBUTING.md               # Zasady kontrybucji i workflow PR
-├── SECURITY_REVIEW.md            # Checklist bezpieczeństwa przed release
-└── STAGING.md                    # Staging environment docs
-```
-
-## 📧 Cloud Functions
-
-| Trigger | Opis |
-|---------|------|
-| onPlaceReport | Email do admina o nowym zgłoszeniu miejsca |
-| onPlaceChangeRequest | Email o propozycji zmiany |
-| onUserCreated | Email powitalny + powiadomienie admina |
-| onReviewReport | Email o zgłoszeniu opinii |
-| onPhotoReport | Email o zgłoszeniu zdjęcia + przyciski akcji |
-| onUserDeleted | Email pożegnalny + powiadomienie admina |
-| onReviewCreatedPush | Push do właściciela miejsca o nowej opinii |
-| onBadgeEarned | Push o nowej odznace |
-| onPhotoAddedToPlace | Push o nowym zdjęciu |
-| onUserBanned | Push + email o blokadzie konta |
-| dailyRankingCheck | Push o awansie w rankingu (scheduled) |
-| adminDeletePlace | HTTP: usuń miejsce + email z powodem |
-| adminDeleteReview | HTTP: usuń opinię + email z powodem |
-| adminDeletePhoto | HTTP: usuń zgłoszone zdjęcie + email |
-| adminDeletePhotoFromPlace | HTTP: usuń zdjęcie z miejsca + email |
-| adminDeleteUser | HTTP: usuń użytkownika + email z powodem |
-| adminDismissPhotoReport | HTTP: odrzuć zgłoszenie zdjęcia |
-| adminUpdateUserEmail | HTTP: aktualizuj email (Auth + Firestore) |
-
-## 🏗️ Conventions
-
-### Commit messages:
-```
-feat: nowa funkcjonalność
-fix: naprawa buga
-refactor: zmiana struktury bez zmiany zachowania
-perf: optymalizacja wydajności
-style: formatowanie (Prettier, whitespace)
-docs: dokumentacja
-test: testy
-chore: tooling, CI, deps
-cleanup: usuwanie dead code
-devops: CI/CD, deploy config
-```
-
-### Branching:
-- `main` — stabilny, produkcyjny kod
-- `feature/*` — nowe funkcje
-- `fix/*` — poprawki bugów
-- `refactor/*` — refactoring
-- `cleanup/*` — cleanup & polish
-- `devops/*` — CI/CD zmiany
-- `style/*` — formatowanie
-
-## 📋 Regulamin i Polityka Prywatności
-
-- Regulamin: `/terms-of-service`
-- Polityka prywatności: `/privacy-policy`
-
-## 💰 Koszty
-
-| Usługa | Plan | Limit free |
-|--------|------|-----------|
-| Firebase Auth | Spark | 50k MAU |
-| Firestore | Spark | 50k reads/20k writes/day |
-| Cloud Functions | Spark | 2M invocations/month |
-| Firebase Storage | Spark | 5GB |
-| Firebase Hosting | Spark | 10GB storage, 360MB/day |
-| Google Maps SDK | — | $200/month credit (~28k loads) |
-| Play Integrity | — | 10k requests/day |
-
-## 🚀 Release / Google Play Store
-
-### Budowanie release bundle:
-```bash
-./gradlew bundleRelease
-# Output: app/build/outputs/bundle/release/app-release.aab
-```
-
-### Signing config:
-Release build wymaga keystore. Skonfiguruj w `local.properties` (lub CI env vars):
 ```properties
-KEYSTORE_PATH=../kidzone-upload.jks
-KEYSTORE_PASSWORD=***
-KEY_ALIAS=kidzone-upload
-KEY_PASSWORD=***
+VERSION_NAME=1.0.0
+VERSION_CODE=1
 ```
 
-Dla CI/CD (GitHub Actions) — ustaw te same wartości jako GitHub Secrets
-i użyj workflow `signed-release.yml`.
+Proces wydania:
 
-### Checklist przed uploadem do Play Console:
-1. ✅ `./gradlew bundleRelease` przechodzi bez błędów
-2. ✅ `versionCode` jest wyższy niż poprzedni upload
-3. ✅ `google-services.json` — produkcyjny (nie staging!)
-4. ✅ ProGuard mapping: `app/build/outputs/mapping/release/mapping.txt` → upload do Play Console (Crashlytics)
-5. ✅ Testuj na fizycznym urządzeniu z release buildem
-6. ✅ Sprawdź deep linki (`adb shell am start -d "kidzone://place/testId"`)
+1. Zwiększ `VERSION_NAME` i `VERSION_CODE`.
+2. Uruchom testy oraz Android CI.
+3. Zbuduj podpisany AAB.
+4. Wykonaj ręczny smoke test na urządzeniu.
+5. Wdróż wydanie stopniowo w Google Play.
 
-### Upload do Google Play Console:
-1. Zaloguj się do [Play Console](https://play.google.com/console)
-2. Production → Create new release
-3. Upload `app-release.aab`
-4. Dodaj release notes (co nowego)
-5. Review → Start rollout (staged rollout zalecany: 10% → 50% → 100%)
+Dokumentacja release:
 
-### Materiały do listingu:
-| Element | Wymiary | Format |
-|---------|---------|--------|
-| Ikona | 512×512 px | PNG, 32-bit |
-| Feature graphic | 1024×500 px | PNG / JPEG |
-| Screenshoty (phone) | 16:9 (np. 1080×1920) | PNG / JPEG, min 2, max 8 |
-| Screenshoty (tablet) | 16:9 (np. 1920×1200) | PNG / JPEG (opcjonalne) |
+- [wersjonowanie](docs/release/VERSIONING.md),
+- [proces wydania](docs/release/RELEASE_PROCESS.md),
+- [checklista Go/No-Go](docs/release/GO_NO_GO_CHECKLIST.md),
+- [proces hotfix](docs/release/HOTFIX_PROCESS.md).
 
-### Google Play dane:
-| Pole | Wartość |
-|------|---------|
-| Kategoria | Parenting |
-| Content rating | PEGI 3 / Everyone (IARC questionnaire) |
-| Target audience | Rodzice (18+) — **nie** zaznaczaj "dzieci" |
-| Polityka prywatności | `https://playground-705e7162.web.app/privacy-policy` |
-| Reklamy | Nie |
-| In-app purchases | Nie |
+## Bezpieczeństwo i prywatność
 
-## ⚠️ Troubleshooting
+- Firebase App Check,
+- reguły Firestore i Storage z walidacją danych,
+- kontrola autoryzacji w funkcjach administracyjnych,
+- brak cleartext traffic,
+- `allowBackup=false`,
+- R8/ProGuard dla buildów release,
+- Gitleaks w CI,
+- ograniczone raportowanie błędów bez surowych danych wyjątków,
+- walidacja argumentów deep linków.
 
-### `bundleRelease` / R8 missing classes
-Jeśli `./gradlew bundleRelease` (lub `assembleRelease`) kończy się błędem:
+Dokumenty:
+
+- [security overview](docs/security.md),
+- [Firebase security plan](docs/firebase-security-plan.md),
+- [App Check](docs/app-check.md),
+- [monitoring](docs/operations/MONITORING.md).
+
+## Struktura repozytorium
+
+```text
+app/                    aplikacja Android
+admin-panel/            panel administracyjny React
+functions/              Firebase Cloud Functions
+tests/firestore-rules/  testy reguł Firestore
+docs/                   dokumentacja techniczna, produktowa, QA i release
+.github/workflows/       pipeline'y CI/CD
 ```
-ERROR: Missing classes detected while running R8.
-```
-Upewnij się, że `proguard-rules.pro` zawiera:
-```proguard
--dontwarn com.google.android.gms.internal.**
--dontwarn com.google.android.gms.common.annotation.NoNullnessRewrite
-```
-Te klasy to wewnętrzne adnotacje Google Play Services, które nie są potrzebne w runtime.
 
-Alternatywnie, sprawdź plik wygenerowany przez R8:
-```
-app/build/outputs/mapping/release/missing_rules.txt
-```
-i dodaj wymienione tam reguły do `proguard-rules.pro`.
+## Kontrybucja
 
-## 📄 Licencja
+Nie commitujemy bezpośrednio do `main`. Każda zmiana przechodzi przez branch, pull request, zielony CI i squash merge.
+
+Szczegóły: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Licencja
 
 Projekt prywatny.
-
-## 🤝 Kontrybucja
-
-Szczegóły: [CONTRIBUTING.md](./CONTRIBUTING.md)
-
-**TL;DR:** Nie commitujemy bezpośrednio do `main`. Każda zmiana przez PR → zielony CI → squash & merge.

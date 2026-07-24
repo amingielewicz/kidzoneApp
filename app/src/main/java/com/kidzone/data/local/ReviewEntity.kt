@@ -2,15 +2,18 @@ package com.kidzone.data.local
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.kidzone.data.local.LocalMapperUtils.fromPipeSeparated
+import com.kidzone.data.local.LocalMapperUtils.toPhotoHashes
+import com.kidzone.data.local.LocalMapperUtils.toPipeSeparated
+import com.kidzone.data.local.LocalMapperUtils.toJson
 import com.kidzone.domain.model.Review
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 
 /**
- * Room entity reprezentujący opinię w lokalnym cache.
+ * ⚙️ Techniczne:
+ * Reprezentacja opinii w lokalnej bazie danych Room.
  *
- * Mapowanie 1:1 z [Review] z warstwy domain. Lista photoUrls przechowywana
- * jako pipe-separated string (analogicznie do PlaceEntity).
+ * @property photoUrls Adresy URL zdjęć połączone znakiem pipe (|).
+ * @property photoHashes Mapa (JSON) URL -> Hash MD5 dla spójnej deduplikacji offline.
  */
 @Entity(tableName = "reviews")
 data class ReviewEntity(
@@ -21,7 +24,7 @@ data class ReviewEntity(
     val rating: Int,
     val comment: String,
     val photoUrls: String, // pipe-separated URLs
-    val photoHashes: String = "", // JSON map: photo URL -> MD5 hash
+    val photoHashes: String = "{}", // JSON map: photo URL -> MD5 hash
     val createdAtMillis: Long,
     val updatedAtMillis: Long,
     /** Czas ostatniego zapisu do cache – do ewentualnej polityki TTL. */
@@ -34,10 +37,8 @@ data class ReviewEntity(
         authorName = authorName,
         rating = rating,
         comment = comment,
-        photoUrls = photoUrls
-            .split("|")
-            .filter { it.isNotBlank() },
-        photoHashes = decodePhotoHashes(photoHashes),
+        photoUrls = photoUrls.fromPipeSeparated(),
+        photoHashes = photoHashes.toPhotoHashes(),
         createdAtMillis = createdAtMillis,
         updatedAtMillis = updatedAtMillis
     )
@@ -50,20 +51,10 @@ data class ReviewEntity(
             authorName = review.authorName,
             rating = review.rating,
             comment = review.comment,
-            photoUrls = review.photoUrls.joinToString("|"),
-            photoHashes = Gson().toJson(review.photoHashes),
+            photoUrls = review.photoUrls.toPipeSeparated(),
+            photoHashes = review.photoHashes.toJson(),
             createdAtMillis = review.createdAtMillis,
             updatedAtMillis = review.updatedAtMillis
         )
     }
-}
-
-private fun decodePhotoHashes(value: String): Map<String, String> {
-    if (!value.trimStart().startsWith("{")) return emptyMap()
-    return runCatching {
-        Gson().fromJson<Map<String, String>>(
-            value,
-            object : TypeToken<Map<String, String>>() {}.type
-        ).orEmpty()
-    }.getOrDefault(emptyMap())
 }

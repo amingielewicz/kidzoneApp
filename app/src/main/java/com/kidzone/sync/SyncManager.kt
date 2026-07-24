@@ -18,41 +18,21 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Manages the offline write queue and sync scheduling.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie lokalną kolejką operacji oczekujących (zapis z opóźnieniem).
+ * - Harmonogramowanie zadań [SyncWorker] poprzez WorkManager.
  *
- * Offline write replay is currently gated for user-facing writes until
- * [SyncWorker] has production processors for every queued operation. Do not
- * enqueue new place/review writes unless their processor performs the Firestore
- * write instead of only acknowledging the payload.
+ * 🛡️ Bezpieczeństwo i Prywatność:
+ * - Zawartość operacji może zawierać dane osobowe (PII); zabrania się logowania pełnej treści.
+ * - Operacje są powiązane z sesją użytkownika na poziomie bazy danych.
  *
- * ## How it works:
+ * ⚡ Wydajność i Zasoby:
+ * - Wykorzystuje WorkManager z wykładniczym czasem ponowień (Backoff).
+ * - Ogranicza aktywność do momentu uzyskania stabilnego połączenia sieciowego.
  *
- * 1. **Enqueue**: When a write operation fails due to no network (or is
- *    explicitly requested for offline-first mode), call [enqueue] with
- *    the operation type and serialized payload.
- *
- * 2. **Schedule**: After enqueue, [requestSync] schedules a [SyncWorker]
- *    with WorkManager constraint: `NetworkType.CONNECTED`. WorkManager
- *    guarantees execution when network is available, even if app is killed.
- *
- * 3. **Process**: [SyncWorker] picks up pending operations FIFO, syncs
- *    each to Firestore, and removes successful ones from the queue.
- *
- * 4. **Retry**: Failed operations are retried with exponential backoff
- *    (10s, 20s, 40s, 80s, 160s). After 5 failures → dead letter.
- *
- * ## Usage in Repository:
- *
- * ```kotlin
- * suspend fun addPlace(place: Place): OpResult<Place> {
- *     return try {
- *         // Try online write first
- *         firestoreWrite(place)
- *     } catch (e: Exception) {
- *         OpResult.failure(e)
- *     }
- * }
- * ```
+ * ✅ Gwarancje:
+ * - Trwałość danych (Persistence): operacje przeżywają restart aplikacji i urządzenia.
+ * - Kolejkowanie FIFO (pierwsze weszło, pierwsze wyszło) na poziomie bazy danych.
  */
 @Singleton
 class SyncManager @Inject constructor(
@@ -61,11 +41,14 @@ class SyncManager @Inject constructor(
 ) {
 
     /**
-     * Enqueue a write operation for later sync.
+     * Dodaje operację do kolejki i planuje próbę synchronizacji.
      *
-     * @param type Operation type (see [OperationType])
-     * @param payload JSON-serialized data for the operation
-     * @return ID of the enqueued operation
+     * Wywołujący musi przekazać typ obsługiwany przez [SyncWorker]. Metoda nie waliduje semantycznie
+     * payloadu i nie powinna być używana jako potwierdzenie zapisu dla UI.
+     *
+     * @param type typ operacji z [OperationType].
+     * @param payload zserializowane dane operacji; nie mogą być zapisywane w logach.
+     * @return identyfikator rekordu Room.
      */
     suspend fun enqueue(type: String, payload: String): Long {
         val entity = PendingOperationEntity(
@@ -75,19 +58,15 @@ class SyncManager @Inject constructor(
         )
         val id = pendingOperationDao.enqueue(entity)
         Timber.d("SyncManager: enqueued $type (id=$id)")
-
-        // Schedule sync when network is available
         requestSync()
-
         return id
     }
 
     /**
-     * Schedule a sync attempt. WorkManager handles:
-     * - Waiting for network connectivity
-     * - Surviving app/process death
-     * - Exponential backoff on failure
-     * - Battery-efficient scheduling
+     * Planuje unikalną próbę przetworzenia kolejki po uzyskaniu połączenia z siecią.
+     *
+     * [ExistingWorkPolicy.REPLACE] zastępuje poprzednie oczekujące zlecenie o tej samej nazwie.
+     * WorkManager odpowiada za przetrwanie restartu procesu i wykładniczy backoff.
      */
     fun requestSync() {
         val constraints = Constraints.Builder()
@@ -114,18 +93,19 @@ class SyncManager @Inject constructor(
     }
 
     /**
-     * Observe count of pending operations.
-     * UI can show a badge/indicator when > 0.
+     * Obserwuje liczbę operacji, które nadal oczekują na zakończenie.
+     *
+     * @return strumień liczby rekordów kwalifikowanych przez DAO jako oczekujące.
      */
     fun observePendingCount(): Flow<Int> = pendingOperationDao.observePendingCount()
 
     /**
-     * Get current pending count (one-shot).
+     * Pobiera aktualną liczbę oczekujących operacji.
      */
     suspend fun getPendingCount(): Int = pendingOperationDao.getPendingCount()
 
     /**
-     * Check if there are pending operations.
+     * Sprawdza, czy kolejka zawiera operacje oczekujące.
      */
     suspend fun hasPendingOperations(): Boolean = getPendingCount() > 0
 }

@@ -23,6 +23,20 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 
+/**
+ * 🧪 Cel testu:
+ * - Weryfikacja pobierania i prezentacji rankingów użytkowników oraz miejsc w [RankingViewModel].
+ * - Sprawdzenie poprawności obliczania odznak w kontekście rankingowym.
+ *
+ * 🛠️ Środowisko:
+ * - Mockowanie warstwy danych i konfiguracji wydajnościowej.
+ * - [MainDispatcherRule] do synchronizacji operacji asynchronicznych.
+ *
+ * 🔍 Scenariusze:
+ * - Sukces pobrania obu list (miejsca i użytkownicy).
+ * - Obsługa błędów częściowych (np. błąd pobierania rankingu miejsc).
+ * - Weryfikacja limitów wyników pobieranych z repozytoriów.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RankingViewModelTest {
 

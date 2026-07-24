@@ -7,11 +7,18 @@ import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
 /**
- * DAO dla tabeli `places` – operacje cache'owania miejsc.
+ * 🎯 Odpowiedzialności:
+ * - Zarządzanie lokalnym cache'em miejsc w bazie danych Room.
+ * - Realizacja zapytań przestrzennych (bounding boxes) i wyszukiwania tekstowego na danych lokalnych.
+ * - Obsługa TTL (Time To Live) dla wpisów w cache.
  *
- * Strategia: Firestore jest source-of-truth, Room to read-cache.
- * Przy każdym uaktualnieniu z Firestore nadpisujemy (REPLACE) lokalne
- * encje i usuwamy te, których już nie ma w zdalnym zbiorze.
+ * 🔌 Strategia Cache:
+ * - Room służy jako Read-Cache dla warstwy prezentacji.
+ * - [OnConflictStrategy.REPLACE] zapewnia spójność przy dociąganiu nowszych wersji dokumentów z Firestore.
+ *
+ * ✅ Gwarancje:
+ * - Flow automatycznie emituje nową listę przy każdej zmianie w tabeli `places`.
+ * - Deterministyczne sortowanie (po dacie utworzenia lub ocenie).
  */
 @Dao
 interface PlaceDao {

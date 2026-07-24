@@ -1,35 +1,65 @@
 # ADR-002: Use Navigation Compose
 
+Ostatnia aktualizacja: 2026-07-14
+
 ## Status
 
 Accepted
 
 ## Context
 
-KidZone is built with Jetpack Compose. Navigation should be consistent with the UI stack and should support deep links, predictable back stack behavior and typed screen arguments.
+kidZone używa Jetpack Compose. Nawigacja musi wspierać spójny back stack, deep linki, stan po logout/delete account oraz bezpieczne argumenty ekranów.
 
 ## Decision
 
-KidZone uses Navigation Compose as the main navigation mechanism.
-
-## Consequences
-
-Positive:
-
-- navigation is aligned with Compose,
-- screen routes are explicit,
-- deep links can be handled in one navigation graph,
-- UI state stays in ViewModels.
-
-Trade-offs:
-
-- route arguments must be kept small,
-- complex flows require discipline around back stack handling,
-- ViewModels must not receive NavController.
+Głównym mechanizmem nawigacji jest Navigation Compose.
 
 ## Rules
 
-- ViewModel does not know NavController.
-- Large objects are not passed through routes.
-- Screen arguments are validated.
-- Deep links handle missing or invalid resources.
+- `NavController` pozostaje w warstwie UI,
+- ViewModel emituje event lub wynik zamiast wykonywać nawigację,
+- route przekazuje małe argumenty, głównie identyfikatory,
+- pełne obiekty są ponownie pobierane po ID,
+- argumenty są walidowane,
+- nieważny lub brakujący zasób ma kontrolowany error state,
+- deep link nie omija auth, ownership ani moderacji,
+- logout, ban sign-out i account deletion czyszczą prywatny back stack,
+- powiadomienie nie tworzy niepotrzebnych duplikatów ekranów.
+
+## Consequences
+
+### Positive
+
+- zgodność ze stosem Compose,
+- jeden graph dla ekranów i deep linków,
+- przewidywalne testy route i back stack,
+- oddzielenie stanu UI od mechanizmu nawigacji.
+
+### Trade-offs
+
+- złożone flow wymagają świadomego `popUpTo`, `inclusive` i `launchSingleTop`,
+- błędne route mogą prowadzić do zduplikowanych ekranów,
+- argumenty tekstowe wymagają kodowania i walidacji,
+- proces restore może wymagać ponownego pobrania danych.
+
+## Rejected alternatives
+
+### Przekazywanie całych modeli przez route
+
+Odrzucone z powodu rozmiaru, serializacji, nieaktualnych danych i problemów z process recreation.
+
+### Nawigacja bezpośrednio z ViewModel
+
+Odrzucona z powodu zależności od frameworka i trudniejszych testów.
+
+## Validation
+
+Zmiany graphu powinny sprawdzać:
+
+- Back i Up,
+- cold start z deep linka,
+- deep link po wylogowaniu,
+- brak zasobu,
+- logout i delete account,
+- powiadomienie otwierające już aktywny ekran,
+- process recreation.

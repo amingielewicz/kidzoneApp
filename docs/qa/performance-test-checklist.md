@@ -1,196 +1,214 @@
 # Performance and load test checklist
 
-Powiazane issue: #174
+Powiązane issue: #174
+
+Ostatnia aktualizacja: 2026-07-14
 
 ## Cel
 
-Ta checklista sluzy do recznej walidacji wydajnosci aplikacji kidZone przed release albo po zmianach dotykajacych mapy, list miejsc, rankingu, dodawania miejsca, uploadu zdjec lub Firebase.
-
-Nie zastepuje testow automatycznych. Ma dac powtarzalny sposob sprawdzenia, czy aplikacja jest plynna dla uzytkownika koncowego i czy Firebase Performance pokazuje sensowne dane diagnostyczne.
+Manualna walidacja wydajności kidZone przed release oraz po zmianach mapy, list, rankingu, formularzy, zdjęć, cache albo Firebase.
 
 ## Dane testu
 
-Przed rozpoczeciem uzupelnij:
-
 ```text
-Data testu:
+Data:
 Tester:
-Wersja aplikacji:
+Version name / code:
 Commit:
-Build: debug / release / internal test
-Urzadzenie:
-Android version:
-Siec: Wi-Fi / LTE / throttled / offline
+Build: debug / signed release / Internal Testing
+Urządzenie:
+Android:
+Sieć: Wi-Fi / LTE / throttled / offline
 Firebase project:
-Plan Firebase: Spark / Blaze
 Wynik: PASS / FAIL / BLOCKED
-Uwagi:
+Dowody:
 ```
 
 ## Przygotowanie
 
-- [ ] aplikacja jest zbudowana z aktualnego `main` albo brancha release,
-- [ ] test jest wykonywany na realnym urzadzeniu, jesli sprawdzamy plynnosc mapy i upload zdjec,
-- [ ] tester ma konto testowe z co najmniej jednym dodanym miejscem,
-- [ ] w bazie sa miejsca z roznych kategorii i kilka miejsc z opiniami,
-- [ ] tester ma dostep do Firebase Console, jesli sprawdza Performance Monitoring i Crashlytics,
-- [ ] znany jest stan limitow i billing Firebase/Google Cloud,
-- [ ] przed testem aplikacja zostala uruchomiona na czysto po instalacji albo po wyczyszczeniu danych, jesli sprawdzamy cold start.
+- [ ] właściwy build i projekt Firebase,
+- [ ] fizyczne urządzenie dla mapy, zdjęć i płynności,
+- [ ] konto oraz dane testowe,
+- [ ] dostęp do Performance, Crashlytics, vitals i billing,
+- [ ] znane limity Remote Config,
+- [ ] czysta instalacja dla cold start,
+- [ ] aktualizacja z poprzedniej wersji dla warm start i migracji,
+- [ ] brak produkcyjnych danych w testach obciążeniowych.
 
-## Komendy lokalne
-
-Przed testem manualnym wykonaj:
-
-```powershell
-$env:MAPS_API_KEY="AIzaSyPlaceholder"; .\gradlew.bat testDebugUnitTest
-$env:MAPS_API_KEY="AIzaSyPlaceholder"; .\gradlew.bat detekt
-```
-
-Opcjonalnie, jesli konfiguracja podpisu release jest dostepna:
+## Automatyczne bramki
 
 ```powershell
-.\gradlew.bat assembleRelease
+$env:MAPS_API_KEY="AIzaSyPlaceholder"; .\gradlew.bat testDebugUnitTest detekt lintDebug
 ```
 
-## Scenariusze wydajnosciowe
+Dla signed artefaktu użyj właściwego zadania release zgodnego z konfiguracją projektu.
 
-### Cold start
+## Start aplikacji
 
-- [ ] aplikacja startuje bez bialego/pustego ekranu utrzymujacego sie dluzej niz kilka sekund,
-- [ ] ekran startowy pokazuje loading state albo docelowa tresc,
-- [ ] po pierwszym uruchomieniu nie ma widocznego przyciecia przy inicjalizacji Firebase, Remote Config, FCM i cache,
-- [ ] kolejne uruchomienie jest szybsze albo porownywalne z pierwszym.
+- [ ] cold start nie pozostawia długiego pustego ekranu,
+- [ ] użytkownik widzi loading lub treść,
+- [ ] inicjalizacja Firebase, Remote Config, FCM, Room i App Check nie zamraża UI,
+- [ ] kolejne uruchomienie nie jest wyraźnie wolniejsze,
+- [ ] migracja po aktualizacji nie powoduje ANR,
+- [ ] start offline ma kontrolowany stan.
 
-### Zakladka Start
+## Start, Lista i wyszukiwanie
 
-- [ ] sekcja `Blisko Ciebie` laduje sie bez blokowania UI,
-- [ ] `TOP blisko Ciebie` nie powoduje dlugiego pustego stanu,
-- [ ] `Ostatnio dodane w okolicy` pokazuje maksymalnie oczekiwana liczbe kart i nie rozpycha ekranu,
-- [ ] brak lokalizacji albo odmowa uprawnienia pokazuje fallback bez petli loadingu,
-- [ ] po powrocie internetu dane moga sie odswiezyc bez restartu aplikacji.
+- [ ] sekcje Startu ładują się niezależnie bez blokowania całego ekranu,
+- [ ] brak lokalizacji ma szybki fallback,
+- [ ] lista nie skacze podczas doładowania,
+- [ ] paginacja nie blokuje scrolla i nie duplikuje rekordów,
+- [ ] wyszukiwanie ma debounce,
+- [ ] filtry i sortowanie reagują bez widocznego zamrożenia,
+- [ ] czyszczenie wyszukiwania szybko przywraca dane,
+- [ ] cache pozostaje użyteczny offline.
 
-### Mapa
+## Mapa
 
-- [ ] pierwsze otwarcie mapy jest plynne,
-- [ ] przesuwanie mapy nie powoduje widocznych przyciec,
-- [ ] zoom nie wykonuje niekontrolowanej liczby zapytan,
-- [ ] markery pojawiaja sie w rozsadnym czasie,
-- [ ] lista fallback dla mapy dziala, jesli mapa nie jest dostepna,
-- [ ] przejscie z mapy do szczegolow miejsca i powrot nie resetuje niepotrzebnie calego stanu.
+- [ ] pierwsze otwarcie jest płynne,
+- [ ] ruch i zoom nie powodują lawiny zapytań,
+- [ ] bounds, limit markerów i clustering działają,
+- [ ] markery pojawiają się w akceptowalnym czasie,
+- [ ] przejście do szczegółów i powrót nie resetuje całego stanu,
+- [ ] fallback listowy działa,
+- [ ] odmowa lokalizacji i wyłączony GPS nie tworzą nieskończonego loadingu,
+- [ ] powrót z ustawień nie uruchamia wielu równoległych requestów.
 
-### Lista i wyszukiwarka miejsc
+## Ranking i Profil
 
-- [ ] lista miejsc renderuje sie bez skokow ukladu,
-- [ ] paginacja nie blokuje przewijania,
-- [ ] wyszukiwanie po wpisaniu tekstu nie odpala zapytan po kazdym pojedynczym znaku bez debounce,
-- [ ] pusty wynik wyszukiwania pokazuje czytelny stan,
-- [ ] czyszczenie wyszukiwania szybko przywraca liste.
+- [ ] ranking nie pobiera nieograniczonego zbioru,
+- [ ] refresh nie blokuje przewijania,
+- [ ] puste dane kończą się empty state,
+- [ ] pola agregowane pozwalają uniknąć N+1 reads,
+- [ ] Profil, odznaki i statystyki nie tworzą kaskady requestów.
 
-### Ranking
+## Formularze i zapis
 
-- [ ] ranking miejsc i uzytkownikow laduje sie bez dlugiego pustego ekranu,
-- [ ] odswiezenie rankingu nie blokuje przewijania,
-- [ ] brak danych pokazuje pusty stan zamiast spinnera bez konca,
-- [ ] wejscie w miejsce z rankingu jest responsywne.
+- [ ] wpisywanie długich danych jest płynne,
+- [ ] walidacja nie blokuje głównego wątku,
+- [ ] wyszukiwanie duplikatów miejsc ma limit i timeout,
+- [ ] zapis ma jednoznaczny loading,
+- [ ] double submit jest blokowany,
+- [ ] retry nie tworzy duplikatu,
+- [ ] zapis offline nie udaje sukcesu,
+- [ ] częściowy błąd nie pozostawia trwałego spinnera.
 
-### Dodawanie miejsca
+## Zdjęcia
 
-- [ ] formularz reaguje plynnie przy wpisywaniu dlugiej nazwy i opisu,
-- [ ] wybor kategorii, udogodnien i lokalizacji nie powoduje przyciec,
-- [ ] sprawdzanie miejsc w poblizu nie blokuje formularza,
-- [ ] zapis bez zdjec pokazuje jasny loading state i konczy sie sukcesem albo czytelnym bledem,
-- [ ] walidacja blednych danych jest natychmiastowa i zrozumiala.
+- [ ] Photo Picker otwiera się bez szerokiego dostępu do galerii,
+- [ ] wybór jednego i kilku zdjęć nie zamraża UI,
+- [ ] kompresja odbywa się poza głównym wątkiem,
+- [ ] postęp uploadu jest widoczny,
+- [ ] zły MIME lub rozmiar daje kontrolowany błąd,
+- [ ] przerwanie sieci umożliwia bezpieczny retry,
+- [ ] retry nie tworzy kilku plików,
+- [ ] EXIF/GPS cleanup nie powoduje zauważalnego opóźnienia,
+- [ ] po serii uploadów nie widać narastającego zużycia pamięci.
 
-### Upload zdjec
+## Account deletion i cleanup
 
-- [ ] wybor jednego zdjecia nie blokuje UI,
-- [ ] wybor kilku zdjec pokazuje postep albo stan uploadu,
-- [ ] kompresja zdjec nie powoduje dlugiego zamrozenia ekranu,
-- [ ] zbyt duze albo bledne zdjecie daje kontrolowany komunikat,
-- [ ] brak internetu podczas uploadu daje kontrolowany komunikat,
-- [ ] po bledzie uploadu uzytkownik moze sprobowac ponownie.
+- [ ] operacja nie blokuje UI bez informacji,
+- [ ] długie etapy mają kontrolowany status,
+- [ ] błąd częściowy jest widoczny,
+- [ ] retry cleanup jest idempotentne,
+- [ ] logout/delete czyści lokalny cache i widget bez ANR,
+- [ ] masowy cleanup nie powoduje niekontrolowanych kosztów.
 
-## Firebase Performance Monitoring
+## Firebase Performance
 
-Po wykonaniu scenariuszy sprawdz w Firebase Console, czy pojawiaja sie albo sa oczekiwane trace:
+Sprawdź istniejące trace odpowiadające realnej implementacji, między innymi:
 
-- [ ] `cold_start`,
-- [ ] `location_fetch`,
-- [ ] `image_compress`,
-- [ ] `photo_upload`,
-- [ ] `remote_config_fetch`,
-- [ ] `place_load`,
-- [ ] `nearby_places_load`,
-- [ ] `map_places_load`,
-- [ ] `top_places_load`,
-- [ ] `places_page_load`,
-- [ ] `place_search_load`,
-- [ ] `add_place`.
+- cold start,
+- location fetch,
+- image compression,
+- photo upload,
+- Remote Config fetch,
+- loading miejsc, mapy, listy i rankingu,
+- add place,
+- synchronizację offline.
 
-## Remote Config parametry wydajnosciowe
+Dla każdego trace:
 
-W Firebase Console -> Remote Config sprawdz albo ustaw:
+- [ ] ma próbki dla testowanego builda,
+- [ ] status błędu nie jest stale aktywny,
+- [ ] p95/p99 nie pokazuje oczywistej regresji,
+- [ ] atrybuty nie zawierają PII, dokładnej lokalizacji, URI zdjęć ani tokenów,
+- [ ] nazwa i kontekst pozwalają rozpoznać operację.
 
-| Klucz | Domyslnie | Bezpieczny zakres w aplikacji | Wplyw |
-| --- | ---: | ---: | --- |
-| `perf_home_nearby_limit` | 20 | 5-40 | liczba kart w sekcji `Blisko Ciebie` |
-| `perf_home_top_places_limit` | 20 | 5-40 | liczba kart w sekcji `TOP blisko Ciebie` |
-| `perf_home_recently_added_limit` | 10 | 3-30 | liczba kart w sekcji `Ostatnio dodane w okolicy` |
-| `perf_home_top_places_radius_km` | 10 | 1-50 | promien lokalnego rankingu top miejsc |
-| `perf_home_fetch_radius_km` | 50 | 5-100 | promien jednego fetcha danych dla Start |
-| `perf_map_markers_limit` | 1000 | 100-2000 | maksymalna liczba miejsc pobieranych dla viewportu mapy |
-| `perf_ranking_top_limit` | 100 | 10-200 | liczba pozycji pokazywana w rankingu |
-| `perf_ranking_fetch_pool` | 200 | 20-500 | pula pobierana przed filtrowaniem rankingu |
+Nie dopisuj fikcyjnego trace do checklisty tylko dlatego, że był kiedyś planowany. Nazwy muszą odpowiadać aktualnemu kodowi.
 
-- [ ] zmiana `perf_home_nearby_limit` po fetchu Remote Config ogranicza liczbe kart na Start,
-- [ ] zmiana `perf_map_markers_limit` nie powoduje pustej mapy ani widocznego przyciecia,
-- [ ] `perf_ranking_fetch_pool` jest nie mniejszy niz `perf_ranking_top_limit`,
-- [ ] nieprawidlowa wartosc w Remote Config wraca do domyslnego fallbacku.
+## Remote Config
 
-Dla kazdego dostepnego trace sprawdz:
+Dla parametrów wpływających na wydajność sprawdź:
 
-- [ ] trace ma rozsadna liczbe probek po testach,
-- [ ] trace nie raportuje stalego statusu `error`,
-- [ ] p95/p99 nie wskazuje oczywistej regresji,
-- [ ] najwolniejsze trace maja jasny kontekst funkcjonalny,
-- [ ] nie ma custom attributes zawierajacych e-mail, token, pelne URL-e zdjec albo inne dane prywatne.
+- wartości domyślne w aplikacji,
+- bezpieczny zakres,
+- fallback dla wartości błędnej,
+- zależności między limitami,
+- rollback,
+- wpływ na koszty.
 
-## Crashlytics i logowanie release
+Szczególną uwagę zwróć na limity Startu, mapy, rankingu, paginacji, debounce i zdjęć.
 
-- [ ] release nie uzywa `Timber.DebugTree`,
-- [ ] `WARN+` trafia do Crashlytics jako breadcrumb albo non-fatal,
-- [ ] breadcrumb nie zawiera e-maili ani dlugich tokenopodobnych wartosci,
-- [ ] wymuszony testowy non-fatal pojawia sie w Firebase Console,
-- [ ] Crashlytics nie pokazuje krytycznych crashy po smoke tescie.
+## Crashlytics, vitals i logi
 
-## Testy obciazeniowe manualne
+- [ ] brak nowego crasha i ANR,
+- [ ] release nie używa debugowego drzewa logowania,
+- [ ] breadcrumb i non-fatal nie zawierają PII,
+- [ ] intensywny test nie generuje lawiny non-fatal,
+- [ ] Android vitals nie pokazuje regresji po rollout,
+- [ ] logi backendu nie zawierają tokenów ani pełnych payloadów.
 
-Te scenariusze wykonuj tylko na projekcie testowym albo z pelna swiadomoscia kosztow Firebase/Google Cloud.
+## Kontrolowany test obciążenia
 
-- [ ] 20 szybkich wejsc/wyjsc w ekran mapy nie powoduje crasha,
-- [ ] 20 kolejnych wyszukiwan miejsc nie powoduje limitow ani wyraznego spowolnienia,
-- [ ] 10 wejsc w szczegoly roznych miejsc nie powoduje narastajacego opoznienia,
-- [ ] 5 dodan miejsca pod rzad nie zostawia aplikacji w stanie loading,
-- [ ] 5 uploadow zdjec pod rzad nie powoduje wycieku pamieci widocznego jako systemowe zamykanie aplikacji,
-- [ ] po intensywnym tescie aplikacja nadal poprawnie otwiera Start, Mapy, Liste i Profil.
+Wykonuj wyłącznie na projekcie testowym albo z zaakceptowanym ryzykiem kosztowym.
+
+- [ ] wielokrotne wejście i wyjście z Mapy,
+- [ ] seria wyszukiwań i zmian filtrów,
+- [ ] seria wejść w szczegóły,
+- [ ] kilka zapisów miejsca i opinii,
+- [ ] kilka uploadów zdjęć,
+- [ ] powtarzane retry tego samego eventu,
+- [ ] szybkie przełączanie sieci online/offline,
+- [ ] aplikacja po teście nadal działa bez restartu.
+
+Nie używaj testu obciążenia do generowania spamu lub obchodzenia limitów produkcyjnych.
+
+## Koszty
+
+- [ ] liczba Firestore reads/writes jest zgodna z oczekiwaniem,
+- [ ] mapa nie wykonuje nieograniczonych odczytów,
+- [ ] upload i transfer Storage są kontrolowane,
+- [ ] scheduled Functions mają checkpointy i limity,
+- [ ] alerty billing są aktywne,
+- [ ] nie ma wzrostu kosztów niewspółmiernego do liczby testów.
 
 ## Kryteria PASS
 
-Test mozna uznac za PASS, jesli:
+- brak crasha i trwałego loadingu,
+- podstawowe flow pozostaje responsywne,
+- nie ma oczywistej regresji p95/p99,
+- requesty, markery i strony mają limity,
+- upload i retry są stabilne,
+- telemetryka nie zawiera PII,
+- koszt jest zgodny z oczekiwaniem,
+- znane problemy mają issue i priorytet.
 
-- [ ] wszystkie krytyczne scenariusze uzytkownika dzialaja bez crasha,
-- [ ] loading state nie blokuje aplikacji na stale,
-- [ ] Firebase Performance pokazuje trace dla najwazniejszych operacji albo brak danych jest wyjasniony typem buildu,
-- [ ] Crashlytics nie pokazuje krytycznych nowych awarii,
-- [ ] nie znaleziono logow z oczywistymi danymi wrazliwymi,
-- [ ] znane problemy sa wpisane do issue z priorytetem.
+## FAIL / BLOCKED
 
-## Kryteria FAIL / BLOCKED
+FAIL:
 
-Oznacz FAIL albo BLOCKED, jesli:
+- crash lub ANR,
+- regularne zamrożenie Mapy/Listy/Rankingu,
+- niekończący się loading,
+- duplikaty po retry,
+- upload niemożliwy na stabilnej sieci,
+- oczywisty wyciek PII do telemetryki,
+- niekontrolowana liczba requestów lub kosztów.
 
-- aplikacja crashuje w podstawowym flow,
-- mapa/lista/ranking regularnie zawieszaja UI,
-- upload zdjec nie daje sie ukonczyc na stabilnej sieci,
-- Performance Monitoring albo Crashlytics nie sa mozliwe do sprawdzenia, mimo ze release ma je wlaczone,
-- Firebase/Google Cloud billing albo limity uniemozliwiaja wykonanie testu.
+BLOCKED:
+
+- brak właściwego builda lub projektu,
+- brak wymaganych danych albo dostępu do monitoringu,
+- billing lub konfiguracja uniemożliwia bezpieczny test,
+- środowisko testowe nie odpowiada testowanemu release.

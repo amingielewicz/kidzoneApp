@@ -1,143 +1,213 @@
 # Firebase Security Hardening Plan
 
+Ostatnia aktualizacja: 2026-07-13
+
 ## Cel
 
-Ten dokument opisuje plan utwardzenia Firebase w KidZone bez ryzykownego zmieniania reguł produkcyjnych na ślepo.
+Plan utwardzenia Firebase w kidZone bez wprowadzania ryzykownych zmian produkcyjnych bez migracji, testów i możliwości rollbacku.
 
-## Aktualny stan
+## Zakres
 
 Projekt korzysta z:
 
-- Firestore Rules,
-- Storage Rules,
-- Firebase App Check,
-- Firebase Hosting,
-- Firebase Auth,
-- Firebase Cloud Functions,
-- Firebase Cloud Messaging.
+- Firebase Authentication,
+- Cloud Firestore,
+- Firebase Storage,
+- Cloud Functions,
+- App Check,
+- Cloud Messaging,
+- Crashlytics, Analytics i Performance,
+- Firebase Hosting.
 
-## Najważniejsze ustalenia
+## Docelowe zasady
 
-### 1. Publiczne i prywatne dane użytkownika są w jednym dokumencie
+- dane publiczne i prywatne są rozdzielone,
+- ownership jest sprawdzany po UID,
+- rola administratora pochodzi z custom claims lub innego zaufanego źródła,
+- klient nie zmienia pól systemowych i moderacyjnych,
+- ścieżki Storage zawierają właściciela tam, gdzie jest to potrzebne,
+- App Check release używa Play Integrity,
+- sekrety, tokeny i PII nie trafiają do logów,
+- każda zmiana Rules ma testy emulatorowe.
 
-Dokument `users/{uid}` zawiera jednocześnie dane publiczne i prywatne.
+## Publiczny i prywatny profil
 
-Przykładowe pola publiczne:
-
-- `avatarUrl`,
-- `name`,
-- `nameLowercase`,
-- `lastKnownUserRank`,
-- `placesAddedCount`,
-- `reviewsCount`,
-- `badgeEarnedAt`.
-
-Przykładowe pola prywatne:
-
-- `email`,
-- `fcmTokens`.
-
-Ryzyko:
-
-- Firestore nie ukrywa pojedynczych pól w odczytanym dokumencie.
-- Jeśli dokument jest czytelny, klient dostaje cały dokument.
-- `email` i `fcmTokens` nie powinny być widoczne dla innych użytkowników.
-
-Docelowy kierunek:
+Docelowa struktura:
 
 ```text
 users/{uid}
 users/{uid}/private/profile
+users/{uid}/private/messaging
+users/{uid}/private/preferences
 ```
 
-`users/{uid}` powinien zawierać tylko profil publiczny.
+`users/{uid}` zawiera tylko dane publiczne, na przykład:
 
-`users/{uid}/private/profile` powinien zawierać dane prywatne.
+- `displayName`,
+- `avatarUrl`,
+- publiczne liczniki i odznaki,
+- publiczny status profilu zgodny z produktem.
 
-### 2. Upload zdjęć wymaga dalszego utwardzenia
+Prywatne subdokumenty zawierają między innymi:
 
-Storage Rules ograniczają typ i rozmiar pliku, ale docelowo upload powinien być powiązany z właścicielem albo autorem.
+- e-mail,
+- dane profilu niewidoczne publicznie,
+- tokeny FCM,
+- preferencje powiadomień.
 
-Docelowy kierunek:
+Firestore nie ukrywa pojedynczych pól w dokumencie, dlatego dane prywatne nie mogą pozostawać w publicznie czytelnym profilu.
+
+## Storage
+
+Docelowe ścieżki:
 
 ```text
-places/{placeId}/users/{uid}/{fileName}
-reviews/{reviewId}/users/{uid}/{fileName}
+places/{ownerUserId}/{placeId}/photos/{fileId}
+reviews/{ownerUserId}/{reviewId}/photos/{fileId}
+users/{userId}/avatar/{fileId}
 ```
 
-Dzięki temu reguła może sprawdzić, czy:
+Rules powinny sprawdzać UID w ścieżce, MIME, rozmiar i dozwoloną operację.
 
-```text
-request.auth.uid == uid
-```
+Legacy paths pozostają read-only lub są migrowane kontrolowanie. Nie zaostrzamy Rules przed zmianą aktywnych ścieżek aplikacji.
 
-### 3. Rola admina musi bazować na custom claims
+## Role administratora
 
-Dostęp administratorski powinien zależeć od Firebase custom claims, a nie od pola `role` w dokumencie użytkownika.
+Źródłem prawdy nie jest edytowalne pole `role` w publicznym dokumencie.
 
-Zasada:
+Preferowane sprawdzenie:
 
 ```text
 request.auth.token.admin == true
 ```
 
-Pole `role` może istnieć informacyjnie w Firestore, ale nie powinno być źródłem prawdy dla dostępu admina.
+Zmiana custom claims odbywa się wyłącznie po stronie zaufanej. Po zmianie roli należy uwzględnić odświeżenie tokenu użytkownika.
 
-### 4. App Check wymaga kontrolowanego rollout'u
+## App Check
 
-Aplikacja inicjalizuje Firebase App Check w `KidZoneApplication`:
+- debug provider tylko dla debug buildów,
+- Play Integrity dla release,
+- enforcement wdrażany etapami,
+- signed build przechodzi smoke przed blokowaniem ruchu,
+- monitoring i rollback są przygotowane,
+- App Check nie zastępuje Rules, auth ani rate limitingu.
 
-- debug build używa debug providera,
-- release build używa Play Integrity.
+Szczegóły: `docs/app-check.md`.
 
-Procedura rejestracji debug tokenów i włączania enforcement jest opisana w [`docs/app-check.md`](app-check.md).
+## Cloud Functions
 
-Nie należy włączać enforcement bez wcześniejszego smoke testu logowania, Firestore, Storage i Cloud Functions.
+Funkcje powinny:
 
-## Kolejność wdrożenia
+- sprawdzać auth i role,
+- walidować payload,
+- być idempotentne,
+- nie ufać UID i polom administracyjnym z klienta,
+- obsługiwać retry i błędy częściowe,
+- nie logować PII,
+- mieć limity kosztów i liczby operacji.
 
-### Etap 1 — dokumentacja i testy
+## Account deletion
 
-- opisać aktualne ryzyka,
-- udokumentować App Check i debug tokeny,
-- dopisać testy Firestore Rules,
-- dopisać lub przygotować testy Storage Rules,
-- upewnić się, że CI testuje reguły.
+Utwardzenie musi uwzględniać:
 
-### Etap 2 — migracja danych użytkownika
+- cleanup prywatnych subdokumentów,
+- usunięcie lub anonimizację profilu publicznego,
+- cleanup Storage,
+- cleanup tokenów FCM,
+- aktualizację agregatów i rankingu,
+- retry po błędzie częściowym,
+- retencję backupów.
 
-- dodać obsługę prywatnego subdokumentu,
-- przenieść `email` i `fcmTokens`,
-- zmienić odczyty profili publicznych,
-- dopiero potem zaostrzyć Firestore Rules.
+## Etapy wdrożenia
 
-### Etap 3 — migracja ścieżek zdjęć
+### Etap 1 — inwentaryzacja
 
-- zmienić ścieżki uploadu zdjęć,
-- dodać `uid` do ścieżki,
-- zaostrzyć Storage Rules,
-- dopisać testy odmowy uploadu do cudzych ścieżek.
+- zidentyfikuj aktywne ścieżki Firestore i Storage,
+- sprawdź wszystkie miejsca odczytu e-maila i tokenów FCM,
+- potwierdź źródło roli administratora,
+- spisz aktywne buildy i ich zależności,
+- przygotuj testy Rules.
+
+### Etap 2 — migracja danych prywatnych
+
+- dodaj obsługę prywatnych subdokumentów,
+- rozpocznij dual write lub kontrolowaną migrację,
+- zmień odczyty aplikacji i backendu,
+- zweryfikuj starsze buildy,
+- dopiero potem usuń prywatne pola z publicznego dokumentu.
+
+### Etap 3 — migracja Storage
+
+- wdroż nowe ścieżki właścicielskie,
+- zmień uploady aplikacji,
+- dodaj cleanup i migrację istniejących plików,
+- uruchom testy negatywne,
+- zaostrz Rules po potwierdzeniu aktywnych klientów.
+
+### Etap 4 — role i admin
+
+- przenieś autoryzację na custom claims,
+- sprawdź panel administracyjny i Cloud Functions,
+- zablokuj możliwość samodzielnej zmiany roli,
+- dodaj audyt operacji administracyjnych.
+
+### Etap 5 — App Check i rate limiting
+
+- zweryfikuj signed release build,
+- uruchom monitoring,
+- włącz enforcement jednej usługi,
+- wykonaj smoke,
+- rozszerz enforcement,
+- wdroż limity backendowe i alerty kosztowe.
+
+## Kolejność deploy
+
+Dla zmiany zależnej od schematu:
+
+1. kompatybilny backend i Rules,
+2. migracja danych,
+3. indeksy,
+4. aplikacja obsługująca nowy model,
+5. obserwacja aktywnych wersji,
+6. usunięcie compatibility layer,
+7. finalne zaostrzenie Rules.
+
+Nie wdrażamy Rules, które natychmiast blokują aktualną wersję aplikacji.
+
+## Testy
+
+Wymagane scenariusze:
+
+- publiczny profil bez PII,
+- brak dostępu do cudzych danych prywatnych,
+- brak eskalacji admina,
+- upload tylko do własnej ścieżki,
+- błędny MIME i rozmiar,
+- działanie App Check dla debug i release,
+- częściowy błąd account deletion,
+- starszy build podczas migracji,
+- rollback Rules i enforcement.
 
 ## Czego nie robić bez migracji
 
-Nie należy od razu blokować odczytu `users/{uid}`, bo aplikacja może zależeć od publicznych danych profilu.
+- nie usuwać ręcznie pól produkcyjnych bez sprawdzenia klientów,
+- nie blokować odczytu profilu publicznego używanego przez aplikację,
+- nie zmieniać Storage Rules przed wdrożeniem nowych ścieżek,
+- nie włączać enforcement wszystkich usług jednocześnie,
+- nie traktować pola `role` z klienta jako źródła dostępu,
+- nie migrować danych bez backupu i planu rollbacku.
 
-Nie należy od razu zmieniać Storage Rules na właścicielskie, jeśli aplikacja nadal zapisuje zdjęcia pod starymi ścieżkami.
+## Release gate
 
-Nie należy usuwać pól `email` ani `fcmTokens` ręcznie z Firebase Console.
-
-## Checklist przed zmianą reguł
-
-- [ ] Wiemy, które ekrany czytają `users/{uid}`.
-- [ ] Wiemy, gdzie aplikacja zapisuje `fcmTokens`.
-- [ ] Wiemy, gdzie aplikacja czyta `email`.
-- [ ] Debug tokeny App Check są dodane w Firebase Console.
-- [ ] App Check enforcement został sprawdzony smoke testem.
-- [ ] Mamy testy odmowy odczytu prywatnych danych.
-- [ ] Mamy testy odmowy uploadu do cudzej ścieżki.
-- [ ] Android CI jest zielony.
-- [ ] Firestore Rules Tests są zielone.
+- [ ] aktualne ścieżki są zinwentaryzowane,
+- [ ] migracja jest kompatybilna ze starszym buildem,
+- [ ] testy Firestore i Storage Rules przechodzą,
+- [ ] App Check smoke ma PASS,
+- [ ] panel admina i Functions używają zaufanej roli,
+- [ ] account deletion działa po migracji,
+- [ ] monitoring i rollback są gotowe,
+- [ ] Data Safety i polityka prywatności odpowiadają nowemu modelowi.
 
 ## Status
 
-Ten dokument jest planem technicznym. Nie zmienia działania aplikacji ani produkcyjnych reguł Firebase.
+Dokument jest planem technicznym. Każdy etap wymaga osobnego PR, testów i świadomego wdrożenia do właściwego projektu Firebase.

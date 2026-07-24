@@ -1,51 +1,99 @@
 # Navigation
 
+Ostatnia aktualizacja: 2026-07-13
+
 ## Cel
 
-Dokument opisuje architekturę nawigacji Android w KidZone opartą o Navigation Compose.
+Dokument opisuje zasady nawigacji kidZone opartej na Navigation Compose, deep linkach i przewidywalnym back stacku.
 
 ## Założenia
 
-- Jeden główny NavHost.
-- Ekrany identyfikowane przez typowane trasy.
-- Argumenty przekazywane wyłącznie przez route lub SavedStateHandle.
-- ViewModel nie zna NavController.
+- jeden główny `NavHost`,
+- typowane trasy,
+- małe argumenty przekazywane przez route lub `SavedStateHandle`,
+- ViewModel nie zna `NavController`,
+- ekran zgłasza intencję nawigacji przez event lub callback,
+- nie przekazujemy pełnych obiektów domenowych między ekranami.
 
-## Deep Links
+## Główne obszary
 
-Obsługiwane typy:
+Nawigacja obejmuje:
 
-- kidzone://place/{placeId}
-- https://.../place/{placeId}
-
-Każdy deep link powinien:
-
-- walidować argumenty,
-- obsłużyć brak danych,
-- przekierować do ekranu błędu, jeśli zasób nie istnieje.
-
-## Back Stack
-
-Zasady:
-
-- Back zawsze wraca do logicznie poprzedniego ekranu.
-- Po logowaniu użytkownik nie wraca do ekranu logowania.
-- Po wylogowaniu stos nawigacji jest czyszczony.
+- splash i onboarding,
+- logowanie i rejestrację,
+- główną nawigację zakładkową,
+- Start, Mapę, Listę, Ranking i Profil,
+- szczegóły miejsca,
+- dodawanie i edycję miejsca,
+- opinie i zdjęcia,
+- ustawienia konta i dokumenty prawne.
 
 ## Argumenty
 
 Preferowane typy:
 
-- String ID
-- Boolean
-- Enum
+- identyfikator `String`,
+- `Boolean`,
+- enum lub typowana trasa,
+- proste wartości możliwe do odtworzenia.
 
-Nie przekazujemy dużych obiektów między ekranami.
+Dane ekranu są ponownie pobierane przez ViewModel na podstawie identyfikatora. Nie przekazujemy dużych obiektów ani danych prywatnych w URI.
 
-## Checklist
+## Deep linki
 
-- [ ] Wszystkie trasy są opisane.
-- [ ] Deep linki są przetestowane.
-- [ ] Back stack działa poprawnie.
-- [ ] Brak zależności ViewModel -> NavController.
-- [ ] Obsłużone są błędne argumenty.
+Przykładowe typy:
+
+```text
+kidzone://place/{placeId}
+https://.../place/{placeId}
+```
+
+Każdy deep link:
+
+- waliduje schemat i argumenty,
+- nie ufa danym wejściowym,
+- obsługuje brak zasobu,
+- respektuje wymaganie logowania,
+- nie omija blokad konta ani uprawnień,
+- prowadzi do kontrolowanego błędu zamiast crasha.
+
+Deep link z FCM powinien używać tych samych reguł walidacji.
+
+## Back stack
+
+- Back wraca do logicznie poprzedniego ekranu.
+- Po logowaniu ekrany auth są usuwane ze stosu.
+- Po wylogowaniu stos części zalogowanej jest czyszczony.
+- Po usunięciu konta nie można wrócić do ekranu prywatnego.
+- Po ban sign-out stos jest czyszczony.
+- Nawigacja z powiadomienia nie powinna tworzyć wielu kopii tego samego ekranu.
+
+## Główne zakładki
+
+Przełączanie zakładek powinno:
+
+- zachowywać oczekiwany stan i scroll,
+- nie tworzyć kolejnych kopii root destination,
+- nie pobierać ponownie całej bazy bez potrzeby,
+- mieć przewidywalne zachowanie Back.
+
+## Nawigacja po sukcesie
+
+Nawigacja po zapisie jest eventem jednorazowym. Nie powinna być przechowywana jako trwały boolean w `UiState`, który może uruchomić się ponownie po rotacji lub powrocie do ekranu.
+
+Podwójne kliknięcie zapisu nie może otworzyć dwóch ekranów ani utworzyć dwóch rekordów.
+
+## Ustawienia systemowe
+
+Otwieranie ustawień aplikacji, ustawień lokalizacji, Photo Pickera i kamery jest akcją platformową. Po powrocie ekran odświeża faktyczny stan zgody lub usługi.
+
+## Checklista
+
+- [ ] wszystkie trasy są opisane,
+- [ ] argumenty są małe i walidowane,
+- [ ] deep linki mają testy pozytywne i negatywne,
+- [ ] ViewModel nie zna `NavController`,
+- [ ] auth, logout, ban i delete account czyszczą właściwy back stack,
+- [ ] event nawigacyjny nie odtwarza się po rotacji,
+- [ ] deep link z FCM nie omija kontroli dostępu,
+- [ ] błędny argument nie powoduje crasha.

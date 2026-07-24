@@ -89,6 +89,25 @@ const REASON_LABELS: Record<string, string> = {
   OTHER: 'Inne',
 };
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Wyświetlanie statystyk agregowanych aplikacji (liczba miejsc, opinii, użytkowników).
+ * - Prezentacja ostatniej aktywności w systemie.
+ * - Szybki wgląd w oczekujące zgłoszenia naruszeń.
+ *
+ * 📥 Wejście:
+ * - Dane z kolekcji `users`, `places`, `reviews` oraz `*_reports`.
+ *
+ * 📤 Wyjście:
+ * - Nawigacja do szczegółów raportów lub list obiektów.
+ *
+ * ⚡ Zarządzanie stanem:
+ * - Lokalne hooki `useState` do przechowywania list i liczników.
+ * - `useEffect` do inicjalnego pobrania danych (fetchDashboard).
+ *
+ * 🛡️ Bezpieczeństwo:
+ * - Dostępny wyłącznie dla użytkowników z przypisaną rolą administratora.
+ */
 export function DashboardPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);

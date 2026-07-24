@@ -14,53 +14,87 @@ import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 /**
- * Minimalny czas wyświetlania splasha (w ms).
+ * Minimalny czas wyświetlania ekranu startowego.
  *
- * Bez tego progu, na ciepłym starcie / z aktywną sesją Firebase, splash
- * "miga" dosłownie na 1 klatkę i nawigacja od razu skacze do Main – co
- * wygląda jak glitch. 800 ms to kompromis: na tyle krótko, że nie irytuje,
- * a na tyle długo, że logo jest widoczne.
+ * Ogranicza krótkie mignięcie splasha przy ciepłym starcie i natychmiast dostępnej sesji Firebase.
  */
 private const val MIN_DISPLAY_MS = 800L
 
 /**
- * Maksymalny czas oczekiwania na pierwszy emit z [AuthRepository.currentUser].
+ * Maksymalny czas oczekiwania na pierwszy stan uwierzytelnienia.
  *
- * W praktyce Firebase Auth emituje natychmiast (ma cached state), ale gdyby
- * z jakiegoś powodu strumień się zawiesił (np. źle zainicjalizowany Firebase,
- * brak Google Play Services na emulatorze), nie chcemy zawieszać użytkownika
- * na splash-screenie – traktujemy to jako "niezalogowany" i wysyłamy do
- * loginu, gdzie zobaczy realny komunikat błędu.
+ * Po przekroczeniu limitu aplikacja przechodzi do stanu wylogowanego zamiast pozostawać na
+ * nieskończonym ekranie ładowania.
  */
 private const val AUTH_CHECK_TIMEOUT_MS = 5_000L
 
 /**
- * Decyduje na podstawie [AuthRepository.currentUser] gdzie wysłać
- * użytkownika po splash screenie.
+ * 🎯 Odpowiedzialności:
+ * - Rozstrzyganie docelowego celu nawigacji po uruchomieniu aplikacji.
+ * - Koordynacja czasu prezentacji ekranu powitalnego (Splash).
+ * - Zarządzanie timeoutem przy braku odpowiedzi z systemu autoryzacji.
  *
- * Dba też o:
- *  - [MIN_DISPLAY_MS] – splash ma być widoczny wystarczająco długo,
- *  - [AUTH_CHECK_TIMEOUT_MS] – fallback gdyby Firebase się zawiesił.
+ * 🚫 Poza zakresem:
+ * - Brak decyzji o offline queue.
+ * - Brak retry logiki dla autoryzacji.
+ * - Brak bezpośredniej nawigacji (decyduje UI na podstawie stanu).
+ *
+ * 📥 Wejście:
+ * - Strumień aktualnego użytkownika z [AuthRepository].
+ *
+ * 📤 Wyjście:
+ * - Stan rozstrzygnięcia sesji ([State]).
+ *
+ * ✅ Gwarancje:
+ * - Minimalny czas wyświetlania splasha ([MIN_DISPLAY_MS]), aby uniknąć mignięć UI.
+ * - Przejście do stanu wylogowanego po przekroczeniu [AUTH_CHECK_TIMEOUT_MS].
+ *
+ * 🔌 Offline:
+ * - Wspiera odczyt sesji z cache Firebase Auth.
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla operacji asynchronicznych i opóźnień.
+ * - Brak blokujących operacji na wątku Main.
+ *
+ * 🧪 Testowalność:
+ * - Pełne DI.
+ * - Deterministyczne rozstrzyganie celu nawigacji na podstawie mockowanych danych.
+ *
+ * 🧼 Lifecycle:
+ * - Krótkotrwały cykl życia ograniczony do czasu startu aplikacji.
  */
 @HiltViewModel
 class SplashViewModel @Inject constructor(
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
-    enum class State { Loading, SignedIn, SignedOut }
+    /**
+     * Stan rozstrzygnięcia sesji na ekranie startowym.
+     */
+    enum class State {
+        /** Trwa odczyt sesji lub minimalny czas prezentacji splasha. */
+        Loading,
+
+        /** Użytkownik posiada aktywną sesję. */
+        SignedIn,
+
+        /** Brak aktywnej sesji albo odczyt zakończył się timeoutem. */
+        SignedOut
+    }
 
     private val _state = MutableStateFlow(State.Loading)
+
+    /**
+     * Niezmienny strumień aktualnego stanu ekranu startowego.
+     */
     val state: StateFlow<State> = _state.asStateFlow()
 
     init {
         viewModelScope.launch {
             val started = System.currentTimeMillis()
-            // withTimeoutOrNull zwróci null jeżeli timeout strzeli przed
-            // pierwszym emitem; null traktujemy jak "niezalogowany".
             val user = withTimeoutOrNull(AUTH_CHECK_TIMEOUT_MS) {
                 authRepository.currentUser.first()
             }
-            // Doczekaj do MIN_DISPLAY_MS, żeby splash nie mignął.
             val elapsed = System.currentTimeMillis() - started
             val remaining = MIN_DISPLAY_MS - elapsed
             if (remaining > 0) delay(remaining)

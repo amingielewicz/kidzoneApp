@@ -6,8 +6,9 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 
 /**
- * Hilt EntryPoint for accessing [RemoteConfigService] in Compose contexts
- * that don't have a ViewModel (e.g., NavGraph maintenance gate).
+ * 🎯 Odpowiedzialności:
+ * - Punkt wejścia (EntryPoint) Hilt umożliwiający dostęp do [RemoteConfigService] poza ViewModelami.
+ * - Umożliwia sprawdzenie statusu przerwy technicznej bezpośrednio w grafie nawigacji.
  */
 @EntryPoint
 @InstallIn(SingletonComponent::class)

@@ -15,6 +15,20 @@ private const val LOCATION_PERMISSION_PREFS =
 private const val LOCATION_PERMISSION_REQUESTED_KEY =
     "fine_location_requested"
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Inteligentne zarządzanie prośbami o uprawnienia lokalizacji.
+ * - Wykrywanie stanu "trwałej odmowy" (permanently denied).
+ * - Przekierowywanie użytkownika do ustawień systemowych aplikacji, gdy dialogi systemowe są nieskuteczne.
+ *
+ * ⚙️ Techniczne:
+ * - Śledzi historię zapytań w SharedPreferences (`location_permission_preferences`).
+ * - Wykorzystuje `shouldShowRequestPermissionRationale` do detekcji intencji użytkownika.
+ *
+ * ✅ Gwarancje:
+ * - Brak "martwych kliknięć": jeśli systemowy dialog się nie pojawi, otwierane są ustawienia.
+ * - Spójna obsługa lokalizacji w całej aplikacji.
+ */
 fun requestLocationPermissionOrOpenSettings(
     context: Context,
     requestPermission: () -> Unit

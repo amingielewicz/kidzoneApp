@@ -25,6 +25,15 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.kidzone.R
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Standaryzacja wyglądu i zachowania dialogów akcji w aplikacji.
+ * - Spójne rozmieszczenie ikon, tytułów i przycisków potwierdzenia.
+ *
+ * ✅ Gwarancje:
+ * - Wykorzystanie motywu Material Design 3.
+ * - Prawidłowe zachowanie na różnych szerokościach ekranu ([ACTION_DIALOG_MAX_WIDTH]).
+ */
 @Composable
 fun KidZoneActionDialog(
     title: String,

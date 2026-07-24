@@ -9,8 +9,22 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Centralny dostęp do Firebase Remote Config.
- * Feature flags i maintenance mode.
+ * 🎯 Odpowiedzialności:
+ * - Centralny dostęp do konfiguracji zdalnej Firebase Remote Config.
+ * - Zarządzanie flagami funkcji (Feature Flags) i trybem konserwacji (Maintenance Mode).
+ * - Dostarczanie parametrów wydajnościowych (PerformanceConfig) dla ekranów UI.
+ *
+ * 🛡️ Bezpieczeństwo i Prywatność:
+ * - Nie pobiera ani nie wysyła danych PII.
+ * - Używa anonimowych parametrów do segmentacji konfiguracji.
+ *
+ * ⚡ Wydajność i Zasoby:
+ * - Inteligentne interwały odświeżania (0s w Debug, 1h w Release).
+ * - Śledzenie wydajności pobierania poprzez [PerformanceTraces].
+ *
+ * ✅ Gwarancje:
+ * - Bezpieczne wartości domyślne (fallback) przy braku połączenia sieciowego.
+ * - Walidacja zakresów wartości dla parametrów technicznych.
  */
 @Singleton
 class RemoteConfigService @Inject constructor(

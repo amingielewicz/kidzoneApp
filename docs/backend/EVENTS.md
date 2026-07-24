@@ -1,8 +1,10 @@
 # Backend Events
 
+Ostatnia aktualizacja: 2026-07-13
+
 ## Cel
 
-Dokument opisuje zdarzenia backendowe KidZone oraz przepływy pomiędzy Firestore, Auth, Storage, Cloud Functions i FCM.
+Dokument opisuje zdarzenia backendowe kidZone oraz przepływy między Firebase Authentication, Firestore, Storage, Cloud Functions i FCM.
 
 ## Typy eventów
 
@@ -12,7 +14,22 @@ Firestore events
 Storage-related events
 Scheduled events
 Manual admin actions
+Account deletion events
 ```
+
+## Wspólne zasady
+
+Każdy event powinien mieć:
+
+- jednoznaczne źródło,
+- jasno opisany skutek,
+- identyfikator lub mechanizm deduplikacji,
+- kontrolę auth i ownership tam, gdzie jest wymagana,
+- obsługę retry,
+- bezpieczny log bez danych osobowych,
+- test sukcesu i co najmniej jednego błędu.
+
+Event nie może zakładać idealnej kolejności wykonania ani dokładnie jednokrotnego dostarczenia.
 
 ## Auth events
 
@@ -24,12 +41,14 @@ Manual admin actions
 Firebase Authentication
 ```
 
-Skutek:
+Skutki:
 
-- utworzenie profilu użytkownika,
+- utworzenie wymaganych danych profilu,
 - ustawienie wartości domyślnych,
-- opcjonalne wysłanie wiadomości powitalnej,
-- opcjonalne powiadomienie administratora.
+- inicjalizacja danych prywatnych,
+- opcjonalna wiadomość powitalna.
+
+Powtórne wykonanie nie może nadpisać danych użytkownika ani utworzyć duplikatów.
 
 ### User deleted
 
@@ -39,15 +58,17 @@ Skutek:
 Firebase Authentication
 ```
 
-Skutek:
+Skutki:
 
-- oznaczenie profilu jako usunięty albo usunięcie danych,
-- czyszczenie zależnych danych zgodnie z polityką produktu,
-- opcjonalne powiadomienie administratora.
+- cleanup danych prywatnych,
+- usunięcie lub anonimizacja profilu publicznego,
+- cleanup Storage,
+- usunięcie tokenów FCM,
+- oznaczenie wyniku cleanup i retry błędów częściowych.
 
 ## Firestore events
 
-### Review created
+### Review created, updated lub deleted
 
 Źródło:
 
@@ -55,30 +76,16 @@ Skutek:
 reviews/{reviewId}
 ```
 
-Skutek:
+Skutki:
 
 - aktualizacja `ratingAverage`,
 - aktualizacja `reviewsCount`,
 - sprawdzenie odznak,
-- wysłanie powiadomienia do właściciela miejsca.
+- opcjonalne powiadomienie właściciela miejsca.
 
-### Place report created
+Agregaty muszą być odporne na ponowne wykonanie, równoległe zapisy i usunięcie opinii.
 
-Źródło:
-
-```text
-reports/{reportId}
-```
-
-Gdy `targetType = place`.
-
-Skutek:
-
-- zapis zgłoszenia do kolejki moderacji,
-- powiadomienie administratora,
-- blokada duplikatu zgłoszenia, jeśli wymagana.
-
-### Review report created
+### Report created
 
 Źródło:
 
@@ -86,29 +93,15 @@ Skutek:
 reports/{reportId}
 ```
 
-Gdy `targetType = review`.
+Dla celu `place`, `review` lub `photo`:
 
-Skutek:
+- walidacja typu i identyfikatora,
+- deduplikacja zgłoszenia,
+- zapis do kolejki moderacji,
+- opcjonalne powiadomienie administratora,
+- powiązanie z właściwym zasobem.
 
-- zapis zgłoszenia do kolejki moderacji,
-- powiadomienie administratora,
-- powiązanie zgłoszenia z opinią i miejscem.
-
-### Photo report created
-
-Źródło:
-
-```text
-reports/{reportId}
-```
-
-Gdy `targetType = photo`.
-
-Skutek:
-
-- zapis zgłoszenia do kolejki moderacji,
-- powiadomienie administratora,
-- przygotowanie akcji usunięcia zdjęcia.
+Event nie powinien kopiować zbędnych danych użytkownika do rekordu moderacyjnego.
 
 ### Change request created
 
@@ -118,11 +111,12 @@ Skutek:
 changeRequests/{changeRequestId}
 ```
 
-Skutek:
+Skutki:
 
-- zapis propozycji zmiany,
+- walidacja propozycji,
+- zapis statusu oczekującego,
 - powiadomienie administratora,
-- oczekiwanie na akceptację lub odrzucenie.
+- ochrona przed samodzielną zmianą statusu przez klienta.
 
 ## Storage-related events
 
@@ -134,15 +128,28 @@ Skutek:
 Firebase Storage
 ```
 
-Skutek:
+Skutki mogą obejmować:
 
-- aktualizacja listy zdjęć miejsca,
-- zwiększenie `photosCount`,
-- opcjonalne powiadomienie obserwujących albo właściciela miejsca.
+- walidację metadanych i ścieżki,
+- aktualizację dokumentu miejsca lub opinii,
+- aktualizację `photosCount`,
+- cleanup pliku bez poprawnego rekordu,
+- opcjonalne powiadomienie.
+
+Trigger nie może tworzyć pętli aktualizacji ani ufać samemu rozszerzeniu pliku.
+
+### Photo deleted
+
+Skutki:
+
+- usunięcie odnośnika z Firestore,
+- aktualizacja licznika,
+- bezpieczna obsługa brakującego dokumentu,
+- zamknięcie odpowiedniego zgłoszenia, jeśli dotyczy.
 
 ## Scheduled events
 
-### Daily ranking check
+### Ranking check
 
 Źródło:
 
@@ -150,67 +157,84 @@ Skutek:
 Cloud Scheduler
 ```
 
-Skutek:
+Zasady:
 
-- przeliczenie albo sprawdzenie zmian rankingowych,
-- wysłanie powiadomień o awansie,
-- zapis metadanych ostatniego sprawdzenia.
+- paginacja i limity,
+- checkpoint ostatniego wykonania,
+- limit powiadomień,
+- brak pełnego skanu bez kontroli,
+- błąd pojedynczego rekordu nie ukrywa wyniku całej partii.
+
+### Maintenance
+
+Scheduled cleanup może obejmować:
+
+- nieważne tokeny FCM,
+- osierocone pliki,
+- wygasłe rekordy tymczasowe,
+- nieudane operacje wymagające follow-up.
+
+Retencja musi odpowiadać polityce prywatności i account deletion.
 
 ## Manual admin actions
 
-### Delete place
+Operacje usuwania miejsca, opinii, zdjęcia lub zmiany danych użytkownika powinny:
 
-Źródło:
+- weryfikować auth i rolę,
+- walidować target,
+- zapisywać powód i wynik,
+- być idempotentne,
+- aktualizować zależne dane,
+- zamykać zgłoszenie moderacyjne,
+- nie logować danych osobowych.
 
-```text
-Admin panel HTTP call
-```
+## Account deletion workflow
 
-Skutek:
-
-- usunięcie lub oznaczenie miejsca jako usunięte,
-- zapis powodu,
-- opcjonalne powiadomienie autora.
-
-### Delete review
-
-Źródło:
+Przepływ może obejmować wiele systemów:
 
 ```text
-Admin panel HTTP call
+request accepted
+  → reauthentication verified
+  → private Firestore cleanup
+  → public content delete/anonymize
+  → Storage cleanup
+  → FCM cleanup
+  → Auth delete
+  → local session/cache cleanup
 ```
 
-Skutek:
+Kolejność musi być świadomie zaprojektowana. Częściowy błąd nie może zostać oznaczony jako pełny sukces.
 
-- usunięcie opinii,
-- aktualizacja agregatów miejsca,
-- opcjonalne powiadomienie autora.
+## Idempotencja
 
-### Delete photo
+Stosujemy:
 
-Źródło:
+- event ID lub klucz deduplikacji,
+- statusy `pending`, `processing`, `completed`, `failed`,
+- transakcje lub warunkowe aktualizacje,
+- retry z backoffem,
+- mechanizm dead-letter lub follow-up dla błędów trwałych.
 
-```text
-Admin panel HTTP call
-```
+## Monitoring
 
-Skutek:
+Monitorujemy:
 
-- usunięcie pliku ze Storage,
-- aktualizacja dokumentu miejsca,
-- zamknięcie zgłoszenia, jeśli dotyczy.
+- liczbę eventów,
+- czas wykonania,
+- retry i błędy trwałe,
+- duplikaty,
+- koszt odczytów i zapisów,
+- liczbę rekordów w partii,
+- błędy cleanup account deletion.
 
-## Zasady projektowe
+## Checklista
 
-- Eventy powinny być idempotentne, jeśli mogą zostać wykonane ponownie.
-- Eventy nie powinny zakładać idealnej kolejności wykonania.
-- Event powinien mieć jasno opisany skutek uboczny.
-- Eventy krytyczne powinny mieć logi diagnostyczne bez danych wrażliwych.
-
-## Checklist
-
-- [ ] Event ma określone źródło.
-- [ ] Event ma określony skutek.
-- [ ] Event nie loguje danych wrażliwych.
-- [ ] Event jest odporny na ponowne wykonanie albo ma zabezpieczenie.
-- [ ] Event ma scenariusz testowy.
+- [ ] event ma określone źródło i skutek,
+- [ ] event jest odporny na ponowne wykonanie,
+- [ ] retry nie tworzy duplikatów,
+- [ ] auth i ownership są sprawdzone,
+- [ ] logi nie zawierają PII,
+- [ ] koszty i limity są kontrolowane,
+- [ ] błąd częściowy jest widoczny,
+- [ ] istnieje scenariusz testowy,
+- [ ] retencja i cleanup są zgodne z dokumentami prawnymi.

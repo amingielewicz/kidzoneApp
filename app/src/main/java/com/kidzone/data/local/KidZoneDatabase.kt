@@ -6,19 +6,16 @@ import com.kidzone.data.local.sync.PendingOperationDao
 import com.kidzone.data.local.sync.PendingOperationEntity
 
 /**
- * Główna baza danych Room aplikacji kidZone.
+ * 🎯 Odpowiedzialności:
+ * - Główny magazyn danych lokalnych aplikacji kidZone (Room).
+ * - Zarządzanie tabelami cache'u (miejsca, opinie) oraz kolejką operacji oczekujących.
  *
- * Zawiera tabele:
- *  - `places` – offline cache miejsc,
- *  - `reviews` – offline cache opinii,
- *  - `pending_operations` – offline write queue (sync when online).
+ * ⚙️ Techniczne:
+ * - `version = 5`: Dodano mapy JSON dla `photoHashes` w encjach.
+ * - `exportSchema = false`: Schematy nie są eksportowane (używamy czyszczenia cache przy zmianach).
  *
- * exportSchema = false – nie generujemy JSON-ów schematów,
- * bo nie potrzebujemy migracji (cache można wyczyścić i załadować ponownie).
- *
- * version = 3 – dodano tabelę `pending_operations` (offline write queue).
- * fallbackToDestructiveMigration() w DatabaseModule zapewnia, że stara baza
- * zostanie usunięta i odtworzona.
+ * ✅ Gwarancje:
+ * - `fallbackToDestructiveMigration()`: Automatyczne odświeżenie bazy przy zmianie schematu (zapobiega crashom).
  */
 @Database(
     entities = [PlaceEntity::class, ReviewEntity::class, PendingOperationEntity::class],

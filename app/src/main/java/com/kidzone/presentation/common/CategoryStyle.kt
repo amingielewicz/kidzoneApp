@@ -34,7 +34,13 @@ import androidx.compose.ui.unit.dp
 import com.kidzone.domain.model.PlaceCategory
 
 /**
- * Wizualna reprezentacja kategorii miejsca – ikona + kolor.
+ * 🎯 Odpowiedzialności:
+ * - Definiowanie spójnej identyfikacji wizualnej dla kategorii miejsc (ikona + kolor).
+ * - Udostępnianie ujednoliconych komponentów [CategoryIcon] oraz [CategoryBadge].
+ *
+ * ✅ Gwarancje:
+ * - Spójność wizualna między wszystkimi ekranami aplikacji.
+ * - Wsparcie dla animacji Shared Transitions dzięki ujednoliconej strukturze komponentów.
  */
 data class CategoryStyle(
     val icon: ImageVector,

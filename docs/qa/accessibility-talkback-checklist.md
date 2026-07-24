@@ -1,70 +1,124 @@
-# Accessibility TalkBack checklist
+# Accessibility and TalkBack checklist
 
-Use this checklist for release candidates and accessibility-focused PRs. Test on a real Android device when possible; emulator checks are useful for repeatability, but TalkBack timing, focus behavior, system font limits and Material You colors can differ from physical devices.
+Ostatnia aktualizacja: 2026-07-14
+
+Używaj tej checklisty dla release candidate oraz PR-ów zmieniających UI, nawigację, formularze, mapę, uprawnienia lub komunikaty dynamiczne.
 
 ## Setup
 
-- [ ] Turn on TalkBack.
-- [ ] Test light mode and dark mode.
-- [ ] Test Android font scale at default, 1.3x, 1.5x and the maximum available value on the device.
-- [ ] Test Android display size at default and large/maximum.
-- [ ] On Android 12+, test Material You dynamic colors with at least one bright and one muted wallpaper palette.
-- [ ] Test with reduced motion enabled.
-- [ ] Test with a signed-in regular user and an admin account.
+- [ ] TalkBack włączony,
+- [ ] jasny i ciemny motyw,
+- [ ] font scale: domyślny, około 1.3x, 1.5x–1.6x i maksimum urządzenia,
+- [ ] display size: domyślny i duży,
+- [ ] mały ekran i landscape,
+- [ ] dynamic colors na Androidzie 12+,
+- [ ] reduced motion,
+- [ ] zwykłe konto użytkownika,
+- [ ] fizyczne urządzenie dla co najmniej jednego pełnego smoke.
 
-## Android app
+## Globalne zasady
 
-### Login and registration
+- [ ] każda akcja ma czytelną nazwę, rolę i stan,
+- [ ] elementy dekoracyjne nie są odczytywane,
+- [ ] kolejność fokusu jest logiczna,
+- [ ] fokus nie przeskakuje po recomposition,
+- [ ] touch target ma minimum 48 dp,
+- [ ] kolor nie jest jedynym nośnikiem informacji,
+- [ ] dynamiczne komunikaty są ogłaszane raz,
+- [ ] duży font nie ukrywa CTA.
 
-- [ ] Email and password fields announce their labels and required/error states.
-- [ ] Password visibility button announces the current action: "Pokaż hasło" or "Ukryj hasło".
-- [ ] Login, registration, Google sign-in and password reset actions are reachable by swipe navigation.
-- [ ] Permission rationale screens are announced before system permission dialogs.
+## Logowanie i rejestracja
 
-### Add place
+- [ ] pola e-mail i hasła odczytują etykiety, wartości i błędy,
+- [ ] przycisk hasła mówi „Pokaż hasło” lub „Ukryj hasło”,
+- [ ] login, rejestracja, Google sign-in i reset hasła są osiągalne gestami,
+- [ ] loading i disabled state są zrozumiałe,
+- [ ] błąd auth nie ujawnia technicznego wyjątku,
+- [ ] po sukcesie fokus trafia do logicznego miejsca na następnym ekranie.
 
-- [ ] Required-field errors are announced after attempting to save an incomplete form.
-- [ ] Incomplete form flow is clear: empty place name, missing GPS, GPS fetched and second save attempt.
-- [ ] Category and amenities controls announce selected/unselected state.
-- [ ] Location, camera and photo picker actions explain why the permission or picker is needed.
-- [ ] Location status changes are announced after GPS is fetched.
-- [ ] Photo thumbnails and remove buttons have meaningful labels.
-- [ ] The save button state is understandable when the form is incomplete.
+## Start i Lista
 
-### Map
+- [ ] nagłówek oraz główne akcje są odczytywane w logicznej kolejności,
+- [ ] karta miejsca nie dubluje bez potrzeby semantyki dzieci,
+- [ ] karta odczytuje nazwę, kategorię, ocenę i adres lub dystans,
+- [ ] wyszukiwarka i filtry mają jasne etykiety,
+- [ ] wybrany filtr i sortowanie mają dostępny stan,
+- [ ] empty, offline i error state są ogłaszane,
+- [ ] sortowanie „Od najbliższych” obsługuje brak lokalizacji.
 
-- [ ] Loading and error banners are announced without stealing focus repeatedly.
-- [ ] My location, zoom in and zoom out controls have clear accessible names.
-- [ ] The map list fallback opens from the map and every item is reachable by swipe navigation.
-- [ ] Place cards in the fallback list announce name, category, distance and rating/new state.
+## Mapa
 
-### Place details
+- [ ] loading i błędy nie kradną fokusu wielokrotnie,
+- [ ] „Moja lokalizacja” ma czytelną nazwę,
+- [ ] brak zgody i wyłączony GPS mają dostępny fallback,
+- [ ] trwała odmowa prowadzi do ustawień,
+- [ ] lista fallback jest osiągalna gestami,
+- [ ] bottom sheet przejmuje fokus,
+- [ ] po zamknięciu bottom sheeta fokus wraca logicznie,
+- [ ] miejsce można otworzyć bez polegania wyłącznie na markerze.
 
-- [ ] Title, category, address, rating and report actions are announced in a useful order.
-- [ ] Review creation and photo reporting flows are reachable without touch exploration.
-- [ ] Reward or badge animations respect reduced motion settings.
+## Dodawanie miejsca i opinii
 
-### Profile
+- [ ] wymagane pola oraz błędy są ogłaszane,
+- [ ] kategoria i udogodnienia odczytują stan wyboru,
+- [ ] lokalizacja, kamera i Photo Picker wyjaśniają cel,
+- [ ] zmiana statusu GPS jest ogłaszana,
+- [ ] miniatura zdjęcia i przycisk usunięcia mają znaczące nazwy,
+- [ ] klawiatura nie blokuje zapisu,
+- [ ] double submit jest niemożliwy,
+- [ ] częściowy błąd uploadu nie jest ogłaszany jako pełny sukces.
 
-- [ ] Custom profile navigation rows expose button role and at least a 48 dp touch target.
-- [ ] Badges, settings and logout actions are reachable and have clear names.
-- [ ] Status banners use polite or assertive announcements appropriately.
+## Szczegóły miejsca
 
-## Admin panel
+- [ ] tytuł, kategoria, adres i ocena są odczytywane w użytecznej kolejności,
+- [ ] opinie i zdjęcia są osiągalne gestami,
+- [ ] akcje zgłoszenia jasno wskazują cel,
+- [ ] galeria nie tworzy pustych elementów fokusu,
+- [ ] usunięty lub niedostępny zasób ma kontrolowany komunikat,
+- [ ] animacje odznak respektują reduced motion.
 
-- [ ] Admin login page exposes a clear landmark and form labels.
-- [ ] Desktop navigation has a labelled nav landmark.
-- [ ] Mobile menu button announces open and close state.
-- [ ] Tables and action buttons expose descriptive names for users, places, reports and change requests.
-- [ ] Dialog close buttons and destructive actions include the affected entity in their accessible name.
+## Ranking i Profil
 
-## Automated checks
+- [ ] użytkownik rozumie pozycję i podstawę rankingu,
+- [ ] odznaki mają znaczące nazwy,
+- [ ] statystyki profilu nie są odczytywane jako niepowiązane liczby,
+- [ ] ustawienia, logout i account deletion są osiągalne,
+- [ ] akcje destrukcyjne zawierają nazwę działania i celu,
+- [ ] po logout/delete account fokus nie wraca do prywatnego ekranu.
 
-Run these before opening or merging an accessibility PR:
+## Dialogi, bottom sheety i snackbary
+
+- [ ] warstwa przejmuje fokus,
+- [ ] fokus nie wychodzi poza otwartą warstwę,
+- [ ] przycisk zamknięcia ma jednoznaczną etykietę,
+- [ ] treść jest przewijalna przy dużym foncie,
+- [ ] snackbar jest ogłaszany bez wielokrotnego powtarzania,
+- [ ] po zamknięciu fokus wraca do właściwego elementu.
+
+## Uprawnienia i ustawienia systemowe
+
+- [ ] rationale jest odczytane przed dialogiem systemowym,
+- [ ] zwykła odmowa ma dalszy krok,
+- [ ] trwała odmowa otwiera ustawienia aplikacji,
+- [ ] powrót z ustawień odświeża i ogłasza stan,
+- [ ] brak powiadomień nie blokuje aplikacji,
+- [ ] Photo Picker działa bez szerokiej zgody galerii.
+
+## Deep linki i powiadomienia
+
+- [ ] deep link otwiera właściwy ekran,
+- [ ] brak zasobu ma kontrolowany komunikat,
+- [ ] wylogowany użytkownik przechodzi przez poprawny auth flow,
+- [ ] powiadomienie nie tworzy zduplikowanego ekranu,
+- [ ] tytuł i treść powiadomienia nie ujawniają PII.
+
+## Automatyczne bramki
 
 ```powershell
-$env:MAPS_API_KEY="AIzaSyPlaceholder"; .\gradlew.bat testDebugUnitTest detekt assembleDebug lintDebug assembleDebugAndroidTest
+$env:MAPS_API_KEY="AIzaSyPlaceholder"; .\gradlew.bat testDebugUnitTest detekt lintDebug assembleDebug assembleDebugAndroidTest
 ```
+
+Dla panelu administracyjnego:
 
 ```powershell
 cd admin-panel
@@ -75,8 +129,22 @@ npm.cmd run a11y:check
 npm.cmd run build
 ```
 
-Run device UI tests when a device or emulator is available:
+Testy urządzeniowe, jeśli środowisko jest dostępne:
 
 ```powershell
 $env:MAPS_API_KEY="AIzaSyPlaceholder"; .\gradlew.bat connectedDebugAndroidTest
+```
+
+## Wynik
+
+```text
+Urządzenie:
+Android:
+Build:
+TalkBack: PASS / FAIL / BLOCKED
+Large font: PASS / FAIL / BLOCKED
+Display size: PASS / FAIL / BLOCKED
+Landscape: PASS / FAIL / BLOCKED
+Krytyczne problemy:
+Dowody:
 ```

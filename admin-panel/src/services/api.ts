@@ -1,13 +1,18 @@
 import { auth } from './firebase';
 
 /**
- * Fetch z automatycznym dodaniem tokena admina w nagłówku Authorization.
+ * 🎯 Cel: Fetch z automatycznym dodaniem tokena admina w nagłówku Authorization.
  *
- * Rzuca Error jeśli:
- *  - user nie jest zalogowany,
- *  - Cloud Function zwróciła status 4xx/5xx.
+ * 📥 Parametry:
+ * - url: Adres endpointu (zwykle Cloud Function).
+ * - options: Standardowe opcje fetch.
  *
- * Caller powinien obsłużyć te błędy (try/catch lub .catch()).
+ * 📤 Zwraca: Promise<Response>.
+ *
+ * 🛡️ Autoryzacja:
+ * - Pobiera aktualny ID Token z Firebase Auth.
+ * - Dołącza nagłówek 'Authorization: Bearer <token>'.
+ * - Rzuca błąd, gdy użytkownik nie jest zalogowany lub status >= 400.
  */
 export async function adminFetch(url: string, options?: RequestInit): Promise<Response> {
   const user = auth.currentUser;

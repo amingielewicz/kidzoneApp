@@ -1,198 +1,106 @@
 # Account deletion test checklist
 
-Powiązane issue: #210
-Powiązane issue release: #269, #270, #275
-Parent: #182
+Powiązane issue: #182, #210, #269, #270, #275, #292
 
-Ostatnia aktualizacja: 2026-06-28
+Ostatnia aktualizacja: 2026-07-13
 
 ## Cel
 
-Ten dokument opisuje sposób ręcznej weryfikacji usuwania konta użytkownika w aplikacji kidZone przed publikacją w Google Play.
+Dokument opisuje ręczną weryfikację usuwania konta użytkownika przed publikacją kidZone w Google Play.
 
-Issue #210 pozostaje otwarte po dodaniu tej dokumentacji, ponieważ realny test musi zostać wykonany ręcznie na aplikacji i w Firebase Console.
-
-## Dlaczego to ważne
-
-Aplikacja pozwala zakładać konto użytkownika. Przed publikacją trzeba potwierdzić, że użytkownik ma realną i zrozumiałą możliwość usunięcia konta albo wysłania żądania usunięcia danych.
-
-Flow usuwania konta musi być zgodny z:
-
-- polityką prywatności,
-- regulaminem,
-- publiczną stroną `public/account-deletion.html`,
-- Google Play Data Safety,
-- realnym zachowaniem aplikacji,
-- faktyczną konfiguracją Firebase.
-
-## Zakres testu
-
-Test obejmuje:
-
-- istnienie akcji usunięcia konta,
-- komunikaty ostrzegawcze,
-- ponowne uwierzytelnienie użytkownika,
-- Firebase Authentication,
-- Firestore,
-- Storage,
-- tokeny FCM,
-- publiczne treści użytkownika,
-- prywatne dane użytkownika,
-- dokumenty prawne,
-- Google Play Console.
-
-## Minimalne dane do zapisania przed testem
-
-Przed wykonaniem testu zapisać:
+## Dane testu
 
 ```text
-Data testu:
+Data:
 Tester:
 Wersja aplikacji:
-Commit:
-Urządzenie / emulator:
-Android version:
+Commit / tag:
+Build type:
+Urządzenie:
+Android:
 Firebase project:
-Konto testowe e-mail:
-UID użytkownika:
+Konto testowe:
+UID:
 Wynik: PASS / FAIL / BLOCKED
 ```
 
-## Konto testowe
+## Przygotowanie konta
 
-Utworzyć konto testowe, które można bezpiecznie usunąć.
+Na koncie testowym utwórz:
 
-Na koncie testowym przygotować dane:
+- publiczną nazwę użytkownika,
+- opcjonalne dane profilu,
+- avatar,
+- co najmniej jedno miejsce,
+- opinię i ocenę,
+- co najmniej jedno zdjęcie,
+- aktywny token FCM,
+- dane prywatne w `users/{uid}/private/*`, jeśli istnieją.
 
-- [ ] publiczna nazwa użytkownika,
-- [ ] opcjonalne imię i nazwisko, jeśli UI pozwala je ustawić,
-- [ ] avatar, jeśli funkcja istnieje,
-- [ ] co najmniej jedno dodane miejsce,
-- [ ] co najmniej jedna opinia,
-- [ ] co najmniej jedna ocena,
-- [ ] co najmniej jedno zdjęcie miejsca lub opinii,
-- [ ] token FCM zapisany po zalogowaniu, jeśli FCM jest aktywne,
-- [ ] dane prywatne w `users/{uid}/private/*`, jeśli istnieją.
+## 1. Dostępność funkcji
 
-## 1. Czy użytkownik widzi opcję usunięcia konta?
+- [ ] akcja usunięcia konta jest dostępna w `Profil → Konto i bezpieczeństwo`,
+- [ ] użytkownik nie musi szukać jej w dokumentach prawnych,
+- [ ] publiczna strona `/account-deletion` działa bez logowania,
+- [ ] ścieżka w aplikacji i na stronie publicznej jest zgodna.
 
-Sprawdzić w aplikacji:
+## 2. Ostrzeżenie
 
-- [ ] profil,
-- [ ] ustawienia konta,
-- [ ] ekran edycji profilu,
-- [ ] regulamin / prywatność,
-- [ ] inne miejsca, gdzie może być akcja usunięcia.
+Komunikat powinien jasno opisywać:
 
-Wynik:
+- nieodwracalność operacji,
+- utratę możliwości logowania,
+- sposób obsługi danych prywatnych,
+- sposób obsługi miejsc, opinii, ocen i zdjęć,
+- możliwą anonimizację treści publicznych,
+- konieczność ponownego uwierzytelnienia.
 
-```text
-Opcja usunięcia konta istnieje: TAK / NIE
-Ścieżka w aplikacji:
-Uwagi:
-```
-
-Jeżeli opcja nie istnieje, sprawdzić, czy istnieje jasna procedura kontaktu e-mail.
-
-## 2. Ostrzeżenie przed usunięciem
-
-Przed usunięciem użytkownik powinien dostać jasny komunikat.
-
-Sprawdzić, czy komunikat informuje o:
-
-- [ ] usunięciu konta,
-- [ ] skutkach dla logowania,
-- [ ] skutkach dla danych prywatnych,
-- [ ] skutkach dla treści publicznych,
-- [ ] ewentualnej anonimizacji opinii/miejsc,
-- [ ] tym, czy zdjęcia zostaną usunięte,
-- [ ] nieodwracalności operacji,
-- [ ] możliwej konieczności ponownego logowania.
-
-Wynik:
-
-```text
-Ostrzeżenie jest jasne: TAK / NIE
-Braki:
-```
+- [ ] użytkownik może anulować operację,
+- [ ] anulowanie nie zmienia danych,
+- [ ] potwierdzenie nie jest możliwe przypadkowym pojedynczym kliknięciem.
 
 ## 3. Ponowne uwierzytelnienie
 
-Firebase może wymagać świeżego logowania przed usunięciem konta.
+Sprawdź osobno:
 
-Sprawdzić:
+- konto e-mail i hasło,
+- konto Google, jeśli obsługiwane.
 
-- [ ] czy aplikacja obsługuje `requires-recent-login`,
-- [ ] czy użytkownik może ponownie podać hasło,
-- [ ] czy użytkownik logowany Google ma obsłużony reauth,
-- [ ] czy błąd reauth jest pokazany w zrozumiały sposób,
-- [ ] czy anulowanie reauth nie usuwa konta częściowo.
-
-Wynik:
-
-```text
-Reauth działa: TAK / NIE / NIE DOTYCZY
-Uwagi:
-```
+- [ ] `requires-recent-login` jest obsłużone,
+- [ ] błędne hasło nie usuwa części danych,
+- [ ] anulowany reauth nie usuwa części danych,
+- [ ] błąd sieci nie pozostawia konta w stanie pośrednim,
+- [ ] użytkownik dostaje czytelny komunikat i możliwość ponowienia.
 
 ## 4. Firebase Authentication
 
-Po usunięciu konta sprawdzić w Firebase Console:
+Po operacji:
 
 - [ ] użytkownik znika z Firebase Authentication,
-- [ ] użytkownik nie może zalogować się starym hasłem,
-- [ ] sesja w aplikacji jest zakończona,
-- [ ] aplikacja przechodzi do ekranu logowania,
-- [ ] po restarcie aplikacji użytkownik nadal jest wylogowany.
+- [ ] stare dane logowania nie działają,
+- [ ] sesja jest zakończona,
+- [ ] restart aplikacji nie przywraca sesji,
+- [ ] przycisk wstecz nie wraca do części zalogowanej.
 
-Wynik:
+## 5. Firestore — profil publiczny
 
-```text
-Firebase Auth account removed: TAK / NIE
-Uwagi:
-```
+Sprawdź `users/{uid}`.
 
-## 5. Firestore — dokument publiczny użytkownika
+Poprawny wynik:
 
-Sprawdzić dokument:
-
-```text
-users/{uid}
-```
-
-Możliwe poprawne strategie:
-
-### Opcja A — usunięcie dokumentu
-
-```text
-users/{uid} nie istnieje po usunięciu konta.
-```
-
-### Opcja B — anonimizacja dokumentu
-
-```text
-users/{uid} zostaje, ale nie zawiera danych identyfikujących użytkownika.
-```
-
-Jeśli dokument zostaje, sprawdzić:
+- dokument usunięty, albo
+- dokument zanonimizowany bez danych identyfikujących.
 
 - [ ] brak e-maila,
 - [ ] brak imienia i nazwiska,
-- [ ] brak prywatnych danych,
-- [ ] nazwa użytkownika jest zanonimizowana,
-- [ ] avatar jest usunięty albo zastąpiony fallbackiem,
-- [ ] role i pola administracyjne nie ujawniają prywatnych informacji.
+- [ ] nazwa użytkownika zanonimizowana, jeśli dokument zostaje,
+- [ ] avatar usunięty albo zastąpiony fallbackiem,
+- [ ] brak prywatnych i administracyjnych informacji,
+- [ ] reguły nie pozwalają byłemu użytkownikowi na dostęp.
 
-Wynik:
+## 6. Firestore — dane prywatne
 
-```text
-users/{uid}: USUNIĘTY / ZANONIMIZOWANY / BEZ ZMIAN / BLOCKED
-Uwagi:
-```
-
-## 6. Firestore — prywatne dane użytkownika
-
-Sprawdzić ścieżki:
+Sprawdź:
 
 ```text
 users/{uid}/private/profile
@@ -200,71 +108,25 @@ users/{uid}/private/messaging
 users/{uid}/private/*
 ```
 
-Po usunięciu konta prywatne dane powinny być usunięte albo zanonimizowane.
-
-Sprawdzić:
-
-- [ ] e-mail usunięty,
-- [ ] imię i nazwisko usunięte,
+- [ ] e-mail i dane profilu usunięte,
 - [ ] ustawienia prywatne usunięte,
-- [ ] tokeny FCM usunięte,
-- [ ] prywatne dokumenty nie są publicznie czytelne,
-- [ ] brak danych pozwalających łatwo zidentyfikować użytkownika.
+- [ ] tokeny FCM usunięte lub unieważnione,
+- [ ] brak dokumentów pozwalających zidentyfikować użytkownika,
+- [ ] brak publicznego odczytu pozostałych dokumentów.
 
-Wynik:
+## 7. Treści publiczne
 
-```text
-Private user data removed/anonymized: TAK / NIE / BLOCKED
-Uwagi:
-```
+Sprawdź miejsca, opinie, oceny, zdjęcia, zgłoszenia i ranking.
 
-## 7. Publiczne treści użytkownika
-
-Sprawdzić treści utworzone przed usunięciem konta:
-
-- [ ] miejsca,
-- [ ] opinie,
-- [ ] oceny,
-- [ ] zdjęcia,
-- [ ] zgłoszenia,
-- [ ] ranking.
-
-Możliwe strategie:
-
-### Opcja A — usunięcie treści
-
-Wszystkie treści użytkownika są usuwane.
-
-### Opcja B — anonimizacja autora
-
-Treści zostają, ale autor jest zanonimizowany.
-
-Przykład:
-
-```text
-Użytkownik usunięty
-```
-
-Sprawdzić:
-
-- [ ] publiczne treści nie pokazują e-maila,
-- [ ] publiczne treści nie pokazują imienia i nazwiska,
-- [ ] publiczne treści nie linkują do prywatnego profilu,
-- [ ] ranking nie pokazuje usuniętego użytkownika jako aktywnego profilu,
-- [ ] szczegóły miejsca/opinii nie crashują po usunięciu autora.
-
-Wynik:
-
-```text
-Public content: USUNIĘTE / ZANONIMIZOWANE / BEZ ZMIAN / BLOCKED
-Uwagi:
-```
+- [ ] publiczne treści nie pokazują e-maila ani danych prywatnych,
+- [ ] autor jest usunięty albo zanonimizowany zgodnie z polityką,
+- [ ] ranking nie prowadzi do aktywnego profilu usuniętego konta,
+- [ ] szczegóły miejsca i opinii nie crashują bez autora,
+- [ ] zgłoszenia administracyjne zachowują dane tylko w uzasadnionym zakresie.
 
 ## 8. Firebase Storage
 
-Sprawdzić zdjęcia użytkownika w Storage.
-
-Możliwe ścieżki:
+Sprawdź między innymi:
 
 ```text
 users/{uid}/avatar/*
@@ -272,214 +134,110 @@ places/{uid}/{placeId}/photos/*
 reviews/{uid}/{reviewId}/photos/*
 ```
 
-Sprawdzić:
+- [ ] avatar został usunięty,
+- [ ] pliki prywatne zostały usunięte,
+- [ ] zdjęcia publiczne mają strategię zgodną z dokumentami,
+- [ ] brak uszkodzonych odnośników w UI,
+- [ ] usunięte konto nie może zapisywać ani usuwać plików,
+- [ ] cleanup częściowy ma retry albo osobne issue.
 
-- [ ] avatar został usunięty albo zanonimizowany,
-- [ ] zdjęcia prywatne zostały usunięte,
-- [ ] zdjęcia publiczne mają jasną strategię: usunięcie albo pozostawienie jako treść publiczna,
-- [ ] aplikacja nie pokazuje uszkodzonych obrazków,
-- [ ] brak dostępu do ścieżek po usuniętym koncie, jeśli powinny być prywatne.
+## 9. FCM
 
-Wynik:
+- [ ] token został usunięty albo unieważniony,
+- [ ] usunięty użytkownik nie dostaje powiadomień konta,
+- [ ] token nie jest publiczny,
+- [ ] token nie występuje w logach,
+- [ ] scheduled functions nie próbują wysyłać do nieaktywnego konta bez obsługi błędu.
 
-```text
-Storage cleanup: TAK / NIE / CZĘŚCIOWO / BLOCKED
-Uwagi:
-```
+## 10. Lokalny stan aplikacji
 
-## 9. Firebase Cloud Messaging
+- [ ] Room i preferences nie pokazują prywatnych danych,
+- [ ] widget nie pokazuje danych konta,
+- [ ] cache obrazów nie pokazuje avatara jako aktywnego profilu,
+- [ ] inne konto nie widzi danych poprzedniego użytkownika,
+- [ ] aplikacja działa po ponownej rejestracji lub logowaniu innym kontem.
 
-Jeśli FCM jest aktywne, sprawdzić:
+## 11. Odporność na błędy
 
-- [ ] token FCM jest usuwany z `users/{uid}/private/messaging`,
-- [ ] wylogowany/usunięty użytkownik nie dostaje powiadomień powiązanych z kontem,
-- [ ] token nie jest publicznie czytelny,
-- [ ] token nie zostaje w logach.
+Przetestuj:
 
-Wynik:
+- brak internetu przed potwierdzeniem,
+- utratę internetu podczas operacji,
+- timeout Cloud Function,
+- częściowe niepowodzenie Storage,
+- restart aplikacji podczas procesu,
+- dwukrotne kliknięcie przycisku.
 
-```text
-FCM token cleanup: TAK / NIE / NIE DOTYCZY / BLOCKED
-Uwagi:
-```
+Oczekiwane zachowanie:
 
-## 10. Zachowanie aplikacji po usunięciu konta
+- brak duplikacji operacji,
+- brak fałszywego komunikatu sukcesu,
+- czytelna informacja o stanie,
+- możliwość bezpiecznego retry,
+- błąd jest raportowany bez danych osobowych.
 
-Po usunięciu konta:
+## 12. Dokumenty publiczne
 
-- [ ] aplikacja kończy sesję użytkownika,
-- [ ] użytkownik trafia do logowania/startu,
-- [ ] aplikacja nie crashuje,
-- [ ] przycisk wstecz nie wraca do zalogowanej części aplikacji,
-- [ ] restart aplikacji nie przywraca sesji,
-- [ ] cache lokalny nie pokazuje prywatnych danych,
-- [ ] ponowna rejestracja tym samym e-mailem działa albo jest jasno obsłużona.
+Sprawdź zgodność:
 
-Wynik:
+- `public/privacy-policy.html`,
+- `public/terms-of-service.html`,
+- `public/account-deletion.html`,
+- `docs/legal/google-play-data-safety-draft.md`.
 
-```text
-App state after deletion: PASS / FAIL / BLOCKED
-Uwagi:
-```
-
-## 11. Local cache / Room
-
-Jeśli aplikacja cacheuje dane lokalnie:
-
-- [ ] prywatne dane użytkownika znikają po wylogowaniu/usunięciu konta,
-- [ ] cache nie pokazuje danych usuniętego konta,
-- [ ] publiczne dane mogą zostać, jeśli nie identyfikują użytkownika,
-- [ ] aplikacja nie crashuje przy braku autora/UID.
-
-Wynik:
-
-```text
-Local cache cleanup: TAK / NIE / NIE DOTYCZY / BLOCKED
-Uwagi:
-```
-
-## 12. Dokumenty prawne
-
-Sprawdzić zgodność z:
-
-```text
-public/privacy-policy.html
-public/terms-of-service.html
-public/account-deletion.html
-```
-
-Polityka prywatności powinna wyjaśniać:
-
-- [ ] jak użytkownik usuwa konto,
-- [ ] czy może zażądać usunięcia danych e-mailem,
-- [ ] co dzieje się z treściami publicznymi,
-- [ ] co dzieje się ze zdjęciami,
-- [ ] jaki jest kontakt do administratora,
-- [ ] czy część danych może zostać zanonimizowana zamiast usunięta.
-
-Publiczna strona usuwania konta powinna:
-
-- [ ] działać bez logowania,
-- [ ] zawierać ścieżkę w aplikacji,
-- [ ] zawierać kontakt e-mail,
-- [ ] opisywać dane usuwane i anonimizowane,
-- [ ] opisywać termin realizacji,
-- [ ] linkować politykę prywatności i regulamin.
-
-Wynik:
-
-```text
-Legal docs consistent: TAK / NIE / BLOCKED
-Uwagi:
-```
+- [ ] opis odpowiada realnej implementacji,
+- [ ] kontakt jest aktualny,
+- [ ] termin realizacji jest wykonalny,
+- [ ] opisano usuwanie i anonimizację,
+- [ ] linki działają po HTTPS bez logowania.
 
 ## 13. Google Play Console
 
-Przed publikacją sprawdzić deklaracje:
+- [ ] Account deletion URL jest zapisany,
+- [ ] Privacy Policy URL jest zapisany,
+- [ ] Data Safety deklaruje możliwość usunięcia danych,
+- [ ] deklaracja odpowiada wynikowi testu,
+- [ ] dowód finalnej konfiguracji jest dołączony do issue.
 
-- [ ] Data Safety mówi, że użytkownik może zażądać usunięcia danych,
-- [ ] link do polityki prywatności działa,
-- [ ] opis w Google Play nie obiecuje czegoś, czego aplikacja nie robi,
-- [ ] procedura usuwania konta jest dostępna z aplikacji albo jasno opisana,
-- [ ] procedura działa dla kont testowych.
+## Kryteria PASS
 
-Wynik:
+PASS wymaga jednocześnie:
 
-```text
-Google Play deletion declaration ready: TAK / NIE / BLOCKED
-Uwagi:
-```
+- usunięcia konta Auth,
+- usunięcia lub anonimizacji danych prywatnych,
+- spójnej strategii treści publicznych,
+- poprawnego cleanup Storage i FCM,
+- wyczyszczenia lokalnego cache i widgetu,
+- zgodności dokumentów i Play Console,
+- braku krytycznego błędu w scenariuszach awaryjnych.
 
-## 14. Minimalny wynik PASS
-
-Test można uznać za zaliczony, jeśli:
-
-- [ ] konto można usunąć z aplikacji albo istnieje jasna procedura żądania usunięcia,
-- [ ] użytkownik dostaje jasne ostrzeżenie,
-- [ ] Firebase Auth nie pozwala dalej używać usuniętego konta,
-- [ ] prywatne dane nie są publicznie widoczne,
-- [ ] publiczne treści są usunięte albo zanonimizowane,
-- [ ] zdjęcia mają jasną strategię usunięcia albo pozostawienia,
-- [ ] dokumenty prawne są zgodne z aplikacją,
-- [ ] wynik testu jest zapisany w issue #210.
-
-## 15. Co zrobić przy wyniku FAIL
-
-Jeżeli test nie przejdzie:
-
-1. Nie zamykać #210.
-2. Utworzyć osobne issue dla każdego realnego braku.
-3. Oznaczyć braki jako blocker przed Google Play, jeśli dotyczą wymagań usuwania konta.
-4. Nie oznaczać Data Safety jako finalnego.
-5. Nie publikować aplikacji bez jasnej procedury usuwania konta/danych.
-
-Przykładowe follow-up issue:
-
-```text
-legal: add in-app account deletion entry point
-security: remove private profile data during account deletion
-storage: delete or anonymize user photos after account deletion
-privacy: anonymize public user content after account deletion
-```
-
-## 16. Format komentarza do issue #210
-
-Po wykonaniu testu dopisać komentarz:
+## Wynik
 
 ```markdown
-## Account deletion test result
+## Account deletion result
 
 - Data:
 - Tester:
-- Wersja aplikacji:
-- Commit:
+- Build / commit:
+- Provider: email / Google
 - Urządzenie:
-- Android:
-- Firebase project:
-- Konto testowe:
-- UID:
-- Wynik ogólny: PASS / FAIL / BLOCKED
+- Wynik: PASS / FAIL / BLOCKED
 
-### Firebase Auth
-- Wynik:
-- Uwagi:
+### Wyniki
+- Reauthentication: PASS / FAIL / BLOCKED
+- Firebase Auth: PASS / FAIL / BLOCKED
+- Firestore public profile: PASS / FAIL / BLOCKED
+- Private data: PASS / FAIL / BLOCKED
+- Storage: PASS / FAIL / BLOCKED
+- FCM: PASS / FAIL / BLOCKED
+- Cache and widget: PASS / FAIL / BLOCKED
+- Legal and Play Console: PASS / FAIL / BLOCKED
 
-### Firestore public user document
-- Wynik:
-- Uwagi:
-
-### Firestore private user data
-- Wynik:
-- Uwagi:
-
-### Public content
-- Wynik:
-- Uwagi:
-
-### Storage
-- Wynik:
-- Uwagi:
-
-### FCM tokens
-- Wynik:
-- Uwagi:
-
-### Legal / Google Play
-- Wynik:
-- Uwagi:
+### Dowody
+- screenshoty / nagrania / logi / linki:
 
 ### Follow-up issues
-- ...
+- brak / #...
 ```
 
-## Kryteria zamknięcia issue #210
-
-Issue #210 można zamknąć dopiero, gdy:
-
-- realny test usuwania konta został wykonany,
-- wynik testu jest zapisany,
-- braki mają osobne issue,
-- zachowanie aplikacji jest zgodne z polityką prywatności,
-- Google Play Data Safety może zostać wypełnione bez zgadywania.
-
-Samo dodanie tej dokumentacji nie zamyka issue #210.
+Issue #210 pozostaje otwarte do czasu wykonania realnego testu z wynikiem PASS.

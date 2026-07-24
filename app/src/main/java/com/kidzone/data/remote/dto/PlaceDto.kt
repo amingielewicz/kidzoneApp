@@ -1,16 +1,18 @@
 package com.kidzone.data.remote.dto
 
+import com.kidzone.data.remote.dto.DtoMapperUtils.toPhotoHashMap
 import com.kidzone.domain.model.Amenity
 import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.utils.GeoHash
 
 /**
+ * ⚙️ Techniczne:
  * Reprezentacja [Place] w kolekcji `places` w Firestore.
  *
- * Pole [geohash] jest obliczane z (latitude, longitude) przy zapisie
- * i używane do geo-zapytań (`whereGreaterThanOrEqualTo` / `whereLessThan`
- * na prefixie geohashu). Precision 7 ≈ 150m.
+ * @property geohash Obliczane z (lat, lng) przy zapisie. Precision 7 ≈ 150m. Używane do geo-zapytań.
+ * @property photoHashes `Any?` celowo: stare dokumenty zawierają listę, nowe mapę URL -> hash.
+ * [toDomain] akceptuje wyłącznie nowy, jednoznaczny format.
  */
 data class PlaceDto(
     val id: String = "",
@@ -73,11 +75,3 @@ data class PlaceDto(
         )
     }
 }
-
-private fun Any?.toPhotoHashMap(): Map<String, String> =
-    (this as? Map<*, *>)
-        ?.mapNotNull { (url, hash) ->
-            if (url is String && hash is String) url to hash else null
-        }
-        ?.toMap()
-        .orEmpty()

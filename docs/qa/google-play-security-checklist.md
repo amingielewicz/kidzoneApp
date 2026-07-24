@@ -1,145 +1,157 @@
 # Google Play security release checklist
 
-Powiązane issue: #290, #291, #292, #293, #294, #298
+Powiązane issue: #210, #269, #272, #274, #275, #290, #291, #292, #293, #294, #298, #303
 
-Ten dokument jest finalną bramką jakości przed Release Candidate i publikacją w Google Play. Każdy punkt powinien mieć jeden ze statusów:
+Ostatnia aktualizacja: 2026-07-13
 
-- `OK` - sprawdzone i gotowe,
-- `Do poprawy` - wymaga osobnego issue albo poprawki przed releasem,
-- `Nie dotyczy` - świadomie poza zakresem danego release.
+## Cel
 
-Nie zamyka to ręcznych gate'ów w Firebase Console, Google Play Console ani testu usuwania konta. Te wyniki trzeba nadal wpisać w odpowiednich issue.
+Finalna bramka jakości przed Release Candidate i publikacją w Google Play.
 
-## Poziomy gotowości
+Statusy:
 
-| Poziom | Przeznaczenie | Decyzja |
-| --- | --- | --- |
-| MVP / Release Candidate | Internal Testing albo Closed Testing | Dopuszczalne tylko przy braku P0/P1 i kompletnych punktach minimum. |
-| Optimum / Produkt publiczny | Pierwszy publiczny release | Rekomendowany poziom dla publikacji produkcyjnej. |
-| Enterprise / Maximum | Dojrzały produkt zespołowy | Poza zakresem pierwszego release, chyba że zostanie jawnie wymagany. |
+- `OK` — sprawdzone i gotowe,
+- `Do poprawy` — wymaga poprawki albo osobnego issue,
+- `Nie dotyczy` — świadomie poza zakresem release.
 
 ## 1. Build i podpis
 
-| Punkt | Status | Dowód / link |
+| Punkt | Status | Dowód |
 | --- | --- | --- |
-| Signed Release Build albo AAB buduje się z aktualnego `main` / brancha release. | Do poprawy | |
-| `versionCode` jest większy niż ostatni build wysłany do Google Play. | Do poprawy | |
-| `versionName` odpowiada tagowi albo release notes. | Do poprawy | |
-| Release używa prawdziwego `google-services.json`. | Do poprawy | |
-| Release nie używa placeholderowego `MAPS_API_KEY`. | Do poprawy | |
-| Keystore i hasła są w sekrecie/lokalnej konfiguracji, nie w repo. | Do poprawy | |
+| Signed AAB buduje się z aktualnego `main` lub brancha release. | Do poprawy | |
+| `versionCode` jest wyższy niż ostatni upload. | Do poprawy | |
+| `versionName` odpowiada release notes i tagowi. | Do poprawy | |
+| Release używa produkcyjnego `google-services.json`. | Do poprawy | |
+| `MAPS_API_KEY` nie jest placeholderem. | Do poprawy | |
+| Keystore i hasła nie znajdują się w repo. | Do poprawy | |
+| Build release nie zawiera debug providerów ani debug endpointów. | Do poprawy | |
 
-## 2. Automatyczne testy i jakość
+## 2. Automatyczne testy
 
-| Punkt | Status | Dowód / link |
+| Punkt | Status | Dowód |
 | --- | --- | --- |
 | `detekt` przechodzi. | Do poprawy | |
 | `testDebugUnitTest` przechodzi. | Do poprawy | |
 | `assembleDebug` przechodzi. | Do poprawy | |
-| Firebase rules tests przechodzą, jeśli są uruchamiane lokalnie. | Do poprawy | |
-| Dependency Check ma raport przejrzany albo blokery przeniesione do issue. | Do poprawy | |
-| Brak otwartych P0/P1 blockerów release. | Do poprawy | |
+| Signed release build przechodzi. | Do poprawy | |
+| Firestore Rules tests przechodzą. | Do poprawy | |
+| Gitleaks nie wykrywa sekretów. | Do poprawy | |
+| Brak otwartych P0/P1 blockerów. | Do poprawy | |
 
 ## 3. Firebase i App Check
 
-| Punkt | Status | Dowód / link |
+| Punkt | Status | Dowód |
 | --- | --- | --- |
-| Firestore Rules są wdrożone w docelowym projekcie Firebase. | Do poprawy | |
-| Storage Rules są wdrożone w docelowym projekcie Firebase. | Do poprawy | |
-| App Check release używa Play Integrity. | Do poprawy | |
-| App Check enforcement jest sprawdzony w Firebase Console. | Do poprawy | #291 |
-| Debug provider nie jest wymagany do działania release builda. | Do poprawy | |
-| Crashlytics zbiera testowy crash albo decyzja o odłożeniu jest zapisana. | Do poprawy | |
-| Analytics, Performance, FCM i Remote Config są zgodne z Data Safety. | Do poprawy | |
+| Firestore Rules są wdrożone. | Do poprawy | |
+| Storage Rules są wdrożone. | Do poprawy | |
+| App Check release używa Play Integrity. | Do poprawy | #291 |
+| App Check enforcement jest sprawdzony. | Do poprawy | #291 |
+| Crashlytics rejestruje kontrolowany test bez danych użytkownika. | Do poprawy | |
+| Analytics, Performance, FCM i Remote Config odpowiadają Data Safety. | Do poprawy | #272 |
+| Surowe wyjątki i dane użytkownika nie trafiają do breadcrumbs ani custom keys. | Do poprawy | |
 
 ## 4. Google Maps i koszty
 
-| Punkt | Status | Dowód / link |
+| Punkt | Status | Dowód |
 | --- | --- | --- |
-| Google Maps API key jest ograniczony do package name i SHA. | Do poprawy | #293 |
-| Google Maps usage i billing alerts są sprawdzone. | Do poprawy | |
-| Firebase budget alerts są sprawdzone. | Do poprawy | |
-| Cache, paginacja i limity zapytań są zaakceptowane dla RC. | Do poprawy | |
-| Smoke test na większym zbiorze miejsc jest wykonany albo świadomie odłożony. | Do poprawy | |
+| Klucz Maps jest ograniczony do package name i SHA. | Do poprawy | #293 |
+| Billing i alerty kosztowe są skonfigurowane. | Do poprawy | |
+| Firebase budget alerts są skonfigurowane. | Do poprawy | |
+| Paginacja, cache i limity zapytań są zaakceptowane. | Do poprawy | |
+| Smoke test na większym zbiorze danych jest wykonany. | Do poprawy | |
 
 ## 5. Prywatność i Google Play
 
-| Punkt | Status | Dowód / link |
+| Punkt | Status | Dowód |
 | --- | --- | --- |
 | Privacy Policy URL działa po HTTPS. | Do poprawy | #275 |
-| Terms URL działa po HTTPS, jeśli jest używany w Store Listing. | Do poprawy | #275 |
+| Terms URL działa po HTTPS. | Do poprawy | #275 |
 | Account deletion URL działa po HTTPS. | Do poprawy | #275 |
-| Google Play Data Safety jest przepisane i zapisane w Play Console. | Do poprawy | #272 |
-| Data Safety odpowiada faktycznym usługom Firebase/Google. | Do poprawy | #272 |
-| Uprawnienia Androida w Play Console odpowiadają manifestowi. | Do poprawy | #274 |
-| Nie deklarujemy background location, jeśli aplikacja jej nie używa. | Do poprawy | #274 |
+| Data Safety jest zapisane w Play Console. | Do poprawy | #272 |
+| Data Safety odpowiada aktywnym SDK i finalnemu buildowi. | Do poprawy | #272 |
+| Manifest nie zawiera `ACCESS_BACKGROUND_LOCATION`. | Do poprawy | #274 |
+| Manifest nie zawiera `READ_MEDIA_IMAGES` ani `READ_EXTERNAL_STORAGE`. | Do poprawy | #274 |
+| Photo Picker działa bez szerokiego dostępu do galerii. | Do poprawy | #274, #303 |
+| Grupa docelowa to rodzice i opiekunowie, nie dzieci. | Do poprawy | |
 
-## 6. Account deletion
+## 6. Runtime permissions
 
-| Punkt | Status | Dowód / link |
+| Punkt | Status | Dowód |
 | --- | --- | --- |
-| Usuwanie konta email/password działa end-to-end. | Do poprawy | #210, #292, #299 |
-| Usuwanie konta Google działa end-to-end albo ograniczenie jest opisane. | Do poprawy | #292, #299 |
-| Firebase Auth, Firestore, Storage i FCM tokeny są zweryfikowane po usunięciu konta. | Do poprawy | #210 |
-| Publiczne treści po usunięciu konta są usunięte albo zanonimizowane zgodnie z polityką. | Do poprawy | #210 |
-| Wynik testu jest zapisany w issue albo raporcie QA. | Do poprawy | #210 |
+| Lokalizacja działa dla allow approximate i precise. | Do poprawy | #274 |
+| Pierwsza odmowa nie powoduje crasha. | Do poprawy | #303 |
+| Kolejna odmowa nie tworzy martwego przycisku. | Do poprawy | #303 |
+| Trwała odmowa lokalizacji prowadzi do ustawień aplikacji. | Do poprawy | #303 |
+| Kamera działa dla allow i deny. | Do poprawy | #303 |
+| Trwała odmowa kamery prowadzi do ustawień aplikacji. | Do poprawy | #303 |
+| Powiadomienia są opcjonalne. | Do poprawy | #274 |
+| Aplikacja działa bez lokalizacji, kamery i powiadomień. | Do poprawy | #274, #303 |
 
-## 7. Widget privacy
+## 7. Usuwanie konta
 
-| Punkt | Status | Dowód / link |
+| Punkt | Status | Dowód |
 | --- | --- | --- |
-| Widget nie pokazuje prywatnych danych po logout. | Do poprawy | #294, `docs/qa/widget-privacy-checklist.md` |
-| Widget nie pokazuje prywatnych danych po delete account. | Do poprawy | #294, `docs/qa/widget-privacy-checklist.md` |
-| Widget działa bez lokalizacji i bez cache. | Do poprawy | #294, `docs/qa/widget-privacy-checklist.md` |
-| Widget nie odświeża się nadmiernie po broadcastach. | Do poprawy | #294, `docs/qa/widget-privacy-checklist.md` |
-| Treść widgetu na ekranie blokady jest zaakceptowana dla pierwszego release. | Do poprawy | #294, `docs/qa/widget-privacy-checklist.md` |
+| Email/password działa end-to-end. | Do poprawy | #210, #292 |
+| Logowanie Google działa end-to-end albo ograniczenie jest opisane. | Do poprawy | #292 |
+| Auth, Firestore, Storage i FCM są zweryfikowane po usunięciu. | Do poprawy | #210 |
+| Publiczne treści są usunięte albo zanonimizowane. | Do poprawy | #210 |
+| Lokalny cache nie pokazuje danych po restarcie. | Do poprawy | #210 |
 
-## 8. Manual smoke i accessibility
+## 8. Widget i cache
 
-| Punkt | Status | Dowód / link |
+| Punkt | Status | Dowód |
 | --- | --- | --- |
-| Manual release test plan jest wykonany dla podstawowych ścieżek. | Do poprawy | `docs/qa/manual-release-test-plan.md` |
-| TalkBack checklist jest wykonana albo świadomie odłożona. | Do poprawy | `docs/qa/accessibility-talkback-checklist.md` |
-| Login, rejestracja, mapa, lista, szczegóły, dodawanie miejsca, opinie, ranking i profil działają. | Do poprawy | |
-| Brak internetu, odmowa lokalizacji i odmowa powiadomień są obsłużone. | Do poprawy | |
-| Nie ma krytycznych crashy w smoke teście. | Do poprawy | |
+| Widget nie pokazuje danych po logout. | Do poprawy | #294 |
+| Widget nie pokazuje danych po delete account. | Do poprawy | #294 |
+| Widget działa bez lokalizacji. | Do poprawy | #294 |
+| Cache nie ujawnia prywatnych danych innego konta. | Do poprawy | |
 
-## Go / No-Go
+## 9. Manual smoke i accessibility
+
+| Punkt | Status | Dowód |
+| --- | --- | --- |
+| Manual release test plan jest wykonany. | Do poprawy | `docs/qa/manual-release-test-plan.md` |
+| TalkBack checklist jest wykonana albo świadomie odłożona. | Do poprawy | `docs/accessibility/TALKBACK.md` |
+| Login, mapa, lista, szczegóły, dodawanie miejsca, opinie, ranking i profil działają. | Do poprawy | |
+| Brak internetu i odmowy uprawnień są obsłużone. | Do poprawy | |
+| Brak krytycznych crashy. | Do poprawy | |
+
+## GO / NO-GO
 
 ### GO
 
 Release może iść dalej, gdy:
 
-- wszystkie punkty MVP / Release Candidate mają status `OK` albo świadome `Nie dotyczy`,
-- nie ma otwartych P0/P1,
-- Data Safety, Privacy Policy i Account deletion są potwierdzone,
-- App Check, Firebase Rules, Maps key i release build są sprawdzone,
-- właściciel projektu zaakceptował znane ryzyka.
+- nie ma P0/P1,
+- signed AAB jest poprawny,
+- Data Safety, Privacy Policy i account deletion są potwierdzone,
+- runtime permissions mają PASS,
+- App Check, Rules i Maps key są zweryfikowane,
+- właściciel zaakceptował znane ryzyka.
 
 ### NO-GO
 
 Release blokujemy, gdy:
 
-- nie ma działającego signed release builda,
-- App Check / Firebase Rules / Storage Rules nie są zweryfikowane,
-- Data Safety nie zgadza się z realnym działaniem aplikacji,
-- usuwanie konta nie przeszło testu end-to-end,
-- widget albo cache pokazuje prywatne dane po logout/delete,
-- istnieją krytyczne błędy podstawowych ścieżek użytkownika.
+- nie ma działającego signed AAB,
+- Data Safety nie zgadza się z aplikacją,
+- usuwanie konta nie działa,
+- po odmowie uprawnienia akcje są martwe,
+- widget lub cache pokazuje prywatne dane,
+- występują krytyczne błędy podstawowych ścieżek.
 
-## Wynik końcowy
+## Wynik
 
 ```text
 Release name:
 Build / commit:
 Track: Internal / Closed / Open / Production
 
-MVP / RC: OK / FAIL / BLOCKED
-Optimum / public release: OK / FAIL / BLOCKED
-Enterprise / maximum: Nie dotyczy / Do poprawy
-
+Security checklist: OK / FAIL / BLOCKED
+Privacy and Data Safety: OK / FAIL / BLOCKED
+Runtime permissions: OK / FAIL / BLOCKED
+Account deletion: OK / FAIL / BLOCKED
 GO / NO-GO:
-Decyzja właściciela:
 Najważniejsze ryzyka:
-Linki do dowodów:
+Dowody:
 ```

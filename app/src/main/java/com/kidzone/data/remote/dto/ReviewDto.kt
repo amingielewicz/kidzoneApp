@@ -1,8 +1,10 @@
 package com.kidzone.data.remote.dto
 
+import com.kidzone.data.remote.dto.DtoMapperUtils.toPhotoHashMap
 import com.kidzone.domain.model.Review
 
 /**
+ * ⚙️ Techniczne:
  * Reprezentacja [Review] w kolekcji `reviews` w Firestore.
  */
 data class ReviewDto(

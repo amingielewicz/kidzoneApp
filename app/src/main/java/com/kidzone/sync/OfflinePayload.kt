@@ -7,10 +7,23 @@ import com.kidzone.domain.model.Place
 import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.model.Review
 
+/**
+ * Serializuje dane operacji oczekujących do formatu przechowywanego w kolejce offline.
+ *
+ * Payload jest kontraktem pomiędzy [SyncManager], bazą Room i [SyncWorker]. Zmiana pól wymaga
+ * zachowania kompatybilności z operacjami zapisanymi przez starsze wersje aplikacji albo jawnej
+ * migracji kolejki.
+ *
+ * Surowy JSON może zawierać treści użytkownika i nie powinien być zapisywany w logach ani
+ * telemetryce.
+ */
 object OfflinePayload {
 
     private val gson = Gson()
 
+    /**
+     * Stabilny model danych miejsca zapisywany w kolejce offline.
+     */
     data class PlacePayload(
         val id: String,
         val ownerUserId: String,
@@ -25,11 +38,18 @@ object OfflinePayload {
         val amenities: List<String>,
         val photoUrls: List<String>,
         val photoUploadedBy: Map<String, String>,
+        /** Mapa lub lista (legacy) hashy zdjęć. */
         val photoHashes: Any?,
         val createdAtMillis: Long,
         val updatedAtMillis: Long
     )
 
+    /**
+     * Serializuje miejsce do wersjonowanego kontraktu kolejki.
+     *
+     * @param place model domenowy do zapisania.
+     * @return JSON przeznaczony wyłącznie do lokalnej kolejki operacji.
+     */
     fun serializePlace(place: Place): String {
         val payload = PlacePayload(
             id = place.id,
@@ -52,6 +72,13 @@ object OfflinePayload {
         return gson.toJson(payload)
     }
 
+    /**
+     * Odtwarza model miejsca z payloadu kolejki.
+     *
+     * @param json JSON utworzony przez [serializePlace].
+     * @return odtworzony model domenowy.
+     * @throws IllegalArgumentException gdy kategoria lub udogodnienie nie jest rozpoznawane.
+     */
     fun deserializePlace(json: String): Place {
         val payload = gson.fromJson(json, PlacePayload::class.java)
         return Place(
@@ -59,13 +86,13 @@ object OfflinePayload {
             ownerUserId = payload.ownerUserId,
             name = payload.name,
             description = payload.description,
-            category = PlaceCategory.valueOf(payload.category),
+            category = PlaceCategory.fromKey(payload.category),
             latitude = payload.latitude,
             longitude = payload.longitude,
             address = payload.address,
             averageRating = payload.averageRating,
             reviewsCount = payload.reviewsCount,
-            amenities = payload.amenities.map { Amenity.valueOf(it) }.toSet(),
+            amenities = payload.amenities.mapNotNull(Amenity.Companion::fromKey).toSet(),
             photoUrls = payload.photoUrls,
             photoUploadedBy = payload.photoUploadedBy,
             photoHashes = payload.photoHashes.toPhotoHashMap(),
@@ -74,6 +101,9 @@ object OfflinePayload {
         )
     }
 
+    /**
+     * Stabilny model opinii zapisywany w kolejce offline.
+     */
     data class ReviewPayload(
         val id: String,
         val placeId: String,
@@ -82,9 +112,18 @@ object OfflinePayload {
         val rating: Int,
         val comment: String,
         val photoUrls: List<String>,
-        val createdAtMillis: Long
+        /** Mapa lub lista (legacy) hashy zdjęć. */
+        val photoHashes: Any?,
+        val createdAtMillis: Long,
+        val updatedAtMillis: Long
     )
 
+    /**
+     * Serializuje opinię do lokalnej kolejki.
+     *
+     * @param review model opinii.
+     * @return JSON payloadu kolejki.
+     */
     fun serializeReview(review: Review): String {
         val payload = ReviewPayload(
             id = review.id,
@@ -94,11 +133,19 @@ object OfflinePayload {
             rating = review.rating,
             comment = review.comment,
             photoUrls = review.photoUrls,
-            createdAtMillis = review.createdAtMillis
+            photoHashes = review.photoHashes,
+            createdAtMillis = review.createdAtMillis,
+            updatedAtMillis = review.updatedAtMillis
         )
         return gson.toJson(payload)
     }
 
+    /**
+     * Odtwarza opinię z payloadu kolejki.
+     *
+     * @param json JSON utworzony przez [serializeReview].
+     * @return odtworzony model domenowy.
+     */
     fun deserializeReview(json: String): Review {
         val payload = gson.fromJson(json, ReviewPayload::class.java)
         return Review(
@@ -109,12 +156,25 @@ object OfflinePayload {
             rating = payload.rating,
             comment = payload.comment,
             photoUrls = payload.photoUrls,
-            createdAtMillis = payload.createdAtMillis
+            photoHashes = payload.photoHashes.toPhotoHashMap(),
+            createdAtMillis = payload.createdAtMillis,
+            updatedAtMillis = payload.updatedAtMillis
         )
     }
 
+    /**
+     * Serializuje identyfikator operacji usuwania.
+     *
+     * @param id identyfikator dokumentu.
+     */
     fun serializeId(id: String): String = gson.toJson(mapOf("id" to id))
 
+    /**
+     * Odczytuje identyfikator z payloadu operacji usuwania.
+     *
+     * @param json JSON utworzony przez [serializeId].
+     * @return identyfikator albo pusty tekst, gdy pole nie istnieje.
+     */
     fun deserializeId(json: String): String {
         val map: Map<String, String> = gson.fromJson(
             json,

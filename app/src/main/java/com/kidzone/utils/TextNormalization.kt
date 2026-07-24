@@ -1,20 +1,17 @@
 package com.kidzone.utils
 
 /**
- * Normalizacja tekstów wprowadzanych przez użytkownika - wspólne reguły dla
- * wszystkich miejsc w apce, gdzie zapisujemy do Firestore "ładny" tekst
- * (nazwa miejsca, adres itp.).
+ * 🎯 Odpowiedzialności:
+ * - Ujednolicanie formatu tekstów wprowadzanych przez użytkownika (nazwy, adresy).
+ * - Realizacja reguł "Title Case" oraz "Sentence case".
  *
- * Po co to jest:
- *  - klawiatura Androida włącza Title Case przez [KeyboardCapitalization.Words],
- *    ale autocorrect/swipe potrafią to zepsuć (np. "plac Zabaw Kasztanowa"),
- *  - z legacy danych w bazie też mogą wpadać złe stringi,
- *  - chcemy mieć JEDNO miejsce, w którym widać "to są nasze reguły kapitalizacji",
- *    a nie ścigać wszystkich `.replaceFirstChar` w ekranach.
+ * ⚙️ Techniczne:
+ * - Obsługa specyfiki języka polskiego (polskie znaki diakrytyczne).
+ * - Specjalne reguły dla nazwisk i marek (Mc, Mac, O').
  *
- * Świadomie nie używamy `kotlin.text.capitalize` (deprecated) ani `Locale.ROOT`
- * - polskie znaki (ą, ć, ę, ł, ń, ó, ś, ź, ż) wymagają polskiej Locale, żeby
- * `toUpperCase`/`toLowerCase` dawały spodziewany wynik.
+ * ✅ Gwarancje:
+ * - Deterministyczny wynik dla tych samych danych wejściowych.
+ * - Usuwanie nadmiarowych spacji i znaków niedrukowalnych.
  */
 object TextNormalization {
 

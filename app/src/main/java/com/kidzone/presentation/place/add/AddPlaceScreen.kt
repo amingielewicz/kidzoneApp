@@ -101,6 +101,7 @@ import com.kidzone.presentation.common.requestCameraPermissionOrOpenSettings
 import com.kidzone.presentation.common.requestLocationPermissionOrOpenSettings
 import com.kidzone.presentation.common.selectUniquePhotoUris
 import com.kidzone.presentation.common.style
+import com.kidzone.utils.GeoUtils
 import com.kidzone.utils.UiText
 import kotlinx.coroutines.launch
 
@@ -824,7 +825,7 @@ private fun LocationSection(
         if (latitude != null && longitude != null) {
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "GPS: %.5f, %.5f".format(latitude, longitude),
+                text = "GPS: ${GeoUtils.formatCoordinates(latitude, longitude)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

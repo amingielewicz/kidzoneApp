@@ -24,6 +24,21 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 
+/**
+ * 🧪 Cel testu:
+ * - Weryfikacja przepływu uwierzytelniania w [LoginViewModel].
+ * - Sprawdzenie poprawnego mapowania błędów logowania na komunikaty UI.
+ *
+ * 🛠️ Środowisko:
+ * - Mockowanie [AuthRepository] dla izolacji od Firebase.
+ * - [MainDispatcherRule] do synchronizacji coroutines.
+ *
+ * 🔍 Scenariusze:
+ * - Sukces logowania (email/hasło).
+ * - Obsługa błędnych poświadczeń i niezweryfikowanego adresu email.
+ * - Wykrywanie i komunikowanie blokad konta (Bans).
+ * - Obsługa resetowania hasła i ponownej wysyłki weryfikacji.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class LoginViewModelTest {
 

@@ -22,30 +22,22 @@ import org.json.JSONObject
 import timber.log.Timber
 
 /**
- * WorkManager worker that processes the offline write queue.
+ * 🎯 Odpowiedzialności:
+ * - Procesowanie lokalnej kolejki operacji oczekujących (offline queue).
+ * - Realizacja strategii "serwer wygrywa" (server-wins) przy rozwiązywaniu konfliktów edycji.
+ * - Zarządzanie cyklem życia operacji (OCZEKUJĄCA -> W TOKU -> SUKCES/BŁĄD).
  *
- * Triggered when:
- *  1. Network connectivity is restored (constraint: CONNECTED)
- *  2. App starts and there are pending operations
- *  3. Manually via [SyncManager.requestSync]
+ * 🛡️ Bezpieczeństwo i Prywatność:
+ * - Przetwarza dane osobowe (PII) w paczkach danych (treści użytkownika).
+ * - Bezpieczna deserializacja JSON zapobiegająca awariom przy uszkodzonych danych.
  *
- * Processing logic:
- *  - Fetches all PENDING + retryable FAILED operations
- *  - Processes each in FIFO order
- *  - Success → deletes from queue
- *  - Failure → increments retryCount; moves to dead_letter after [MAX_RETRIES]
- *  - Returns Result.success() even if some ops fail (partial sync is OK)
- *  - Returns Result.retry() only if ALL ops fail (suggests systemic issue)
+ * ⚡ Wydajność i Zasoby:
+ * - Działa w tle poprzez WorkManager (uruchamiany tylko przy dostępie do sieci).
+ * - Przetwarzanie FIFO (pierwsze weszło, pierwsze wyszło) ograniczające liczbę konfliktów.
  *
- * Conflict Resolution (server-wins):
- *  - For UPDATE_PLACE and UPDATE_REVIEW operations, before applying the local
- *    change, the worker fetches the server document's `updatedAtMillis`.
- *  - If the server's timestamp is newer than the local payload's
- *    `updatedAtMillis`, the local change is DISCARDED (server wins).
- *  - If the local timestamp is newer or equal, the local change OVERWRITES
- *    the server document.
- *  - This prevents stale offline edits from clobbering more recent changes
- *    made by other clients or the admin panel.
+ * ✅ Gwarancje:
+ * - Idempotentność procesorów zapobiegająca powstawaniu duplikatów przy ponowieniach.
+ * - Przenoszenie trwale błędnych operacji do "dead_letter" po [MAX_RETRIES] próbach.
  */
 @HiltWorker
 class SyncWorker @AssistedInject constructor(
@@ -115,10 +107,10 @@ class SyncWorker @AssistedInject constructor(
     }
 
     /**
-     * Processes a single pending operation.
+     * Procesuje pojedynczą operację oczekującą.
      *
-     * Deserializes the JSON payload and calls the appropriate repository method.
-     * Returns true on success, false on failure.
+     * Deserializuje ładunek JSON i wywołuje odpowiednią metodę repozytorium.
+     * Zwraca true przy sukcesie, false przy błędzie.
      */
     private suspend fun processOperation(op: PendingOperationEntity): Boolean {
         return when (op.type) {
@@ -129,26 +121,26 @@ class SyncWorker @AssistedInject constructor(
             OperationType.UPDATE_REVIEW -> processPendingUpdateReview(op.payload)
             OperationType.DELETE_REVIEW -> processPendingDeleteReview(op.payload)
             else -> {
-                Timber.w("SyncWorker: discarding unknown operation type: ${op.type}")
+                Timber.w("SyncWorker: odrzucono nieznany typ operacji: ${op.type}")
                 true
             }
         }
     }
 
-    // ─── Conflict Resolution Helper ─────────────────────────────────────────
+    // ─── Pomocnik Rozwiązywania Konfliktów ──────────────────────────────────
 
     /**
-     * Server-wins conflict resolution for UPDATE operations.
+     * Rozwiązywanie konfliktów typu "serwer wygrywa" dla operacji UPDATE.
      *
-     * Fetches the server document's `updatedAtMillis` field and compares it
-     * with the local payload's timestamp.
+     * Pobiera pole `updatedAtMillis` z dokumentu na serwerze i porównuje je
+     * z timestampem lokalnej operacji.
      *
-     * @param collection Firestore collection name ("places" or "reviews")
-     * @param documentId The document ID to check
-     * @param localUpdatedAtMillis The timestamp from the local pending payload
-     * @return [ConflictResult.LOCAL_WINS] if local is newer (proceed with update),
-     *         [ConflictResult.SERVER_WINS] if server is newer (discard local),
-     *         [ConflictResult.DOCUMENT_NOT_FOUND] if the document was deleted on server.
+     * @param collection Nazwa kolekcji Firestore ("places" lub "reviews").
+     * @param documentId ID sprawdzanego dokumentu.
+     * @param localUpdatedAtMillis Timestamp z lokalnego ładunku operacji.
+     * @return [ConflictResult.LOCAL_WINS] jeśli lokalna zmiana jest nowsza (kontynuuj),
+     *         [ConflictResult.SERVER_WINS] jeśli serwer ma nowszą wersję (odrzuć lokalną),
+     *         [ConflictResult.DOCUMENT_NOT_FOUND] jeśli dokument został usunięty na serwerze.
      */
     private suspend fun resolveConflict(
         collection: String,
@@ -223,13 +215,13 @@ class SyncWorker @AssistedInject constructor(
     }
 
     /**
-     * Processes an UPDATE_PLACE operation with server-wins conflict resolution.
+     * Procesuje operację UPDATE_PLACE ze strategią "serwer wygrywa".
      *
-     * Flow:
-     *  1. Parse placeId and updatedAtMillis from JSON payload
-     *  2. Fetch server document's updatedAtMillis
-     *  3. If server is newer → discard local (return true to clear from queue)
-     *  4. If local is newer → apply update via repository
+     * Przepływ:
+     *  1. Parsuje ID miejsca i updatedAtMillis z ładunku JSON.
+     *  2. Pobiera updatedAtMillis z dokumentu na serwerze.
+     *  3. Jeśli serwer jest nowszy → odrzuca lokalną zmianę (czyści z kolejki).
+     *  4. Jeśli lokalna zmiana jest nowsza → aplikuje aktualizację przez repozytorium.
      */
     private suspend fun processPendingUpdatePlace(payload: String): Boolean {
         Timber.d("SyncWorker: processing UPDATE_PLACE")
@@ -290,9 +282,9 @@ class SyncWorker @AssistedInject constructor(
     }
 
     /**
-     * Processes an UPDATE_REVIEW operation with server-wins conflict resolution.
+     * Procesuje operację UPDATE_REVIEW ze strategią "serwer wygrywa".
      *
-     * Same logic as UPDATE_PLACE but targets the "reviews" collection.
+     * Logika analogiczna do UPDATE_PLACE, ale celuje w kolekcję "reviews".
      */
     private suspend fun processPendingUpdateReview(payload: String): Boolean {
         Timber.d("SyncWorker: processing UPDATE_REVIEW")
@@ -349,10 +341,10 @@ class SyncWorker @AssistedInject constructor(
     }
 
     companion object {
-        /** Max retry attempts before moving to dead letter queue. */
+        /** Maksymalna liczba ponowień przed przeniesieniem do dead letter. */
         const val MAX_RETRIES = 5
 
-        /** Unique work name for WorkManager (ensures single instance). */
+        /** Unikalna nazwa zadania dla WorkManager (gwarantuje jedną instancję). */
         const val WORK_NAME = "kidzone_sync_queue"
     }
 }
