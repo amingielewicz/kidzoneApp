@@ -98,6 +98,8 @@ import com.kidzone.presentation.common.KidZoneSortMenu
 import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.NewPlaceBadge
 import com.kidzone.presentation.common.RatingIcon
+import com.kidzone.presentation.common.ScreenState
+import com.kidzone.presentation.common.ScreenStateContent
 import com.kidzone.presentation.common.SortMenuIcon
 import com.kidzone.presentation.common.SortMenuOption
 import com.kidzone.presentation.common.isNewWithoutReviews
@@ -306,19 +308,21 @@ fun PlaceListScreen(
             onRefresh = { viewModel.refresh() },
             modifier = Modifier.fillMaxSize()
         ) {
-            when {
-                state.isLoading && state.places.isEmpty() -> LoadingList()
-                state.errorMessage != null && state.places.isEmpty() -> ListError(state.errorMessage!!.asString())
-                state.places.isEmpty() -> EmptyListState(
-                    state = state,
-                    onClear = {
-                        viewModel.onSearchQueryChange("")
-                        viewModel.onCategorySelect(null)
-                        viewModel.onAmenitiesCleared()
-                    }
-                )
-
-                else -> {
+            ScreenStateContent(
+                state = state.screenState,
+                onRetry = viewModel::refresh,
+                loading = { LoadingList() },
+                empty = {
+                    EmptyListState(
+                        state = state,
+                        onClear = {
+                            viewModel.onSearchQueryChange("")
+                            viewModel.onCategorySelect(null)
+                            viewModel.onAmenitiesCleared()
+                        }
+                    )
+                },
+                content = { places: List<Place> ->
                     val shouldLoadMore by remember {
                         derivedStateOf {
                             val lastVisible =
@@ -340,12 +344,12 @@ fun PlaceListScreen(
                         contentPadding = ListContentPadding,
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(items = state.places, key = { "list_${it.id}" }) { place ->
+                        items(items = places, key = { "list_${it.id}" }) { place ->
                             PlaceCard(
                                 place = place,
                                 distanceKm = state.userLocation?.let { (lat, lng) ->
-                GeoUtils.haversineKm(lat, lng, place.latitude, place.longitude)
-            },
+                                    GeoUtils.haversineKm(lat, lng, place.latitude, place.longitude)
+                                },
                                 showDistance = state.sortOrder == PlaceListViewModel.SortOrder.NEAREST &&
                                         state.userLocation != null,
                                 staleLocationAgeMinutes = state.staleLocationAgeMinutes.takeIf {
@@ -382,16 +386,17 @@ fun PlaceListScreen(
                         }
                     }
                 }
-            }
+            )
         }
     }
 
     if (showFilterSheet) {
+        val totalResultsCount = (state.screenState as? ScreenState.Content)?.data?.size ?: 0
         AmenityFilterSheet(
             sheetState = sheetState,
             selectedCategory = state.selectedCategory,
             selectedAmenities = state.selectedAmenities,
-            totalResultsCount = state.places.size,
+            totalResultsCount = totalResultsCount,
             onAmenityToggled = viewModel::onAmenityToggled,
             onClearAll = viewModel::onAmenitiesCleared,
             onDismiss = {
@@ -421,22 +426,6 @@ private fun LoadingList() {
         ) {
             items(10) { PlaceRowSkeleton() }
         }
-    }
-}
-
-@Composable
-private fun ListError(message: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = message,
-            color = MaterialTheme.colorScheme.error,
-            style = MaterialTheme.typography.bodyMedium
-        )
     }
 }
 

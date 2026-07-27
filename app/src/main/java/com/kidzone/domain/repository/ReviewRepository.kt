@@ -61,6 +61,15 @@ interface ReviewRepository {
     fun observeReviewsByUser(userId: String): Flow<List<Review>>
 
     /**
+     * Wykonuje pełną synchronizację opinii wystawionych przez użytkownika.
+     * Pobiera dane z serwera i aktualizuje lokalny cache.
+     *
+     * @param userId identyfikator autora opinii.
+     * @return lista zsynchronizowanych opinii.
+     */
+    suspend fun syncReviewsByUser(userId: String): OpResult<List<Review>>
+
+    /**
      * Dodaje nową opinię i aktualizuje agregaty miejsca oraz użytkownika.
      *
      * Operacja powinna być odporna na ponowienie i nie tworzyć duplikatu po timeoutcie lub

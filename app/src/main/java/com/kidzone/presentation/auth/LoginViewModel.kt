@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.R
 import com.kidzone.domain.repository.AuthRepository
+import com.kidzone.domain.service.DataPrefetchService
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.UiText
@@ -56,7 +57,8 @@ import javax.inject.Inject
 @Suppress("TooManyFunctions")
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val prefetchService: DataPrefetchService
 ) : ViewModel() {
 
     /**
@@ -123,6 +125,9 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, message = null) }
             val result = authRepository.signInWithEmail(state.email.trim(), state.password)
+            if (result is OpResult.Success) {
+                prefetchService.startPrefetch()
+            }
             _uiState.update {
                 when (result) {
                     is OpResult.Success -> it.copy(isLoading = false, isSignedIn = true)
@@ -164,6 +169,9 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, message = null, banMessage = null) }
             val result = authRepository.signInWithGoogle(idToken)
+            if (result is OpResult.Success) {
+                prefetchService.startPrefetch()
+            }
             _uiState.update {
                 when (result) {
                     is OpResult.Success -> it.copy(isLoading = false, isSignedIn = true)

@@ -1,57 +1,37 @@
-# Implementation Plan - Detekt Issues Cleanup
+# Implementation Plan - Resolve Gradle Deprecations
 
-Address code quality issues identified by Detekt across several files, including complexity, line length, and unused members.
+Address Gradle deprecation warnings to ensure compatibility with Gradle 9.0 and improve build performance (Configuration Cache support).
 
 ## User Review Required
 
 > [!IMPORTANT]
-> - `LoginViewModel` will have `@Suppress("TooManyFunctions")` added as the auth flow requires several specific interaction methods that are better kept explicit.
-> - Spread operators in `UiText` and ViewModels will be suppressed as they are the standard way to pass arguments to string resources.
-> - The unused `configureFirebaseEmulators` in `KidZoneApplication.kt` will be removed.
+> - The logic for `versionCode` and `versionName` will be refactored to use `providers.exec` without immediate `.get()` calls where possible, or by following current Gradle 8.x best practices for value sourcing.
+> - The `packaging` block will be updated to use modern collection DSL.
 
 ## Proposed Changes
 
-### Data Layer
+### Build Configuration
 
-#### [MODIFY] [FirebaseAuthRepository.kt](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/src/main/java/com/kidzone/data/repository/FirebaseAuthRepository.kt)
-- Split `checkBanStatus` by extracting `mapBanReasonCode` and `createBanException` helpers to reduce cyclomatic complexity.
+#### [MODIFY] [app/build.gradle.kts](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/build.gradle.kts)
+- Refactor `versionCode` and `versionName` resolution:
+    - Use `providers.exec { ... }.standardOutput.asText.map { it.trim() }` to stay lazy where possible.
+    - Note: AGP's `versionCode` and `versionName` DSL currently requires non-provider values. I will ensure the retrieval is done cleanly.
+- Update `packaging` DSL:
+    - Change `excludes += ...` to `excludes.add(...)` or `resources.excludes.add(...)` if applicable for modern Gradle `SetProperty`.
+- Move `it.useJUnitPlatform()` check if needed (though it's usually fine).
 
-### Presentation Layer
+### Project Properties
 
-#### [MODIFY] [LoginViewModel.kt](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/src/main/java/com/kidzone/presentation/auth/LoginViewModel.kt)
-- Suppress `TooManyFunctions` as the 11 methods are all distinct UI actions.
-- Suppress `SpreadOperator` for the `mapError` function.
-
-#### [MODIFY] [RegisterViewModel.kt](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/src/main/java/com/kidzone/presentation/auth/RegisterViewModel.kt)
-- Suppress `SpreadOperator` for the `mapError` function.
-
-#### [MODIFY] [ProfileViewModel.kt](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/src/main/java/com/kidzone/presentation/profile/ProfileViewModel.kt)
-- Suppress `SpreadOperator` for the `toAuthUiText` function.
-
-#### [MODIFY] [LoginScreen.kt](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/src/main/java/com/kidzone/presentation/auth/LoginScreen.kt)
-- Wrap long lines in the Google Sign-In error handling block.
-
-#### [MODIFY] [PlaceDetailsScreen.kt](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/src/main/java/com/kidzone/presentation/place/details/PlaceDetailsScreen.kt)
-- Wrap the long line in the `formatDistance` function.
-
-### Utils and Core
-
-#### [MODIFY] [FirebaseErrorMapper.kt](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/src/main/java/com/kidzone/utils/FirebaseErrorMapper.kt)
-- Refactor `toPlacesErrorMessage` using a `when` block to reduce return count to 1.
-- Suppress `SpreadOperator` for argument passing.
-
-#### [MODIFY] [KidZoneApplication.kt](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/src/main/java/com/kidzone/KidZoneApplication.kt)
-- Remove the unused `configureFirebaseEmulators` function.
-
-### Tests
-
-#### [MODIFY] [ResourceLocalizationTest.kt](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/src/test/java/com/kidzone/i18n/ResourceLocalizationTest.kt)
-- Refactor `verify all resources are localized and consistent` by extracting logic into smaller private methods.
-- Use `check()` instead of `throw IllegalStateException`.
-- Wrap long lines in error messages.
+#### [MODIFY] [gradle.properties](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/gradle.properties)
+- Add `org.gradle.configuration-cache=true` to proactively catch issues that lead to Gradle 9.0 incompatibilities.
+- Ensure `android.nonTransitiveRClass=true` is present (already is).
 
 ## Verification Plan
 
 ### Automated Tests
-- Run Detekt to ensure all issues are resolved: `gradlew detekt`.
-- Run unit tests to ensure no regressions: `gradlew :app:testDebugUnitTest`.
+- Run `gradlew help --warning-mode all` and verify that the number of project-related warnings has decreased.
+- Run `gradlew assembleDebug` to ensure the build still produces valid APKs with correct versioning.
+- Run unit tests: `gradlew :app:testDebugUnitTest`.
+
+### Manual Verification
+- Check the generated `BuildConfig` or APK details to confirm `versionCode` and `versionName` are still correctly extracted from Git.

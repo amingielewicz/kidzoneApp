@@ -17,9 +17,11 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
 import com.kidzone.data.local.KidZoneDatabase
+import com.kidzone.data.local.UserEntity
 import com.kidzone.data.remote.FirestoreCollections
 import com.kidzone.data.remote.dto.UserDto
 import com.kidzone.data.remote.dto.UserPrivateDto
+import com.kidzone.di.ApplicationScope
 import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.SignInProvider
@@ -32,6 +34,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -44,12 +48,38 @@ import javax.inject.Singleton
 /**
  * 🎯 Odpowiedzialności:
  * - Implementacja [AuthRepository] oparta o Firebase Authentication + Firestore.
- * - Zarządzanie cyklem życia sesji oraz synchronizacja dokumentu profilu.
- * - Obsługa wylogowania offline i czyszczenia tokenów FCM.
+ * - Zarządzanie cyklem życia sesji użytkownika oraz synchronizacja profilu (publiczny i prywatny).
+ * - Zarządzanie lokalnym cache'em danych użytkowników w Room (UserDao).
+ * - Obsługa blokad konta (bans) i reautentykacji Google/Email.
  *
- * ⚙️ Techniczne:
- * - Mapuje kody błędów Firebase na domyślne wyjątki [AuthException].
- * - Tworzy dokument w kolekcji `users` po pomyślnej rejestracji.
+ * 🚫 Poza zakresem:
+ * - Brak bezpośredniego zarządzania UI (delegowane do ViewModeli).
+ * - Brak walidacji siły hasła (delegowane do PasswordPolicy).
+ *
+ * 📥 Wejście:
+ * - Poświadczenia użytkownika (Email, Google ID Token).
+ * - Lokalny identyfikator użytkownika z bazy lokalnej.
+ *
+ * 📤 Wyjście:
+ * - Reaktywny strumień aktualnego użytkownika ([currentUser]).
+ * - Wyniki operacji [OpResult] z typowanymi wyjątkami [AuthException].
+ *
+ * ✅ Gwarancje:
+ * - Spójność danych między Firebase Auth a Firestore (Self-healing w ensureUserDoc).
+ * - Bezpieczne usuwanie danych lokalnych po wylogowaniu.
+ *
+ * 🔌 Offline:
+ * - Wspiera odczyt profilu i rankingów z bazy Room, gdy sieć jest niedostępna.
+ * - Synchronizuje zmiany profilu wyłącznie w trybie online.
+ *
+ * 🧵 Wątki:
+ * - Bezpieczne do wywołania z dowolnego wątku (Dispatcher.IO dla Room).
+ *
+ * 🧪 Testowalność:
+ * - Pełne wstrzykiwanie zależności (Firestore, Auth, Storage, Database).
+ *
+ * 🧼 Lifecycle:
+ * - AuthStateListener jest automatycznie czyszczony przy zakończeniu subskrypcji Flow.
  */
 @Suppress("LargeClass")
 @Singleton
@@ -58,62 +88,81 @@ class FirebaseAuthRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val firebaseStorage: FirebaseStorage,
     private val database: KidZoneDatabase,
-    @ApplicationContext private val appContext: Context
+    @ApplicationContext private val appContext: Context,
+    @ApplicationScope private val externalScope: kotlinx.coroutines.CoroutineScope
 ) : AuthRepository {
 
     override val currentUser: Flow<User?> = callbackFlow {
         val listener = FirebaseAuth.AuthStateListener { auth ->
-            trySend(auth.currentUser?.takeIf { it.canUseAppSession() }?.toDomain())
+            launch {
+                val user = auth.currentUser?.takeIf { it.canUseAppSession() }?.toDomain()
+                trySend(user)
+                // Przy każdej zmianie w Auth, spróbuj odświeżyć lokalny doc profilu,
+                // żeby avatar był dostępny offline.
+                if (user != null) {
+                    ensureUserDoc(auth.currentUser!!)
+                }
+            }
         }
         firebaseAuth.addAuthStateListener(listener)
         // Wyemituj aktualna wartosc natychmiast (listener emituje dopiero przy zmianach).
-        trySend(firebaseAuth.currentUser?.takeIf { it.canUseAppSession() }?.toDomain())
+        val initialUser = firebaseAuth.currentUser?.takeIf { it.canUseAppSession() }?.toDomain()
+        trySend(initialUser)
         awaitClose { firebaseAuth.removeAuthStateListener(listener) }
     }
 
-    override fun observeUser(userId: String): Flow<User?> = callbackFlow {
+    override fun observeUser(userId: String): Flow<User?> = channelFlow {
         if (userId.isBlank()) {
             trySend(null)
-            close()
-            return@callbackFlow
+            return@channelFlow
         }
+
+        // 1. Obserwuj lokalny cache (Room) jako Single Source of Truth
+        val localFlow = database.userDao().observeById(userId)
+
+        // 2. Uruchom synchronizację z Firestore w tle
         val docRef = firestore.collection(FirestoreCollections.USERS).document(userId)
         val shouldObservePrivateProfile = firebaseAuth.currentUser?.uid == userId
         val privateRef = privateProfileRef(userId).takeIf { shouldObservePrivateProfile }
+
         var publicDto: UserDto? = null
         var privateDto: UserPrivateDto? = null
 
-        fun emitCurrent() {
+        fun syncToLocal() {
             val user = publicDto?.toDomain(
                 privateProfile = privateDto,
                 includeLegacyPrivateFallback = shouldObservePrivateProfile
-            )
-            if (user != null && user.isBanned) {
-                launch {
+            ) ?: return
+
+            // Aktualizujemy cache lokalny. Dzięki temu Profil, avatar
+            // i statystyki będą dostępne natychmiast po starcie offline.
+            launch {
+                if (user.isBanned) {
                     signOutAndClearLocalSessionState()
+                } else {
+                    database.userDao().upsert(UserEntity.fromDomain(user))
                 }
-                trySend(null)
-            } else {
-                trySend(user)
             }
         }
 
         val registration = docRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                close(error)
-                return@addSnapshotListener
-            }
+            if (error != null) return@addSnapshotListener
             publicDto = snapshot?.toObject(UserDto::class.java)
-            emitCurrent()
+            syncToLocal()
         }
         val privateRegistration = privateRef?.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                close(error)
-                return@addSnapshotListener
-            }
+            if (error != null) return@addSnapshotListener
             privateDto = snapshot?.toObject(UserPrivateDto::class.java)
-            emitCurrent()
+            syncToLocal()
         }
+
+        // 3. Emituj dane z Room (uaktualnione przez syncToLocal)
+        launch {
+            localFlow.collectLatest { entity ->
+                send(entity?.toDomain())
+            }
+        }
+
         awaitClose {
             registration.remove()
             privateRegistration?.remove()
@@ -246,16 +295,10 @@ class FirebaseAuthRepository @Inject constructor(
         val uid = firebaseAuth.currentUser?.uid
         
         // 1. Próbujemy usunąć token FCM w tle. 
-        // NIE używamy .await() na pobieraniu tokena, bo w trybie offline 
-        // i przy wyczyszczonym cache (Scenariusz E) może to zawiesić metodę.
         if (uid != null) {
-            // Używamy GlobalScope lub po prostu nie czekamy na wynik, 
-            // bo za chwilę ten ViewModel i tak zniknie.
             try {
                 com.google.firebase.messaging.FirebaseMessaging.getInstance().token
                     .addOnSuccessListener { token ->
-                        // Jeśli uda się pobrać token, wysyłamy prośbę o usunięcie do Firestore.
-                        // SDK Firestore samo obsłuży kolejkę offline.
                         firestore.collection(FirestoreCollections.USERS)
                             .document(uid)
                             .collection("private")
@@ -265,11 +308,15 @@ class FirebaseAuthRepository @Inject constructor(
             } catch (_: Exception) { }
         }
 
-        // 2. Lokalny logout – to musi być natychmiastowe i bezwarunkowe.
-        try {
-            signOutAndClearLocalSessionState()
-        } catch (e: Exception) {
-            Timber.w(e, "Error during local sign out cleanup")
+        // 2. Lokalny logout – Firebase Auth wylogowujemy natychmiast, 
+        // a ciężkie czyszczenie bazy robimy w tle, żeby nie blokować nawigacji.
+        firebaseAuth.signOut()
+        externalScope.launch {
+            try {
+                clearLocalSessionState()
+            } catch (e: Exception) {
+                Timber.w(e, "Error during local session cleanup")
+            }
         }
     }
 
@@ -286,12 +333,20 @@ class FirebaseAuthRepository @Inject constructor(
             .await()
         val dto = snapshot.toObject(UserDto::class.java)
         if (dto != null) {
-            OpResult.success(dto.toPublicDomain())
+            val user = dto.toPublicDomain()
+            // Zapisz publiczne dane lidera w cache, by ranking dział offline.
+            database.userDao().upsert(UserEntity.fromDomain(user))
+            OpResult.success(user)
         } else {
             OpResult.failure(NoSuchElementException("No user with id=$userId"))
         }
     } catch (e: Exception) {
-        OpResult.failure(e)
+        val cached = database.userDao().getById(userId)
+        if (cached != null) {
+            OpResult.success(cached.toDomain())
+        } else {
+            OpResult.failure(e)
+        }
     }
 
     override suspend fun getTopUsers(limit: Int): OpResult<List<User>> = try {
@@ -310,9 +365,19 @@ class FirebaseAuthRepository @Inject constructor(
                 compareByDescending<User> { it.placesAddedCount }
                     .thenByDescending { it.reviewsCount }
             )
+        
+        if (users.isNotEmpty()) {
+            database.userDao().upsertAll(users.map { UserEntity.fromDomain(it) })
+        }
+        
         OpResult.success(users)
     } catch (e: Exception) {
-        OpResult.failure(e)
+        val cached = database.userDao().getTopUsers(limit)
+        if (cached.isNotEmpty()) {
+            OpResult.success(cached.map { it.toDomain() })
+        } else {
+            OpResult.failure(e)
+        }
     }
 
     override suspend fun updateUserProfile(
@@ -605,6 +670,7 @@ class FirebaseAuthRepository @Inject constructor(
     }
 
     private suspend fun clearLocalSessionState() {
+        database.userDao().clearAll()
         clearRoomCache()
         clearWidgetLocationState()
     }

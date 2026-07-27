@@ -64,7 +64,7 @@ private const val REFRESH_DELAY_MS = 300L
  *
  * 📤 Wyjście:
  * - Stan ekranu profilu ([UiState]).
- * - Zdarzenia nawigacji (np. po wylogowaniu).
+ * - Ogólny stan profilu ([profileState]) typu [ScreenState].
  *
  * ✅ Gwarancje:
  * - Deterministyczne obliczanie odznak na podstawie statystyk użytkownika.
@@ -97,6 +97,32 @@ class ProfileViewModel @Inject constructor(
     private val functions: FirebaseFunctions
 ) : ViewModel() {
 
+    /**
+     * Niezmienny stan interakcji i preferencji profilu.
+     *
+     * @property isRefreshing czy trwa odświeżanie typu pull-to-refresh.
+     * @property isEditOpen czy arkusz edycji profilu jest widoczny.
+     * @property isSaving czy trwa zapis zmian profilu.
+     * @property saveError komunikat błędu przy zapisie profilu.
+     * @property isNotificationPrefsOpen czy dialog preferencji powiadomień jest widoczny.
+     * @property notificationPrefs bieżące ustawienia powiadomień.
+     * @property isTermsOfServiceOpen czy dialog regulaminu jest widoczny.
+     * @property isPrivacyPolicyOpen czy dialog polityki prywatności jest widoczny.
+     * @property isContactOpen czy dialog kontaktu z supportem jest widoczny.
+     * @property isChangePasswordOpen czy dialog zmiany hasła jest widoczny.
+     * @property isChangeEmailOpen czy dialog zmiany adresu e-mail jest widoczny.
+     * @property isDeleteAccountOpen czy dialog usuwania konta jest widoczny.
+     * @property isAccountActionInProgress czy trwa operacja na koncie (np. zmiana hasła).
+     * @property accountActionError komunikat błędu przy operacjach na koncie.
+     * @property accountActionInfo komunikat informacyjny po operacjach na koncie.
+     * @property isBadgesInfoOpen czy dialog informacji o odznakach jest widoczny.
+     * @property obtainedBadges lista wszystkich odznak zdobytych przez użytkownika.
+     * @property newlyEarnedBadges lista odznak zdobytych w bieżącej sesji, jeszcze niepokazanych.
+     * @property userRank bieżąca pozycja użytkownika w rankingu globalnym.
+     * @property signInProvider sposób w jaki użytkownik jest zalogowany (np. GOOGLE).
+     * @property selectedLanguage wybrany język aplikacji.
+     * @property isLanguageDialogOpen czy dialog wyboru języka jest widoczny.
+     */
     data class UiState(
         val isRefreshing: Boolean = false,
         val isEditOpen: Boolean = false,
@@ -227,10 +253,10 @@ class ProfileViewModel @Inject constructor(
     }
 
     fun refreshProfile() {
+        _uiState.update { it.copy(isRefreshing = true) }
+        profileReload.update { it + 1 }
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshing = true) }
             authRepository.refreshUser()
-            profileReload.update { it + 1 }
             // Czekamy chwilę, żeby flow zdążyło wyemitować stan ładowania
             // i animacja pull-to-refresh nie zniknęła natychmiast.
             kotlinx.coroutines.delay(REFRESH_DELAY_MS)

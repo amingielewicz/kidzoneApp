@@ -2,6 +2,7 @@ package com.kidzone.presentation.auth
 
 import com.kidzone.R
 import com.kidzone.domain.repository.AuthRepository
+import com.kidzone.domain.service.DataPrefetchService
 import com.kidzone.utils.AuthException
 import com.kidzone.utils.UiText
 import io.mockk.mockk
@@ -11,7 +12,10 @@ import org.junit.jupiter.api.Test
 
 class LoginLocalizationTest {
 
-    private val viewModel = LoginViewModel(mockk<AuthRepository>(relaxed = true))
+    private val viewModel = LoginViewModel(
+        mockk<AuthRepository>(relaxed = true),
+        mockk<DataPrefetchService>(relaxed = true)
+    )
 
     @Test
     fun `error message is correctly set in state`() {

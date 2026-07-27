@@ -1,39 +1,28 @@
-# Walkthrough - Localization Cleanup, Error Hardening, and Code Quality
+# Walkthrough - Gradle Deprecations Resolved
 
-Comprehensive cleanup of localization, error handling, and code style issues across the application.
+Addressed Gradle deprecation warnings to ensure compatibility with future Gradle versions (9.0) and improved build performance by enabling Configuration Cache.
 
 ## Changes Made
 
-### 1. Localization & Strings
-- **Unified Resources**: Extracted hardcoded GPS formats, character counters, and bullet points into `strings.xml`.
-- **English Polishing**: Refined English translations for a more natural feel (e.g., "Leaderboard" instead of "Ranking", "Top places near you" instead of "TOP near you").
-- **Production Readiness**: Removed technical developer notes (mentioning `google-services.json`, etc.) from production resources and replaced them with user-friendly messages.
-- **Automated Control**: Added `ResourceLocalizationTest` to automatically verify that every Polish string has an English equivalent and that formatting arguments match.
+### 1. Build Configuration Refactoring
+- **[app/build.gradle.kts](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/build.gradle.kts)**:
+    - **Versioning Logic**: Refactored the `versionCode` and `versionName` resolution to use lazy `providers.exec` mapping. This ensures that external process execution during the configuration phase follows modern Gradle best practices.
+    - **Packaging DSL**: Updated the `packaging` block to use the `add()` method for `excludes` instead of the deprecated `+=` operator on `SetProperty`.
 
-### 2. Error Handling Hardening
-- **Account Ban Flow**:
-    - Mapped Firestore ban reason codes (SPAM, ABUSE, FRAUD, etc.) to localized strings.
-    - Ban messages now persist on the login screen using a `MessageBanner` instead of disappearing snackbars.
-- **Typed Google Sign-In**: Introduced a sealed hierarchy for Google Sign-In errors (`ConfigurationError`, `TokenError`, etc.). Technical details are logged to Timber, while the user sees a generic localized error.
-- **Repository Exceptions**: Created `RepositoryException` to handle common data errors (AlreadyReported, Timeout) in a localized and type-safe manner.
-- **Nested UiText**: Enhanced `UiText` to support recursive resolution, allowing string resources to take other `UiText` objects as arguments.
-
-### 3. Code Quality (Detekt Cleanup)
-- **Complexity Reduction**: Refactored `checkBanStatus` in `FirebaseAuthRepository` and large test methods into smaller, manageable helpers.
-- **API Refactoring**: Replaced `showInlineMessage(String)` with type-safe `showErrorMessage(UiText)` and `showInfoMessage(UiText)` in `LoginViewModel`.
-- **General Cleanup**:
-    - Removed unused Firebase emulator configuration from `KidZoneApplication`.
-    - Fixed long lines and deep nesting across several files.
-    - Added standard suppressions for necessary boilerplate (e.g., `SpreadOperator` for resource arguments).
+### 2. Performance & Compatibility Improvements
+- **[gradle.properties](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/gradle.properties)**:
+    - **Configuration Cache**: Enabled `org.gradle.configuration-cache=true`. This significantly reduces build start times by caching the results of the configuration phase.
+    - **Warning Management**: Set `org.gradle.configuration-cache.problems=warn` to allow monitoring of any remaining minor plugin incompatibilities without failing the build.
 
 ## Verification Results
 
 ### Automated Tests
-- Full unit test suite: `gradlew :app:testDebugUnitTest`.
-- **254 tests passed**, 0 failed.
-- Verified that localization tests correctly catch missing or mismatched keys.
+- Ran `gradlew help --warning-mode all`: **Build finished successfully**.
+- Ran `gradlew assembleDebug`: **Build finished successfully**. This verified that the git-based versioning still works correctly with the new lazy provider logic.
+- Ran all unit tests: **262 tests passed**.
 
-### Manual Verification
-- Verified the Login screen correctly displays the persistent localized ban reason.
-- Checked bottom navigation bar fitment for the "Rank" / "Leaderboard" tab.
-- Confirmed that technical details for Google Sign-In failures appear in Logcat but not in the user UI.
+### Build Impact
+- Enabling the Configuration Cache reduces subsequent build configuration time to almost zero, providing a snappier development experience.
+
+> [!TIP]
+> Enabling the Configuration Cache is one of the best ways to prepare for Gradle 9.0, as it forces the build scripts and plugins to avoid using deprecated "configuration-time" APIs.

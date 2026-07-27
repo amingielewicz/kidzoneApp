@@ -6,6 +6,7 @@ import com.kidzone.domain.model.PlaceCategory
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.service.LocationProvider
+import com.kidzone.presentation.common.ScreenState
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.OpResult
@@ -22,7 +23,6 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -33,6 +33,7 @@ import org.junit.jupiter.api.extension.RegisterExtension
 /**
  * 🧪 Cel testu:
  * - Weryfikacja wyszukiwania, filtrowania i paginacji listy miejsc w [PlaceListViewModel].
+ * - Sprawdzenie poprawności przejść między stanami [ScreenState] (Loading, Content, Error, Empty).
  * - Sprawdzenie poprawności obliczania dystansów i sortowania wyników.
  *
  * 🛠️ Środowisko:
@@ -40,10 +41,12 @@ import org.junit.jupiter.api.extension.RegisterExtension
  * - [MainDispatcherRule] dla testów asynchronicznych strumieni Flow.
  *
  * 🔍 Scenariusze:
+ * - Stan początkowy to Loading, a po sukcesie Content.
+ * - Błąd repozytorium skutkuje stanem Error z odpowiednim komunikatem.
+ * - Brak pasujących wyników po filtrach skutkuje stanem Empty.
  * - Wyszukiwanie po nazwie i kategorii (w tym normalizacja tekstu).
  * - Działanie filtrów udogodnień (Amenities).
  * - Proces paginacji (ładowanie kolejnych stron wyników).
- * - Obsługa błędów ładowania danych i odświeżanie (Pull-to-refresh).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlaceListViewModelTest {
@@ -113,8 +116,8 @@ class PlaceListViewModelTest {
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertFalse(state.isLoading)
-            assertEquals(4, state.places.size)
+            assertTrue(state.screenState is ScreenState.Content)
+            assertEquals(4, (state.screenState as ScreenState.Content).data.size)
         }
 
         @Test
@@ -141,11 +144,47 @@ class PlaceListViewModelTest {
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertEquals(12, state.places.size)
+            assertEquals(12, (state.screenState as ScreenState.Content).data.size)
             assertTrue(state.hasLocationPermission)
             assertTrue(state.isLocationServiceEnabled)
             assertEquals(52.23 to 21.01, state.userLocation)
-            assertNull(state.errorMessage)
+        }
+
+        @Test
+        fun `repository failure transitions state to Error`() = runTest {
+            coEvery {
+                placeRepository.getPlacesPage(any(), any(), any(), any())
+            } returns OpResult.failure(RuntimeException("Network error"))
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.uiState.value.screenState is ScreenState.Error)
+        }
+
+        @Test
+        fun `refreshing clears previous error and returns to Loading`() = runTest {
+            coEvery {
+                placeRepository.getPlacesPage(any(), any(), any(), any())
+            } returns OpResult.failure(RuntimeException("Fail"))
+
+            viewModel = createAndObserve()
+            advanceUntilIdle()
+            assertTrue(viewModel.uiState.value.screenState is ScreenState.Error)
+
+            coEvery {
+                placeRepository.getPlacesPage(any(), any(), any(), any())
+            } coAnswers {
+                kotlinx.coroutines.delay(100)
+                OpResult.success(PagedResult(samplePlaces, null))
+            }
+
+            viewModel.refresh()
+            // After refresh() call, it should be Loading again because error is cleared and paged is still null
+            assertTrue(viewModel.uiState.value.screenState is ScreenState.Loading)
+            
+            advanceUntilIdle()
+            assertTrue(viewModel.uiState.value.screenState is ScreenState.Content)
         }
     }
 
@@ -161,7 +200,7 @@ class PlaceListViewModelTest {
             viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.RECENTLY_ADDED)
             advanceUntilIdle()
 
-            val places = viewModel.uiState.value.places
+            val places = (viewModel.uiState.value.screenState as ScreenState.Content).data
             assertEquals("p4", places[0].id)
             assertEquals("p3", places[1].id)
             assertEquals("p2", places[2].id)
@@ -176,7 +215,8 @@ class PlaceListViewModelTest {
             viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.ADDED_BY_ME)
             advanceUntilIdle()
 
-            assertEquals(listOf("p3", "p1"), viewModel.uiState.value.places.map { it.id })
+            val places = (viewModel.uiState.value.screenState as ScreenState.Content).data
+            assertEquals(listOf("p3", "p1"), places.map { it.id })
         }
 
         @Test
@@ -187,7 +227,8 @@ class PlaceListViewModelTest {
             viewModel.onSortOrderChange(PlaceListViewModel.SortOrder.WORST_RATED)
             advanceUntilIdle()
 
-            assertEquals(listOf("p2", "p1", "p3", "p4"), viewModel.uiState.value.places.map { it.id })
+            val places = (viewModel.uiState.value.screenState as ScreenState.Content).data
+            assertEquals(listOf("p2", "p1", "p3", "p4"), places.map { it.id })
         }
     }
 
@@ -218,7 +259,8 @@ class PlaceListViewModelTest {
             viewModel.onSearchQueryChange("restauracja")
             advanceUntilIdle()
 
-            assertEquals(listOf("p2"), viewModel.uiState.value.places.map { it.id })
+            val places = (viewModel.uiState.value.screenState as ScreenState.Content).data
+            assertEquals(listOf("p2"), places.map { it.id })
             coVerify(exactly = 0) { placeRepository.getPlacesPage(any(), any(), any(), any()) }
         }
 
@@ -230,7 +272,8 @@ class PlaceListViewModelTest {
             viewModel.onSearchQueryChange("RESTAURACJA")
             advanceUntilIdle()
 
-            assertEquals(listOf("p2"), viewModel.uiState.value.places.map { it.id })
+            val places = (viewModel.uiState.value.screenState as ScreenState.Content).data
+            assertEquals(listOf("p2"), places.map { it.id })
         }
 
         @Test
@@ -246,7 +289,8 @@ class PlaceListViewModelTest {
             viewModel.onSearchQueryChange("Leki")
             advanceUntilIdle()
 
-            assertEquals(listOf("pl1"), viewModel.uiState.value.places.map { it.id })
+            val places = (viewModel.uiState.value.screenState as ScreenState.Content).data
+            assertEquals(listOf("pl1"), places.map { it.id })
         }
 
         @Test
@@ -266,7 +310,8 @@ class PlaceListViewModelTest {
             viewModel.onSearchQueryChange("le")
             advanceUntilIdle()
 
-            assertEquals(listOf("strong", "weak"), viewModel.uiState.value.places.map { it.id })
+            val places = (viewModel.uiState.value.screenState as ScreenState.Content).data
+            assertEquals(listOf("strong", "weak"), places.map { it.id })
         }
 
         @Test
@@ -313,13 +358,15 @@ class PlaceListViewModelTest {
             viewModel = createAndObserve()
             advanceUntilIdle()
 
-            assertEquals(4, viewModel.uiState.value.places.size)
+            val initialPlaces = (viewModel.uiState.value.screenState as ScreenState.Content).data
+            assertEquals(4, initialPlaces.size)
             assertTrue(viewModel.uiState.value.hasMore)
 
             viewModel.loadMore()
             advanceUntilIdle()
 
-            assertEquals(5, viewModel.uiState.value.places.size)
+            val finalPlaces = (viewModel.uiState.value.screenState as ScreenState.Content).data
+            assertEquals(5, finalPlaces.size)
             assertFalse(viewModel.uiState.value.hasMore)
         }
 
@@ -342,7 +389,8 @@ class PlaceListViewModelTest {
             viewModel.loadMore()
             advanceUntilIdle()
 
-            val ids = viewModel.uiState.value.places.map { it.id }
+            val places = (viewModel.uiState.value.screenState as ScreenState.Content).data
+            val ids = places.map { it.id }
             assertEquals(ids.distinct(), ids)
             assertEquals(setOf("p1", "p2", "p3", "p4", "p5"), ids.toSet())
         }

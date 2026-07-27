@@ -12,6 +12,7 @@ import com.kidzone.domain.model.User
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.service.LocationProvider
+import com.kidzone.presentation.common.ScreenState
 import com.kidzone.utils.AppConfig
 import com.kidzone.utils.GeoUtils
 import com.kidzone.utils.OpResult
@@ -88,6 +89,11 @@ class PlaceListViewModel @Inject constructor(
     private val locationProvider: LocationProvider
 ) : ViewModel() {
 
+    /**
+     * Dostępne opcje sortowania listy miejsc.
+     *
+     * @property labelRes zasób zlokalizowanej etykiety opcji.
+     */
     enum class SortOrder(@androidx.annotation.StringRes val labelRes: Int) {
         NEAREST(R.string.sort_nearest),
         RECENTLY_ADDED(R.string.sort_recently_added),
@@ -96,17 +102,35 @@ class PlaceListViewModel @Inject constructor(
         WORST_RATED(R.string.sort_worst_rated)
     }
 
+    /**
+     * Niezmienny stan ekranu listy miejsc.
+     *
+     * @property screenState ogólny stan ładowania/treści/błędu dla głównej listy.
+     * @property selectedCategory wybrana kategoria filtra.
+     * @property selectedAmenities zestaw wybranych udogodnień.
+     * @property sortOrder bieżący sposób sortowania wyników.
+     * @property userLocation współrzędne użytkownika (jeśli dostępne).
+     * @property currentUserId ID zalogowanego użytkownika (do filtra ADDED_BY_ME).
+     * @property nearestUnavailable true gdy wybrano NEAREST, ale brak uprawnień/usług lokalizacji.
+     * @property isRefreshing czy trwa odświeżanie typu pull-to-refresh.
+     * @property hasMore czy istnieją kolejne strony wyników w repository.
+     * @property isLoadingMore czy trwa dociąganie kolejnej strony (pagination).
+     * @property totalCount liczba elementów w bieżącym zbiorze wyników.
+     * @property searchQuery wpisana fraza wyszukiwania.
+     * @property isUsingStaleLocation czy wyświetlany dystans oparty jest na nieaktualnej lokalizacji.
+     * @property staleLocationAgeMinutes wiek nieaktualnej lokalizacji w minutach.
+     * @property hasLocationPermission czy aplikacja posiada uprawnienia do GPS.
+     * @property isLocationServiceEnabled czy usługi lokalizacji są włączone w systemie.
+     */
     data class UiState(
-        val places: List<Place> = emptyList(),
+        val screenState: ScreenState<List<Place>> = ScreenState.Loading,
         val selectedCategory: PlaceCategory? = null,
         val selectedAmenities: Set<Amenity> = emptySet(),
         val sortOrder: SortOrder = SortOrder.NEAREST,
         val userLocation: Pair<Double, Double>? = null,
         val currentUserId: String? = null,
         val nearestUnavailable: Boolean = false,
-        val isLoading: Boolean = true,
         val isRefreshing: Boolean = false,
-        val errorMessage: UiText? = null,
         val hasMore: Boolean = false,
         val isLoadingMore: Boolean = false,
         val totalCount: Int = 0,
@@ -204,8 +228,16 @@ class PlaceListViewModel @Inject constructor(
             )
         )
 
+        val screenState = when {
+            loading.paged != null -> {
+                if (filtered.isEmpty()) ScreenState.Empty else ScreenState.Content(filtered)
+            }
+            loading.error != null -> ScreenState.Error(loading.error)
+            else -> ScreenState.Loading
+        }
+
         UiState(
-            places = filtered,
+            screenState = screenState,
             selectedCategory = filter.category,
             selectedAmenities = filter.amenities,
             sortOrder = filter.order,
@@ -215,9 +247,7 @@ class PlaceListViewModel @Inject constructor(
             currentUserId = filter.user?.id,
             nearestUnavailable = filter.order == SortOrder.NEAREST &&
                 (!location.hasLocationPermission || !location.isLocationServiceEnabled),
-            isLoading = loading.paged == null && loading.error == null,
             isRefreshing = loading.refreshing,
-            errorMessage = loading.error,
             hasMore = filter.query.isBlank() && (loading.paged?.hasMore ?: false),
             isLoadingMore = loading.loadingMore,
             totalCount = loading.paged?.items?.size ?: 0,

@@ -53,6 +53,15 @@ interface PlaceRepository {
     fun observePlacesByOwner(ownerUserId: String): Flow<List<Place>>
 
     /**
+     * Wykonuje pełną synchronizację miejsc przypisanych do użytkownika.
+     * Pobiera dane z serwera i aktualizuje lokalny cache.
+     *
+     * @param ownerUserId identyfikator właściciela miejsc.
+     * @return lista zsynchronizowanych miejsc.
+     */
+    suspend fun syncPlacesByOwner(ownerUserId: String): OpResult<List<Place>>
+
+    /**
      * Pobiera pojedyncze miejsce.
      *
      * Implementacja może użyć cache jako fallbacku, ale nie powinna zwracać danych prywatnych ani

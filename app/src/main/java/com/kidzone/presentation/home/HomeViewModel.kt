@@ -65,6 +65,7 @@ private const val ONE_MINUTE_MILLIS = 60_000L
  * 🧼 Lifecycle:
  * - Odświeżanie danych przy starcie ekranu (wykrywanie powrotu online).
  */
+@Suppress("TooManyFunctions")
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
@@ -154,7 +155,9 @@ class HomeViewModel @Inject constructor(
                 staleLocationAgeMinutes = if (granted) it.staleLocationAgeMinutes else null
             )
         }
-        if (shouldLoad) loadLocationBasedPlaces()
+        if (shouldLoad) {
+            loadLocationBasedPlaces()
+        }
     }
 
     /**

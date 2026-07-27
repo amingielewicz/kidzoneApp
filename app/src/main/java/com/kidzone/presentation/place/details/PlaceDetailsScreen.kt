@@ -96,6 +96,8 @@ import com.kidzone.presentation.common.NewPlaceBadge
 import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.common.RankBadge
+import com.kidzone.presentation.common.ScreenState
+import com.kidzone.presentation.common.ScreenStateContent
 import com.kidzone.presentation.common.SortMenuIcon
 import com.kidzone.presentation.common.SortMenuOption
 import com.kidzone.presentation.common.createCameraImageUri
@@ -118,7 +120,6 @@ private val PLACE_DETAILS_TINY_SPACING = 2.dp
 
 private val PLACE_DETAILS_CARD_ELEVATION = 1.dp
 private val PLACE_DETAILS_MAIN_CARD_ELEVATION = 2.dp
-private val PLACE_DETAILS_EMPTY_STATE_PADDING = 24.dp
 private val PLACE_DETAILS_PROGRESS_SIZE = 24.dp
 
 private val PLACE_DETAILS_ICON_SIZE = 18.dp
@@ -178,6 +179,7 @@ fun PlaceDetailsScreen(
     onBack: () -> Unit,
     onEditPlace: (placeId: String) -> Unit,
     onDeleted: () -> Unit,
+    onSignOut: () -> Unit,
     placeId: String = "",
     viewModel: PlaceDetailsViewModel = hiltViewModel(),
     sharedTransitionScope: SharedTransitionScope? = null,
@@ -187,10 +189,9 @@ fun PlaceDetailsScreen(
     val state by viewModel.uiState.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
 
-    val isOwner = remember(state.place, currentUser) {
-        val place = state.place
-        val user = currentUser
-        place != null && user != null && place.ownerUserId == user.id
+    val currentPlace = (state.screenState as? ScreenState.Content)?.data
+    val isOwner = remember(currentPlace, currentUser) {
+        currentPlace != null && currentUser != null && currentPlace.ownerUserId == currentUser?.id
     }
 
     var showOverflow by remember { mutableStateOf(false) }
@@ -214,12 +215,13 @@ fun PlaceDetailsScreen(
     val isOffline = networkStatus == NetworkStatus.UNAVAILABLE
 
     val availablePlacePhotoSlots = (
-        PLACE_DETAILS_MAX_PHOTOS - (state.place?.photoUrls?.size ?: 0)
+        PLACE_DETAILS_MAX_PHOTOS - ((state.screenState as? ScreenState.Content)?.data?.photoUrls?.size ?: 0)
     ).coerceAtLeast(0)
     val duplicatePhotoError = stringResource(R.string.duplicate_photo_error)
 
     fun addPickedPlacePhotos(uris: List<Uri>) {
-        val availableSlots = PLACE_DETAILS_MAX_PHOTOS - (state.place?.photoUrls?.size ?: 0)
+        val currentPlace = (state.screenState as? ScreenState.Content)?.data ?: return
+        val availableSlots = PLACE_DETAILS_MAX_PHOTOS - currentPlace.photoUrls.size
         if (uris.isEmpty() || availableSlots <= 0) return
 
         val selection = selectUniquePhotoUris(
@@ -343,10 +345,11 @@ fun PlaceDetailsScreen(
 
     Scaffold(
         topBar = {
+            val currentPlace = (state.screenState as? ScreenState.Content)?.data
             TopAppBar(
                 title = {
                     Text(
-                        text = state.place?.name ?: stringResource(R.string.place_details),
+                        text = currentPlace?.name ?: stringResource(R.string.place_details),
                         maxLines = 1
                     )
                 },
@@ -356,7 +359,7 @@ fun PlaceDetailsScreen(
                     }
                 },
                 actions = {
-                    if (state.place != null) {
+                    if (currentPlace != null) {
                         IconButton(onClick = { showOverflow = true }) {
                             Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.more_actions))
                         }
@@ -370,7 +373,7 @@ fun PlaceDetailsScreen(
                                     leadingIcon = Icons.Filled.Edit,
                                     onClick = {
                                         showOverflow = false
-                                        state.place?.let { onEditPlace(it.id) }
+                                        onEditPlace(currentPlace.id)
                                     }
                                 )
                                 KidZoneDropdownMenuItem(
@@ -388,25 +391,23 @@ fun PlaceDetailsScreen(
                                 leadingIcon = Icons.Filled.Share,
                                 onClick = {
                                     showOverflow = false
-                                    state.place?.let { place ->
-                                        val shareText = buildString {
-                                            append(place.name)
-                                            if (place.address.isNotBlank()) {
-                                                append("\n")
-                                                append(place.address)
-                                            }
-                                            append("\n\nhttps://playground-705e7162.web.app/place/${place.id}")
-                                            append("?lat=${place.latitude}&lng=${place.longitude}")
+                                    val shareText = buildString {
+                                        append(currentPlace.name)
+                                        if (currentPlace.address.isNotBlank()) {
+                                            append("\n")
+                                            append(currentPlace.address)
                                         }
-                                        val intent = Intent(Intent.ACTION_SEND).apply {
-                                            type = "text/plain"
-                                            putExtra(Intent.EXTRA_SUBJECT, place.name)
-                                            putExtra(Intent.EXTRA_TEXT, shareText)
-                                        }
-                                        context.startActivity(
-                                            Intent.createChooser(intent, context.getString(R.string.share_place_title))
-                                        )
+                                        append("\n\nhttps://playground-705e7162.web.app/place/${currentPlace.id}")
+                                        append("?lat=${currentPlace.latitude}&lng=${currentPlace.longitude}")
                                     }
+                                    val intent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_SUBJECT, currentPlace.name)
+                                        putExtra(Intent.EXTRA_TEXT, shareText)
+                                    }
+                                    context.startActivity(
+                                        Intent.createChooser(intent, context.getString(R.string.share_place_title))
+                                    )
                                 }
                             )
                             if (!isOwner) {
@@ -450,48 +451,26 @@ fun PlaceDetailsScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            when {
-                state.isLoading && state.place == null -> {
-                    var showSkeleton by remember { mutableStateOf(false) }
-                    LaunchedEffect(Unit) {
-                        delay(100)
-                        showSkeleton = true
-                    }
-                    if (showSkeleton) {
-                        PlaceDetailsSkeleton(
-                            sharedTransitionScope = sharedTransitionScope,
-                            animatedContentScope = animatedContentScope,
-                            animationSource = animationSource,
-                            placeId = placeId
-                        )
-                    }
-                }
-                state.place == null -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(PLACE_DETAILS_EMPTY_STATE_PADDING),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = state.errorMessage?.asString() ?: stringResource(R.string.error_load_place),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
-                        TextButton(onClick = viewModel::retry) {
-                            Text(stringResource(R.string.retry))
-                        }
-                    }
-                }
-                else -> {
+            ScreenStateContent(
+                state = state.screenState,
+                onRetry = viewModel::retry,
+                loading = {
+                    PlaceDetailsSkeleton(
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedContentScope = animatedContentScope,
+                        animationSource = animationSource,
+                        placeId = placeId
+                    )
+                },
+                fallbackActionLabel = stringResource(R.string.sign_out),
+                onFallbackAction = { viewModel.signOut(onSignOut) },
+                content = { place ->
                     androidx.compose.material3.pulltorefresh.PullToRefreshBox(
-                        isRefreshing = state.isLoading,
+                        isRefreshing = state.screenState is ScreenState.Loading,
                         onRefresh = viewModel::refresh
                     ) {
                         PlaceDetailsContent(
-                            place = state.place!!,
+                            place = place,
                             author = state.author,
                             reviews = state.reviews,
                             currentUserId = currentUser?.id,
@@ -514,7 +493,7 @@ fun PlaceDetailsScreen(
                                 fullscreenPhotos = photos
                                 fullscreenPhotoIndex = index
                                 fullscreenReview = review
-                                fullscreenPhotoUploadedBy = state.place?.photoUploadedBy.orEmpty()
+                                fullscreenPhotoUploadedBy = place.photoUploadedBy
                             },
                             onAddPlacePhoto = if (currentUser != null) {
                                 {
@@ -558,13 +537,14 @@ fun PlaceDetailsScreen(
                         )
                     }
                 }
-            }
+            )
         }
     }
 
     if (showDeleteDialog) {
+        val currentPlace = (state.screenState as? ScreenState.Content)?.data
         DeleteConfirmationDialog(
-            placeName = state.place?.name.orEmpty(),
+            placeName = currentPlace?.name.orEmpty(),
             isDeleting = state.isDeleting,
             onConfirm = {
                 viewModel.delete()
@@ -600,40 +580,47 @@ fun PlaceDetailsScreen(
         )
     }
 
-    if (showSuggestEditSheet && state.place != null) {
-        val thankYouSuggestEdit = stringResource(R.string.thank_you_suggest_edit)
-        SuggestEditSheet(
-            place = state.place!!,
-            onSubmit = { name, description, category, amenities, comment ->
-                viewModel.submitSuggestedEdit(name, description, category, amenities, comment)
-                showSuggestEditSheet = false
-                scope.launch {
-                    snackbarHostState.showSnackbar(thankYouSuggestEdit)
-                }
-            },
-            onDismiss = { showSuggestEditSheet = false }
-        )
+    if (showSuggestEditSheet) {
+        val currentPlace = (state.screenState as? ScreenState.Content)?.data
+        if (currentPlace != null) {
+            val thankYouSuggestEdit = stringResource(R.string.thank_you_suggest_edit)
+            SuggestEditSheet(
+                place = currentPlace,
+                onSubmit = { name, description, category, amenities, comment ->
+                    viewModel.submitSuggestedEdit(name, description, category, amenities, comment)
+                    showSuggestEditSheet = false
+                    scope.launch {
+                        snackbarHostState.showSnackbar(thankYouSuggestEdit)
+                    }
+                },
+                onDismiss = { showSuggestEditSheet = false }
+            )
+        }
     }
 
-    if (showLocationCorrectionDialog && state.place != null) {
-        val thankYouLocationCorrection = stringResource(R.string.thank_you_location_correction)
-        LocationCorrectionDialog(
-            isOffline = isOffline,
-            onSubmit = { lat, lng, address ->
-                viewModel.submitLocationCorrection(lat, lng, address)
-                showLocationCorrectionDialog = false
-                scope.launch {
-                    snackbarHostState.showSnackbar(thankYouLocationCorrection)
-                }
-            },
-            onDismiss = { showLocationCorrectionDialog = false }
-        )
+    if (showLocationCorrectionDialog) {
+        val currentPlace = (state.screenState as? ScreenState.Content)?.data
+        if (currentPlace != null) {
+            val thankYouLocationCorrection = stringResource(R.string.thank_you_location_correction)
+            LocationCorrectionDialog(
+                isOffline = isOffline,
+                onSubmit = { lat, lng, address ->
+                    viewModel.submitLocationCorrection(lat, lng, address)
+                    showLocationCorrectionDialog = false
+                    scope.launch {
+                        snackbarHostState.showSnackbar(thankYouLocationCorrection)
+                    }
+                },
+                onDismiss = { showLocationCorrectionDialog = false }
+            )
+        }
     }
 
     if (state.showAddReviewSheet) {
+        val currentPlace = (state.screenState as? ScreenState.Content)?.data
         val editing = state.editingReview
         AddReviewSheet(
-            placeName = state.place?.name.orEmpty(),
+            placeName = currentPlace?.name.orEmpty(),
             isSubmitting = state.isAddingReview,
             errorMessage = state.addReviewError?.asString(),
             onDismiss = viewModel::dismissAddReviewSheet,

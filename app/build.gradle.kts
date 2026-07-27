@@ -42,23 +42,18 @@ android {
         applicationId = "com.kidzone"
         minSdk = 26
         targetSdk = 35
+        
+        // Dynamic versioning using providers to ensure compatibility with Gradle 8.x/9.x
         versionCode = providers.exec {
             commandLine("git", "rev-list", "--count", "HEAD")
-        }.standardOutput.asText.get().trim().toIntOrNull() ?: 1
+        }.standardOutput.asText.map { it.trim().toIntOrNull() ?: 1 }.get()
+        
         versionName = run {
             val baseVersion = "1.0.0"
-            // Na branchach dev/feature dodajemy suffix dev#<numerPR>.
-            // Np. branch po merge jako PR #63 → "0.1.0-dev#63".
-            // Na main (release) zostaje czyste "0.1.0".
-            //
-            // Łańcuch rozwiązywania numeru:
-            //  1. Zmienna środowiskowa PR_NUMBER (ustawiana w CI/CD)
-            //  2. Gradle property -PPR_NUMBER=72 (lokalne override)
-            //  3. Cyfry wyciągnięte z nazwy brancha (np. fix/72-opis → "72")
-            //  4. Skrócony commit hash (7 znaków) jako ostateczny fallback
             val branch = providers.exec {
                 commandLine("git", "rev-parse", "--abbrev-ref", "HEAD")
-            }.standardOutput.asText.get().trim()
+            }.standardOutput.asText.map { it.trim() }.get()
+
             if (branch == "main" || branch == "master" || branch == "HEAD") {
                 baseVersion
             } else {
@@ -67,7 +62,7 @@ android {
                     ?: Regex("\\d+").find(branch)?.value
                     ?: providers.exec {
                         commandLine("git", "rev-parse", "--short=7", "HEAD")
-                    }.standardOutput.asText.get().trim()
+                    }.standardOutput.asText.map { it.trim() }.get()
                 "$baseVersion-dev#$prNumber"
             }
         }
@@ -162,7 +157,7 @@ android {
     }
     packaging {
         resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes.add("/META-INF/{AL2.0,LGPL2.1}")
         }
     }
 

@@ -18,12 +18,13 @@ import com.kidzone.data.local.sync.PendingOperationEntity
  * - `fallbackToDestructiveMigration()`: Automatyczne odświeżenie bazy przy zmianie schematu (zapobiega crashom).
  */
 @Database(
-    entities = [PlaceEntity::class, ReviewEntity::class, PendingOperationEntity::class],
-    version = 5,
+    entities = [PlaceEntity::class, ReviewEntity::class, PendingOperationEntity::class, UserEntity::class],
+    version = 6,
     exportSchema = false
 )
 abstract class KidZoneDatabase : RoomDatabase() {
     abstract fun placeDao(): PlaceDao
     abstract fun reviewDao(): ReviewDao
     abstract fun pendingOperationDao(): PendingOperationDao
+    abstract fun userDao(): UserDao
 }

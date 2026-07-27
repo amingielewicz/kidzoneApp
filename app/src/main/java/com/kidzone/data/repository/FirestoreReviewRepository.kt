@@ -83,32 +83,36 @@ class FirestoreReviewRepository @Inject constructor(
 
         val localFlow = reviewDao.observeByUser(userId)
 
+        // Uruchom synchronizację w tle
         launch {
-            val firestoreFlow = callbackFlow {
-                val registration = reviewsCollection()
-                    .whereEqualTo("userId", userId)
-                    .addSnapshotListener { snapshot, error ->
-                        if (error != null) {
-                            close(error)
-                            return@addSnapshotListener
-                        }
-                        val reviews = snapshot?.documents
-                            ?.mapNotNull { it.toObject(ReviewDto::class.java)?.toDomain() }
-                            ?.sortedByDescending { it.createdAtMillis }
-                            .orEmpty()
-                        trySend(reviews)
-                    }
-                awaitClose { registration.remove() }
-            }
-            firestoreFlow.collect { reviews ->
-                reviewDao.upsertAll(reviews.map(ReviewEntity::fromDomain))
-            }
+            syncReviewsByUser(userId)
         }
 
         // 3. Emituj dane z Room.
         localFlow.collectLatest { entities ->
             trySend(entities.map { it.toDomain() })
         }
+    }
+
+    override suspend fun syncReviewsByUser(userId: String): OpResult<List<Review>> = try {
+        if (userId.isBlank()) {
+            OpResult.success(emptyList())
+        } else {
+            val snapshot = reviewsCollection()
+                .whereEqualTo("userId", userId)
+                .get()
+                .await()
+
+            val reviews = snapshot.documents
+                .mapNotNull { it.toObject(ReviewDto::class.java)?.toDomain() }
+
+            if (reviews.isNotEmpty()) {
+                reviewDao.upsertAll(reviews.map { ReviewEntity.fromDomain(it) })
+            }
+            OpResult.success(reviews)
+        }
+    } catch (e: Exception) {
+        OpResult.failure(e)
     }
 
     override suspend fun addReview(review: Review): OpResult<Review> = try {

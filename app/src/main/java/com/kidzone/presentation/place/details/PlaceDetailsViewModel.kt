@@ -26,6 +26,7 @@ import com.kidzone.domain.repository.ReviewRepository
 import com.kidzone.domain.service.ImageCompressorPort
 import com.kidzone.domain.service.LocationProvider
 import com.kidzone.navigation.Route
+import com.kidzone.presentation.common.ScreenState
 import com.kidzone.presentation.place.add.PLACE_NAME_MAX_LENGTH
 import com.kidzone.review.InAppReviewManager
 import com.kidzone.utils.OpResult
@@ -60,6 +61,37 @@ private const val PLACE_PHOTO_UPLOAD_TIMEOUT_MS = 30_000L
  * - Zarządzanie stanem wyświetlania szczegółów miejsca i jego opinii.
  * - Obsługa akcji użytkownika (dodawanie/edycja opinii, zgłaszanie, usuwanie).
  * - Obliczanie agregatów ocen i statusu rankingowego na poziomie UI.
+ *
+ * 🚫 Poza zakresem:
+ * - Brak decyzji o kolejce offline dla opinii (obsługiwane przez [ReviewRepository]).
+ * - Brak bezpośredniego zarządzania zdjęciami w Storage (delegowane do [PhotoUploader]).
+ *
+ * 📥 Wejście:
+ * - ID miejsca z [SavedStateHandle].
+ * - Strumień opinii z [ReviewRepository].
+ * - Interakcje użytkownika (ocena, komentarz, zgłoszenia).
+ *
+ * 📤 Wyjście:
+ * - Stan ekranu szczegółów ([UiState]).
+ * - Wydarzenia jednorazowe (ReviewActionEvent).
+ *
+ * ✅ Gwarancje:
+ * - Spójność średniej oceny wyświetlanej lokalnie po dodaniu własnej opinii.
+ * - Blokada dodawania opinii przez właściciela miejsca.
+ *
+ * 🔌 Offline:
+ * - Wspiera odczyt szczegółów z cache jeśli Firestore jest nieosiągalny.
+ * - Obsługuje ponawianie prób ładowania po błędzie sieci.
+ *
+ * 🧵 Wątki:
+ * - viewModelScope dla wszystkich operacji asynchronicznych.
+ * - imageCompressor uruchamiany na odpowiednim wątku roboczym.
+ *
+ * 🧪 Testowalność:
+ * - Pełne DI dla wszystkich serwisów i repozytoriów.
+ *
+ * 🧼 Lifecycle:
+ * - Automatyczne czyszczenie listenerów opinii przy niszczeniu VM.
  */
 @HiltViewModel
 class PlaceDetailsViewModel @Inject constructor(
@@ -75,12 +107,37 @@ class PlaceDetailsViewModel @Inject constructor(
     private val analyticsHelper: AnalyticsHelper
 ) : ViewModel() {
 
+    /**
+     * Niezmienny stan ekranu szczegółów miejsca.
+     *
+     * @property screenState ogólny stan ładowania/treści/błędu dla głównego obiektu [Place].
+     * @property author dane użytkownika, który dodał to miejsce.
+     * @property reviews lista opinii przypisanych do tego miejsca.
+     * @property isDeleting czy trwa operacja usuwania miejsca.
+     * @property isDeleted true gdy miejsce zostało pomyślnie usunięte (sygnał do nawigacji).
+     * @property deleteErrorMessage komunikat błędu przy nieudanej próbie usunięcia.
+     * @property showAddReviewSheet czy arkusz dodawania opinii jest widoczny.
+     * @property isAddingReview czy trwa operacja zapisu nowej/edytowanej opinii.
+     * @property addReviewError komunikat błędu przy zapisie opinii.
+     * @property editingReview opcjonalna opinia, która jest aktualnie edytowana.
+     * @property sortOrder bieżący sposób sortowania opinii.
+     * @property reviewActionEvent typ ostatnio zakończonej akcji na opiniach (np. ADDED).
+     * @property topRank pozycja miejsca w TOP 100 (jeśli się kwalifikuje).
+     * @property userLocation bieżące współrzędne użytkownika do obliczania dystansu.
+     * @property isUsingStaleLocation czy dystans oparty jest na nieaktualnej lokalizacji.
+     * @property staleLocationAgeMinutes wiek nieaktualnej lokalizacji w minutach.
+     * @property isUploadingPlacePhoto czy trwa przesyłanie nowego zdjęcia do miejsca.
+     * @property placePhotoDuplicateEvent sygnał wykrycia duplikatu zdjęcia w miejscu.
+     * @property reviewPhotoDuplicateEvent sygnał wykrycia duplikatu zdjęcia w opinii.
+     * @property isPlaceReported czy bieżący użytkownik zgłosił już to miejsce.
+     * @property reportedPhotoUrls zbiór URL-i zdjęć już zgłoszonych przez użytkownika.
+     * @property reportedReviewIds zbiór ID opinii już zgłoszonych przez użytkownika.
+     * @property shouldRequestReview czy należy wyświetlić prośbę o ocenę aplikacji (In-App Review).
+     */
     data class UiState(
-        val place: Place? = null,
+        val screenState: ScreenState<Place> = ScreenState.Loading,
         val author: User? = null,
         val reviews: List<Review> = emptyList(),
-        val isLoading: Boolean = true,
-        val errorMessage: UiText? = null,
         val isDeleting: Boolean = false,
         val isDeleted: Boolean = false,
         val deleteErrorMessage: UiText? = null,
@@ -103,6 +160,12 @@ class PlaceDetailsViewModel @Inject constructor(
         val shouldRequestReview: Boolean = false
     )
 
+    /**
+     * Dostępne opcje sortowania opinii o miejscu.
+     *
+     * @property labelRes zasób zlokalizowanej etykiety opcji.
+     * @property comparator logika porównywania dwóch opinii dla danego porządku.
+     */
     enum class ReviewSortOrder(val labelRes: Int, val comparator: Comparator<Review>) {
         NEWEST(
             labelRes = R.string.sort_recently_added,
@@ -145,10 +208,11 @@ class PlaceDetailsViewModel @Inject constructor(
             reviewRepository.observeReviewsForPlace(placeId)
                 .catch { e ->
                     _uiState.update {
-                        if (it.place == null) {
+                        if (it.screenState is ScreenState.Loading) {
                             it.copy(
-                                isLoading = false,
-                                errorMessage = UiText.StringResource(R.string.error_fetch_list)
+                                screenState = ScreenState.Error(
+                                    UiText.StringResource(R.string.error_fetch_list)
+                                )
                             )
                         } else {
                             it
@@ -173,18 +237,19 @@ class PlaceDetailsViewModel @Inject constructor(
         if (placeId.isBlank()) {
             _uiState.update {
                 it.copy(
-                    isLoading = false,
-                    errorMessage = UiText.StringResource(R.string.error_fetch_places)
+                    screenState = ScreenState.Error(
+                        UiText.StringResource(R.string.error_fetch_places)
+                    )
                 )
             }
             return
         }
-        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+        _uiState.update { it.copy(screenState = ScreenState.Loading) }
         viewModelScope.launch {
             when (val result = placeRepository.getPlace(placeId)) {
                 is OpResult.Success -> {
                     _uiState.update {
-                        it.copy(place = result.data, isLoading = false, errorMessage = null)
+                        it.copy(screenState = ScreenState.Content(result.data))
                     }
                     loadAuthor(result.data.ownerUserId)
                     loadTopRank()
@@ -194,8 +259,9 @@ class PlaceDetailsViewModel @Inject constructor(
 
                 is OpResult.Failure -> _uiState.update {
                     it.copy(
-                        isLoading = false,
-                        errorMessage = UiText.StringResource(R.string.error_load_place)
+                        screenState = ScreenState.Error(
+                            UiText.StringResource(R.string.error_load_place)
+                        )
                     )
                 }
             }
@@ -203,7 +269,8 @@ class PlaceDetailsViewModel @Inject constructor(
     }
 
     private fun loadTopRank() {
-        val placeIdSnapshot = _uiState.value.place?.id ?: return
+        val placeSnapshot = (_uiState.value.screenState as? ScreenState.Content)?.data ?: return
+        val placeIdSnapshot = placeSnapshot.id
         viewModelScope.launch {
             when (val result = placeRepository.getTopPlaces(TOP_RANKING_POOL)) {
                 is OpResult.Success -> {
@@ -230,7 +297,7 @@ class PlaceDetailsViewModel @Inject constructor(
     }
 
     fun delete() {
-        val place = _uiState.value.place ?: return
+        val place = (_uiState.value.screenState as? ScreenState.Content)?.data ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isDeleting = true, deleteErrorMessage = null) }
 
@@ -267,6 +334,13 @@ class PlaceDetailsViewModel @Inject constructor(
     fun refresh() {
         loadPlace()
         refreshLocation()
+    }
+
+    fun signOut(onSignedOut: () -> Unit) {
+        viewModelScope.launch {
+            authRepository.signOut()
+            onSignedOut()
+        }
     }
 
     private fun refreshLocation() {
@@ -319,7 +393,7 @@ class PlaceDetailsViewModel @Inject constructor(
     }
 
     fun deleteReview(reviewId: String) {
-        val place = _uiState.value.place ?: return
+        val place = (_uiState.value.screenState as? ScreenState.Content)?.data ?: return
         viewModelScope.launch {
             when (val result = reviewRepository.deleteReview(reviewId)) {
                 is OpResult.Success -> {
@@ -333,7 +407,9 @@ class PlaceDetailsViewModel @Inject constructor(
                         } else 0.0
                         _uiState.update {
                             it.copy(
-                                place = place.copy(reviewsCount = newCount, averageRating = newAvg)
+                                screenState = ScreenState.Content(
+                                    place.copy(reviewsCount = newCount, averageRating = newAvg)
+                                )
                             )
                         }
                     }
@@ -381,7 +457,7 @@ class PlaceDetailsViewModel @Inject constructor(
         photoUris: List<android.net.Uri> = emptyList(),
         retainedPhotoUrls: List<String> = emptyList()
     ) {
-        val place = _uiState.value.place ?: return
+        val place = (_uiState.value.screenState as? ScreenState.Content)?.data ?: return
         val user = currentUser.value
         if (user == null) {
             _uiState.update {
@@ -466,9 +542,11 @@ class PlaceDetailsViewModel @Inject constructor(
 
                 _uiState.update {
                     it.copy(
-                        place = place.copy(
-                            reviewsCount = newCount,
-                            averageRating = newAvg
+                        screenState = ScreenState.Content(
+                            place.copy(
+                                reviewsCount = newCount,
+                                averageRating = newAvg
+                            )
                         ),
                         isAddingReview = false,
                         showAddReviewSheet = false,
@@ -577,7 +655,9 @@ class PlaceDetailsViewModel @Inject constructor(
                 }
                 _uiState.update {
                     it.copy(
-                        place = place.copy(averageRating = newAvg),
+                        screenState = ScreenState.Content(
+                            place.copy(averageRating = newAvg)
+                        ),
                         isAddingReview = false,
                         showAddReviewSheet = false,
                         addReviewError = null,
@@ -614,7 +694,7 @@ class PlaceDetailsViewModel @Inject constructor(
     }
 
     fun reportPlace(reason: PlaceReportReason, comment: String = "") {
-        val place = _uiState.value.place ?: return
+        val place = (_uiState.value.screenState as? ScreenState.Content)?.data ?: return
         val user = currentUser.value ?: return
         viewModelScope.launch {
             val result = placeRepository.reportPlace(
@@ -714,7 +794,7 @@ class PlaceDetailsViewModel @Inject constructor(
     ): Boolean {
         var duplicateSkipped = false
         for (photoUri in photoUris) {
-            val place = _uiState.value.place ?: return duplicateSkipped
+            val place = (_uiState.value.screenState as? ScreenState.Content)?.data ?: return duplicateSkipped
             if (place.photoUrls.size >= MAX_PLACE_PHOTOS_ON_DETAILS) {
                 return duplicateSkipped
             }
@@ -766,15 +846,17 @@ class PlaceDetailsViewModel @Inject constructor(
     ) {
         placePhotoHashes.add(hash)
         _uiState.update { state ->
-            val place = state.place ?: return@update state
+            val place = (state.screenState as? ScreenState.Content)?.data ?: return@update state
             if (place.photoUrls.size >= MAX_PLACE_PHOTOS_ON_DETAILS || url in place.photoUrls) {
                 state
             } else {
                 state.copy(
-                    place = place.copy(
-                        photoUrls = place.photoUrls + url,
-                        photoUploadedBy = place.photoUploadedBy + (url to userId),
-                        photoHashes = place.photoHashes + (url to hash)
+                    screenState = ScreenState.Content(
+                        place.copy(
+                            photoUrls = place.photoUrls + url,
+                            photoUploadedBy = place.photoUploadedBy + (url to userId),
+                            photoHashes = place.photoHashes + (url to hash)
+                        )
                     )
                 )
             }
@@ -782,7 +864,7 @@ class PlaceDetailsViewModel @Inject constructor(
     }
 
     fun deletePhotoFromPlace(photoUrl: String) {
-        val place = _uiState.value.place ?: return
+        val place = (_uiState.value.screenState as? ScreenState.Content)?.data ?: return
         val user = currentUser.value ?: return
 
         val uploaderId = place.photoUploadedBy[photoUrl]
@@ -800,15 +882,18 @@ class PlaceDetailsViewModel @Inject constructor(
 
                     _uiState.update {
                         it.copy(
-                            place = place.copy(
-                                photoUrls = place.photoUrls - photoUrl,
-                                photoUploadedBy = place.photoUploadedBy - photoUrl,
-                                photoHashes = place.photoHashes - photoUrl
+                            screenState = ScreenState.Content(
+                                place.copy(
+                                    photoUrls = place.photoUrls - photoUrl,
+                                    photoUploadedBy = place.photoUploadedBy - photoUrl,
+                                    photoHashes = place.photoHashes - photoUrl
+                                )
                             ),
                             isUploadingPlacePhoto = false
                         )
                     }
-                    seedPlacePhotoHashes((_uiState.value.place?.photoHashes?.values).orEmpty())
+                    val currentPlace = (_uiState.value.screenState as? ScreenState.Content)?.data
+                    seedPlacePhotoHashes((currentPlace?.photoHashes?.values).orEmpty())
                 }
 
                 is OpResult.Failure -> {
@@ -860,7 +945,7 @@ class PlaceDetailsViewModel @Inject constructor(
         amenities: Set<String>,
         comment: String
     ) {
-        val place = _uiState.value.place ?: return
+        val place = (_uiState.value.screenState as? ScreenState.Content)?.data ?: return
         val user = currentUser.value ?: return
         val changes = mutableMapOf<String, Any>()
         val trimmedName = name.trim().take(PLACE_NAME_MAX_LENGTH).trim()
@@ -883,7 +968,7 @@ class PlaceDetailsViewModel @Inject constructor(
     }
 
     fun submitLocationCorrection(latitude: Double, longitude: Double, address: String?) {
-        val place = _uiState.value.place ?: return
+        val place = (_uiState.value.screenState as? ScreenState.Content)?.data ?: return
         val user = currentUser.value ?: return
         val changes = mutableMapOf<String, Any>(
             "latitude" to latitude,

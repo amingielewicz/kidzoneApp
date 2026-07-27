@@ -361,6 +361,11 @@ fun KidZoneNavGraph(
                         // na liście usunie kartę sam.
                         navController.popBackStack(Route.Main.path, inclusive = false)
                     },
+                    onSignOut = {
+                        navController.navigate(Route.Login.path) {
+                            popUpTo(Route.Main.path) { inclusive = true }
+                        }
+                    },
                     placeId = placeId,
                     sharedTransitionScope = this@SharedTransitionLayout,
                     animatedContentScope = this@composable,

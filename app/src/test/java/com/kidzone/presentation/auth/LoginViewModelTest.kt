@@ -2,6 +2,7 @@ package com.kidzone.presentation.auth
 
 import com.kidzone.R
 import com.kidzone.domain.repository.AuthRepository
+import com.kidzone.domain.service.DataPrefetchService
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
 import com.kidzone.utils.AuthException
@@ -49,12 +50,14 @@ class LoginViewModelTest {
     }
 
     private lateinit var authRepository: AuthRepository
+    private lateinit var prefetchService: DataPrefetchService
     private lateinit var viewModel: LoginViewModel
 
     @BeforeEach
     fun setUp() {
         authRepository = mockk(relaxed = true)
-        viewModel = LoginViewModel(authRepository)
+        prefetchService = mockk(relaxed = true)
+        viewModel = LoginViewModel(authRepository, prefetchService)
     }
 
     // =========================================================================

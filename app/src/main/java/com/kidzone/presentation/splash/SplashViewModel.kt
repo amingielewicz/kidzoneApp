@@ -3,6 +3,7 @@ package com.kidzone.presentation.splash
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.domain.repository.AuthRepository
+import com.kidzone.domain.service.DataPrefetchService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,7 +66,8 @@ private const val AUTH_CHECK_TIMEOUT_MS = 5_000L
  */
 @HiltViewModel
 class SplashViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val prefetchService: DataPrefetchService
 ) : ViewModel() {
 
     /**
@@ -98,7 +100,12 @@ class SplashViewModel @Inject constructor(
             val elapsed = System.currentTimeMillis() - started
             val remaining = MIN_DISPLAY_MS - elapsed
             if (remaining > 0) delay(remaining)
-            _state.value = if (user != null) State.SignedIn else State.SignedOut
+            if (user != null) {
+                prefetchService.startPrefetch()
+                _state.value = State.SignedIn
+            } else {
+                _state.value = State.SignedOut
+            }
         }
     }
 }
