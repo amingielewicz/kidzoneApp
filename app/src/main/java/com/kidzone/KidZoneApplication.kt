@@ -52,6 +52,9 @@ class KidZoneApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // Rozgrzewanie Maps SDK w tle, aby przejście na zakładkę Mapy było błyskawiczne.
+        com.google.android.gms.maps.MapsInitializer.initialize(this)
+
         initTimber()
         coldStartTrace.start()
         initDebugTools()

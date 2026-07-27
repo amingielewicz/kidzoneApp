@@ -43,8 +43,8 @@ interface PlaceDao {
     fun observeByCategoryAndName(category: String, query: String, limit: Int): Flow<List<PlaceEntity>>
 
     /** Miejsca dodane przez konkretnego usera. */
-    @Query("SELECT * FROM places WHERE ownerUserId = :userId ORDER BY createdAtMillis DESC LIMIT :limit")
-    fun observeByOwner(userId: String, limit: Int): Flow<List<PlaceEntity>>
+    @Query("SELECT * FROM places WHERE ownerUserId = :userId ORDER BY createdAtMillis DESC")
+    fun observeByOwner(userId: String): Flow<List<PlaceEntity>>
 
     /** Pojedyncze miejsce po id (one-shot). */
     @Query("SELECT * FROM places WHERE id = :placeId LIMIT 1")

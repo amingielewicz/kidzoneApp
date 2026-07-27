@@ -17,6 +17,7 @@ import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -51,10 +52,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -352,13 +355,43 @@ fun MainScreen(
             }
         }
     ) { padding ->
-        Column(modifier = Modifier
-            .fillMaxSize()
-            .padding(padding)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            // Trwały widok mapy – zawsze obecny w kompozycji, aby Google Maps mogło ładować się w tle.
+            // Gdy nie jesteśmy na zakładce Mapy, przesuwamy go poza widoczny obszar (off-screen),
+            // aby nie przechwytywał dotyku ani nie zużywał niepotrzebnie CPU,
+            // ale zachowujemy jego stan i proces renderowania GL.
+            val isMapVisible = currentRoute == Route.Map.path
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        layout(placeable.width, placeable.height) {
+                            if (isMapVisible) {
+                                placeable.placeRelative(0, 0)
+                            } else {
+                                // Off-screen (rozwiązanie lepsze niż alpha, bo wyłącza input)
+                                placeable.placeRelative(constraints.maxWidth, constraints.maxHeight)
+                            }
+                        }
+                    }
+            ) {
+                MapScreen(
+                    onOpenPlaceDetails = { onOpenPlaceDetails(it, null) },
+                    focusOn = pendingMapFocus,
+                    locationPermissionGrantedSignal = locationPermissionGranted,
+                    onFocusConsumed = { pendingMapFocus = null }
+                )
+            }
+
             NavHost(
                 navController = navController,
                 startDestination = Route.Home.path,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxSize()
             ) {
                 composable(Route.Home.path) {
                     HomeScreen(
@@ -374,12 +407,9 @@ fun MainScreen(
                     )
                 }
                 composable(Route.Map.path) {
-                    MapScreen(
-                        onOpenPlaceDetails = { onOpenPlaceDetails(it, null) },
-                        focusOn = pendingMapFocus,
-                        locationPermissionGrantedSignal = locationPermissionGranted,
-                        onFocusConsumed = { pendingMapFocus = null }
-                    )
+                    // Zakładka Mapy jest obsługiwana przez trwały overlay powyżej.
+                    // Tutaj zostawiamy pusty kontener, aby NavHost wiedział, że trasa jest poprawna.
+                    Spacer(Modifier.fillMaxSize())
                 }
                 composable(Route.PlaceList.path) {
                     PlaceListScreen(

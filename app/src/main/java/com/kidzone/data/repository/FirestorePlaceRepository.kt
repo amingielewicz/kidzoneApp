@@ -50,7 +50,6 @@ class FirestorePlaceRepository @Inject constructor(
 ) : PlaceRepository {
 
     companion object {
-        private const val OWNER_PLACES_LIMIT = 100
         private const val GEO_QUERY_LIMIT = 1500
         private const val MAP_GEOHASH_PREFIX_LIMIT = 9 // 3x3 grid (much faster loading)
         private const val PER_PREFIX_FETCH_LIMIT = 200
@@ -81,7 +80,7 @@ class FirestorePlaceRepository @Inject constructor(
             return@channelFlow
         }
 
-        val localFlow = placeDao.observeByOwner(ownerUserId, OWNER_PLACES_LIMIT)
+        val localFlow = placeDao.observeByOwner(ownerUserId)
 
         // Uruchom synchronizację w tle
         launch {
@@ -99,7 +98,6 @@ class FirestorePlaceRepository @Inject constructor(
         } else {
             val snapshot = firestore.collection(FirestoreCollections.PLACES)
                 .whereEqualTo("ownerUserId", ownerUserId)
-                .limit(OWNER_PLACES_LIMIT.toLong())
                 .get()
                 .await()
 
@@ -139,8 +137,29 @@ class FirestorePlaceRepository @Inject constructor(
                 if (places.isNotEmpty()) placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
                 OpResult.success(places)
             } catch (e: Exception) {
-                val cached = placeDao.getRecentPlaces(GEO_QUERY_LIMIT)
-                if (cached.isNotEmpty()) OpResult.success(cached.map { it.toDomain() }) else OpResult.failure(e)
+                // Geo-aware fallback: calculate bounds around (lat, lng) and query local Room DB
+                val latDelta = radiusKm / KM_PER_DEGREE
+                // Adjust longitude delta based on latitude
+                val lngDelta = radiusKm / (KM_PER_DEGREE * cos(Math.toRadians(latitude)).coerceAtLeast(MIN_LONGITUDE_COSINE))
+                
+                val bounds = GeoBounds(
+                    north = latitude + latDelta,
+                    east = longitude + lngDelta,
+                    south = latitude - latDelta,
+                    west = longitude - lngDelta
+                )
+                
+                val cached = if (bounds.west <= bounds.east) {
+                    placeDao.getPlacesInBounds(bounds.north, bounds.east, bounds.south, bounds.west, GEO_QUERY_LIMIT)
+                } else {
+                    placeDao.getPlacesInWrappedBounds(bounds.north, bounds.east, bounds.south, bounds.west, GEO_QUERY_LIMIT)
+                }
+
+                if (cached.isNotEmpty()) {
+                    OpResult.success(cached.map { it.toDomain() })
+                } else {
+                    OpResult.failure(e)
+                }
             }
         }
 

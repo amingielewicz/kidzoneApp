@@ -50,19 +50,22 @@ android {
         
         versionName = run {
             val baseVersion = "1.0.0"
-            val branch = providers.exec {
+            val branchProvider = providers.exec {
                 commandLine("git", "rev-parse", "--abbrev-ref", "HEAD")
-            }.standardOutput.asText.map { it.trim() }.get()
+            }.standardOutput.asText.map { it.trim() }
+            
+            val branch = branchProvider.get()
 
             if (branch == "main" || branch == "master" || branch == "HEAD") {
                 baseVersion
             } else {
-                val prNumber = System.getenv("PR_NUMBER")
-                    ?: (project.findProperty("PR_NUMBER") as String?)
+                val prNumber = providers.environmentVariable("PR_NUMBER").orNull
+                    ?: providers.gradleProperty("PR_NUMBER").orNull
                     ?: Regex("\\d+").find(branch)?.value
                     ?: providers.exec {
                         commandLine("git", "rev-parse", "--short=7", "HEAD")
-                    }.standardOutput.asText.map { it.trim() }.get()
+                    }.standardOutput.asText.get().trim()
+
                 "$baseVersion-dev#$prNumber"
             }
         }

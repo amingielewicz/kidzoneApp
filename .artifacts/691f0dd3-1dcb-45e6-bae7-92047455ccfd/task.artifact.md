@@ -1,14 +1,7 @@
-- [x] Fix My Places and My Reviews Offline Visibility
-    - [x] Update `FirestorePlaceRepository.kt` (`observePlacesByOwner` sync)
-    - [x] Update `HomeViewModel.kt` with user data prefetch
-    - [x] Ensure place metadata prefetch for user reviews
-- [x] Fix Profile and Avatar Offline Visibility
-    - [x] Refactor `FirebaseAuthRepository.kt` to cache current user profile in Room
-    - [x] Update `UserDao.kt` with single-user observation and upsert
-    - [x] Ensure `DataPrefetchService.kt` warms up the user profile cache
-- [x] Technical Quality and Documentation
-    - [x] Unified KDoc for `UserEntity`, `UserDao`, and `FirebaseAuthRepository`
-    - [x] Fix Detekt issues (complexity and generic catch)
-- [x] Verification
-    - [x] Run unit tests (262 passed)
-    - [x] Manual verification of offline transition (Room SSOT implemented)
+- [ ] Optimize Home Screen Data Loading
+    - [ ] Implement geo-aware fallback in `FirestorePlaceRepository.getPlacesNear`
+    - [ ] Implement multi-stage location loading in `HomeViewModel.kt`
+    - [ ] Update `HomeScreen.kt` stale label logic
+- [ ] Verification
+    - [ ] Run unit tests
+    - [ ] Manual verification of "Fast Start" UX

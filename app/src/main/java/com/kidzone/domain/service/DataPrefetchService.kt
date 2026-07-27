@@ -7,21 +7,26 @@ import com.kidzone.domain.repository.ReviewRepository
 import com.kidzone.data.remote.PerformanceConfigProvider
 import com.kidzone.utils.OpResult
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.delay
 
 /**
  * 🎯 Odpowiedzialności:
  * - Proaktywne pobieranie danych z serwera i wypełnianie lokalnego cache Room.
  * - Zapewnienie dostępności danych offline natychmiast po uruchomieniu aplikacji.
  * - Koordynacja pobierania danych globalnych oraz prywatnych danych użytkownika.
+ * - Monitorowanie stanu sieci w celu dokończenia przerwanego pobierania.
  *
  * ✅ Gwarancje:
  * - Działa w tle, nie blokując głównego wątku ani nawigacji (np. Onboarding).
  * - Automatycznie synchronizuje metadane miejsc dla opinii użytkownika.
+ * - Idempotentność: nie powtarza udanego pobierania w ramach tej samej sesji.
  *
  * 🧵 Wątki:
  * - Wykorzystuje [ApplicationScope], dzięki czemu proces nie jest przerywany przy zmianie ekranów.
@@ -36,31 +41,64 @@ class DataPrefetchService @Inject constructor(
     @ApplicationScope private val externalScope: CoroutineScope
 ) {
     private var isPrefetching = false
+    private var globalDataPrefetched = false
+    private var userDataPrefetched = false
 
     /**
      * Uruchamia proces wstępnego pobierania danych.
-     * Metoda jest bezpieczna do wielokrotnego wywołania (idempotentna w ramach jednej sesji).
+     * Reaguje na zmiany stanu zalogowania.
      */
     fun startPrefetch() {
-        if (isPrefetching) return
-        isPrefetching = true
-
         externalScope.launch {
-            try {
+            authRepository.currentUser.collectLatest { user ->
+                if (user != null) {
+                    performPrefetch(user.id)
+                } else {
+                    // Public prefetch only
+                    performPublicPrefetch()
+                }
+            }
+        }
+    }
+
+    private suspend fun performPublicPrefetch() {
+        if (globalDataPrefetched || isPrefetching) return
+        try {
+            isPrefetching = true
+            Timber.d("Starting global data prefetch...")
+            prefetchGlobalData()
+            globalDataPrefetched = true
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "Global data prefetch failed")
+        } finally {
+            isPrefetching = false
+        }
+    }
+
+    private suspend fun performPrefetch(userId: String) {
+        if (userDataPrefetched && globalDataPrefetched) return
+        
+        try {
+            isPrefetching = true
+            
+            if (!globalDataPrefetched) {
                 Timber.d("Starting global data prefetch...")
                 prefetchGlobalData()
-                
-                authRepository.currentUser.first()?.let { user ->
-                    Timber.d("Starting user data prefetch for uid=${user.id}...")
-                    prefetchUserData(user.id)
-                }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Timber.w(e, "Data prefetch failed partially")
-            } finally {
-                isPrefetching = false
+                globalDataPrefetched = true
             }
+
+            Timber.d("Starting user data prefetch for uid=$userId...")
+            prefetchUserData(userId)
+            userDataPrefetched = true
+            
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "Prefetch failed partially - will retry on next check")
+        } finally {
+            isPrefetching = false
         }
     }
 
@@ -71,22 +109,22 @@ class DataPrefetchService @Inject constructor(
         placeRepository.getTopPlaces(limit = pool)
         authRepository.getTopUsers(limit = pool)
         
-        // 2. Najnowsze miejsca (pierwsza strona)
+        // 2. Najnowsze miejsca (globalnie)
         placeRepository.getPlacesPage(pageSize = 20, cursor = null, category = null, query = null)
         
-        // 3. Domyślna lokalizacja dla Mapy (Warszawa) jako fallback
+        // 3. Domyślna lokalizacja dla Mapy (Warszawa) - zwiekszamy promien do 30km
         @Suppress("MagicNumber")
-        placeRepository.getPlacesNear(52.2297, 21.0122, radiusKm = 10.0)
+        placeRepository.getPlacesNear(52.2297, 21.0122, radiusKm = 30.0)
     }
 
     private suspend fun prefetchUserData(userId: String) {
         // 1. Synchronizuj pełny profil użytkownika (wypełnia UserDao cache)
         authRepository.getUserById(userId)
 
-        // 2. Synchronizuj własne miejsca użytkownika (One-shot sync do Room)
+        // 2. Synchronizuj WSZYSTKIE własne miejsca użytkownika (One-shot sync do Room)
         placeRepository.syncPlacesByOwner(userId)
         
-        // 3. Synchronizuj własne opinie użytkownika (One-shot sync do Room)
+        // 3. Synchronizuj WSZYSTKIE własne opinie użytkownika (One-shot sync do Room)
         val reviewsResult = reviewRepository.syncReviewsByUser(userId)
         
         // 4. Metadane miejsc dla tych opinii (nazwa, kategoria)

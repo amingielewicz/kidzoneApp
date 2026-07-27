@@ -1,37 +1,46 @@
-# Implementation Plan - Resolve Gradle Deprecations
+# Implementation Plan - Home Screen Data Loading Optimization
 
-Address Gradle deprecation warnings to ensure compatibility with Gradle 9.0 and improve build performance (Configuration Cache support).
+Improve the perceived and actual loading speed of the Home (Start) screen by implementing a multi-stage loading strategy (Cache -> Last Known Location -> Fresh GPS Fix).
 
 ## User Review Required
 
 > [!IMPORTANT]
-> - The logic for `versionCode` and `versionName` will be refactored to use `providers.exec` without immediate `.get()` calls where possible, or by following current Gradle 8.x best practices for value sourcing.
-> - The `packaging` block will be updated to use modern collection DSL.
+> - `HomeViewModel` will no longer wait for a fresh GPS fix before showing data. It will use the system's last known location to show relevant content immediately.
+> - `FirestorePlaceRepository` will be updated to use a geo-aware local fallback for nearby queries, ensuring that even if the network is slow or offline, relevant nearby places are shown if they exist in the cache.
 
 ## Proposed Changes
 
-### Build Configuration
+### Data Layer
 
-#### [MODIFY] [app/build.gradle.kts](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/build.gradle.kts)
-- Refactor `versionCode` and `versionName` resolution:
-    - Use `providers.exec { ... }.standardOutput.asText.map { it.trim() }` to stay lazy where possible.
-    - Note: AGP's `versionCode` and `versionName` DSL currently requires non-provider values. I will ensure the retrieval is done cleanly.
-- Update `packaging` DSL:
-    - Change `excludes += ...` to `excludes.add(...)` or `resources.excludes.add(...)` if applicable for modern Gradle `SetProperty`.
-- Move `it.useJUnitPlatform()` check if needed (though it's usually fine).
+#### [MODIFY] [FirestorePlaceRepository.kt](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/src/main/java/com/kidzone/data/repository/FirestorePlaceRepository.kt)
+- Update `getPlacesNear` fallback logic:
+    - Instead of calling `placeDao.getRecentPlaces` (which ignores coordinates), calculate a bounding box (~50km) around the requested center.
+    - Call `placeDao.getPlacesInBounds` to retrieve cached places from that area.
+    - This provides a much more accurate "Offline Nearby" experience.
 
-### Project Properties
+### Presentation Layer
 
-#### [MODIFY] [gradle.properties](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/gradle.properties)
-- Add `org.gradle.configuration-cache=true` to proactively catch issues that lead to Gradle 9.0 incompatibilities.
-- Ensure `android.nonTransitiveRClass=true` is present (already is).
+#### [MODIFY] [HomeViewModel.kt](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/src/main/java/com/kidzone/presentation/home/HomeViewModel.kt)
+- Refactor `loadLocationBasedPlaces`:
+    - **Stage 1 (Immediate)**: Check `locationProvider.getLastKnownLocation()`. If available, immediately call `loadPlacesForLocation` with these coordinates (marking them as potentially stale).
+    - **Stage 2 (Background)**: Start the `getCurrentLocation` retry loop as a separate coroutine.
+    - **Stage 3 (Refinement)**: If the fresh fix is received and is significantly different (> 500m) from the location used in Stage 1, trigger a new fetch to refine the results.
+- This eliminates the 3-9 second delay currently experienced by users waiting for a fresh GPS fix.
+
+#### [MODIFY] [HomeScreen.kt](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/src/main/java/com/kidzone/presentation/home/HomeScreen.kt)
+- Ensure that the `staleLocationAgeMinutes` label is only shown if the location is older than 5 minutes, to avoid unnecessary UI noise for "recent enough" system fixes.
 
 ## Verification Plan
 
 ### Automated Tests
-- Run `gradlew help --warning-mode all` and verify that the number of project-related warnings has decreased.
-- Run `gradlew assembleDebug` to ensure the build still produces valid APKs with correct versioning.
-- Run unit tests: `gradlew :app:testDebugUnitTest`.
+- Run `HomeViewModelTest` to ensure that data is requested twice (if Stage 1 and Stage 3 locations differ).
+- Run `FirestorePlaceRepositoryTest` to verify the new geo-aware fallback.
 
 ### Manual Verification
-- Check the generated `BuildConfig` or APK details to confirm `versionCode` and `versionName` are still correctly extracted from Git.
+1. **The "Fast Start" Test**:
+   - Open app.
+   - **Expectation**: Content should appear almost immediately (within < 1s) based on the last known location, even while the "Acquiring location..." indicator might still be active.
+2. **The "Offline Nearby" Test**:
+   - Cache some places in City A.
+   - Go offline and open app near City A.
+   - **Expectation**: Nearby places from City A should appear using the Room fallback.

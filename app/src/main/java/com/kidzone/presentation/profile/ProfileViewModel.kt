@@ -229,23 +229,42 @@ class ProfileViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            // Reagujemy na Usera z Room natychmiast
+            user.collect { u ->
+                if (u != null) {
+                    val lang = languagePreferences.getLanguage()
+                    val provider = authRepository.getCurrentSignInProvider()
+                    
+                    // Najpierw obliczamy odznaki na podstawie samych statystyk
+                    val fastBadges = u.computeBadges(BadgeContext())
+                    val newlyEarned = detectNewBadges(u.id, fastBadges)
+                    
+                    _uiState.update {
+                        it.copy(
+                            obtainedBadges = fastBadges,
+                            newlyEarnedBadges = newlyEarned,
+                            signInProvider = provider,
+                            selectedLanguage = lang
+                        )
+                    }
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            // Gdy pełny kontekst (z rankingiem) będzie gotowy, aktualizujemy odznaki
             userContext.collect { context ->
                 val (u, bCtx) = context ?: return@collect
                 if (u == null) return@collect
 
                 val allBadges = u.computeBadges(bCtx)
-                val provider = authRepository.getCurrentSignInProvider()
-                val lang = languagePreferences.getLanguage()
-
                 val newlyEarned = detectNewBadges(u.id, allBadges)
 
                 _uiState.update {
                     it.copy(
                         obtainedBadges = allBadges,
                         newlyEarnedBadges = newlyEarned,
-                        userRank = bCtx.userRank,
-                        signInProvider = provider,
-                        selectedLanguage = lang
+                        userRank = bCtx.userRank
                     )
                 }
             }
