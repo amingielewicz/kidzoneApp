@@ -93,6 +93,7 @@ import com.kidzone.presentation.common.KidZoneDropdownMenuItem
 import com.kidzone.presentation.common.KidZoneReportDialog
 import com.kidzone.presentation.common.KidZoneSortMenu
 import com.kidzone.presentation.common.NewPlaceBadge
+import com.kidzone.presentation.common.PlaceRatingStatus
 import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.common.RankBadge
@@ -170,7 +171,19 @@ private const val PLACE_DETAILS_DIVIDER_ALPHA = 0.5f
 private const val PLACE_DETAILS_MAX_PHOTOS = 5
 
 /**
- * Szczegóły miejsca.
+ * 🎯 Odpowiedzialności:
+ * - Prezentacja szczegółowych informacji o wybranym miejscu.
+ * - Wyświetlanie galerii zdjęć, udogodnień oraz listy opinii.
+ * - Obsługa interakcji: dodawanie opinii, zgłaszanie błędów, udostępnianie.
+ *
+ * 📥 Wejście:
+ * - [onBack] powrót do poprzedniego ekranu.
+ * - [onEditPlace] przejście do edycji miejsca.
+ * - [onDeleted] powrót po usunięciu miejsca.
+ * - [placeId] identyfikator wyświetlanego miejsca.
+ *
+ * 📤 Wyjście:
+ * - Zdarzenia nawigacji oraz operacje zapisu opinii/zgłoszeń w Firestore.
  */
 @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod", "FunctionNaming")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
@@ -1008,7 +1021,10 @@ private fun PlaceMainCard(
             }
             Spacer(Modifier.height(PLACE_DETAILS_SECTION_SPACING))
 
-            PlaceDetailsRatingStatus(place = place)
+            PlaceRatingStatus(
+                place = place,
+                iconSize = PLACE_DETAILS_ICON_SIZE
+            )
 
             if (place.description.isNotBlank()) {
                 MainCardDivider()
@@ -1137,56 +1153,6 @@ private fun PlaceMainCard(
                         )
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PlaceDetailsRatingStatus(place: Place) {
-    when {
-        place.reviewsCount > 0 -> {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RatingIcon(size = PLACE_DETAILS_ICON_SIZE)
-                Spacer(Modifier.width(PLACE_DETAILS_CHIP_CONTENT_SPACING))
-                Text(
-                    text = NumberUtils.formatRating(place.averageRating),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(Modifier.width(PLACE_DETAILS_CHIP_HORIZONTAL_PADDING))
-                val reviewsCountText = pluralStringResource(
-                    R.plurals.reviews_count,
-                    place.reviewsCount,
-                    place.reviewsCount
-                )
-                Text(
-                    text = stringResource(R.string.reviews_count_short, reviewsCountText),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        place.isNewWithoutReviews() -> {
-            NewPlaceBadge()
-        }
-
-        else -> {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.Star,
-                    contentDescription = stringResource(R.string.rating),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(PLACE_DETAILS_ICON_SIZE)
-                )
-                Spacer(Modifier.width(PLACE_DETAILS_CHIP_CONTENT_SPACING))
-                Text(
-                    text = stringResource(R.string.map_no_reviews),
-                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

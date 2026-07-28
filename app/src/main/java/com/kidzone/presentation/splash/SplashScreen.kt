@@ -27,21 +27,17 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
 
 /**
- * Ekran startowy: pokazuje logo aplikacji i decyduje, czy wypchnąć
- * użytkownika do logowania, czy do głównego shella.
+ * 🎯 Odpowiedzialności:
+ * - Weryfikacja stanu sesji użytkownika zaraz po uruchomieniu aplikacji.
+ * - Decyzja o nawigacji: do logowania lub bezpośrednio do Main.
+ * - Wyświetlanie animacji logo marki kidZone.
  *
- * Wizualnie: tło w bardzo jasnym chłodnym błękicie (#F5F8FB – echo
- * brand-blue logo) z logiem brandowym (PNG z napisem i nazwą aplikacji
- * wewnątrz) zajmującym 75% szerokości i progress indicator w kolorze
- * brand-blue pod spodem.
+ * 📥 Wejście:
+ * - [onSignedIn] akcja po wykryciu aktywnej sesji.
+ * - [onSignedOut] akcja po wykryciu braku sesji.
  *
- * Tło NIE jest `colorScheme.primary` (BrandBlue), bo logo ma napisy
- * w kolorze szarym z transparentem – na ciemnym tle znikały. Wybrany
- * jasny błękit jest na tyle delikatny, że logo pozostaje czytelne,
- * a jednocześnie podkreśla błękitne akcenty z palety logo (~43% pikseli).
- *
- * Świadomie nie pokazujemy osobnego `Text(app_name)` ani `Text(app_tagline)`
- * – logo zawiera już je w sobie, dublowanie wyglądałoby krzywo.
+ * 📤 Wyjście:
+ * - Automatyczne przekierowanie po wykryciu stanu autentykacji.
  */
 @Composable
 fun SplashScreen(

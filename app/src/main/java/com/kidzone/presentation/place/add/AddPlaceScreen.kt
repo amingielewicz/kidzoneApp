@@ -119,6 +119,20 @@ private const val PLACE_DESCRIPTION_COUNTER_THRESHOLD = 400
 private const val PLACE_DESCRIPTION_WARNING_LENGTH = 480
 private const val NEARBY_VISIBLE_LIMIT = 5
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Formularz dodawania nowego miejsca lub edycji istniejącego.
+ * - Obsługa uploadu zdjęć oraz automatyczne wykrywanie duplikatów w okolicy.
+ * - Walidacja pól oraz wybór lokalizacji na mapie.
+ *
+ * 📥 Wejście:
+ * - [onSaved] callback po udanej operacji (z opcjonalnymi współrzędnymi dla focusu).
+ * - [onBack] powrót bez zapisu.
+ * - [onOpenExistingPlace] przejście do wykrytego duplikatu.
+ *
+ * 📤 Wyjście:
+ * - Przesłanie danych miejsca do Firestore oraz powrót do poprzedniego ekranu.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPlaceScreen(

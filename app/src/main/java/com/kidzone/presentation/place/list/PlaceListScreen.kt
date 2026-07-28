@@ -39,7 +39,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -96,8 +95,7 @@ import com.kidzone.presentation.common.KidZoneCard
 import com.kidzone.presentation.common.KidZoneCategoryFilterBar
 import com.kidzone.presentation.common.KidZoneSortMenu
 import com.kidzone.presentation.common.KidZoneSpacing
-import com.kidzone.presentation.common.NewPlaceBadge
-import com.kidzone.presentation.common.RatingIcon
+import com.kidzone.presentation.common.PlaceRatingStatus
 import com.kidzone.presentation.common.ScreenState
 import com.kidzone.presentation.common.ScreenStateContent
 import com.kidzone.presentation.common.SortMenuIcon
@@ -125,6 +123,19 @@ private val ListContentPadding = PaddingValues(
     bottom = 144.dp
 )
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Przeglądanie pełnej listy miejsc z zaawansowanym filtrowaniem i wyszukiwaniem.
+ * - Obsługa paginacji (Load More) oraz dynamicznego sortowania (np. najbliższe).
+ * - Zarządzanie stanem uprawnień lokalizacji dla potrzeb sortowania.
+ *
+ * 📥 Wejście:
+ * - [onOpenPlaceDetails] nawigacja do szczegółów wybranego punktu.
+ * - [sharedTransitionScope] obsługa animacji przejść między ekranami.
+ *
+ * 📤 Wyjście:
+ * - Zdarzenia nawigacyjne oraz zmiany parametrów wyszukiwania.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun PlaceListScreen(
@@ -757,7 +768,7 @@ private fun PlaceCard(
                         category = place.category
                     )
                 }
-                PlaceListStatus(place = place)
+                PlaceRatingStatus(place = place, showCount = false)
             }
 
             val showDistanceLabel = showDistance && distanceKm != null
@@ -800,52 +811,6 @@ private fun PlaceCard(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun PlaceListStatus(place: Place) {
-    when {
-        place.reviewsCount > 0 -> RatingBadge(place = place)
-        place.isNewWithoutReviews() -> NewPlaceBadge()
-        else -> NoReviewsLabel()
-    }
-}
-
-@Composable
-private fun RatingBadge(place: Place) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        RatingIcon(
-            size = 15.dp
-        )
-
-        Spacer(Modifier.width(3.dp))
-
-        Text(
-            text = "%.1f".format(place.averageRating),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.SemiBold
-        )
-    }
-}
-
-@Composable
-private fun NoReviewsLabel() {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = Icons.Filled.Star,
-            contentDescription = stringResource(R.string.rating),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(15.dp)
-        )
-        Spacer(Modifier.width(3.dp))
-        Text(
-            text = stringResource(R.string.map_no_reviews),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
-            fontWeight = FontWeight.Medium
-        )
     }
 }
 

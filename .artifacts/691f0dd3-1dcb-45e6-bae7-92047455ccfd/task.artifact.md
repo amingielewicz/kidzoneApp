@@ -1,7 +1,10 @@
-- [ ] Optimize Home Screen Data Loading
-    - [ ] Implement geo-aware fallback in `FirestorePlaceRepository.getPlacesNear`
-    - [ ] Implement multi-stage location loading in `HomeViewModel.kt`
-    - [ ] Update `HomeScreen.kt` stale label logic
+- [ ] Fix Achievement Dialog Machine-Gunning
+    - [ ] Implement collection buffer in `ProfileViewModel.kt`
+    - [ ] Aggreggate local and network badges during initial load
+- [x] Standardize KDoc and Resolve Detekt Issues
+    - [x] Add `@Suppress("FunctionNaming")` to `PlaceStatus.kt`
+    - [x] Remove `PLACE_STATUS_HEIGHT` from `HomeScreen.kt`
+    - [x] Add KDoc to all 14 primary Screens
 - [ ] Verification
-    - [ ] Run unit tests
-    - [ ] Manual verification of "Fast Start" UX
+    - [ ] Run `gradlew :app:detekt`
+    - [ ] Verify single summary dialog for multiple initial badges

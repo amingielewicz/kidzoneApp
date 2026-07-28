@@ -106,7 +106,7 @@ import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.KidZoneCategoryFilterBar
 import com.kidzone.presentation.common.KidZoneFilterChip
 import com.kidzone.presentation.common.NetworkStatus
-import com.kidzone.presentation.common.RatingIcon
+import com.kidzone.presentation.common.PlaceRatingStatus
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.common.requestLocationPermissionOrOpenSettings
@@ -132,6 +132,20 @@ private const val SPIDERFY_RADIUS_STEP_DEGREES = 0.000015
 private const val SPIDERFY_MAX_EXTRA = 8
 private val MAP_TOP_OVERLAY_SPACING = 8.dp
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Wizualizacja przestrzenna miejsc na mapie Google.
+ * - Obsługa klastrowania markerów dla dużej liczby punktów.
+ * - Podgląd szczegółów miejsca (BottomSheet) oraz filtrowanie widoku.
+ *
+ * 📥 Wejście:
+ * - [onOpenPlaceDetails] nawigacja do pełnego widoku miejsca.
+ * - [focusOn] opcjonalne współrzędne do wycentrowania mapy.
+ * - [locationPermissionGrantedSignal] sygnał o zmianie uprawnień lokalizacji.
+ *
+ * 📤 Wyjście:
+ * - Zdarzenia nawigacji do detali lub nawigacji zewnętrznej (Google Maps).
+ */
 @SuppressLint("MissingPermission")
 @OptIn(
     ExperimentalMaterial3Api::class,
@@ -809,20 +823,7 @@ private fun PlacePreviewContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (place.reviewsCount > 0) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RatingIcon(
-                        contentDescription = stringResource(R.string.rating),
-                        size = 18.dp
-                    )
-                    Spacer(Modifier.width(2.dp))
-                    Text(
-                        text = NumberUtils.formatRating(place.averageRating),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
+            PlaceRatingStatus(place = place, showCount = false)
         }
 
         if (place.address.isNotBlank()) {
@@ -979,11 +980,7 @@ private fun MapPlaceListItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(4.dp))
-            Text(
-                text = ratingLabel,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            PlaceRatingStatus(place = place)
             addressLabel?.let {
                 Spacer(Modifier.height(4.dp))
                 Text(

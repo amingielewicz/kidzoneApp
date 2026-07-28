@@ -95,6 +95,19 @@ private const val KEY_ADD_PLACE_FAB_LABEL_USED = "add_place_fab_label_used"
 private const val LOCATION_REQUEST_INTERVAL_MS = 10_000L
 private const val LOCATION_REQUEST_MIN_INTERVAL_MS = 5_000L
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Główny szkielet aplikacji (Shell) z dolną nawigacją (Bottom Navigation).
+ * - Zarządzanie trwałym widokiem mapy w tle (Persistent Map) dla natychmiastowej reakcji.
+ * - Obsługa globalnych elementów: FAB (Dodaj miejsce), komunikaty sieciowe, status GPS.
+ *
+ * 📥 Wejście:
+ * - Parametry nawigacyjne (focusTab, focusLatitude) dla obsługi powiadomień i akcji.
+ * - [onSignOut] powrót do autentykacji.
+ *
+ * 📤 Wyjście:
+ * - Centralna koordynacja nawigacji między zakładkami oraz do ekranów stackowych.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable

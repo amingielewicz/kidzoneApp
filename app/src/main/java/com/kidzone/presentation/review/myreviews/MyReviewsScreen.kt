@@ -60,7 +60,16 @@ import com.kidzone.presentation.common.RatingIcon
 import com.kidzone.utils.DateUtils
 
 /**
- * Lista opinii wystawionych przez aktualnie zalogowanego usera.
+ * 🎯 Odpowiedzialności:
+ * - Wyświetlanie listy opinii wystawionych przez użytkownika.
+ * - Obsługa usuwania własnych opinii oraz łączenie ich z metadanymi miejsc.
+ *
+ * 📥 Wejście:
+ * - [onBack] nawigacja wstecz do profilu.
+ * - [onOpenPlaceDetails] przejście do miejsca, którego dotyczy opinia.
+ *
+ * 📤 Wyjście:
+ * - Operacje usuwania treści oraz zdarzenia nawigacyjne.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable

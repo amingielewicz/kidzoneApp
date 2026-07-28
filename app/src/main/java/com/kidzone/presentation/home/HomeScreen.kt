@@ -34,7 +34,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -80,8 +79,7 @@ import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.KidZoneRadii
 import com.kidzone.presentation.common.KidZoneSpacing
-import com.kidzone.presentation.common.NewPlaceBadge
-import com.kidzone.presentation.common.RatingIcon
+import com.kidzone.presentation.common.PlaceRatingStatus
 import com.kidzone.presentation.common.isNewWithoutReviews
 import com.kidzone.presentation.common.rememberLocationServiceEnabled
 import com.kidzone.presentation.common.shimmerEffect
@@ -91,7 +89,6 @@ private val PLACE_CARD_WIDTH = 178.dp
 private val PLACE_CARD_ICON_SIZE = 30.dp
 private val PLACE_CARD_CONTENT_PADDING = 14.dp
 private val PLACE_NAME_BLOCK_HEIGHT = 40.dp
-private val PLACE_STATUS_HEIGHT = 24.dp
 private val PLACE_CARD_MAIN_GAP = 10.dp
 private val PLACE_CARD_STATUS_GAP = 6.dp
 private val LOCATION_PANEL_MIN_HEIGHT = 360.dp
@@ -125,6 +122,20 @@ private data class PlaceCardAnimation(
     val animatedContentScope: AnimatedContentScope?
 )
 
+/**
+ * 🎯 Odpowiedzialności:
+ * - Prezentacja personalizowanych sekcji miejsc (W pobliżu, Najlepsze, Nowe).
+ * - Obsługa powitania nowych użytkowników i zachęcanie do nadania uprawnień.
+ * - Szybki dostęp do mapy i wyszukiwania.
+ *
+ * 📥 Wejście:
+ * - [onOpenPlaceDetails] nawigacja do szczegółów.
+ * - [onOpenMap] skrót do głównej zakładki mapy.
+ * - [onRequestLocation] wyzwalacz systemowego dialogu uprawnień.
+ *
+ * 📤 Wyjście:
+ * - Interakcje z kartami miejsc oraz akcje Onboardingowe.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
@@ -812,49 +823,7 @@ private fun PlaceCard(
                 )
             }
             Spacer(Modifier.height(PLACE_CARD_STATUS_GAP))
-            PlaceRatingStatus(place = place)
-        }
-    }
-}
-
-@Composable
-private fun PlaceRatingStatus(place: Place) {
-    when {
-        place.reviewsCount > 0 -> {
-            Row(
-                modifier = Modifier.height(PLACE_STATUS_HEIGHT),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RatingIcon(size = 14.dp)
-                Spacer(Modifier.width(KidZoneSpacing.GapTiny))
-                Text(
-                    text = "%.1f (%d)".format(place.averageRating, place.reviewsCount),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-        place.isNewWithoutReviews() -> NewPlaceBadge()
-        else -> {
-            Row(
-                modifier = Modifier.height(PLACE_STATUS_HEIGHT),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Star,
-                    contentDescription = stringResource(R.string.rating),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(Modifier.width(KidZoneSpacing.GapTiny))
-                Text(
-                    text = stringResource(R.string.no_ratings),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f)
-                )
-            }
+            PlaceRatingStatus(place = place, iconSize = 14.dp)
         }
     }
 }

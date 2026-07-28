@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
@@ -46,6 +47,7 @@ private const val CONTACT_SUBJECT_MIN_LENGTH = 3
 private const val CONTACT_MESSAGE_MIN_LENGTH = 10
 private const val CONTACT_MESSAGE_FUNCTION = "submitContactMessage"
 private const val REFRESH_DELAY_MS = 300L
+private const val INITIAL_BADGE_COLLECTION_DELAY_MS = 800L
 
 /**
  * 🎯 Odpowiedzialności:
@@ -154,6 +156,10 @@ class ProfileViewModel @Inject constructor(
     private var pendingSeenBadgeNames: Set<String> = emptySet()
     private var pendingNewBadgeNames: Set<String> = emptySet()
     private val profileReload = MutableStateFlow(0)
+    
+    // Mechanizm buforowania odznak podczas startu, aby uniknąć wielu okien.
+    private var isInitialCollectionPhase = true
+    private val badgeBuffer = mutableSetOf<UserBadge>()
 
     val profileState: StateFlow<ScreenState<User>> = profileReload
         .flatMapLatest {
@@ -182,41 +188,50 @@ class ProfileViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, ScreenState.Loading)
 
-    private val userContext = profileState.map { state ->
+    private val userContext = profileState.flatMapLatest { state ->
         val user = (state as? ScreenState.Content)?.data
-            ?: return@map null to BadgeContext()
+            ?: return@flatMapLatest flowOf<Pair<User?, BadgeContext>>(null to BadgeContext())
 
-        coroutineScope {
-            val placesTask = async {
-                placeRepository.getTopPlaces(RANKING_LIMIT)
+        // Emituj usera natychmiast z pustym kontekstem (dla szybkich odznak)
+        val initial = user to BadgeContext()
+
+        flow<Pair<User?, BadgeContext>> {
+            emit(initial)
+
+            // Pobierz rankingi w tle
+            val context = coroutineScope {
+                val placesTask = async {
+                    placeRepository.getTopPlaces(RANKING_LIMIT)
+                }
+
+                val usersTask = async {
+                    authRepository.getTopUsers(RANKING_LIMIT)
+                }
+
+                val topPlaces = (placesTask.await() as? OpResult.Success)
+                    ?.data
+                    .orEmpty()
+
+                val topUsers = (usersTask.await() as? OpResult.Success)
+                    ?.data
+                    .orEmpty()
+
+                val myRank = topUsers.indexOfFirst { it.id == user.id }
+                    .takeIf { it != -1 }
+                    ?.let { it + 1 }
+
+                val myBestPlaceRank = topPlaces.indexOfFirst {
+                    it.ownerUserId == user.id
+                }
+                    .takeIf { it != -1 }
+                    ?.let { it + 1 }
+
+                BadgeContext(
+                    userRank = myRank,
+                    bestPlaceRank = myBestPlaceRank
+                )
             }
-
-            val usersTask = async {
-                authRepository.getTopUsers(RANKING_LIMIT)
-            }
-
-            val topPlaces = (placesTask.await() as? OpResult.Success)
-                ?.data
-                .orEmpty()
-
-            val topUsers = (usersTask.await() as? OpResult.Success)
-                ?.data
-                .orEmpty()
-
-            val myRank = topUsers.indexOfFirst { it.id == user.id }
-                .takeIf { it != -1 }
-                ?.let { it + 1 }
-
-            val myBestPlaceRank = topPlaces.indexOfFirst {
-                it.ownerUserId == user.id
-            }
-                .takeIf { it != -1 }
-                ?.let { it + 1 }
-
-            user to BadgeContext(
-                userRank = myRank,
-                bestPlaceRank = myBestPlaceRank
-            )
+            emit(user to context)
         }
     }.stateIn(
         viewModelScope,
@@ -224,25 +239,19 @@ class ProfileViewModel @Inject constructor(
         null
     )
 
-    val user: StateFlow<User?> = userContext.map { it?.first }
+    val user: StateFlow<User?> = profileState.map { (it as? ScreenState.Content)?.data }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(AppConfig.FLOW_SUBSCRIPTION_TIMEOUT_MS), null)
 
     init {
         viewModelScope.launch {
-            // Reagujemy na Usera z Room natychmiast
+            // Reagujemy na Usera z Room natychmiast, nie czekając na rankingi
             user.collect { u ->
                 if (u != null) {
                     val lang = languagePreferences.getLanguage()
                     val provider = authRepository.getCurrentSignInProvider()
                     
-                    // Najpierw obliczamy odznaki na podstawie samych statystyk
-                    val fastBadges = u.computeBadges(BadgeContext())
-                    val newlyEarned = detectNewBadges(u.id, fastBadges)
-                    
                     _uiState.update {
                         it.copy(
-                            obtainedBadges = fastBadges,
-                            newlyEarnedBadges = newlyEarned,
                             signInProvider = provider,
                             selectedLanguage = lang
                         )
@@ -252,7 +261,7 @@ class ProfileViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            // Gdy pełny kontekst (z rankingiem) będzie gotowy, aktualizujemy odznaki
+            // Główna pętla odznak – reaguje na każdą zmianę (pierwsza szybka emisja + druga z rankingiem)
             userContext.collect { context ->
                 val (u, bCtx) = context ?: return@collect
                 if (u == null) return@collect
@@ -263,9 +272,27 @@ class ProfileViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         obtainedBadges = allBadges,
-                        newlyEarnedBadges = newlyEarned,
+                        // Akumulujemy nowe odznaki, aby pokazać je w jednym oknie (summary),
+                        // jeśli jesteśmy w fazie startowej.
+                        newlyEarnedBadges = if (isInitialCollectionPhase) {
+                            it.newlyEarnedBadges
+                        } else {
+                            (it.newlyEarnedBadges + newlyEarned).distinct()
+                        },
                         userRank = bCtx.userRank
                     )
+                }
+            }
+        }
+
+        // KROK 3: Okno kolekcji startowej (buffer window)
+        viewModelScope.launch {
+            // Czekamy chwilę, aż obie emisje (local + network) zdążą wpaść do bufora
+            kotlinx.coroutines.delay(INITIAL_BADGE_COLLECTION_DELAY_MS)
+            isInitialCollectionPhase = false
+            if (badgeBuffer.isNotEmpty()) {
+                _uiState.update { 
+                    it.copy(newlyEarnedBadges = badgeBuffer.toList().distinct()) 
                 }
             }
         }
@@ -565,6 +592,8 @@ class ProfileViewModel @Inject constructor(
         pendingSeenBadgesUserId = null
         pendingSeenBadgeNames = emptySet()
         pendingNewBadgeNames = emptySet()
+        badgeBuffer.clear()
+        isInitialCollectionPhase = false
         _uiState.update { it.copy(newlyEarnedBadges = emptyList()) }
     }
 
@@ -579,6 +608,11 @@ class ProfileViewModel @Inject constructor(
             val newBadgeNames = newlyEarned.map { it.name }.toSet()
             pendingSeenBadgesUserId = userId
             pendingSeenBadgeNames = current.map { it.name }.toSet()
+            
+            if (isInitialCollectionPhase) {
+                badgeBuffer.addAll(newlyEarned)
+            }
+
             if (pendingNewBadgeNames != newBadgeNames) {
                 pendingNewBadgeNames = newBadgeNames
                 viewModelScope.launch {

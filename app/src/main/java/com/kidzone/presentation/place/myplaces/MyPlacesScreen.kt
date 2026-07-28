@@ -22,7 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Place
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -48,9 +47,20 @@ import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.KidZoneCard
 import com.kidzone.presentation.common.KidZoneSpacing
+import com.kidzone.presentation.common.PlaceRatingStatus
 
 /**
- * Lista miejsc dodanych przez aktualnie zalogowanego usera.
+ * 🎯 Odpowiedzialności:
+ * - Wyświetlanie listy miejsc dodanych przez aktualnie zalogowanego użytkownika.
+ * - Szybki dostęp do edycji własnych treści.
+ * - Spójność wizualna ocen i statusów z resztą systemu.
+ *
+ * 📥 Wejście:
+ * - [onBack] nawigacja wstecz do profilu.
+ * - [onOpenPlaceDetails] przejście do pełnego widoku miejsca.
+ *
+ * 📤 Wyjście:
+ * - Zdarzenia nawigacyjne oraz wybór własnych miejsc.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -196,28 +206,9 @@ private fun MyPlaceCard(
                     Spacer(Modifier.height(KidZoneSpacing.GapTiny))
                     CategoryBadge(category = place.category)
                 }
-                if (place.reviewsCount > 0) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(2.dp))
-                        Text(
-                            text = "%.1f".format(place.averageRating),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            text = "(${place.reviewsCount})",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+                // Używamy wspólnego komponentu, aby gwiazdka była żółta (tertiary),
+                // a statusy "Nowe" i "Brak ocen" wyświetlały się poprawnie.
+                PlaceRatingStatus(place = place, iconSize = 18.dp)
             }
             if (place.address.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))

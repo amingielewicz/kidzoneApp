@@ -78,18 +78,17 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 
 /**
- * Ekran logowania - e-mail/hasło + Google + reset hasła.
+ * 🎯 Odpowiedzialności:
+ * - Autentykacja użytkownika za pomocą e-mail/hasło lub Google Sign-In.
+ * - Obsługa odzyskiwania hasła oraz nawigacja do rejestracji.
+ * - Walidacja danych wejściowych i prezentacja błędów logowania.
  *
- * Wizualnie:
- *  - subtelny pionowy gradient w tle (od jasnego błękitu do białego),
- *    który echuje brand-blue z palety, ale nie konkuruje z treścią,
- *  - logo brandu w nagłówku (PNG zawierający już nazwę i tagline),
- *  - karta z formularzem (e-mail, hasło) - "uniesiona" względem tła,
- *  - separator z napisem "lub" oddzielający logowanie e-mailem od Google,
- *  - akcje pomocnicze (rejestracja, reset hasła) w stopce.
+ * 📥 Wejście:
+ * - [onLoginSuccess] callback po pomyślnym zalogowaniu.
+ * - [onNavigateToRegister] przejście do ekranu tworzenia konta.
  *
- * Logika autoryzacji nadal w [LoginViewModel]; tutaj tylko renderowanie
- * stanu i przekazywanie akcji użytkownika.
+ * 📤 Wyjście:
+ * - Rozpoczęcie sesji Firebase i przekierowanie do głównej części aplikacji.
  */
 @Composable
 fun LoginScreen(

@@ -87,6 +87,16 @@ interface PlaceRepository {
     ): OpResult<List<Place>>
 
     /**
+     * Pobiera miejsca z lokalnego cache'u w zadanym promieniu.
+     * Metoda nie wykonuje zapytań sieciowych.
+     */
+    suspend fun getCachedPlacesNear(
+        latitude: Double,
+        longitude: Double,
+        radiusKm: Double
+    ): List<Place>
+
+    /**
      * Pobiera ograniczoną listę miejsc widocznych w aktualnym viewportcie mapy.
      *
      * @param bounds granice geograficzne viewportu.

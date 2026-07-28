@@ -21,7 +21,15 @@ import androidx.compose.ui.unit.dp
 import com.kidzone.R
 
 /**
- * Ekran wyświetlany gdy Remote Config `maintenance_mode` == true.
+ * 🎯 Odpowiedzialności:
+ * - Wyświetlanie komunikatu o trwającej przerwie technicznej lub braku wsparcia wersji.
+ * - Blokowanie dostępu do aplikacji w sytuacjach awaryjnych serwera.
+ *
+ * 📥 Wejście:
+ * - [message] komunikat przekazany z serwera (Remote Config).
+ *
+ * 📤 Wyjście:
+ * - Wyjście z aplikacji lub przekierowanie do sklepu.
  */
 @Composable
 fun MaintenanceScreen(message: String) {

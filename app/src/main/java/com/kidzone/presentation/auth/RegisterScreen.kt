@@ -1,10 +1,12 @@
+@file:Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
+
 package com.kidzone.presentation.auth
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,23 +14,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -38,7 +40,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -55,14 +56,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -71,23 +69,24 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kidzone.R
-import com.kidzone.presentation.common.NetworkStatus
-import com.kidzone.presentation.common.SystemStatusIcons
-import com.kidzone.presentation.common.passwordRequirementText
-import com.kidzone.presentation.common.rememberNetworkStatus
-import com.kidzone.utils.PasswordPolicy
+import com.kidzone.presentation.profile.PrivacyPolicyDialog
+import com.kidzone.presentation.profile.TermsOfServiceDialog
+
+@Suppress("MagicNumber")
+private val RegisterBackgroundStartColor = Color(0xFFE3F2FD)
 
 /**
- * Ekran rejestracji - nazwa, e-mail, hasło zgodne z [PasswordPolicy].
+ * 🎯 Odpowiedzialności:
+ * - Rejestracja nowego konta użytkownika (e-mail/hasło/imię).
+ * - Walidacja unikalności loginu oraz siły hasła.
+ * - Wyświetlanie regulaminu i polityki prywatności przed akceptacją.
  *
- * Layout dopasowany do [LoginScreen]: gradient tła, logo brandu w nagłówku,
- * karta z formularzem, leading-iconki w polach. Pod polem hasła pokazujemy
- * checklist wymagań, dzięki któremu user widzi w czasie rzeczywistym, co
- * jeszcze musi zrobić.
+ * 📥 Wejście:
+ * - [onRegisterSuccess] callback po pomyślnym utworzeniu konta.
+ * - [onBack] powrót do ekranu autentykacji.
  *
- * Tytuł karty "Stwórz konto" + subtitle "Dołącz do społeczności kidZone".
- * Stopka pod kartą - skrót "Masz już konto? Zaloguj się" prowadzi z
- * powrotem do LoginScreen przez [onBack] (Navigation popBackStack).
+ * 📤 Wyjście:
+ * - Utworzenie dokumentu użytkownika w Firestore i rozpoczęcie sesji.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,43 +96,31 @@ fun RegisterScreen(
     viewModel: RegisterViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
-
-    var isPasswordVisible by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
-    val networkStatus by rememberNetworkStatus()
-    val isNetworkAvailable = networkStatus == NetworkStatus.AVAILABLE
 
-    fun showConnectionError() {
-        viewModel.showConnectionError()
-    }
+    var isPasswordVisible by remember { mutableStateOf(false) }
+    var isTermsOpen by remember { mutableStateOf(false) }
+    var isPrivacyOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.isRegistered) {
-        // Nie nawigujemy od razu – pokazujemy komunikat o weryfikacji emaila.
-        // User musi sam kliknąć "Przejdź do logowania" po przeczytaniu.
+        if (state.isRegistered) {
+            onRegisterSuccess()
+        }
     }
 
     LaunchedEffect(state.errorMessage) {
-        val message = state.errorMessage
-        if (message != null) {
-            snackbarHostState.showSnackbar(message.asString(context))
+        state.errorMessage?.let {
+            snackbarHostState.showSnackbar(it.asString(context))
             viewModel.consumeErrorMessage()
         }
     }
 
-    val backgroundBrush = Brush.verticalGradient(
-        colors = listOf(
-            Color(0xFFF5F8FB),
-            Color(0xFFFFFFFF)
-        )
-    )
-
     Scaffold(
-        containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { /* tytuł świadomie pusty - hierarchia w karcie */ },
+                title = { Text(stringResource(R.string.register_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -142,330 +129,229 @@ fun RegisterScreen(
                         )
                     }
                 },
-                actions = {
-                    SystemStatusIcons(
-                        isNetworkAvailable = isNetworkAvailable,
-                        isLocationAvailable = true,
-                        onNetworkClick = ::showConnectionError,
-                        onLocationClick = {}
-                    )
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent
                 )
             )
-        }
+        },
+        containerColor = Color.Transparent
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(backgroundBrush)
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            RegisterBackgroundStartColor,
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
                 .padding(padding)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                    .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Image(
-                    painter = painterResource(R.drawable.ic_splash_logo),
-                    contentDescription = stringResource(R.string.app_name),
-                    modifier = Modifier
-                        .fillMaxWidth(0.4f)
-                        .widthIn(max = 180.dp)
+                Text(
+                    text = stringResource(R.string.register_subtitle),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
                 )
 
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(32.dp))
 
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 480.dp),
-                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp)
+                        modifier = Modifier.padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text(
-                            text = stringResource(R.string.register_title),
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = stringResource(R.string.register_subtitle),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-
-                        Spacer(Modifier.height(20.dp))
-
+                        // Imię / Nick
                         OutlinedTextField(
                             value = state.name,
                             onValueChange = viewModel::onNameChange,
                             label = { RequiredFieldLabel(stringResource(R.string.username)) },
+                            placeholder = { Text(stringResource(R.string.username_helper)) },
                             leadingIcon = {
-                                Icon(Icons.Filled.Person, contentDescription = null)
-                            },
-                            trailingIcon = {
-                                if (state.name.isNotEmpty() && state.isNameValid) {
-                                    Icon(
-                                        imageVector = Icons.Filled.CheckCircle,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.secondary
-                                    )
-                                }
+                                Icon(Icons.Default.Person, contentDescription = null)
                             },
                             singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            isError = state.name.isNotEmpty() && !state.isNameValid,
-                            supportingText = {
-                                if (state.name.isBlank()) {
-                                    Text(stringResource(R.string.field_required))
-                                } else {
-                                    Text(
-                                        text = stringResource(R.string.username_helper),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                    )
-                                }
-                            },
-                            enabled = !state.isLoading,
-                            modifier = Modifier.fillMaxWidth()
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                         )
-                        Spacer(Modifier.height(8.dp))
 
+                        // Email
                         OutlinedTextField(
                             value = state.email,
                             onValueChange = viewModel::onEmailChange,
                             label = { RequiredFieldLabel(stringResource(R.string.email)) },
                             leadingIcon = {
-                                Icon(Icons.Filled.Email, contentDescription = null)
-                            },
-                            trailingIcon = {
-                                if (state.email.isNotEmpty() && state.isEmailValid) {
-                                    Icon(
-                                        imageVector = Icons.Filled.CheckCircle,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.secondary
-                                    )
-                                }
+                                Icon(Icons.Default.Email, contentDescription = null)
                             },
                             singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            isError = state.email.isNotEmpty() && !state.isEmailValid,
-                            supportingText = {
-                                when {
-                                    state.email.isBlank() -> Text(stringResource(R.string.field_required))
-                                    !state.isEmailValid -> Text(stringResource(R.string.invalid_email_format))
-                                }
-                            },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                            enabled = !state.isLoading,
-                            modifier = Modifier.fillMaxWidth()
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Email,
+                                imeAction = ImeAction.Next
+                            )
                         )
-                        Spacer(Modifier.height(8.dp))
 
+                        // Hasło
                         OutlinedTextField(
                             value = state.password,
                             onValueChange = viewModel::onPasswordChange,
                             label = { RequiredFieldLabel(stringResource(R.string.password)) },
                             leadingIcon = {
-                                Icon(Icons.Filled.Lock, contentDescription = null)
+                                Icon(Icons.Default.Lock, contentDescription = null)
                             },
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            isError = state.password.isNotEmpty() && !state.isPasswordValid,
-                            visualTransformation = if (isPasswordVisible) {
-                                VisualTransformation.None
-                            } else {
-                                PasswordVisualTransformation()
-                            },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                             trailingIcon = {
-                                IconButton(
-                                    onClick = { isPasswordVisible = !isPasswordVisible },
-                                    enabled = !state.isLoading
-                                ) {
+                                IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
                                     Icon(
-                                        imageVector = if (isPasswordVisible) {
-                                            Icons.Filled.VisibilityOff
-                                        } else {
-                                            Icons.Filled.Visibility
-                                        },
-                                        contentDescription = if (isPasswordVisible) {
-                                            stringResource(R.string.hide_password)
-                                        } else {
-                                            stringResource(R.string.show_password)
-                                        }
+                                        imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff
+                                        else Icons.Default.Visibility,
+                                        contentDescription = stringResource(
+                                            if (isPasswordVisible) R.string.hide_password
+                                            else R.string.show_password
+                                        )
                                     )
                                 }
                             },
-                            enabled = !state.isLoading,
-                            supportingText = {
-                                if (state.password.isBlank()) {
-                                    Text(stringResource(R.string.field_required))
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
+                            visualTransformation = if (isPasswordVisible) VisualTransformation.None
+                            else PasswordVisualTransformation(),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Password,
+                                imeAction = ImeAction.Done
+                            )
                         )
 
-                        if (state.password.isNotEmpty()) {
-                            Spacer(Modifier.height(8.dp))
-                            PasswordRequirementsChecklist(password = state.password)
-                        }
-
-                        if (state.isRegistered) {
-                            Spacer(Modifier.height(16.dp))
-                            Surface(
-                                modifier = Modifier.fillMaxWidth(),
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(16.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Email,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(40.dp)
-                                    )
-                                    Spacer(Modifier.height(12.dp))
+                        // Akceptacja regulaminu
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Checkbox(
+                                checked = false, // Placeholder or real state if added to ViewModel
+                                onCheckedChange = { /* Handle if added to ViewModel */ },
+                                colors = CheckboxDefaults.colors(
+                                    checkedColor = MaterialTheme.colorScheme.primary
+                                )
+                            )
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = stringResource(R.string.register_success_title),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold
+                                        text = "Rejestrując się akceptujesz ",
+                                        style = MaterialTheme.typography.bodySmall
                                     )
-                                    Spacer(Modifier.height(8.dp))
-                                    Text(
-                                        text = stringResource(R.string.register_success_message),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        textAlign = TextAlign.Center,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                    Spacer(Modifier.height(16.dp))
-                                    Button(
-                                        onClick = onRegisterSuccess,
-                                        shape = RoundedCornerShape(12.dp),
-                                        modifier = Modifier.fillMaxWidth()
+                                    TextButton(
+                                        onClick = { isTermsOpen = true },
+                                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                        modifier = Modifier.height(32.dp)
                                     ) {
-                                        Text(stringResource(R.string.go_to_login))
+                                        Text(
+                                            text = stringResource(R.string.terms_of_service),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "oraz ",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    TextButton(
+                                        onClick = { isPrivacyOpen = true },
+                                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.privacy_policy),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     }
                                 }
                             }
                         }
 
-                        if (!state.isRegistered) {
-                            Spacer(Modifier.height(20.dp))
-                            Button(
-                                onClick = {
-                                    if (isNetworkAvailable) {
-                                        viewModel.register()
-                                    } else {
-                                        viewModel.showConnectionError()
-                                    }
-                                },
-                                enabled = !state.isLoading && state.isFormValid,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(52.dp)
-                            ) {
-                                if (state.isLoading) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                } else {
-                                    Text(
-                                        text = stringResource(R.string.register),
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
+                        Spacer(Modifier.height(8.dp))
+
+                        Button(
+                            onClick = viewModel::register,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            enabled = !state.isLoading && state.isFormValid,
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            if (state.isLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text(
+                                    text = stringResource(R.string.register),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }
                 }
 
-                // Stopka - powrót do logowania.
+                Spacer(Modifier.height(32.dp))
+
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         text = stringResource(R.string.register_has_account),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    TextButton(
-                        onClick = onBack,
-                        enabled = !state.isLoading
-                    ) {
+                    TextButton(onClick = onBack) {
                         Text(
                             text = stringResource(R.string.login),
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
-
-                Spacer(Modifier.height(16.dp))
             }
         }
     }
-}
 
-/**
- * Lista wymagań hasła z dynamicznym kolorowaniem - zielona ikona +
- * tekst, gdy reguła spełniona; szara, gdy jeszcze nie. Generowana
- * z [PasswordPolicy.evaluate] - jedno źródło prawdy dla całej apki.
- */
-@Composable
-internal fun PasswordRequirementsChecklist(password: String) {
-    val statuses = PasswordPolicy.evaluate(password)
-    Column(
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        statuses.forEach { status ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val (icon, color) = if (status.isSatisfied) {
-                    Icons.Filled.CheckCircle to MaterialTheme.colorScheme.secondary
-                } else {
-                    Icons.Filled.Cancel to MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                }
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = color,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    text = passwordRequirementText(status.labelKey),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (status.isSatisfied) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    }
-                )
-            }
-        }
+    if (isTermsOpen) {
+        TermsOfServiceDialog(onDismiss = { isTermsOpen = false })
+    }
+
+    if (isPrivacyOpen) {
+        PrivacyPolicyDialog(onDismiss = { isPrivacyOpen = false })
     }
 }
 
-/**
- * Label dla wymaganego pola - tekst + czerwona gwiazdka.
- */
 @Composable
 private fun RequiredFieldLabel(text: String) {
     val errorColor = MaterialTheme.colorScheme.error

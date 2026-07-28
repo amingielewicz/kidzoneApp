@@ -131,7 +131,32 @@ private const val SUPPI_WIDGET_URL =
     "https://suppi.pl/api/widget/button.svg?fill=6457FD&textColor=ffffff"
 
 /**
- * Profil zalogowanego użytkownika.
+ * 🎯 Odpowiedzialności:
+ * - Prezentacja danych użytkownika, statystyk aktywności oraz zdobytych odznak.
+ * - Zarządzanie ustawieniami konta (bezpieczeństwo, język, powiadomienia).
+ * - Obsługa dialogów gratulacyjnych za nowo zdobyte osiągnięcia.
+ *
+ * 📥 Wejście:
+ * - [onSignOut] akcja powrotu do ekranu logowania po wylogowaniu.
+ * - [onOpenMyPlaces] / [onOpenMyReviews] nawigacja do list własnych treści.
+ * - [scrollToSection] opcjonalny parametr przewijający widok (np. do odznak).
+ *
+ * 📤 Wyjście:
+ * - Zmiany w profilu, edycja danych oraz kontakt z supportem.
+ */
+/**
+ * 🎯 Odpowiedzialności:
+ * - Prezentacja danych użytkownika, statystyk aktywności oraz zdobytych odznak.
+ * - Zarządzanie ustawieniami konta (bezpieczeństwo, język, powiadomienia).
+ * - Obsługa dialogów gratulacyjnych za nowo zdobyte osiągnięcia.
+ *
+ * 📥 Wejście:
+ * - [onSignOut] akcja powrotu do ekranu logowania po wylogowaniu.
+ * - [onOpenMyPlaces] / [onOpenMyReviews] nawigacja do list własnych treści.
+ * - [scrollToSection] opcjonalny parametr przewijający widok (np. do odznak).
+ *
+ * 📤 Wyjście:
+ * - Zmiany w profilu, edycja danych oraz kontakt z supportem.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod", "LongParameterList")

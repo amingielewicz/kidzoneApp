@@ -63,7 +63,7 @@ import com.kidzone.presentation.common.CategoryBadge
 import com.kidzone.presentation.common.CategoryIcon
 import com.kidzone.presentation.common.EmptyState
 import com.kidzone.presentation.common.KidZoneCard
-import com.kidzone.presentation.common.RatingIcon
+import com.kidzone.presentation.common.PlaceRatingStatus
 import com.kidzone.presentation.common.KidZoneSpacing
 import com.kidzone.presentation.common.UserBadge
 import com.kidzone.presentation.common.chronologicalOrder
@@ -76,7 +76,16 @@ private const val PLACEHOLDER_AVATAR_BLUE = 0xFF42A5F5
 private const val PLACEHOLDER_AVATAR_ICON_BLUE = 0xFFE3F2FD
 
 /**
- * Ranking miejsc i użytkowników.
+ * 🎯 Odpowiedzialności:
+ * - Wyświetlanie globalnych rankingów najlepiej ocenianych miejsc oraz najaktywniejszych rodziców.
+ * - Obsługa przełączania zakładek rankingu oraz nawigacji do szczegółów liderów.
+ *
+ * 📥 Wejście:
+ * - [onOpenPlaceDetails] nawigacja do miejsca z rankingu.
+ * - [initialTab] wybór startowej zakładki (Miejsca / Rodzice).
+ *
+ * 📤 Wyjście:
+ * - Zdarzenia wyboru elementów rankingu.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -353,22 +362,7 @@ private fun TopPlaceCardContent(
                 CategoryBadge(category = place.category)
             }
             Spacer(Modifier.width(8.dp))
-            Column(horizontalAlignment = Alignment.End) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RatingIcon(contentDescription = null, size = 18.dp)
-                    Spacer(Modifier.width(2.dp))
-                    Text(
-                        text = "%.1f".format(place.averageRating),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Text(
-                    text = stringResource(R.string.reviews_count_label, place.reviewsCount),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            PlaceRatingStatus(place = place, iconSize = 18.dp)
         }
 }
 

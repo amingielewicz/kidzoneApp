@@ -25,7 +25,7 @@ import javax.inject.Inject
 
 /** Okno czasowe używane przez sekcję ostatnio dodanych miejsc. */
 private const val RECENTLY_ADDED_WINDOW_MILLIS = 14L * 24L * 60L * 60L * 1000L
-private const val LOCATION_RETRY_DELAY_MS = 3_000L
+private const val LOCATION_RETRY_DELAY_MS = 1_000L
 private const val LOCATION_RETRY_COUNT = 3
 private const val ONE_MINUTE_MILLIS = 60_000L
 
@@ -220,6 +220,7 @@ class HomeViewModel @Inject constructor(
             }
             return
         }
+
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -231,10 +232,23 @@ class HomeViewModel @Inject constructor(
                 )
             }
 
-            var location: Pair<Double, Double>? = null
+            // KROK 1: Natychmiastowe użycie ostatniej znanej lokalizacji (jeśli dostępna)
+            // Pozwala na wyświetlenie danych w < 1s zamiast czekania na świeży fix GPS.
+            val lastKnown = locationProvider.getLastKnownLocation()
+            if (lastKnown != null) {
+                saveLastKnownLocation(lastKnown.first, lastKnown.second)
+                loadPlacesForLocation(
+                    lat = lastKnown.first,
+                    lng = lastKnown.second,
+                    isStale = true
+                )
+            }
+
+            // KROK 2: Próba uzyskania świeżego, dokładnego fixu GPS w tle.
+            var freshLocation: Pair<Double, Double>? = null
             repeat(LOCATION_RETRY_COUNT) { attempt ->
-                location = runCatching { locationProvider.getCurrentLocation() }.getOrNull()
-                if (location != null) return@repeat
+                freshLocation = runCatching { locationProvider.getCurrentLocation() }.getOrNull()
+                if (freshLocation != null) return@repeat
                 if (attempt < LOCATION_RETRY_COUNT - 1) {
                     _uiState.update { it.copy(isAcquiringLocation = true) }
                     delay(LOCATION_RETRY_DELAY_MS)
@@ -242,18 +256,39 @@ class HomeViewModel @Inject constructor(
             }
             _uiState.update { it.copy(isAcquiringLocation = false) }
 
-            if (location == null) {
-                applyWeakGpsFallback()
-                return@launch
-            }
+            // KROK 3: Jeśli uzyskaliśmy świeży fix, sprawdzamy czy warto odświeżyć dane.
+            if (freshLocation != null) {
+                val (lat, lng) = freshLocation!!
+                val distanceMoved = lastKnown?.let { (lLat, lLng) ->
+                    GeoUtils.haversineKm(lLat, lLng, lat, lng)
+                } ?: Double.MAX_VALUE
 
-            val (lat, lng) = location ?: return@launch
-            saveLastKnownLocation(lat, lng)
-            loadPlacesForLocation(
-                lat = lat,
-                lng = lng,
-                isStale = false
-            )
+                // Odświeżamy tylko jeśli przesunęliśmy się o > 500m lub nie mieliśmy danych z kroku 1.
+                @Suppress("MagicNumber")
+                if (distanceMoved > 0.5 || lastKnown == null) {
+                    saveLastKnownLocation(lat, lng)
+                    loadPlacesForLocation(
+                        lat = lat,
+                        lng = lng,
+                        isStale = false
+                    )
+                } else {
+                    // Mamy świeży sygnał, ale lokalizacja jest podobna – usuwamy tylko znacznik "stale"
+                    _uiState.update {
+                        it.copy(
+                            isUsingStaleLocation = false,
+                            staleLocationAgeMinutes = null,
+                            hasWeakGpsSignal = false
+                        )
+                    }
+                }
+            } else if (lastKnown == null) {
+                // Całkowity brak sygnału i brak cache'u lokalizacji
+                applyWeakGpsFallback()
+            } else {
+                // Nie mamy świeżego sygnału, ale mamy dane z lastKnown – zostawiamy stan z kroku 1.
+                _uiState.update { it.copy(hasWeakGpsSignal = true) }
+            }
         }
     }
 
@@ -313,6 +348,17 @@ class HomeViewModel @Inject constructor(
         if (!isStale) {
             persistLocationForWidget(lat, lng)
         }
+
+        // Najpierw próbujemy załadować dane z cache lokalnego natychmiast (Stale-While-Revalidate)
+        // Jeśli mamy internet, i tak pobierzemy świeże dane, ale user zobaczy coś od razu.
+        val cachedPlaces = placeRepository.getCachedPlacesNear(lat, lng, performanceConfig.homeFetchRadiusKm)
+        if (cachedPlaces.isNotEmpty()) {
+            updateHomeSections(cachedPlaces, lat, lng, isStale)
+        }
+
+        // Następnie (lub równolegle przez Repository) pobieramy dane z sieci.
+        // Repository samo zarządza tym, czy najpierw zwraca cache. 
+        // Tutaj wywołanie gwarantuje próbę synchronizacji.
         when (
             val result = placeRepository.getPlacesNear(
                 lat,
@@ -321,39 +367,48 @@ class HomeViewModel @Inject constructor(
             )
         ) {
             is OpResult.Success -> {
-                val placesWithDistance = result.data
-                    .map { it to GeoUtils.haversineKm(lat, lng, it.latitude, it.longitude) }
-
-                val homeSections = buildHomeSections(placesWithDistance, performanceConfig)
-
-                _uiState.update {
-                    it.copy(
-                        topPlaces = homeSections.topPlaces,
-                        nearbyPlaces = homeSections.nearbyPlaces,
-                        recentlyAddedPlaces = homeSections.recentlyAddedPlaces,
-                        isTopLoading = false,
-                        isNearbyLoading = false,
-                        isRecentlyAddedLoading = false,
-                        isRefreshing = false,
-                        isAcquiringLocation = false,
-                        isUsingStaleLocation = isStale,
-                        staleLocationAgeMinutes = lastKnownLocation?.ageMinutes().takeIf { isStale },
-                        hasWeakGpsSignal = isStale,
-                        errorMessage = null
-                    )
+                updateHomeSections(result.data, lat, lng, isStale)
+            }
+            is OpResult.Failure -> {
+                if (_uiState.value.nearbyPlaces.isEmpty()) {
+                    _uiState.update {
+                        it.copy(
+                            isTopLoading = false,
+                            isNearbyLoading = false,
+                            isRecentlyAddedLoading = false,
+                            isRefreshing = false,
+                            errorMessage = result.error.toPlacesErrorMessage(
+                                UiText.StringResource(com.kidzone.R.string.error_fetch_places)
+                            )
+                        )
+                    }
                 }
             }
-            is OpResult.Failure -> _uiState.update {
-                it.copy(
-                    isTopLoading = false,
-                    isNearbyLoading = false,
-                    isRecentlyAddedLoading = false,
-                    isRefreshing = false,
-                    errorMessage = result.error.toPlacesErrorMessage(
-                        UiText.StringResource(com.kidzone.R.string.error_fetch_places)
-                    )
-                )
-            }
+        }
+    }
+
+    private fun updateHomeSections(places: List<Place>, lat: Double, lng: Double, isStale: Boolean) {
+        val performanceConfig = performanceConfigProvider.performanceConfig
+        val placesWithDistance = places
+            .map { it to GeoUtils.haversineKm(lat, lng, it.latitude, it.longitude) }
+
+        val homeSections = buildHomeSections(placesWithDistance, performanceConfig)
+
+        _uiState.update {
+            it.copy(
+                topPlaces = homeSections.topPlaces,
+                nearbyPlaces = homeSections.nearbyPlaces,
+                recentlyAddedPlaces = homeSections.recentlyAddedPlaces,
+                isTopLoading = false,
+                isNearbyLoading = false,
+                isRecentlyAddedLoading = false,
+                isRefreshing = false,
+                isAcquiringLocation = false,
+                isUsingStaleLocation = isStale,
+                staleLocationAgeMinutes = lastKnownLocation?.ageMinutes().takeIf { isStale },
+                hasWeakGpsSignal = isStale,
+                errorMessage = null
+            )
         }
     }
 

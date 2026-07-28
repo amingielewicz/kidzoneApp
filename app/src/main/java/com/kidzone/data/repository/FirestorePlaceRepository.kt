@@ -137,31 +137,36 @@ class FirestorePlaceRepository @Inject constructor(
                 if (places.isNotEmpty()) placeDao.upsertAll(places.map(PlaceEntity::fromDomain))
                 OpResult.success(places)
             } catch (e: Exception) {
-                // Geo-aware fallback: calculate bounds around (lat, lng) and query local Room DB
-                val latDelta = radiusKm / KM_PER_DEGREE
-                // Adjust longitude delta based on latitude
-                val lngDelta = radiusKm / (KM_PER_DEGREE * cos(Math.toRadians(latitude)).coerceAtLeast(MIN_LONGITUDE_COSINE))
-                
-                val bounds = GeoBounds(
-                    north = latitude + latDelta,
-                    east = longitude + lngDelta,
-                    south = latitude - latDelta,
-                    west = longitude - lngDelta
-                )
-                
-                val cached = if (bounds.west <= bounds.east) {
-                    placeDao.getPlacesInBounds(bounds.north, bounds.east, bounds.south, bounds.west, GEO_QUERY_LIMIT)
-                } else {
-                    placeDao.getPlacesInWrappedBounds(bounds.north, bounds.east, bounds.south, bounds.west, GEO_QUERY_LIMIT)
-                }
-
+                val cached = getCachedPlacesNear(latitude, longitude, radiusKm)
                 if (cached.isNotEmpty()) {
-                    OpResult.success(cached.map { it.toDomain() })
+                    OpResult.success(cached)
                 } else {
                     OpResult.failure(e)
                 }
             }
         }
+
+    override suspend fun getCachedPlacesNear(latitude: Double, longitude: Double, radiusKm: Double): List<Place> {
+        // Calculate bounds around (lat, lng) and query local Room DB
+        val latDelta = radiusKm / KM_PER_DEGREE
+        // Adjust longitude delta based on latitude
+        val lngDelta = radiusKm / (KM_PER_DEGREE * cos(Math.toRadians(latitude)).coerceAtLeast(MIN_LONGITUDE_COSINE))
+
+        val bounds = GeoBounds(
+            north = latitude + latDelta,
+            east = longitude + lngDelta,
+            south = latitude - latDelta,
+            west = longitude - lngDelta
+        )
+
+        val cached = if (bounds.west <= bounds.east) {
+            placeDao.getPlacesInBounds(bounds.north, bounds.east, bounds.south, bounds.west, GEO_QUERY_LIMIT)
+        } else {
+            placeDao.getPlacesInWrappedBounds(bounds.north, bounds.east, bounds.south, bounds.west, GEO_QUERY_LIMIT)
+        }
+
+        return cached.map { it.toDomain() }
+    }
 
     override suspend fun getTopPlaces(limit: Int): OpResult<List<Place>> =
         performanceTraces.measureResult(PerformanceTraces.TOP_PLACES_LOAD) {

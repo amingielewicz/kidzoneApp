@@ -7,6 +7,7 @@ import com.kidzone.domain.repository.ReviewRepository
 import com.kidzone.data.remote.PerformanceConfigProvider
 import com.kidzone.utils.OpResult
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -104,33 +105,40 @@ class DataPrefetchService @Inject constructor(
 
     private suspend fun prefetchGlobalData() {
         val pool = performanceConfigProvider.performanceConfig.rankingFetchPool
-        
-        // 1. Rankingi (Miejsca i Użytkownicy)
-        placeRepository.getTopPlaces(limit = pool)
-        authRepository.getTopUsers(limit = pool)
-        
-        // 2. Najnowsze miejsca (globalnie)
-        placeRepository.getPlacesPage(pageSize = 20, cursor = null, category = null, query = null)
-        
-        // 3. Domyślna lokalizacja dla Mapy (Warszawa) - zwiekszamy promien do 30km
-        @Suppress("MagicNumber")
-        placeRepository.getPlacesNear(52.2297, 21.0122, radiusKm = 30.0)
+
+        coroutineScope {
+            // 1. Globalne rankingi
+            launch { placeRepository.getTopPlaces(limit = pool) }
+            launch { authRepository.getTopUsers(limit = pool) }
+
+            // 2. Najnowsze miejsca (globalnie)
+            launch { placeRepository.getPlacesPage(pageSize = 20, cursor = null, category = null, query = null) }
+
+            // 3. Domyślna lokalizacja dla Mapy (Warszawa) - zwiekszamy promien do 30km
+            launch {
+                @Suppress("MagicNumber")
+                placeRepository.getPlacesNear(52.2297, 21.0122, radiusKm = 30.0)
+            }
+        }
     }
 
     private suspend fun prefetchUserData(userId: String) {
-        // 1. Synchronizuj pełny profil użytkownika (wypełnia UserDao cache)
-        authRepository.getUserById(userId)
+        coroutineScope {
+            // 1. Synchronizuj pełny profil użytkownika
+            launch { authRepository.getUserById(userId) }
 
-        // 2. Synchronizuj WSZYSTKIE własne miejsca użytkownika (One-shot sync do Room)
-        placeRepository.syncPlacesByOwner(userId)
-        
-        // 3. Synchronizuj WSZYSTKIE własne opinie użytkownika (One-shot sync do Room)
-        val reviewsResult = reviewRepository.syncReviewsByUser(userId)
-        
-        // 4. Metadane miejsc dla tych opinii (nazwa, kategoria)
-        if (reviewsResult is OpResult.Success) {
-            reviewsResult.data.forEach { review ->
-                placeRepository.getPlace(review.placeId)
+            // 2. Synchronizuj WSZYSTKIE własne miejsca użytkownika
+            launch { placeRepository.syncPlacesByOwner(userId) }
+
+            // 3. Synchronizuj WSZYSTKIE własne opinie użytkownika
+            launch {
+                val reviewsResult = reviewRepository.syncReviewsByUser(userId)
+                if (reviewsResult is OpResult.Success) {
+                    reviewsResult.data.forEach { review ->
+                        // Pobieramy metadane miejsc w tle
+                        launch { placeRepository.getPlace(review.placeId) }
+                    }
+                }
             }
         }
     }

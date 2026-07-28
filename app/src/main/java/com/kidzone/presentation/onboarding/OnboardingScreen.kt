@@ -63,7 +63,17 @@ private data class OnboardingPage(
 )
 
 /**
- * Ekran onboardingu – wyswietlany po pierwszym zalogowaniu.
+ * 🎯 Odpowiedzialności:
+ * - Prezentacja kluczowych funkcji aplikacji nowym użytkownikom (mapa, oceny, rankingi).
+ * - Zarządzanie wyborem języka przed rozpoczęciem korzystania z aplikacji.
+ * - Zachęcanie do dołączenia do społeczności kidZone.
+ *
+ * 📥 Wejście:
+ * - [onComplete] przejście dalej po zakończeniu wszystkich stron.
+ * - [onSkipped] akcja po pominięciu prezentacji.
+ *
+ * 📤 Wyjście:
+ * - Zapisanie stanu "onboarding zakończony" i nawigacja dalej.
  */
 @Composable
 fun OnboardingScreen(
