@@ -1,6 +1,7 @@
-- [ ] Fix Achievement Dialog Machine-Gunning
-    - [ ] Implement collection buffer in `ProfileViewModel.kt`
-    - [ ] Aggreggate local and network badges during initial load
+- [x] Fix Achievement Dialog Machine-Gunning
+    - [x] Implement collection buffer in `ProfileViewModel.kt`
+    - [x] Aggregate local and network badges during initial load
+    - [x] Add unit tests for stabilization logic in `ProfileViewModelTest.kt`
 - [x] Standardize KDoc and Resolve Detekt Issues
     - [x] Add `@Suppress("FunctionNaming")` to `PlaceStatus.kt`
     - [x] Remove `PLACE_STATUS_HEIGHT` from `HomeScreen.kt`

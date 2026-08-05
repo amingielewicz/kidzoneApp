@@ -366,7 +366,7 @@ fun ProfileScreen(
         )
     }
 
-    if (ui.newlyEarnedBadges.isEmpty()) {
+    if (ui.newlyEarnedBadges.isEmpty() && ui.isInitialCheckComplete) {
         notificationPromptReason?.let { reason ->
             NotificationSoftPromptDialog(
                 reason = reason,
@@ -426,13 +426,13 @@ private fun ProfileContent(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(KidZoneSpacing.GapSmall),
     ) {
-        item { ProfileHeaderCard(user = user, userRank = userRank, onEdit = onEdit) }
+        item(key = "header") { ProfileHeaderCard(user = user, userRank = userRank, onEdit = onEdit) }
 
         if (user.firstName.isNotBlank() || user.lastName.isNotBlank()) {
-            item { PersonalInfoCard(user = user) }
+            item(key = "personal_info") { PersonalInfoCard(user = user) }
         }
 
-        item {
+        item(key = "stats") {
             StatsCard(
                 user = user,
                 onOpenMyPlaces = onOpenMyPlaces,
@@ -440,7 +440,7 @@ private fun ProfileContent(
             )
         }
 
-        item {
+        item(key = "my_content") {
             MyContentCard(
                 placesCount = user.placesAddedCount,
                 reviewsCount = user.reviewsCount,
@@ -449,9 +449,9 @@ private fun ProfileContent(
             )
         }
 
-        item { BadgesCard(obtainedBadges = obtainedBadges, onOpenInfo = onOpenBadgesInfo) }
+        item(key = "badges") { BadgesCard(obtainedBadges = obtainedBadges, onOpenInfo = onOpenBadgesInfo) }
 
-        item {
+        item(key = "security") {
             AccountSecurityCard(
                 showPasswordAndEmail = signInProvider == SignInProvider.EMAIL_PASSWORD,
                 onChangePassword = onChangePassword,
@@ -460,7 +460,7 @@ private fun ProfileContent(
             )
         }
 
-        item {
+        item(key = "settings") {
             SettingsCard(
                 onTermsOfService = onTermsOfService,
                 onPrivacyPolicy = onPrivacyPolicy,
@@ -972,7 +972,7 @@ private fun BadgeEarnedDialog(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 320.dp)
+                            .heightIn(max = 600.dp)
                             .verticalScroll(rememberScrollState()),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {

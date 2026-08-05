@@ -1,3 +1,5 @@
+@file:Suppress("CyclomaticComplexMethod", "LongMethod")
+
 package com.kidzone.presentation.profile
 
 import android.net.Uri
@@ -26,16 +28,21 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -47,46 +54,12 @@ private const val CONTACT_SUBJECT_MIN_LENGTH = 3
 private const val CONTACT_MESSAGE_MIN_LENGTH = 10
 private const val CONTACT_MESSAGE_FUNCTION = "submitContactMessage"
 private const val REFRESH_DELAY_MS = 300L
-private const val INITIAL_BADGE_COLLECTION_DELAY_MS = 800L
+private const val INITIAL_BADGE_COLLECTION_DELAY_MS = 1500L
 
 /**
  * 🎯 Odpowiedzialności:
  * - Zarządzanie stanem profilu użytkownika (dane osobowe, statystyki, odznaki).
  * - Obsługa preferencji (język, powiadomienia) i ustawień konta.
- * - Koordynacja procesu wylogowania i kontaktu z supportem.
- *
- * 🚫 Poza zakresem:
- * - Brak decyzji o offline queue (obsługiwane przez Repository).
- * - Brak retry logiki dla operacji sieciowych.
- * - Brak bezpośredniego zarządzania sesją (delegowane do [AuthRepository]).
- *
- * 📥 Wejście:
- * - Strumień aktualnego użytkownika z [AuthRepository].
- * - Interakcje użytkownika (edycja profilu, zmiana haseł, wybór języka).
- *
- * 📤 Wyjście:
- * - Stan ekranu profilu ([UiState]).
- * - Ogólny stan profilu ([profileState]) typu [ScreenState].
- *
- * ✅ Gwarancje:
- * - Deterministyczne obliczanie odznak na podstawie statystyk użytkownika.
- * - Spójność lokalnych preferencji językowych z systemem.
- *
- * 🔌 Offline:
- * - Wspiera odczyt profilu z cache lokalnego Room.
- * - Natychmiastowe lokalne wylogowanie bez oczekiwania na sieć.
- *
- * 🧵 Wątki:
- * - viewModelScope dla operacji asynchronicznych i strumieni Flow.
- * - Brak blokujących operacji na wątku Main.
- *
- * 🧪 Testowalność:
- * - Pełne DI.
- * - Brak zależności od singletonów.
- * - Deterministyczne mapowanie modelu domeny na odznaki UI.
- *
- * 🧼 Lifecycle:
- * - Obserwacja zmian sesji i automatyczne przełączanie strumieni danych.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -99,32 +72,6 @@ class ProfileViewModel @Inject constructor(
     private val functions: FirebaseFunctions
 ) : ViewModel() {
 
-    /**
-     * Niezmienny stan interakcji i preferencji profilu.
-     *
-     * @property isRefreshing czy trwa odświeżanie typu pull-to-refresh.
-     * @property isEditOpen czy arkusz edycji profilu jest widoczny.
-     * @property isSaving czy trwa zapis zmian profilu.
-     * @property saveError komunikat błędu przy zapisie profilu.
-     * @property isNotificationPrefsOpen czy dialog preferencji powiadomień jest widoczny.
-     * @property notificationPrefs bieżące ustawienia powiadomień.
-     * @property isTermsOfServiceOpen czy dialog regulaminu jest widoczny.
-     * @property isPrivacyPolicyOpen czy dialog polityki prywatności jest widoczny.
-     * @property isContactOpen czy dialog kontaktu z supportem jest widoczny.
-     * @property isChangePasswordOpen czy dialog zmiany hasła jest widoczny.
-     * @property isChangeEmailOpen czy dialog zmiany adresu e-mail jest widoczny.
-     * @property isDeleteAccountOpen czy dialog usuwania konta jest widoczny.
-     * @property isAccountActionInProgress czy trwa operacja na koncie (np. zmiana hasła).
-     * @property accountActionError komunikat błędu przy operacjach na koncie.
-     * @property accountActionInfo komunikat informacyjny po operacjach na koncie.
-     * @property isBadgesInfoOpen czy dialog informacji o odznakach jest widoczny.
-     * @property obtainedBadges lista wszystkich odznak zdobytych przez użytkownika.
-     * @property newlyEarnedBadges lista odznak zdobytych w bieżącej sesji, jeszcze niepokazanych.
-     * @property userRank bieżąca pozycja użytkownika w rankingu globalnym.
-     * @property signInProvider sposób w jaki użytkownik jest zalogowany (np. GOOGLE).
-     * @property selectedLanguage wybrany język aplikacji.
-     * @property isLanguageDialogOpen czy dialog wyboru języka jest widoczny.
-     */
     data class UiState(
         val isRefreshing: Boolean = false,
         val isEditOpen: Boolean = false,
@@ -144,6 +91,7 @@ class ProfileViewModel @Inject constructor(
         val isBadgesInfoOpen: Boolean = false,
         val obtainedBadges: List<UserBadge> = emptyList(),
         val newlyEarnedBadges: List<UserBadge> = emptyList(),
+        val isInitialCheckComplete: Boolean = false,
         val userRank: Int? = null,
         val signInProvider: SignInProvider = SignInProvider.UNKNOWN,
         val selectedLanguage: AppLanguage = AppLanguage.SYSTEM,
@@ -154,146 +102,105 @@ class ProfileViewModel @Inject constructor(
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
     private var pendingSeenBadgesUserId: String? = null
     private var pendingSeenBadgeNames: Set<String> = emptySet()
-    private var pendingNewBadgeNames: Set<String> = emptySet()
     private val profileReload = MutableStateFlow(0)
     
-    // Mechanizm buforowania odznak podczas startu, aby uniknąć wielu okien.
     private var isInitialCollectionPhase = true
     private val badgeBuffer = mutableSetOf<UserBadge>()
+    private var detectedBadgeNames: Set<String> = emptySet()
 
     val profileState: StateFlow<ScreenState<User>> = profileReload
         .flatMapLatest {
-            authRepository.currentUser.flatMapLatest { current ->
-                if (current == null) {
-                    flowOf(ScreenState.Error(UiText.StringResource(R.string.error_unauthorized)))
-                } else {
-                    authRepository.observeUser(current.id)
-                        .map { user ->
-                            if (user == null) {
-                                ScreenState.Error(
-                                    UiText.StringResource(
-                                        R.string.profile_load_error
-                                    )
-                                )
-                            } else {
-                                ScreenState.Content(user)
-                            }
-                        }
-                }
-            }.onStart {
+            flow {
                 emit(ScreenState.Loading)
-            }.catch {
-                emit(ScreenState.Error(UiText.StringResource(R.string.profile_load_error)))
+                
+                val source: Flow<ScreenState<User>> = authRepository.currentUser
+                    .distinctUntilChanged { old, new -> old?.id == new?.id }
+                    .flatMapLatest { current ->
+                        if (current == null) {
+                            flowOf(ScreenState.Error(UiText.StringResource(R.string.error_unauthorized)))
+                        } else {
+                            authRepository.observeUser(current.id)
+                                .map { user ->
+                                    if (user == null) {
+                                        // Jeśli dane jeszcze nie dotarły do cache Room, zostań w Loading.
+                                        ScreenState.Loading
+                                    } else {
+                                        ScreenState.Content(user)
+                                    }
+                                }
+                        }
+                    }
+                
+                emitAll(source)
             }
         }
+        .catch { emit(ScreenState.Error(UiText.StringResource(R.string.profile_load_error))) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, ScreenState.Loading)
 
-    private val userContext = profileState.flatMapLatest { state ->
-        val user = (state as? ScreenState.Content)?.data
-            ?: return@flatMapLatest flowOf<Pair<User?, BadgeContext>>(null to BadgeContext())
-
-        // Emituj usera natychmiast z pustym kontekstem (dla szybkich odznak)
-        val initial = user to BadgeContext()
-
-        flow<Pair<User?, BadgeContext>> {
-            emit(initial)
-
-            // Pobierz rankingi w tle
-            val context = coroutineScope {
-                val placesTask = async {
-                    placeRepository.getTopPlaces(RANKING_LIMIT)
+    private val rankings: StateFlow<BadgeContext> = profileState
+        .mapNotNull { (it as? ScreenState.Content<User>)?.data }
+        .distinctUntilChanged { old, new -> old.id == new.id }
+        .flatMapLatest { user ->
+            flow {
+                val context = coroutineScope {
+                    val placesTask = async { placeRepository.getTopPlaces(RANKING_LIMIT) }
+                    val usersTask = async { authRepository.getTopUsers(RANKING_LIMIT) }
+                    val topPlaces = (placesTask.await() as? OpResult.Success)?.data.orEmpty()
+                    val topUsers = (usersTask.await() as? OpResult.Success)?.data.orEmpty()
+                    val myRank = topUsers.indexOfFirst { it.id == user.id }.takeIf { it != -1 }?.let { it + 1 }
+                    val myBestPlaceRank = topPlaces.indexOfFirst { it.ownerUserId == user.id }.takeIf { it != -1 }?.let { it + 1 }
+                    BadgeContext(userRank = myRank, bestPlaceRank = myBestPlaceRank)
                 }
-
-                val usersTask = async {
-                    authRepository.getTopUsers(RANKING_LIMIT)
-                }
-
-                val topPlaces = (placesTask.await() as? OpResult.Success)
-                    ?.data
-                    .orEmpty()
-
-                val topUsers = (usersTask.await() as? OpResult.Success)
-                    ?.data
-                    .orEmpty()
-
-                val myRank = topUsers.indexOfFirst { it.id == user.id }
-                    .takeIf { it != -1 }
-                    ?.let { it + 1 }
-
-                val myBestPlaceRank = topPlaces.indexOfFirst {
-                    it.ownerUserId == user.id
-                }
-                    .takeIf { it != -1 }
-                    ?.let { it + 1 }
-
-                BadgeContext(
-                    userRank = myRank,
-                    bestPlaceRank = myBestPlaceRank
-                )
+                emit(context)
             }
-            emit(user to context)
         }
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.Eagerly,
-        null
-    )
+        .stateIn(viewModelScope, SharingStarted.Eagerly, BadgeContext())
+
+    private val userContext: StateFlow<Pair<User?, BadgeContext>?> = profileState
+        .mapNotNull { (it as? ScreenState.Content<User>)?.data }
+        .combine(rankings) { user, rankCtx -> user to rankCtx }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     val user: StateFlow<User?> = profileState.map { (it as? ScreenState.Content)?.data }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(AppConfig.FLOW_SUBSCRIPTION_TIMEOUT_MS), null)
 
     init {
         viewModelScope.launch {
-            // Reagujemy na Usera z Room natychmiast, nie czekając na rankingi
-            user.collect { u ->
-                if (u != null) {
+            user.mapNotNull { it }
+                .distinctUntilChanged { old, new -> 
+                    old.id == new.id && old.avatarUrl == new.avatarUrl && old.name == new.name && old.email == new.email
+                }
+                .collect {
                     val lang = languagePreferences.getLanguage()
                     val provider = authRepository.getCurrentSignInProvider()
-                    
-                    _uiState.update {
-                        it.copy(
-                            signInProvider = provider,
-                            selectedLanguage = lang
-                        )
-                    }
+                    _uiState.update { state -> state.copy(signInProvider = provider, selectedLanguage = lang) }
                 }
-            }
         }
 
         viewModelScope.launch {
-            // Główna pętla odznak – reaguje na każdą zmianę (pierwsza szybka emisja + druga z rankingiem)
             userContext.collect { context ->
                 val (u, bCtx) = context ?: return@collect
                 if (u == null) return@collect
 
                 val allBadges = u.computeBadges(bCtx)
-                val newlyEarned = detectNewBadges(u.id, allBadges)
+                val newlyEarned = detectNewBadges(u.id, allBadges, u)
 
-                _uiState.update {
-                    it.copy(
+                _uiState.update { state ->
+                    if (state.obtainedBadges == allBadges && state.userRank == bCtx.userRank && newlyEarned.isEmpty()) return@update state
+                    state.copy(
                         obtainedBadges = allBadges,
-                        // Akumulujemy nowe odznaki, aby pokazać je w jednym oknie (summary),
-                        // jeśli jesteśmy w fazie startowej.
-                        newlyEarnedBadges = if (isInitialCollectionPhase) {
-                            it.newlyEarnedBadges
-                        } else {
-                            (it.newlyEarnedBadges + newlyEarned).distinct()
-                        },
+                        newlyEarnedBadges = if (isInitialCollectionPhase) state.newlyEarnedBadges else (state.newlyEarnedBadges + newlyEarned).distinct(),
                         userRank = bCtx.userRank
                     )
                 }
             }
         }
 
-        // KROK 3: Okno kolekcji startowej (buffer window)
         viewModelScope.launch {
-            // Czekamy chwilę, aż obie emisje (local + network) zdążą wpaść do bufora
-            kotlinx.coroutines.delay(INITIAL_BADGE_COLLECTION_DELAY_MS)
+            delay(INITIAL_BADGE_COLLECTION_DELAY_MS)
             isInitialCollectionPhase = false
-            if (badgeBuffer.isNotEmpty()) {
-                _uiState.update { 
-                    it.copy(newlyEarnedBadges = badgeBuffer.toList().distinct()) 
-                }
+            _uiState.update { state ->
+                state.copy(newlyEarnedBadges = badgeBuffer.toList().distinct(), isInitialCheckComplete = true) 
             }
         }
     }
@@ -303,284 +210,130 @@ class ProfileViewModel @Inject constructor(
         profileReload.update { it + 1 }
         viewModelScope.launch {
             authRepository.refreshUser()
-            // Czekamy chwilę, żeby flow zdążyło wyemitować stan ładowania
-            // i animacja pull-to-refresh nie zniknęła natychmiast.
-            kotlinx.coroutines.delay(REFRESH_DELAY_MS)
+            delay(REFRESH_DELAY_MS)
             _uiState.update { it.copy(isRefreshing = false) }
         }
     }
 
-    fun retryProfile() = refreshProfile()
+    fun retryProfile() {
+        _uiState.update { it.copy(newlyEarnedBadges = emptyList(), isInitialCheckComplete = false) }
+        profileReload.update { it + 1 }
+    }
 
     fun signOut(onSignedOut: () -> Unit) {
-        viewModelScope.launch {
-            authRepository.signOut()
-            onSignedOut()
-        }
+        viewModelScope.launch { authRepository.signOut(); onSignedOut() }
     }
 
-    // --- Profile Editing ---
-
-    fun openEditSheet() {
-        _uiState.update { it.copy(isEditOpen = true, saveError = null) }
-    }
-
-    fun dismissEditSheet() {
-        if (!_uiState.value.isSaving) {
-            _uiState.update { it.copy(isEditOpen = false) }
-        }
-    }
+    fun openEditSheet() { _uiState.update { it.copy(isEditOpen = true, saveError = null) } }
+    fun dismissEditSheet() { if (!_uiState.value.isSaving) _uiState.update { it.copy(isEditOpen = false) } }
 
     fun saveProfile(displayName: String, firstName: String, lastName: String, newAvatarUri: Uri?) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, saveError = null) }
-
             var finalAvatarUrl: String? = user.value?.avatarUrl
             if (newAvatarUri != null) {
                 when (val uploadResult = authRepository.uploadAvatar(newAvatarUri)) {
                     is OpResult.Success -> finalAvatarUrl = uploadResult.data
                     is OpResult.Failure -> {
-                        _uiState.update {
-                            it.copy(
-                                isSaving = false,
-                                saveError = uploadResult.error.toUploadErrorMessage()
-                            )
-                        }
+                        _uiState.update { it.copy(isSaving = false, saveError = uploadResult.error.toUploadErrorMessage()) }
                         return@launch
                     }
                 }
             }
-
             val result = authRepository.updateUserProfile(displayName, firstName, lastName, finalAvatarUrl)
             _uiState.update {
                 when (result) {
                     is OpResult.Success -> it.copy(isSaving = false, isEditOpen = false)
-                    is OpResult.Failure -> it.copy(
-                        isSaving = false,
-                        saveError = result.error.toAuthErrorMessage(R.string.profile_update_failed)
-                    )
+                    is OpResult.Failure -> it.copy(isSaving = false, saveError = result.error.toAuthErrorMessage(R.string.profile_update_failed))
                 }
             }
         }
     }
 
-    // --- Account Actions ---
-
-    fun openChangePassword() {
-        _uiState.update { it.copy(isChangePasswordOpen = true, accountActionError = null) }
-    }
-
-    fun dismissChangePassword() {
-        if (!_uiState.value.isAccountActionInProgress) {
-            _uiState.update { it.copy(isChangePasswordOpen = false, accountActionError = null) }
-        }
-    }
-
+    fun openChangePassword() { _uiState.update { it.copy(isChangePasswordOpen = true, accountActionError = null) } }
+    fun dismissChangePassword() { if (!_uiState.value.isAccountActionInProgress) _uiState.update { it.copy(isChangePasswordOpen = false, accountActionError = null) } }
     fun changePassword(current: String, new: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isAccountActionInProgress = true, accountActionError = null) }
             val result = authRepository.changePassword(current, new)
             _uiState.update {
                 when (result) {
-                    is OpResult.Success -> it.copy(
-                        isAccountActionInProgress = false,
-                        isChangePasswordOpen = false,
-                        accountActionInfo = UiText.StringResource(R.string.password_changed)
-                    )
-                    is OpResult.Failure -> it.copy(
-                        isAccountActionInProgress = false,
-                        accountActionError = result.error.toAuthErrorMessage(R.string.account_action_failed)
-                    )
+                    is OpResult.Success -> it.copy(isAccountActionInProgress = false, isChangePasswordOpen = false, accountActionInfo = UiText.StringResource(R.string.password_changed))
+                    is OpResult.Failure -> it.copy(isAccountActionInProgress = false, accountActionError = result.error.toAuthErrorMessage(R.string.account_action_failed))
                 }
             }
         }
     }
 
-    fun openChangeEmail() {
-        _uiState.update { it.copy(isChangeEmailOpen = true, accountActionError = null) }
-    }
-
-    fun dismissChangeEmail() {
-        if (!_uiState.value.isAccountActionInProgress) {
-            _uiState.update { it.copy(isChangeEmailOpen = false, accountActionError = null) }
-        }
-    }
-
+    fun openChangeEmail() { _uiState.update { it.copy(isChangeEmailOpen = true, accountActionError = null) } }
+    fun dismissChangeEmail() { if (!_uiState.value.isAccountActionInProgress) _uiState.update { it.copy(isChangeEmailOpen = false, accountActionError = null) } }
     fun changeEmail(password: String, newEmail: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isAccountActionInProgress = true, accountActionError = null) }
             val result = authRepository.changeEmail(password, newEmail)
             _uiState.update {
                 when (result) {
-                    is OpResult.Success -> it.copy(
-                        isAccountActionInProgress = false,
-                        isChangeEmailOpen = false,
-                        accountActionInfo = UiText.StringResource(R.string.change_email_verification_sent, newEmail)
-                    )
-                    is OpResult.Failure -> it.copy(
-                        isAccountActionInProgress = false,
-                        accountActionError = result.error.toAuthErrorMessage(R.string.account_action_failed)
-                    )
+                    is OpResult.Success -> it.copy(isAccountActionInProgress = false, isChangeEmailOpen = false, accountActionInfo = UiText.StringResource(R.string.change_email_verification_sent, newEmail))
+                    is OpResult.Failure -> it.copy(isAccountActionInProgress = false, accountActionError = result.error.toAuthErrorMessage(R.string.account_action_failed))
                 }
             }
         }
     }
 
-    fun openDeleteAccount() {
-        _uiState.update {
-            it.copy(isDeleteAccountOpen = true, accountActionError = null)
-        }
-    }
-
-    fun dismissDeleteAccount() {
-        if (!_uiState.value.isAccountActionInProgress) {
-            _uiState.update { it.copy(isDeleteAccountOpen = false) }
-        }
-    }
-
+    fun openDeleteAccount() { _uiState.update { it.copy(isDeleteAccountOpen = true, accountActionError = null) } }
+    fun dismissDeleteAccount() { if (!_uiState.value.isAccountActionInProgress) _uiState.update { it.copy(isDeleteAccountOpen = false) } }
     fun deleteAccount(password: String, onDeleted: () -> Unit) {
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(isAccountActionInProgress = true, accountActionError = null)
-            }
+            _uiState.update { it.copy(isAccountActionInProgress = true, accountActionError = null) }
             val result = authRepository.deleteAccount(password)
-            if (result is OpResult.Success) {
-                _uiState.update { it.copy(isAccountActionInProgress = false, isDeleteAccountOpen = false) }
-                onDeleted()
-            } else {
-                _uiState.update {
-                    it.copy(
-                        isAccountActionInProgress = false,
-                        accountActionError = (result as? OpResult.Failure)
-                            ?.error
-                            ?.toAuthErrorMessage(R.string.delete_account_failed)
-                            ?: UiText.StringResource(R.string.delete_account_failed)
-                    )
-                }
-            }
+            if (result is OpResult.Success) { _uiState.update { it.copy(isAccountActionInProgress = false, isDeleteAccountOpen = false) }; onDeleted() }
+            else { _uiState.update { it.copy(isAccountActionInProgress = false, accountActionError = (result as? OpResult.Failure)?.error?.toAuthErrorMessage(R.string.delete_account_failed) ?: UiText.StringResource(R.string.delete_account_failed)) } }
         }
     }
 
     fun deleteAccountGoogle(idToken: String, onDeleted: () -> Unit) {
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(isAccountActionInProgress = true, accountActionError = null)
-            }
+            _uiState.update { it.copy(isAccountActionInProgress = true, accountActionError = null) }
             val result = authRepository.deleteAccountWithGoogle(idToken)
-            if (result is OpResult.Success) {
-                _uiState.update { it.copy(isAccountActionInProgress = false, isDeleteAccountOpen = false) }
-                onDeleted()
-            } else {
-                _uiState.update {
-                    it.copy(
-                        isAccountActionInProgress = false,
-                        accountActionError = (result as? OpResult.Failure)
-                            ?.error
-                            ?.toAuthErrorMessage(R.string.delete_account_failed)
-                            ?: UiText.StringResource(R.string.delete_account_failed)
-                    )
-                }
-            }
+            if (result is OpResult.Success) { _uiState.update { it.copy(isAccountActionInProgress = false, isDeleteAccountOpen = false) }; onDeleted() }
+            else { _uiState.update { it.copy(isAccountActionInProgress = false, accountActionError = (result as? OpResult.Failure)?.error?.toAuthErrorMessage(R.string.delete_account_failed) ?: UiText.StringResource(R.string.delete_account_failed)) } }
         }
     }
-
-    // --- Misc Dialogs ---
 
     fun openTermsOfService() { _uiState.update { it.copy(isTermsOfServiceOpen = true) } }
     fun dismissTermsOfService() { _uiState.update { it.copy(isTermsOfServiceOpen = false) } }
-
     fun openPrivacyPolicy() { _uiState.update { it.copy(isPrivacyPolicyOpen = true) } }
     fun dismissPrivacyPolicy() { _uiState.update { it.copy(isPrivacyPolicyOpen = false) } }
-
     fun openContact() { _uiState.update { it.copy(isContactOpen = true) } }
     fun dismissContact() { _uiState.update { it.copy(isContactOpen = false) } }
 
-    @Suppress("LongMethod")
     fun submitContactMessage(subject: String, message: String) {
-        val cleanSubject = subject.trim()
-        val cleanMessage = message.trim()
-        if (cleanSubject.length < CONTACT_SUBJECT_MIN_LENGTH ||
-            cleanMessage.length < CONTACT_MESSAGE_MIN_LENGTH
-        ) {
-            _uiState.update {
-                it.copy(
-                    accountActionError = UiText.StringResource(R.string.contact_support_validation_error)
-                )
-            }
+        val cleanSubject = subject.trim(); val cleanMessage = message.trim()
+        if (cleanSubject.length < CONTACT_SUBJECT_MIN_LENGTH || cleanMessage.length < CONTACT_MESSAGE_MIN_LENGTH) {
+            _uiState.update { it.copy(accountActionError = UiText.StringResource(R.string.contact_support_validation_error)) }
             return
         }
-
         viewModelScope.launch {
             _uiState.update { it.copy(isAccountActionInProgress = true, accountActionError = null) }
-
-            runCatching {
-                functions
-                    .getHttpsCallable(CONTACT_MESSAGE_FUNCTION)
-                    .call(contactMessagePayload(cleanSubject, cleanMessage))
-                    .await()
-            }.onSuccess {
-                _uiState.update {
-                    it.copy(
-                        isAccountActionInProgress = false,
-                        isContactOpen = false,
-                        accountActionInfo = UiText.StringResource(R.string.contact_support_sent)
-                    )
-                }
-            }.onFailure {
-                _uiState.update {
-                    it.copy(
-                        isAccountActionInProgress = false,
-                        accountActionError = UiText.StringResource(R.string.contact_support_send_failed)
-                    )
-                }
-            }
+            runCatching { functions.getHttpsCallable(CONTACT_MESSAGE_FUNCTION).call(mapOf("subject" to cleanSubject, "message" to cleanMessage)).await() }
+                .onSuccess { _uiState.update { it.copy(isAccountActionInProgress = false, isContactOpen = false, accountActionInfo = UiText.StringResource(R.string.contact_support_sent)) } }
+                .onFailure { _uiState.update { it.copy(isAccountActionInProgress = false, accountActionError = UiText.StringResource(R.string.contact_support_send_failed)) } }
         }
     }
 
-    private fun contactMessagePayload(subject: String, message: String): Map<String, String> =
-        mapOf(
-            "subject" to subject,
-            "message" to message
-        )
-
-    fun openNotificationPrefs() {
-        _uiState.update { it.copy(isNotificationPrefsOpen = true) }
-        loadNotificationPrefs()
-    }
-
+    fun openNotificationPrefs() { _uiState.update { it.copy(isNotificationPrefsOpen = true) }; loadNotificationPrefs() }
     fun dismissNotificationPrefs() { _uiState.update { it.copy(isNotificationPrefsOpen = false) } }
-
     fun saveNotificationPrefs(prefs: NotificationPrefs) {
         viewModelScope.launch {
             _uiState.update { it.copy(isAccountActionInProgress = true) }
             notificationPrefsUseCase.save(prefs)
-            _uiState.update {
-                it.copy(
-                    isAccountActionInProgress = false,
-                    isNotificationPrefsOpen = false,
-                    notificationPrefs = prefs
-                )
-            }
+            _uiState.update { it.copy(isAccountActionInProgress = false, isNotificationPrefsOpen = false, notificationPrefs = prefs) }
         }
     }
-
-    private fun loadNotificationPrefs() {
-        viewModelScope.launch {
-            val prefs = notificationPrefsUseCase.load()
-            _uiState.update { it.copy(notificationPrefs = prefs) }
-        }
-    }
-
+    private fun loadNotificationPrefs() { viewModelScope.launch { val prefs = notificationPrefsUseCase.load(); _uiState.update { it.copy(notificationPrefs = prefs) } } }
     fun openLanguageDialog() { _uiState.update { it.copy(isLanguageDialogOpen = true) } }
     fun dismissLanguageDialog() { _uiState.update { it.copy(isLanguageDialogOpen = false) } }
-
-    fun saveLanguage(language: AppLanguage) {
-        languagePreferences.setLanguage(language)
-        _uiState.update { it.copy(selectedLanguage = language, isLanguageDialogOpen = false) }
-    }
-
-    // --- Badges ---
-
+    fun saveLanguage(language: AppLanguage) { languagePreferences.setLanguage(language); _uiState.update { it.copy(selectedLanguage = language, isLanguageDialogOpen = false) } }
     fun openBadgesInfo() { _uiState.update { it.copy(isBadgesInfoOpen = true) } }
     fun dismissBadgesInfo() { _uiState.update { it.copy(isBadgesInfoOpen = false) } }
 
@@ -591,54 +344,50 @@ class ProfileViewModel @Inject constructor(
         }
         pendingSeenBadgesUserId = null
         pendingSeenBadgeNames = emptySet()
-        pendingNewBadgeNames = emptySet()
+        detectedBadgeNames = emptySet()
         badgeBuffer.clear()
         isInitialCollectionPhase = false
         _uiState.update { it.copy(newlyEarnedBadges = emptyList()) }
     }
 
-    private fun detectNewBadges(userId: String, currentBadges: List<UserBadge>): List<UserBadge> {
-        val seenNames = badgePreferences.getSeenBadges(userId)
-        val seen = seenNames.mapNotNull { runCatching { UserBadge.valueOf(it) }.getOrNull() }.toSet()
-        val current = currentBadges.toSet()
-        val newlyEarned = (current - seen).sortedBy { it.ordinal }
-        val revoked = seen - current
+    private fun detectNewBadges(userId: String, currentBadges: List<UserBadge>, userObj: User): List<UserBadge> {
+        val seenNamesInPrefs = badgePreferences.getSeenBadges(userId)
+        
+        // Baseline: co już użytkownik widział na tym urządzeniu + co wykryliśmy w tej sesji.
+        val allKnownBadges = seenNamesInPrefs + detectedBadgeNames
+        val currentNames = currentBadges.map { it.name }.toSet()
+        
+        val newlyEarned = currentBadges.filter { it.name !in allKnownBadges }.sortedBy { it.ordinal }
+        
+        // Obsługa odznak odebranych (np. spadek w rankingu).
+        val seenAsBadges = allKnownBadges.mapNotNull { runCatching { UserBadge.valueOf(it) }.getOrNull() }.toSet()
+        val revoked = seenAsBadges.filter { b -> currentBadges.none { it == b } }
+        if (revoked.isNotEmpty()) {
+            viewModelScope.launch { authRepository.revokeBadges(revoked.map { it.name }) }
+            // Uaktualniamy lokalną pamięć, aby nie próbować odbierać w nieskończoność.
+            badgePreferences.setSeenBadges(userId, currentNames)
+        }
 
         if (newlyEarned.isNotEmpty()) {
-            val newBadgeNames = newlyEarned.map { it.name }.toSet()
+            // Rejestrujemy wykryte odznaki, aby nie wykrywać ich ponownie przed zatwierdzeniem.
+            detectedBadgeNames = detectedBadgeNames + newlyEarned.map { it.name }
             pendingSeenBadgesUserId = userId
-            pendingSeenBadgeNames = current.map { it.name }.toSet()
+            // Przygotowujemy KOMPLETNY stan odznak do zapisu w Prefs po kliknięciu "Super!".
+            pendingSeenBadgeNames = currentNames
             
             if (isInitialCollectionPhase) {
+                // Podczas startu zbieramy wszystko (historyczne + nowe) do jednego okna.
                 badgeBuffer.addAll(newlyEarned)
-            }
-
-            if (pendingNewBadgeNames != newBadgeNames) {
-                pendingNewBadgeNames = newBadgeNames
+            } else {
+                // Odznaki zdobyte w trakcie sesji zapisujemy też trwale w bazy (z timestampem).
                 viewModelScope.launch {
                     authRepository.recordBadgesEarned(newlyEarned.map { it.name })
                 }
             }
             return newlyEarned
         }
-
-        if (revoked.isNotEmpty()) {
-            _uiState.update { state ->
-                state.copy(newlyEarnedBadges = state.newlyEarnedBadges.filter { it !in revoked })
-            }
-            viewModelScope.launch {
-                authRepository.revokeBadges(revoked.map { it.name })
-            }
-        }
-
-        if (seen != current) {
-            badgePreferences.setSeenBadges(userId, current.map { it.name }.toSet())
-        }
-
-        return newlyEarned
+        return emptyList()
     }
 
-    fun consumeAccountActionInfo() {
-        _uiState.update { it.copy(accountActionInfo = null) }
-    }
+    fun consumeAccountActionInfo() { _uiState.update { it.copy(accountActionInfo = null) } }
 }

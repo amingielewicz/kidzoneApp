@@ -146,12 +146,19 @@ class FirebaseAuthRepository @Inject constructor(
         }
 
         val registration = docRef.addSnapshotListener { snapshot, error ->
-            if (error != null) return@addSnapshotListener
+            if (error != null) {
+                // Propagujemy błąd do strumienia, aby UI mogło pokazać "Spróbuj ponownie".
+                close(error)
+                return@addSnapshotListener
+            }
             publicDto = snapshot?.toObject(UserDto::class.java)
             syncToLocal()
         }
         val privateRegistration = privateRef?.addSnapshotListener { snapshot, error ->
-            if (error != null) return@addSnapshotListener
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
             privateDto = snapshot?.toObject(UserPrivateDto::class.java)
             syncToLocal()
         }
