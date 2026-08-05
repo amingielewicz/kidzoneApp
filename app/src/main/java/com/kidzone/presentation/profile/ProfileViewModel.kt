@@ -148,7 +148,9 @@ class ProfileViewModel @Inject constructor(
                     val topPlaces = (placesTask.await() as? OpResult.Success)?.data.orEmpty()
                     val topUsers = (usersTask.await() as? OpResult.Success)?.data.orEmpty()
                     val myRank = topUsers.indexOfFirst { it.id == user.id }.takeIf { it != -1 }?.let { it + 1 }
-                    val myBestPlaceRank = topPlaces.indexOfFirst { it.ownerUserId == user.id }.takeIf { it != -1 }?.let { it + 1 }
+                    val myBestPlaceRank = topPlaces.indexOfFirst { 
+                        it.ownerUserId == user.id 
+                    }.takeIf { it != -1 }?.let { it + 1 }
                     BadgeContext(userRank = myRank, bestPlaceRank = myBestPlaceRank)
                 }
                 emit(context)
@@ -183,13 +185,21 @@ class ProfileViewModel @Inject constructor(
                 if (u == null) return@collect
 
                 val allBadges = u.computeBadges(bCtx)
-                val newlyEarned = detectNewBadges(u.id, allBadges, u)
+                val newlyEarned = detectNewBadges(u.id, allBadges)
 
                 _uiState.update { state ->
-                    if (state.obtainedBadges == allBadges && state.userRank == bCtx.userRank && newlyEarned.isEmpty()) return@update state
+                    if (state.obtainedBadges == allBadges && 
+                        state.userRank == bCtx.userRank && 
+                        newlyEarned.isEmpty()
+                    ) return@update state
+                    
                     state.copy(
                         obtainedBadges = allBadges,
-                        newlyEarnedBadges = if (isInitialCollectionPhase) state.newlyEarnedBadges else (state.newlyEarnedBadges + newlyEarned).distinct(),
+                        newlyEarnedBadges = if (isInitialCollectionPhase) {
+                            state.newlyEarnedBadges
+                        } else {
+                            (state.newlyEarnedBadges + newlyEarned).distinct()
+                        },
                         userRank = bCtx.userRank
                     )
                 }
@@ -235,7 +245,12 @@ class ProfileViewModel @Inject constructor(
                 when (val uploadResult = authRepository.uploadAvatar(newAvatarUri)) {
                     is OpResult.Success -> finalAvatarUrl = uploadResult.data
                     is OpResult.Failure -> {
-                        _uiState.update { it.copy(isSaving = false, saveError = uploadResult.error.toUploadErrorMessage()) }
+                        _uiState.update { 
+                            it.copy(
+                                isSaving = false, 
+                                saveError = uploadResult.error.toUploadErrorMessage()
+                            ) 
+                        }
                         return@launch
                     }
                 }
@@ -244,50 +259,90 @@ class ProfileViewModel @Inject constructor(
             _uiState.update {
                 when (result) {
                     is OpResult.Success -> it.copy(isSaving = false, isEditOpen = false)
-                    is OpResult.Failure -> it.copy(isSaving = false, saveError = result.error.toAuthErrorMessage(R.string.profile_update_failed))
+                    is OpResult.Failure -> it.copy(
+                        isSaving = false, 
+                        saveError = result.error.toAuthErrorMessage(R.string.profile_update_failed)
+                    )
                 }
             }
         }
     }
 
     fun openChangePassword() { _uiState.update { it.copy(isChangePasswordOpen = true, accountActionError = null) } }
-    fun dismissChangePassword() { if (!_uiState.value.isAccountActionInProgress) _uiState.update { it.copy(isChangePasswordOpen = false, accountActionError = null) } }
+    fun dismissChangePassword() { 
+        if (!_uiState.value.isAccountActionInProgress) {
+            _uiState.update { it.copy(isChangePasswordOpen = false, accountActionError = null) } 
+        }
+    }
     fun changePassword(current: String, new: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isAccountActionInProgress = true, accountActionError = null) }
             val result = authRepository.changePassword(current, new)
             _uiState.update {
                 when (result) {
-                    is OpResult.Success -> it.copy(isAccountActionInProgress = false, isChangePasswordOpen = false, accountActionInfo = UiText.StringResource(R.string.password_changed))
-                    is OpResult.Failure -> it.copy(isAccountActionInProgress = false, accountActionError = result.error.toAuthErrorMessage(R.string.account_action_failed))
+                    is OpResult.Success -> it.copy(
+                        isAccountActionInProgress = false, 
+                        isChangePasswordOpen = false, 
+                        accountActionInfo = UiText.StringResource(R.string.password_changed)
+                    )
+                    is OpResult.Failure -> it.copy(
+                        isAccountActionInProgress = false, 
+                        accountActionError = result.error.toAuthErrorMessage(R.string.account_action_failed)
+                    )
                 }
             }
         }
     }
 
     fun openChangeEmail() { _uiState.update { it.copy(isChangeEmailOpen = true, accountActionError = null) } }
-    fun dismissChangeEmail() { if (!_uiState.value.isAccountActionInProgress) _uiState.update { it.copy(isChangeEmailOpen = false, accountActionError = null) } }
+    fun dismissChangeEmail() { 
+        if (!_uiState.value.isAccountActionInProgress) {
+            _uiState.update { it.copy(isChangeEmailOpen = false, accountActionError = null) } 
+        }
+    }
     fun changeEmail(password: String, newEmail: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isAccountActionInProgress = true, accountActionError = null) }
             val result = authRepository.changeEmail(password, newEmail)
             _uiState.update {
                 when (result) {
-                    is OpResult.Success -> it.copy(isAccountActionInProgress = false, isChangeEmailOpen = false, accountActionInfo = UiText.StringResource(R.string.change_email_verification_sent, newEmail))
-                    is OpResult.Failure -> it.copy(isAccountActionInProgress = false, accountActionError = result.error.toAuthErrorMessage(R.string.account_action_failed))
+                    is OpResult.Success -> it.copy(
+                        isAccountActionInProgress = false, 
+                        isChangeEmailOpen = false, 
+                        accountActionInfo = UiText.StringResource(R.string.change_email_verification_sent, newEmail)
+                    )
+                    is OpResult.Failure -> it.copy(
+                        isAccountActionInProgress = false, 
+                        accountActionError = result.error.toAuthErrorMessage(R.string.account_action_failed)
+                    )
                 }
             }
         }
     }
 
     fun openDeleteAccount() { _uiState.update { it.copy(isDeleteAccountOpen = true, accountActionError = null) } }
-    fun dismissDeleteAccount() { if (!_uiState.value.isAccountActionInProgress) _uiState.update { it.copy(isDeleteAccountOpen = false) } }
+    fun dismissDeleteAccount() { 
+        if (!_uiState.value.isAccountActionInProgress) {
+            _uiState.update { it.copy(isDeleteAccountOpen = false) } 
+        }
+    }
     fun deleteAccount(password: String, onDeleted: () -> Unit) {
         viewModelScope.launch {
             _uiState.update { it.copy(isAccountActionInProgress = true, accountActionError = null) }
             val result = authRepository.deleteAccount(password)
-            if (result is OpResult.Success) { _uiState.update { it.copy(isAccountActionInProgress = false, isDeleteAccountOpen = false) }; onDeleted() }
-            else { _uiState.update { it.copy(isAccountActionInProgress = false, accountActionError = (result as? OpResult.Failure)?.error?.toAuthErrorMessage(R.string.delete_account_failed) ?: UiText.StringResource(R.string.delete_account_failed)) } }
+            if (result is OpResult.Success) { 
+                _uiState.update { it.copy(isAccountActionInProgress = false, isDeleteAccountOpen = false) }
+                onDeleted() 
+            } else { 
+                _uiState.update { 
+                    it.copy(
+                        isAccountActionInProgress = false, 
+                        accountActionError = (result as? OpResult.Failure)?.error
+                            ?.toAuthErrorMessage(R.string.delete_account_failed) 
+                            ?: UiText.StringResource(R.string.delete_account_failed)
+                    ) 
+                } 
+            }
         }
     }
 
@@ -295,8 +350,19 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isAccountActionInProgress = true, accountActionError = null) }
             val result = authRepository.deleteAccountWithGoogle(idToken)
-            if (result is OpResult.Success) { _uiState.update { it.copy(isAccountActionInProgress = false, isDeleteAccountOpen = false) }; onDeleted() }
-            else { _uiState.update { it.copy(isAccountActionInProgress = false, accountActionError = (result as? OpResult.Failure)?.error?.toAuthErrorMessage(R.string.delete_account_failed) ?: UiText.StringResource(R.string.delete_account_failed)) } }
+            if (result is OpResult.Success) { 
+                _uiState.update { it.copy(isAccountActionInProgress = false, isDeleteAccountOpen = false) }
+                onDeleted() 
+            } else { 
+                _uiState.update { 
+                    it.copy(
+                        isAccountActionInProgress = false, 
+                        accountActionError = (result as? OpResult.Failure)?.error
+                            ?.toAuthErrorMessage(R.string.delete_account_failed) 
+                            ?: UiText.StringResource(R.string.delete_account_failed)
+                    ) 
+                } 
+            }
         }
     }
 
@@ -309,15 +375,38 @@ class ProfileViewModel @Inject constructor(
 
     fun submitContactMessage(subject: String, message: String) {
         val cleanSubject = subject.trim(); val cleanMessage = message.trim()
-        if (cleanSubject.length < CONTACT_SUBJECT_MIN_LENGTH || cleanMessage.length < CONTACT_MESSAGE_MIN_LENGTH) {
-            _uiState.update { it.copy(accountActionError = UiText.StringResource(R.string.contact_support_validation_error)) }
+        if (cleanSubject.length < CONTACT_SUBJECT_MIN_LENGTH || 
+            cleanMessage.length < CONTACT_MESSAGE_MIN_LENGTH
+        ) {
+            _uiState.update { 
+                it.copy(accountActionError = UiText.StringResource(R.string.contact_support_validation_error)) 
+            }
             return
         }
         viewModelScope.launch {
             _uiState.update { it.copy(isAccountActionInProgress = true, accountActionError = null) }
-            runCatching { functions.getHttpsCallable(CONTACT_MESSAGE_FUNCTION).call(mapOf("subject" to cleanSubject, "message" to cleanMessage)).await() }
-                .onSuccess { _uiState.update { it.copy(isAccountActionInProgress = false, isContactOpen = false, accountActionInfo = UiText.StringResource(R.string.contact_support_sent)) } }
-                .onFailure { _uiState.update { it.copy(isAccountActionInProgress = false, accountActionError = UiText.StringResource(R.string.contact_support_send_failed)) } }
+            runCatching { 
+                functions.getHttpsCallable(CONTACT_MESSAGE_FUNCTION).call(
+                    mapOf("subject" to cleanSubject, "message" to cleanMessage)
+                ).await() 
+            }
+                .onSuccess { 
+                    _uiState.update { 
+                        it.copy(
+                            isAccountActionInProgress = false, 
+                            isContactOpen = false, 
+                            accountActionInfo = UiText.StringResource(R.string.contact_support_sent)
+                        ) 
+                    } 
+                }
+                .onFailure { 
+                    _uiState.update { 
+                        it.copy(
+                            isAccountActionInProgress = false, 
+                            accountActionError = UiText.StringResource(R.string.contact_support_send_failed)
+                        ) 
+                    } 
+                }
         }
     }
 
@@ -327,13 +416,29 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isAccountActionInProgress = true) }
             notificationPrefsUseCase.save(prefs)
-            _uiState.update { it.copy(isAccountActionInProgress = false, isNotificationPrefsOpen = false, notificationPrefs = prefs) }
+            _uiState.update { 
+                it.copy(
+                    isAccountActionInProgress = false, 
+                    isNotificationPrefsOpen = false, 
+                    notificationPrefs = prefs
+                ) 
+            }
         }
     }
-    private fun loadNotificationPrefs() { viewModelScope.launch { val prefs = notificationPrefsUseCase.load(); _uiState.update { it.copy(notificationPrefs = prefs) } } }
+    private fun loadNotificationPrefs() { 
+        viewModelScope.launch { 
+            val prefs = notificationPrefsUseCase.load()
+            _uiState.update { it.copy(notificationPrefs = prefs) } 
+        } 
+    }
     fun openLanguageDialog() { _uiState.update { it.copy(isLanguageDialogOpen = true) } }
     fun dismissLanguageDialog() { _uiState.update { it.copy(isLanguageDialogOpen = false) } }
-    fun saveLanguage(language: AppLanguage) { languagePreferences.setLanguage(language); _uiState.update { it.copy(selectedLanguage = language, isLanguageDialogOpen = false) } }
+    fun saveLanguage(language: AppLanguage) { 
+        languagePreferences.setLanguage(language)
+        _uiState.update { 
+            it.copy(selectedLanguage = language, isLanguageDialogOpen = false) 
+        } 
+    }
     fun openBadgesInfo() { _uiState.update { it.copy(isBadgesInfoOpen = true) } }
     fun dismissBadgesInfo() { _uiState.update { it.copy(isBadgesInfoOpen = false) } }
 
@@ -350,7 +455,7 @@ class ProfileViewModel @Inject constructor(
         _uiState.update { it.copy(newlyEarnedBadges = emptyList()) }
     }
 
-    private fun detectNewBadges(userId: String, currentBadges: List<UserBadge>, userObj: User): List<UserBadge> {
+    private fun detectNewBadges(userId: String, currentBadges: List<UserBadge>): List<UserBadge> {
         val seenNamesInPrefs = badgePreferences.getSeenBadges(userId)
         
         // Baseline: co już użytkownik widział na tym urządzeniu + co wykryliśmy w tej sesji.

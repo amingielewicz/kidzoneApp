@@ -28,9 +28,9 @@ Unified the visual style of ratings across all screens, standardized documentati
 ## Verification Results
 
 ### Quality Metrics
-- **Analysis**: `gradlew :app:detekt` — **PASSED** (0 issues).
+- **Analysis**: `gradlew :app:detekt` — **PASSED** (fixed all MaxLineLength and UnusedParameter issues in `ProfileViewModel`).
 - **Compilation**: `gradlew :app:compileDebugKotlin` — **PASSED**.
-- **Unit Tests**: **262 tests passed**, 0 failed.
+- **Unit Tests**: **263 tests passed**, 0 failed (stabilized `ProfileViewModelTest`).
 
 ### Manual Verification
 - **Visuals**: Confirmed yellow stars and consistent "New" badges across all tabs.

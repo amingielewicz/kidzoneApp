@@ -6,6 +6,11 @@
     - [x] Add `@Suppress("FunctionNaming")` to `PlaceStatus.kt`
     - [x] Remove `PLACE_STATUS_HEIGHT` from `HomeScreen.kt`
     - [x] Add KDoc to all 14 primary Screens
-- [ ] Verification
-    - [ ] Run `gradlew :app:detekt`
-    - [ ] Verify single summary dialog for multiple initial badges
+- [x] Verification
+    - [x] Run `gradlew :app:detekt` — PASSED
+    - [x] Verify single summary dialog for multiple initial badges — VERIFIED
+- [x] Achievement UX (Issue 357)
+    - [x] Full list of badges shown on first load after new install
+    - [x] Notification prompt hidden during discovery phase (isInitialCheckComplete)
+    - [x] Clicking "Super!" correctly persists all seen badges
+    - [x] Vertical list in dialog expanded for better readability
