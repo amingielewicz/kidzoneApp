@@ -275,21 +275,11 @@ class PlaceListViewModel @Inject constructor(
         val hasPermission = locationProvider.hasPermission()
         val isServiceEnabled = locationProvider.isServiceEnabled()
 
-        Log.d(
-            "PlaceListLocation",
-            "refreshLocation: hasPermission=$hasPermission, isServiceEnabled=$isServiceEnabled"
-        )
-
         _hasLocationPermission.value = hasPermission
         _isLocationServiceEnabled.value = isServiceEnabled
 
         if (!hasPermission || !isServiceEnabled) {
             val staleLocation: Pair<Double, Double>? = locationProvider.getLastKnownLocation()
-
-            Log.d(
-                "PlaceListLocation",
-                "using stale: staleLocation=$staleLocation, age=${locationProvider.getLastKnownLocationAgeMinutes()}"
-            )
 
             _userLocation.value = staleLocation
             _isUsingStaleLocation.value = staleLocation != null
@@ -305,23 +295,12 @@ class PlaceListViewModel @Inject constructor(
         viewModelScope.launch {
             val location: Pair<Double, Double>? = locationProvider.getCurrentLocation()
 
-            Log.d(
-                "PlaceListLocation",
-                "current location result=$location"
-            )
-
             if (location != null) {
                 _userLocation.value = location
                 _isUsingStaleLocation.value = false
                 _staleLocationAgeMinutes.value = null
             } else {
                 val staleLocation: Pair<Double, Double>? = locationProvider.getLastKnownLocation()
-
-                Log.d(
-                    "PlaceListLocation",
-                    "current null, fallback stale=$staleLocation, " +
-                        "age=${locationProvider.getLastKnownLocationAgeMinutes()}"
-                )
 
                 _userLocation.value = staleLocation
                 _isUsingStaleLocation.value = staleLocation != null

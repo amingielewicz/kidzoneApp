@@ -97,7 +97,8 @@ service cloud.firestore {
       let comment = data.get('comment', null);
       let status = data.get('status', null);
 
-      return data.keys().hasAll(['placeId', 'reporterId'])
+      return data.keys().hasAll(['placeId', 'reporterId', 'createdAtMillis'])
+        && data.keys().hasOnly(['placeId', 'reporterId', 'reason', 'comment', 'status', 'createdAtMillis'])
         && data.reporterId == request.auth.uid
         && data.placeId is string
         && (reason == null || (reason is string && reason in [
@@ -108,8 +109,9 @@ service cloud.firestore {
           'INAPPROPRIATE',
           'OTHER'
         ]))
-        && (comment == null || (comment is string && comment.size() <= 1000))
-        && (status == null || status == 'pending');
+        && (comment == null || (comment is string && comment.size() <= 500))
+        && (status == null || status == 'pending')
+        && data.createdAtMillis is int;
     }
 
     function isValidReviewReport() {
@@ -118,7 +120,8 @@ service cloud.firestore {
       let comment = data.get('comment', null);
       let status = data.get('status', null);
 
-      return data.keys().hasAll(['reviewId', 'reporterId'])
+      return data.keys().hasAll(['reviewId', 'reporterId', 'createdAtMillis'])
+        && data.keys().hasOnly(['reviewId', 'reporterId', 'reason', 'comment', 'status', 'createdAtMillis'])
         && data.reporterId == request.auth.uid
         && data.reviewId is string
         && (reason == null || (reason is string && reason in [
@@ -128,8 +131,9 @@ service cloud.firestore {
           'NOT_RELEVANT',
           'OTHER'
         ]))
-        && (comment == null || (comment is string && comment.size() <= 1000))
-        && (status == null || status == 'pending');
+        && (comment == null || (comment is string && comment.size() <= 500))
+        && (status == null || status == 'pending')
+        && data.createdAtMillis is int;
     }
 
     function isValidPhotoReport() {
@@ -138,7 +142,8 @@ service cloud.firestore {
       let comment = data.get('comment', null);
       let status = data.get('status', null);
 
-      return data.keys().hasAll(['photoUrl', 'reporterId'])
+      return data.keys().hasAll(['photoUrl', 'reporterId', 'createdAtMillis'])
+        && data.keys().hasOnly(['photoUrl', 'reporterId', 'reason', 'comment', 'status', 'createdAtMillis'])
         && data.reporterId == request.auth.uid
         && data.photoUrl is string
         && (reason == null || (reason is string && reason in [
@@ -148,8 +153,9 @@ service cloud.firestore {
           'OFFENSIVE',
           'OTHER'
         ]))
-        && (comment == null || (comment is string && comment.size() <= 1000))
-        && (status == null || status == 'pending');
+        && (comment == null || (comment is string && comment.size() <= 500))
+        && (status == null || status == 'pending')
+        && data.createdAtMillis is int;
     }
 
     function isValidPlaceChangeRequest() {
@@ -185,9 +191,10 @@ service cloud.firestore {
 
         && request.resource.data.changes is map
         && request.resource.data.changes.size() > 0
+        && request.resource.data.changes.size() <= 20
 
         && request.resource.data.comment is string
-        && request.resource.data.comment.size() <= 500
+        && request.resource.data.comment.size() <= 1000
 
         && request.resource.data.type is string
         && request.resource.data.type in [
@@ -253,7 +260,8 @@ service cloud.firestore {
             'firstName',
             'lastName',
             'emailNotificationsEnabled',
-            'fcmTokens'
+            'fcmTokens',
+            'createdAtMillis'
           ])
         )
         || (
