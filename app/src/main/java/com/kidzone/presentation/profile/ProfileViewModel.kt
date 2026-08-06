@@ -251,7 +251,10 @@ class ProfileViewModel @Inject constructor(
             _uiState.update { state ->
                 when (result) {
                     is OpResult.Success -> state.copy(isSaving = false, isEditOpen = false)
-                    is OpResult.Failure -> state.copy(isSaving = false, saveError = result.error.toAuthErrorMessage(R.string.profile_update_failed))
+                    is OpResult.Failure -> state.copy(
+                        isSaving = false,
+                        saveError = result.error.toAuthErrorMessage(R.string.profile_update_failed)
+                    )
                 }
             }
         }
@@ -269,8 +272,15 @@ class ProfileViewModel @Inject constructor(
             val result = authRepository.changePassword(current, new)
             _uiState.update { state ->
                 when (result) {
-                    is OpResult.Success -> state.copy(isAccountActionInProgress = false, isChangePasswordOpen = false, accountActionInfo = UiText.StringResource(R.string.password_changed))
-                    is OpResult.Failure -> state.copy(isAccountActionInProgress = false, accountActionError = result.error.toAuthErrorMessage(R.string.account_action_failed))
+                    is OpResult.Success -> state.copy(
+                        isAccountActionInProgress = false,
+                        isChangePasswordOpen = false,
+                        accountActionInfo = UiText.StringResource(R.string.password_changed)
+                    )
+                    is OpResult.Failure -> state.copy(
+                        isAccountActionInProgress = false,
+                        accountActionError = result.error.toAuthErrorMessage(R.string.account_action_failed)
+                    )
                 }
             }
         }
@@ -288,8 +298,20 @@ class ProfileViewModel @Inject constructor(
             val result = authRepository.changeEmail(password, newEmail)
             _uiState.update { state ->
                 when (result) {
-                    is OpResult.Success -> state.copy(isAccountActionInProgress = false, isChangeEmailOpen = false, accountActionInfo = UiText.StringResource(R.string.change_email_verification_sent, newEmail))
-                    is OpResult.Failure -> state.copy(isAccountActionInProgress = false, accountActionError = result.error.toAuthErrorMessage(R.string.account_action_failed))
+                    is OpResult.Success -> state.copy(
+                        isAccountActionInProgress = false,
+                        isChangeEmailOpen = false,
+                        accountActionInfo = UiText.StringResource(
+                            R.string.change_email_verification_sent,
+                            newEmail
+                        )
+                    )
+                    is OpResult.Failure -> state.copy(
+                        isAccountActionInProgress = false,
+                        accountActionError = result.error.toAuthErrorMessage(
+                            R.string.account_action_failed
+                        )
+                    )
                 }
             }
         }
@@ -354,7 +376,13 @@ class ProfileViewModel @Inject constructor(
         if (cleanSubject.length < CONTACT_SUBJECT_MIN_LENGTH || 
             cleanMessage.length < CONTACT_MESSAGE_MIN_LENGTH
         ) {
-            _uiState.update { it.copy(accountActionError = UiText.StringResource(R.string.contact_support_validation_error)) }
+            _uiState.update { 
+                it.copy(
+                    accountActionError = UiText.StringResource(
+                        R.string.contact_support_validation_error
+                    )
+                ) 
+            }
             return
         }
         viewModelScope.launch {
