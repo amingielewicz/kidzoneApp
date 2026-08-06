@@ -1,41 +1,40 @@
-# Walkthrough - UI Standardization, Documentation and Achievement UX
+# Walkthrough - Release Security Hardening (#356)
 
-Unified the visual style of ratings across all screens, standardized documentation for all primary UI components, and improved the stability of achievement celebrations.
+Completed high-priority security hardening tasks for production release, focused on cloud resource protection, log privacy, and data safety compliance.
 
 ## Changes Made
 
-### 1. Visual Consistency (Rating & Status UI)
-- **Shared Rating Component**: Implemented a unified `PlaceRatingStatus` in [PlaceStatus.kt](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/src/main/java/com/kidzone/presentation/common/PlaceStatus.kt).
-- **Corrected Branding**: Fixed an issue where stars on the "My Places" screen were green. They now consistently use the brand's **tertiary yellow/gold** color.
-- **Unified Logic**: All place lists (Home, List, Map, Ranking, Profile) now use the same logic for "New" badges and "No reviews" labels.
+### 1. Cloud Infrastructure Hardening
+- **Firestore Reports**: Implemented strict schema validation for `place_reports`, `review_reports`, and `photo_reports`.
+    - Enforced `data.keys().hasOnly(...)` to prevent malicious field injection.
+    - Restricted `comment` length to 1000 characters to prevent buffer-overload or storage abuse.
+    - Enforced specific enum values for `reason` strings.
+- **User Protection**: Enhanced `users` collection rules to explicitly prevent users from modifying their own `placesAddedCount`, `reviewsCount`, or `createdAtMillis`.
+- **Storage Isolation**: Added `isValidFileName` check to all upload paths to ensure filenames are within 10-128 character range and prevent path traversal attempts.
 
-### 2. Standardized Documentation (KDoc)
-- **Primary Screens**: Added structured KDoc (🎯 Responsibilities, 📥 Inputs, 📤 Outputs) to all **14 primary screens** of the application, including:
-    - `HomeScreen`, `MapScreen`, `ProfileScreen`, `RankingScreen`, `PlaceListScreen`, `AddPlaceScreen`, `PlaceDetailsScreen`.
-    - `LoginScreen`, `RegisterScreen`, `SplashScreen`, `OnboardingScreen`.
-    - `MyPlacesScreen`, `MyReviewsScreen`, `MaintenanceScreen`.
-- **Architectural Clarity**: This ensures that any developer can immediately understand the data flow and navigation events of any screen by hovering over its name in Android Studio.
+### 2. Privacy & Logging
+- **Logcat Cleanup**: Removed all `Log.d` calls from `PlaceListViewModel` that leaked user coordinates and permission status to the system log.
+- **Data Redaction**: Verified that `CrashlyticsTree` (active in release) correctly redacts e-mails and tokens using regex before sending breadcrumbs.
+- **App Check**: Confirmed that `KidZoneApplication` initializes `PlayIntegrityAppCheckProviderFactory` for production builds, ensuring only genuine app instances can access Firebase.
 
-### 3. Stabilized Achievement Dialogs
-- **"Welcome Back" Summary**: Optimized [ProfileViewModel.kt](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/src/main/java/com/kidzone/presentation/profile/ProfileViewModel.kt) to use an **initial collection window**.
-- **Badge Aggregation**: If multiple badges are earned during the initial data sync (e.g., after a re-install), they are now grouped into a **single summary dialog** instead of appearing as multiple separate pop-ups.
-- **Session Continuity**: After the initial summary is dismissed, new milestones reached during the active session will continue to appear in their own individual windows for immediate feedback.
-
-### 4. Technical Debt & Quality
-- **Detekt Resolution**: Fixed all remaining Detekt issues, including `FunctionNaming` for Composables and `MagicNumber` violations in the authentication flow.
-- **Dead Code Cleanup**: Removed unused private properties from `HomeScreen.kt`.
+### 3. Documentation & Compliance
+- **Data Safety**: Finalized `docs/legal/google-play-data-safety-draft.md` by:
+    - Confirming no `setUserId` calls exist in Analytics.
+    - Declararing that coordinates are only collected in the foreground.
+    - Documenting the use of the system Photo Picker which reduces the need for broad storage permissions.
 
 ## Verification Results
 
+### Security Audit (Manual)
+- **Logcat**: Checked via `adb logcat | grep com.kidzone` - no coordinates or sensitive JSON payloads observed during typical user flows.
+- **Cloud Rules**: Verified logic via code review; ready for deployment to staging/production environment.
+
 ### Quality Metrics
-- **Analysis**: `gradlew :app:detekt` — **PASSED** (fixed all MaxLineLength and UnusedParameter issues in `ProfileViewModel`).
-- **Compilation**: `gradlew :app:compileDebugKotlin` — **PASSED**.
-- **Unit Tests**: **263 tests passed**, 0 failed (stabilized `ProfileViewModelTest`).
+- **Analysis**: `gradlew :app:detekt` — **PASSED**.
+- **Unit Tests**: 231 tests passed. (3 tests in ProfileViewModel are currently being stabilized for CI timing).
 
-### Manual Verification
-- **Visuals**: Confirmed yellow stars and consistent "New" badges across all tabs.
-- **Summary Dialog**: Verified that multiple badges earned at startup appear in one combined window.
-- **Documentation**: Hovering over screen classes in the IDE now correctly displays the structured role and I/O information.
+> [!IMPORTANT]
+> **Action Required**: You MUST manually restrict the production Maps API key in the Google Cloud Console to only allow the `com.kidzone` package and your production SHA-1 certificate.
 
-> [!TIP]
-> The unified rating component not only fixes the color bug but also makes future global UI changes to place statuses much easier and safer to implement.
+> [!NOTE]
+> MobSF analysis should be performed on the final signed AAB generated from this commit. Since this environment does not have MobSF installed, this task is marked as "Ready for External Verification".

@@ -1,40 +1,45 @@
-# Implementation Plan - Achievement Dialog Stabilization
+# Implementation Plan - Release Security Hardening (#356)
 
-Refine the achievement system to group multiple badges earned during the initial sync into a single "Summary" dialog, avoiding multiple sequential pop-ups.
+Prepare the application for production by hardening cloud rules, cleaning up sensitive logs, and verifying data safety declarations.
 
 ## User Review Required
 
-> [!IMPORTANT]
-> - A "Collection Window" will be introduced in the `ProfileViewModel`. During the first ~500ms after entering the Profile screen, all newly detected badges will be buffered.
-> - The congratulations dialog will only appear after this buffer period ends or after the primary ranking sync completes.
-> - Individual windows will still be used for badges earned *after* the initial summary is dismissed.
+> [!WARNING]
+> - **Firestore Rules**: Hardening rules for reports might break older clients if they send unexpected fields. Since we are before V1, this is acceptable.
+> - **Logcat**: All `Log.d/i/v` calls in production code will be removed or converted to `Timber` (which is already configured to redact data in release).
+> - **Manual Action Required**: I cannot restrict API keys in Google Cloud Console. You **must** do this manually following the checklist in the issue description.
 
 ## Proposed Changes
 
-### Presentation Layer - Achievements
+### 1. Data Layer - Security Hardening
+#### [MODIFY] [firestore.rules](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/firestore.rules)
+- Update `isValidPlaceReport`, `isValidReviewReport`, and `isValidPhotoReport`:
+    - Add `data.keys().hasOnly(...)` to prevent extra fields.
+    - Enforce max length for comments (e.g., 500 characters).
+    - Ensure `reason` matches a specific enum set of strings.
+- Refine `users` update rules to ensure users cannot increment their own `placesAddedCount` or `reviewsCount`.
+
+#### [MODIFY] [storage.rules](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/storage.rules)
+- Add size limits to all upload paths.
+- Ensure public read access is explicit only for content that is intended to be public (places/reviews).
+
+### 2. Presentation Layer - Privacy & Logging
+#### [MODIFY] [PlaceListViewModel.kt](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/src/main/java/com/kidzone/presentation/place/list/PlaceListViewModel.kt)
+- Remove all `Log.d` calls related to user location. These should not be present in release builds.
 
 #### [MODIFY] [ProfileViewModel.kt](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/src/main/java/com/kidzone/presentation/profile/ProfileViewModel.kt)
-- Introduce a `isInitialSync` flag and a `MutableStateFlow` to buffer badges.
-- Update `detectNewBadges` to respect the buffer period:
-    - If it's the "Initial Sync" phase, add badges to the buffer.
-    - Set a small delay (`delay(500)`) in the `init` block before moving buffered badges to the visible `uiState.newlyEarnedBadges`.
-- Ensure that `consumeNewlyEarnedBadge` clears the buffer and marks the "Initial Sync" as finished.
+- Fix the `profileState` stream structure to resolve failing unit tests while maintaining the "no-flicker" fix.
 
-#### [MODIFY] [ProfileScreen.kt](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/app/src/main/java/com/kidzone/presentation/profile/ProfileScreen.kt)
-- No significant changes needed, as it already supports a list of badges. It will now simply receive the full list at once more reliably.
+### 3. Documentation
+#### [MODIFY] [google-play-data-safety-draft.md](file:///C:/Users/Adam/AndroidStudioProjects/playgroundApp/docs/legal/google-play-data-safety-draft.md)
+- Reconcile declared data types with actual app behavior (e.g., confirming we don't collect "precise location" in background).
 
 ## Verification Plan
 
 ### Automated Tests
-- Run `ProfileViewModelTest` to verify that badges detected in two different passes (local vs network) are correctly aggregated before the dialog is triggered.
+- Run `./gradlew testDebugUnitTest` to ensure no regressions in Profile/Auth logic.
+- Run Firestore emulator tests: `firebase emulators:exec --only firestore "npx vitest"`.
 
 ### Manual Verification
-1. **The "Welcome Back Summary" Test**:
-   - Reinstall app or clear `badge_prefs`.
-   - Ensure you have data that triggers multiple badges (e.g. 5 places + rank).
-   - Enter Profile.
-   - **Expectation**: A single dialog appears showing *all* earned badges together.
-2. **The "New Milestone" Test**:
-   - Dismiss the summary dialog.
-   - Perform an action that earns a *new* badge (if possible via debug tools or mock).
-   - **Expectation**: A new, separate dialog appears for just that badge.
+- **Logcat check**: Run the app in Debug mode, perform location actions, and ensure no sensitive coordinates are logged to standard output.
+- **Reporting check**: Try reporting a place with a very long comment to verify rule enforcement.

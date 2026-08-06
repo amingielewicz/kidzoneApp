@@ -33,6 +33,10 @@ service firebase.storage {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isValidFileName(name) {
+      return name.size() >= 10 && name.size() <= 128;
+    }
+
     // Zdjęcia miejsc.
     // Nowy format właścicielski:
     // places/{ownerUserId}/{placeId}/photos/{fileName}
@@ -40,7 +44,8 @@ service firebase.storage {
       allow read: if true;
 
       allow create, update: if isOwner(ownerUserId)
-        && isImageUnder(10 * 1024 * 1024);
+        && isImageUnder(10 * 1024 * 1024)
+        && isValidFileName(fileName);
 
       allow delete: if isOwner(ownerUserId) || isAdmin();
     }
@@ -59,7 +64,8 @@ service firebase.storage {
       allow read: if true;
 
       allow create, update: if isOwner(ownerUserId)
-        && isImageUnder(10 * 1024 * 1024);
+        && isImageUnder(10 * 1024 * 1024)
+        && isValidFileName(fileName);
 
       allow delete: if isOwner(ownerUserId) || isAdmin();
     }
@@ -76,7 +82,8 @@ service firebase.storage {
       allow read: if isSignedIn();
 
       allow create, update: if isOwner(userId)
-        && isImageUnder(5 * 1024 * 1024);
+        && isImageUnder(5 * 1024 * 1024)
+        && isValidFileName(fileName);
 
       allow delete: if isOwner(userId) || isAdmin();
     }

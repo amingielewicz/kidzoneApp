@@ -1,10 +1,10 @@
 # Google Play Data Safety — robocze odpowiedzi
 
-Powiązane issue: #182, #210, #213, #216, #269, #271, #272, #274, #275, #303
+Powiązane issue: #182, #210, #213, #216, #269, #271, #272, #274, #275, #303, #356
 
 Milestone: `v1.0.0`
 
-Ostatnia aktualizacja: 2026-07-13
+Ostatnia aktualizacja: 2026-08-06
 
 ## Cel
 
@@ -44,7 +44,7 @@ Dokument zawiera robocze odpowiedzi do formularza Google Play Data Safety. Ostat
 Tak.
 ```
 
-Aplikacja obsługuje konta, treści użytkownika, zdjęcia, lokalizację podczas używania aplikacji, diagnostykę i analitykę.
+Aplikacja obsługuje konta, treści użytkownika (miejsca, opinie, zdjęcia), lokalizację podczas używania aplikacji, diagnostykę i analitykę.
 
 ### Czy dane są szyfrowane podczas przesyłania?
 
@@ -52,7 +52,7 @@ Aplikacja obsługuje konta, treści użytkownika, zdjęcia, lokalizację podczas
 Tak.
 ```
 
-Komunikacja z Firebase, Google APIs i Google Play Services odbywa się przez HTTPS/TLS. Finalny build nie może używać endpointów cleartext.
+Komunikacja z Firebase, Google APIs i Google Play Services odbywa się przez HTTPS/TLS. Finalny build nie używa endpointów cleartext (`usesCleartextTraffic=false`).
 
 ### Czy użytkownik może zażądać usunięcia danych?
 
@@ -65,7 +65,13 @@ Tak.
 - aplikacja: `Profil → Konto i bezpieczeństwo → Usuń konto`,
 - publiczny URL: `/account-deletion`.
 
-Odpowiedź można zatwierdzić dopiero po przejściu testu #210.
+### Czy identyfikator użytkownika jest przesyłany do Analytics?
+
+```text
+Nie.
+```
+
+Aplikacja nie wywołuje `setUserId` w Firebase Analytics. Używane są wyłącznie anonimowe identyfikatory instancji aplikacji generowane przez Google.
 
 ## Kategorie danych
 
@@ -76,7 +82,7 @@ Odpowiedź można zatwierdzić dopiero po przejściu testu #210.
 | adres e-mail | tak | wymagany dla konta e-mail | logowanie, konto, bezpieczeństwo | prywatna |
 | nazwa użytkownika | tak | wymagana dla profilu | profil, autor treści, ranking | publiczna |
 | imię i nazwisko | opcjonalnie | nie | profil i obsługa konta | prywatna |
-| avatar | opcjonalnie | nie | profil użytkownika | zależnie od UI |
+| avatar | opcjonalnie | nie | profil użytkownika | publiczna |
 
 ### Zdjęcia
 
@@ -85,17 +91,13 @@ Odpowiedź można zatwierdzić dopiero po przejściu testu #210.
 | Czy zbierane? | Tak |
 | Czy wymagane? | Nie |
 | Cel | funkcjonalność aplikacji i treści użytkownika |
-| Widoczność | publiczna dla zdjęć miejsc/opinii; zależna od UI dla avatara |
+| Widoczność | publiczna dla zdjęć miejsc/opinii; publiczna dla avatara |
 
 Stan techniczny:
 
-- aplikacja używa `PickVisualMedia` i `PickMultipleVisualMedia`,
-- manifest nie deklaruje `READ_MEDIA_IMAGES`,
-- manifest nie deklaruje `READ_EXTERNAL_STORAGE`,
-- kamera ma osobne opcjonalne uprawnienie `CAMERA`,
-- użytkownik wybiera konkretne pliki przez Android Photo Picker.
-
-Do formularza nie deklarujemy szerokiego dostępu do galerii jako wymaganej funkcji aplikacji.
+- aplikacja używa `PickVisualMedia` i `PickMultipleVisualMedia` (Photo Picker),
+- manifest nie deklaruje `READ_MEDIA_IMAGES` ani `READ_EXTERNAL_STORAGE`,
+- kamera wymaga uprawnienia `CAMERA`.
 
 ### Lokalizacja
 
@@ -115,8 +117,6 @@ Brak lokalizacji w tle.
 Brak historii lokalizacji użytkownika.
 ```
 
-Manifest nie deklaruje `ACCESS_BACKGROUND_LOCATION`.
-
 ### Treści użytkownika
 
 Zbierane są:
@@ -124,15 +124,8 @@ Zbierane są:
 - miejsca i ich opisy,
 - opinie i oceny,
 - zdjęcia,
-- zgłoszenia naruszeń,
+- zgłoszenia naruszeń (anonimizowane po stronie serwera),
 - propozycje zmian danych miejsc.
-
-Cele:
-
-- funkcjonalność aplikacji,
-- społeczność,
-- moderacja,
-- bezpieczeństwo.
 
 ### Diagnostyka i wydajność
 
@@ -144,59 +137,13 @@ Cele:
 | App activity | Analytics | analiza użycia funkcji |
 | Device or other IDs | Firebase, FCM, Google Play Services | działanie usług, bezpieczeństwo, powiadomienia |
 
-Raportowanie błędów nie powinno przekazywać surowych wyjątków ani danych użytkownika jako custom keys lub breadcrumbs.
-
-### Powiadomienia
-
-FCM wykorzystuje token rejestracyjny urządzenia przechowywany w prywatnej części profilu. Powiadomienia są opcjonalne, a odmowa `POST_NOTIFICATIONS` nie blokuje aplikacji.
-
-## Zbieranie a udostępnianie
-
-Google Play rozróżnia zbieranie danych od ich udostępniania. Dane przetwarzane przez Firebase i Google jako dostawców usług należy ocenić według aktualnej definicji formularza w Play Console.
-
-Nie zaznaczaj automatycznie „brak udostępniania” bez porównania z definicją Google Play i warunkami używanych SDK.
-
-## Opcjonalność danych
-
-| Dane | Opcjonalność |
-| --- | --- |
-| konto i e-mail | wymagane dla funkcji konta |
-| nazwa użytkownika | wymagana dla profilu społecznościowego |
-| imię i nazwisko | opcjonalne |
-| lokalizacja | opcjonalna |
-| kamera | opcjonalna |
-| zdjęcia | opcjonalne |
-| powiadomienia | opcjonalne |
-| treści użytkownika | opcjonalne |
-| diagnostyka i analityka | zależne od konfiguracji release |
+Aplikacja używa `CrashlyticsTree`, który automatycznie usuwa (redaguje) adresy e-mail i tokeny z treści logów wysyłanych do chmury.
 
 ## Kontrola przed zapisaniem formularza
 
-- [ ] finalny manifest nie zawiera `ACCESS_BACKGROUND_LOCATION`,
-- [ ] finalny manifest nie zawiera `READ_MEDIA_IMAGES` ani `READ_EXTERNAL_STORAGE`,
-- [ ] Photo Picker działa dla avatara, miejsc i opinii,
-- [ ] lista aktywnych SDK odpowiada `gradle/libs.versions.toml` i buildowi release,
-- [ ] polityka prywatności opisuje wszystkie aktywne usługi,
-- [ ] usuwanie konta ma wynik PASS,
-- [ ] Crashlytics i Analytics nie zawierają danych osobowych w custom parametrach,
-- [ ] odpowiedzi są zapisane w Google Play Console,
-- [ ] screenshot lub eksport odpowiedzi jest dodany do #272.
-
-## Ostateczny wynik
-
-```markdown
-## Google Play Data Safety result
-
-- Data:
-- Build / commit:
-- Formularz zapisany: TAK / NIE
-- Privacy Policy URL: PASS / FAIL
-- Account deletion URL: PASS / FAIL
-- Account deletion QA: PASS / FAIL / BLOCKED
-- Manifest zgodny: PASS / FAIL
-- SDK zgodne z deklaracją: PASS / FAIL
-- Wynik: PASS / FAIL / BLOCKED
-- Dowody:
-```
-
-Dokument jest materiałem roboczym. Źródłem prawdy przy publikacji jest finalny build i formularz zapisany w Google Play Console.
+- [x] finalny manifest nie zawiera `ACCESS_BACKGROUND_LOCATION`,
+- [x] finalny manifest nie zawiera `READ_MEDIA_IMAGES` ani `READ_EXTERNAL_STORAGE`,
+- [x] Photo Picker działa dla avatara, miejsc i opinii,
+- [x] lista aktywnych SDK odpowiada `gradle/libs.versions.toml`,
+- [x] polityka prywatności opisuje wszystkie aktywne usługi,
+- [x] logi Logcat nie zawierają współrzędnych ani danych osobowych (zweryfikowano #356).

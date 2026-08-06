@@ -29,7 +29,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -37,12 +36,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -108,34 +107,28 @@ class ProfileViewModel @Inject constructor(
     private val badgeBuffer = mutableSetOf<UserBadge>()
     private var detectedBadgeNames: Set<String> = emptySet()
 
-    val profileState: StateFlow<ScreenState<User>> = profileReload
-        .flatMapLatest {
-            flow {
-                emit(ScreenState.Loading)
-                
-                val source: Flow<ScreenState<User>> = authRepository.currentUser
-                    .distinctUntilChanged { old, new -> old?.id == new?.id }
-                    .flatMapLatest { current ->
-                        if (current == null) {
-                            flowOf(ScreenState.Error(UiText.StringResource(R.string.error_unauthorized)))
-                        } else {
-                            authRepository.observeUser(current.id)
-                                .map { user ->
-                                    if (user == null) {
-                                        // Jeśli dane jeszcze nie dotarły do cache Room, zostań w Loading.
-                                        ScreenState.Loading
-                                    } else {
-                                        ScreenState.Content(user)
-                                    }
-                                }
-                        }
+    val profileState: StateFlow<ScreenState<User>> = combine(
+        profileReload,
+        authRepository.currentUser.distinctUntilChanged { old, new -> old?.id == new?.id }
+    ) { _, current ->
+        current
+    }.flatMapLatest { current ->
+        if (current == null) {
+            flowOf(ScreenState.Error(UiText.StringResource(R.string.error_unauthorized)))
+        } else {
+            authRepository.observeUser(current.id)
+                .map { user ->
+                    if (user == null) {
+                        ScreenState.Error(UiText.StringResource(R.string.profile_load_error))
+                    } else {
+                        ScreenState.Content(user)
                     }
-                
-                emitAll(source)
-            }
+                }
+                .onStart { emit(ScreenState.Loading) }
+                .catch { emit(ScreenState.Error(UiText.StringResource(R.string.profile_load_error))) }
         }
-        .catch { emit(ScreenState.Error(UiText.StringResource(R.string.profile_load_error))) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, ScreenState.Loading)
+    }
+    .stateIn(viewModelScope, SharingStarted.Eagerly, ScreenState.Loading)
 
     private val rankings: StateFlow<BadgeContext> = profileState
         .mapNotNull { (it as? ScreenState.Content<User>)?.data }
@@ -226,7 +219,6 @@ class ProfileViewModel @Inject constructor(
     }
 
     fun retryProfile() {
-        _uiState.update { it.copy(newlyEarnedBadges = emptyList(), isInitialCheckComplete = false) }
         profileReload.update { it + 1 }
     }
 
@@ -245,8 +237,8 @@ class ProfileViewModel @Inject constructor(
                 when (val uploadResult = authRepository.uploadAvatar(newAvatarUri)) {
                     is OpResult.Success -> finalAvatarUrl = uploadResult.data
                     is OpResult.Failure -> {
-                        _uiState.update { 
-                            it.copy(
+                        _uiState.update { state ->
+                            state.copy(
                                 isSaving = false, 
                                 saveError = uploadResult.error.toUploadErrorMessage()
                             ) 
@@ -256,13 +248,10 @@ class ProfileViewModel @Inject constructor(
                 }
             }
             val result = authRepository.updateUserProfile(displayName, firstName, lastName, finalAvatarUrl)
-            _uiState.update {
+            _uiState.update { state ->
                 when (result) {
-                    is OpResult.Success -> it.copy(isSaving = false, isEditOpen = false)
-                    is OpResult.Failure -> it.copy(
-                        isSaving = false, 
-                        saveError = result.error.toAuthErrorMessage(R.string.profile_update_failed)
-                    )
+                    is OpResult.Success -> state.copy(isSaving = false, isEditOpen = false)
+                    is OpResult.Failure -> state.copy(isSaving = false, saveError = result.error.toAuthErrorMessage(R.string.profile_update_failed))
                 }
             }
         }
@@ -278,17 +267,10 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isAccountActionInProgress = true, accountActionError = null) }
             val result = authRepository.changePassword(current, new)
-            _uiState.update {
+            _uiState.update { state ->
                 when (result) {
-                    is OpResult.Success -> it.copy(
-                        isAccountActionInProgress = false, 
-                        isChangePasswordOpen = false, 
-                        accountActionInfo = UiText.StringResource(R.string.password_changed)
-                    )
-                    is OpResult.Failure -> it.copy(
-                        isAccountActionInProgress = false, 
-                        accountActionError = result.error.toAuthErrorMessage(R.string.account_action_failed)
-                    )
+                    is OpResult.Success -> state.copy(isAccountActionInProgress = false, isChangePasswordOpen = false, accountActionInfo = UiText.StringResource(R.string.password_changed))
+                    is OpResult.Failure -> state.copy(isAccountActionInProgress = false, accountActionError = result.error.toAuthErrorMessage(R.string.account_action_failed))
                 }
             }
         }
@@ -304,17 +286,10 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isAccountActionInProgress = true, accountActionError = null) }
             val result = authRepository.changeEmail(password, newEmail)
-            _uiState.update {
+            _uiState.update { state ->
                 when (result) {
-                    is OpResult.Success -> it.copy(
-                        isAccountActionInProgress = false, 
-                        isChangeEmailOpen = false, 
-                        accountActionInfo = UiText.StringResource(R.string.change_email_verification_sent, newEmail)
-                    )
-                    is OpResult.Failure -> it.copy(
-                        isAccountActionInProgress = false, 
-                        accountActionError = result.error.toAuthErrorMessage(R.string.account_action_failed)
-                    )
+                    is OpResult.Success -> state.copy(isAccountActionInProgress = false, isChangeEmailOpen = false, accountActionInfo = UiText.StringResource(R.string.change_email_verification_sent, newEmail))
+                    is OpResult.Failure -> state.copy(isAccountActionInProgress = false, accountActionError = result.error.toAuthErrorMessage(R.string.account_action_failed))
                 }
             }
         }
@@ -334,8 +309,8 @@ class ProfileViewModel @Inject constructor(
                 _uiState.update { it.copy(isAccountActionInProgress = false, isDeleteAccountOpen = false) }
                 onDeleted() 
             } else { 
-                _uiState.update { 
-                    it.copy(
+                _uiState.update { state ->
+                    state.copy(
                         isAccountActionInProgress = false, 
                         accountActionError = (result as? OpResult.Failure)?.error
                             ?.toAuthErrorMessage(R.string.delete_account_failed) 
@@ -354,8 +329,8 @@ class ProfileViewModel @Inject constructor(
                 _uiState.update { it.copy(isAccountActionInProgress = false, isDeleteAccountOpen = false) }
                 onDeleted() 
             } else { 
-                _uiState.update { 
-                    it.copy(
+                _uiState.update { state ->
+                    state.copy(
                         isAccountActionInProgress = false, 
                         accountActionError = (result as? OpResult.Failure)?.error
                             ?.toAuthErrorMessage(R.string.delete_account_failed) 
@@ -374,13 +349,12 @@ class ProfileViewModel @Inject constructor(
     fun dismissContact() { _uiState.update { it.copy(isContactOpen = false) } }
 
     fun submitContactMessage(subject: String, message: String) {
-        val cleanSubject = subject.trim(); val cleanMessage = message.trim()
+        val cleanSubject = subject.trim()
+        val cleanMessage = message.trim()
         if (cleanSubject.length < CONTACT_SUBJECT_MIN_LENGTH || 
             cleanMessage.length < CONTACT_MESSAGE_MIN_LENGTH
         ) {
-            _uiState.update { 
-                it.copy(accountActionError = UiText.StringResource(R.string.contact_support_validation_error)) 
-            }
+            _uiState.update { it.copy(accountActionError = UiText.StringResource(R.string.contact_support_validation_error)) }
             return
         }
         viewModelScope.launch {
@@ -391,8 +365,8 @@ class ProfileViewModel @Inject constructor(
                 ).await() 
             }
                 .onSuccess { 
-                    _uiState.update { 
-                        it.copy(
+                    _uiState.update { state ->
+                        state.copy(
                             isAccountActionInProgress = false, 
                             isContactOpen = false, 
                             accountActionInfo = UiText.StringResource(R.string.contact_support_sent)
@@ -400,8 +374,8 @@ class ProfileViewModel @Inject constructor(
                     } 
                 }
                 .onFailure { 
-                    _uiState.update { 
-                        it.copy(
+                    _uiState.update { state ->
+                        state.copy(
                             isAccountActionInProgress = false, 
                             accountActionError = UiText.StringResource(R.string.contact_support_send_failed)
                         ) 
@@ -416,8 +390,8 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isAccountActionInProgress = true) }
             notificationPrefsUseCase.save(prefs)
-            _uiState.update { 
-                it.copy(
+            _uiState.update { state ->
+                state.copy(
                     isAccountActionInProgress = false, 
                     isNotificationPrefsOpen = false, 
                     notificationPrefs = prefs
@@ -435,8 +409,8 @@ class ProfileViewModel @Inject constructor(
     fun dismissLanguageDialog() { _uiState.update { it.copy(isLanguageDialogOpen = false) } }
     fun saveLanguage(language: AppLanguage) { 
         languagePreferences.setLanguage(language)
-        _uiState.update { 
-            it.copy(selectedLanguage = language, isLanguageDialogOpen = false) 
+        _uiState.update { state -> 
+            state.copy(selectedLanguage = language, isLanguageDialogOpen = false) 
         } 
     }
     fun openBadgesInfo() { _uiState.update { it.copy(isBadgesInfoOpen = true) } }

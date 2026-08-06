@@ -1,16 +1,11 @@
-- [x] Fix Achievement Dialog Machine-Gunning
-    - [x] Implement collection buffer in `ProfileViewModel.kt`
-    - [x] Aggregate local and network badges during initial load
-    - [x] Add unit tests for stabilization logic in `ProfileViewModelTest.kt`
-- [x] Standardize KDoc and Resolve Detekt Issues
-    - [x] Add `@Suppress("FunctionNaming")` to `PlaceStatus.kt`
-    - [x] Remove `PLACE_STATUS_HEIGHT` from `HomeScreen.kt`
-    - [x] Add KDoc to all 14 primary Screens
+- [x] Release Security Hardening (#356)
+    - [x] Harden Firestore rules for reports (schema & size validation)
+    - [x] Harden Storage rules (filename validation)
+    - [x] Cleanup sensitive Logcat output in `PlaceListViewModel.kt`
+    - [x] Update Google Play Data Safety draft with latest code reality
+    - [x] Resolve Detekt issues (MaxLineLength, UnusedParameter) in `ProfileViewModel.kt`
+- [ ] CI Stabilization
+    - [ ] Resolve flaky unit tests in `ProfileViewModelTest.kt` (ongoing)
 - [x] Verification
     - [x] Run `gradlew :app:detekt` — PASSED
-    - [x] Verify single summary dialog for multiple initial badges — VERIFIED
-- [x] Achievement UX (Issue 357)
-    - [x] Full list of badges shown on first load after new install
-    - [x] Notification prompt hidden during discovery phase (isInitialCheckComplete)
-    - [x] Clicking "Super!" correctly persists all seen badges
-    - [x] Vertical list in dialog expanded for better readability
+    - [x] Manual Logcat audit — VERIFIED
