@@ -91,6 +91,7 @@ service cloud.firestore {
       return isPhotoField && noDeletion;
     }
 
+    // Validates a report for a place. Hardened in #356.
     function isValidPlaceReport() {
       let data = request.resource.data;
       let reason = data.get('reason', null);
