@@ -33,6 +33,7 @@ service firebase.storage {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Validates if the file name has a safe length. Hardened in #356.
     function isValidFileName(name) {
       return name.size() >= 10 && name.size() <= 128;
     }

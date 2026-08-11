@@ -146,4 +146,5 @@ Aplikacja używa `CrashlyticsTree`, który automatycznie usuwa (redaguje) adresy
 - [x] Photo Picker działa dla avatara, miejsc i opinii,
 - [x] lista aktywnych SDK odpowiada `gradle/libs.versions.toml`,
 - [x] polityka prywatności opisuje wszystkie aktywne usługi,
-- [x] logi Logcat nie zawierają współrzędnych ani danych osobowych (zweryfikowano #356).
+- [x] logi Logcat nie zawierają współrzędnych ani danych osobowych (zweryfikowano #356),
+- [x] Cloud Rules (Firestore/Storage) zostały utwardzone (hasOnly, max length, isValidFileName) (#356).
