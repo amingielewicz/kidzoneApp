@@ -15,6 +15,7 @@ import com.kidzone.utils.toPlacesErrorMessage
 import com.kidzone.widget.NearbyPlacesWidget
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +29,8 @@ private const val RECENTLY_ADDED_WINDOW_MILLIS = 14L * 24L * 60L * 60L * 1000L
 private const val LOCATION_RETRY_DELAY_MS = 1_000L
 private const val LOCATION_RETRY_COUNT = 3
 private const val ONE_MINUTE_MILLIS = 60_000L
+private const val DEFAULT_CITY_LAT = 52.2297
+private const val DEFAULT_CITY_LNG = 21.0122
 
 /**
  * 🎯 Odpowiedzialności:
@@ -78,11 +81,11 @@ class HomeViewModel @Inject constructor(
      * Miejsce połączone z odległością od pozycji użytej do budowy sekcji.
      *
      * @property place model miejsca.
-     * @property distanceKm odległość w kilometrach obliczona formułą haversine.
+     * @property distanceKm odległość w kilometrach (null, jeśli lokalizacja nieznana).
      */
     data class PlaceWithDistance(
         val place: Place,
-        val distanceKm: Double
+        val distanceKm: Double?
     )
 
     private data class LastKnownLocation(
@@ -121,7 +124,8 @@ class HomeViewModel @Inject constructor(
         val isAcquiringLocation: Boolean = false,
         val isUsingStaleLocation: Boolean = false,
         val staleLocationAgeMinutes: Int? = null,
-        val hasWeakGpsSignal: Boolean = false
+        val hasWeakGpsSignal: Boolean = false,
+        val isGlobalFallback: Boolean = false
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -143,20 +147,14 @@ class HomeViewModel @Inject constructor(
      */
     fun refreshLocationGranted() {
         val granted = locationProvider.hasPermission()
-        val shouldLoad = granted && !_uiState.value.locationGranted
-        _uiState.update {
-            it.copy(
-                locationGranted = granted,
-                isTopLoading = if (granted) it.isTopLoading else false,
-                isNearbyLoading = if (granted) it.isNearbyLoading else false,
-                isRecentlyAddedLoading = if (granted) it.isRecentlyAddedLoading else false,
-                hasWeakGpsSignal = if (granted) it.hasWeakGpsSignal else false,
-                isUsingStaleLocation = if (granted) it.isUsingStaleLocation else false,
-                staleLocationAgeMinutes = if (granted) it.staleLocationAgeMinutes else null
-            )
-        }
-        if (shouldLoad) {
+        val prevGranted = _uiState.value.locationGranted
+        
+        _uiState.update { it.copy(locationGranted = granted) }
+        
+        if (granted && !prevGranted) {
             loadLocationBasedPlaces()
+        } else if (!granted) {
+            loadGlobalFallbackPlaces()
         }
     }
 
@@ -166,7 +164,7 @@ class HomeViewModel @Inject constructor(
      * UI nadal powinno odświeżyć rzeczywisty stan podczas kolejnego lifecycle eventu.
      */
     fun onLocationPermissionGranted() {
-        _uiState.update { it.copy(locationGranted = true) }
+        _uiState.update { it.copy(locationGranted = true, isGlobalFallback = false) }
         loadLocationBasedPlaces()
     }
 
@@ -178,11 +176,7 @@ class HomeViewModel @Inject constructor(
      */
     fun refresh() {
         if (!locationProvider.hasPermission()) {
-            viewModelScope.launch {
-                _uiState.update { it.copy(isRefreshing = true) }
-                delay(300)
-                _uiState.update { it.copy(isRefreshing = false) }
-            }
+            loadGlobalFallbackPlaces()
             return
         }
         _uiState.update { it.copy(isRefreshing = true) }
@@ -196,11 +190,7 @@ class HomeViewModel @Inject constructor(
 
             val (lat, lng) = location
             saveLastKnownLocation(lat, lng)
-            loadPlacesForLocation(
-                lat = lat,
-                lng = lng,
-                isStale = false
-            )
+            loadPlacesForLocation(lat, lng, isStale = false)
         }
     }
 
@@ -218,6 +208,7 @@ class HomeViewModel @Inject constructor(
                     hasWeakGpsSignal = false
                 )
             }
+            loadGlobalFallbackPlaces()
             return
         }
 
@@ -228,7 +219,8 @@ class HomeViewModel @Inject constructor(
                     isNearbyLoading = true,
                     isRecentlyAddedLoading = true,
                     errorMessage = null,
-                    hasWeakGpsSignal = false
+                    hasWeakGpsSignal = false,
+                    isGlobalFallback = false
                 )
             }
 
@@ -308,6 +300,7 @@ class HomeViewModel @Inject constructor(
                     errorMessage = null
                 )
             }
+            loadGlobalFallbackPlaces()
             return
         }
 
@@ -329,6 +322,7 @@ class HomeViewModel @Inject constructor(
                     errorMessage = null
                 )
             }
+            loadGlobalFallbackPlaces()
             return
         }
 
@@ -357,7 +351,7 @@ class HomeViewModel @Inject constructor(
         }
 
         // Następnie (lub równolegle przez Repository) pobieramy dane z sieci.
-        // Repository samo zarządza tym, czy najpierw zwraca cache. 
+        // Repository samo zarządza tym, czy najpierw zwraca cache.
         // Tutaj wywołanie gwarantuje próbę synchronizacji.
         when (
             val result = placeRepository.getPlacesNear(
@@ -407,8 +401,60 @@ class HomeViewModel @Inject constructor(
                 isUsingStaleLocation = isStale,
                 staleLocationAgeMinutes = lastKnownLocation?.ageMinutes().takeIf { isStale },
                 hasWeakGpsSignal = isStale,
+                isGlobalFallback = false,
                 errorMessage = null
             )
+        }
+    }
+
+    private fun loadGlobalFallbackPlaces() {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isTopLoading = true,
+                    isNearbyLoading = true,
+                    isRecentlyAddedLoading = false,
+                    isRefreshing = true,
+                    errorMessage = null,
+                    isGlobalFallback = true
+                )
+            }
+
+            val performanceConfig = performanceConfigProvider.performanceConfig
+
+            val topPlacesDeferred = async { placeRepository.getTopPlaces(performanceConfig.homeTopPlacesLimit) }
+            val nearbyPlacesDeferred = async {
+                placeRepository.getPlacesNear(DEFAULT_CITY_LAT, DEFAULT_CITY_LNG, performanceConfig.homeFetchRadiusKm)
+            }
+
+            val topResult = topPlacesDeferred.await()
+            val nearbyResult = nearbyPlacesDeferred.await()
+
+            val topPlaces = when (topResult) {
+                is OpResult.Success -> topResult.data.map { PlaceWithDistance(it, null) }
+                else -> emptyList()
+            }
+
+            val nearbyPlaces = when (nearbyResult) {
+                is OpResult.Success -> nearbyResult.data.map { PlaceWithDistance(it, null) }
+                else -> emptyList()
+            }
+
+            _uiState.update {
+                it.copy(
+                    topPlaces = topPlaces,
+                    nearbyPlaces = nearbyPlaces,
+                    recentlyAddedPlaces = emptyList(),
+                    isTopLoading = false,
+                    isNearbyLoading = false,
+                    isRecentlyAddedLoading = false,
+                    isRefreshing = false,
+                    isAcquiringLocation = false,
+                    isUsingStaleLocation = false,
+                    staleLocationAgeMinutes = null,
+                    hasWeakGpsSignal = false
+                )
+            }
         }
     }
 
