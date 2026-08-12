@@ -74,6 +74,7 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.model.LatLng
 import com.kidzone.R
 import com.kidzone.navigation.Route
+import com.kidzone.presentation.common.MandatoryTosDialog
 import com.kidzone.presentation.common.NetworkStatus
 import com.kidzone.presentation.common.NotificationPromptReason
 import com.kidzone.presentation.common.NotificationSoftPromptDialog
@@ -83,11 +84,14 @@ import com.kidzone.presentation.common.rememberNetworkStatus
 import com.kidzone.presentation.common.requestLocationPermissionOrOpenSettings
 import com.kidzone.presentation.common.shouldShowNotificationPrompt
 import com.kidzone.presentation.home.HomeScreen
+import com.kidzone.presentation.main.MainViewModel
 import com.kidzone.presentation.map.MapScreen
 import com.kidzone.presentation.place.add.isLocationServiceEnabled
 import com.kidzone.presentation.place.list.PlaceListScreen
 import com.kidzone.presentation.profile.ProfileScreen
 import com.kidzone.presentation.ranking.RankingScreen
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.runtime.collectAsState
 
 private const val MAIN_UI_PREFS = "main_ui_prefs"
 private const val KEY_HOME_INTRO_USED = "home_intro_used"
@@ -125,8 +129,10 @@ fun MainScreen(
     onFocusConsumed: () -> Unit = {},
     onLocaleChanged: () -> Unit = {},
     sharedTransitionScope: SharedTransitionScope? = null,
-    animatedContentScope: AnimatedContentScope? = null
+    animatedContentScope: AnimatedContentScope? = null,
+    viewModel: MainViewModel = hiltViewModel()
 ) {
+    val state by viewModel.uiState.collectAsState()
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -456,6 +462,13 @@ fun MainScreen(
         NotificationSoftPromptDialog(
             reason = reason,
             onDismiss = { notificationPromptReason = null }
+        )
+    }
+
+    if (state.showTosDialog) {
+        MandatoryTosDialog(
+            onAccept = { viewModel.acceptTos() },
+            isAccepting = state.isAcceptingTos
         )
     }
 }

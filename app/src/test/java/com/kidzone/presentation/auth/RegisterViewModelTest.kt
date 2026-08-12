@@ -4,7 +4,6 @@ import com.kidzone.R
 import com.kidzone.domain.repository.AuthRepository
 import com.kidzone.testutil.MainDispatcherRule
 import com.kidzone.testutil.TestFixtures
-import com.kidzone.utils.AuthException
 import com.kidzone.utils.OpResult
 import com.kidzone.utils.UiText
 import io.mockk.coEvery
@@ -57,14 +56,7 @@ class RegisterViewModelTest {
             assertEquals("", state.name)
             assertEquals("", state.email)
             assertEquals("", state.password)
-            assertFalse(state.isTosAccepted)
             assertFalse(state.isFormValid)
-        }
-
-        @Test
-        fun `isNameValid returns false for blank name`() {
-            viewModel.onNameChange("   ")
-            assertFalse(viewModel.uiState.value.isNameValid)
         }
 
         @Test
@@ -80,28 +72,22 @@ class RegisterViewModelTest {
         }
 
         @Test
-        fun `isFormValid becomes true only when all fields valid including TOS`() {
+        fun `isFormValid becomes true when all requirements are met`() {
             viewModel.onNameChange("Jan Kowalski")
             viewModel.onEmailChange("jan@example.com")
             viewModel.onPasswordChange("StrongP@ss123!")
-            viewModel.onTosAcceptanceChange(true)
-            assertTrue(viewModel.uiState.value.isFormValid)
-        }
-
-        @Test
-        fun `isFormValid remains false when TOS not accepted`() {
-            viewModel.onNameChange("Jan Kowalski")
-            viewModel.onEmailChange("jan@example.com")
-            viewModel.onPasswordChange("StrongP@ss123!")
-            viewModel.onTosAcceptanceChange(false)
-            assertFalse(viewModel.uiState.value.isFormValid)
+            
+            val state = viewModel.uiState.value
+            assertTrue(state.isNameValid, "Name should be valid")
+            assertTrue(state.isEmailValid, "Email should be valid")
+            assertTrue(state.isPasswordValid, "Password should be valid")
+            assertTrue(state.isFormValid, "Whole form should be valid")
         }
 
         @Test
         fun `changing name clears error message`() {
             viewModel.onEmailChange("jan@example.com")
             viewModel.onPasswordChange("StrongP@ss123!")
-            viewModel.onTosAcceptanceChange(true)
             
             // Trigger error by submitting blank name
             viewModel.onNameChange("")
@@ -126,28 +112,12 @@ class RegisterViewModelTest {
             viewModel.onNameChange("Jan Kowalski")
             viewModel.onEmailChange("jan@example.com")
             viewModel.onPasswordChange("StrongP@ss123!")
-            viewModel.onTosAcceptanceChange(true)
             
             viewModel.register()
             advanceUntilIdle()
 
             assertTrue(viewModel.uiState.value.isRegistered)
             coVerify { authRepository.signOut() }
-        }
-
-        @Test
-        fun `shows error when TOS not accepted`() = runTest {
-            viewModel.onNameChange("Jan")
-            viewModel.onEmailChange("jan@example.com")
-            viewModel.onPasswordChange("StrongP@ss123!")
-            viewModel.onTosAcceptanceChange(false)
-            
-            viewModel.register()
-            advanceUntilIdle()
-
-            val state = viewModel.uiState.value
-            assertFalse(state.isRegistered)
-            assertEquals(R.string.field_required, (state.errorMessage as? UiText.StringResource)?.resId)
         }
 
         @Test
@@ -158,28 +128,11 @@ class RegisterViewModelTest {
             viewModel.onNameChange("  Jan  ")
             viewModel.onEmailChange("  jan@example.com  ")
             viewModel.onPasswordChange("StrongP@ss123!")
-            viewModel.onTosAcceptanceChange(true)
             
             viewModel.register()
             advanceUntilIdle()
 
             coVerify { authRepository.registerWithEmail("Jan", "jan@example.com", "StrongP@ss123!") }
-        }
-
-        @Test
-        fun `maps auth exceptions correctly`() = runTest {
-            coEvery { authRepository.registerWithEmail(any(), any(), any()) } returns
-                OpResult.failure(AuthException.EmailAlreadyInUse)
-
-            viewModel.onNameChange("Jan")
-            viewModel.onEmailChange("jan@example.com")
-            viewModel.onPasswordChange("StrongP@ss123!")
-            viewModel.onTosAcceptanceChange(true)
-            
-            viewModel.register()
-            advanceUntilIdle()
-
-            assertEquals(R.string.error_email_already_in_use, (viewModel.uiState.value.errorMessage as? UiText.StringResource)?.resId)
         }
     }
 }

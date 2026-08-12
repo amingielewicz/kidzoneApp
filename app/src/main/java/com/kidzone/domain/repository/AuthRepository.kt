@@ -226,6 +226,11 @@ interface AuthRepository {
     suspend fun recordBadgesEarned(badgeNames: List<String>): OpResult<Unit>
 
     /**
+     * Rejestruje fakt akceptacji Regulaminu przez użytkownika.
+     */
+    suspend fun acceptTos(): OpResult<Unit>
+
+    /**
      * Usuwa zapisane odznaki, których warunki nie są już spełnione.
      *
      * @param badgeNames nazwy odznak do cofnięcia; pusta lista jest operacją no-op.

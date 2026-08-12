@@ -234,7 +234,6 @@ class FirebaseAuthRepository @Inject constructor(
                 nameLowercase = nameLowercase,
                 avatarUrl = firebaseUser.photoUrl?.toString(),
                 createdAtMillis = createdAtMillis,
-                tosAcceptedAtMillis = createdAtMillis,
                 badgeEarnedAt = emptyMap()
             )
             val privateDto = UserPrivateDto(
@@ -767,6 +766,20 @@ class FirebaseAuthRepository @Inject constructor(
         OpResult.failure(e)
     }
 
+    override suspend fun acceptTos(): OpResult<Unit> = try {
+        val uid = firebaseAuth.currentUser?.uid
+            ?: error("No signed-in user")
+        
+        firestore.collection(FirestoreCollections.USERS)
+            .document(uid)
+            .update("tosAcceptedAtMillis", System.currentTimeMillis())
+            .await()
+            
+        OpResult.success(Unit)
+    } catch (e: Exception) {
+        OpResult.failure(e)
+    }
+
     /**
      * Lowercase nazwy użytkownika dla case-insensitive zapytań w Firestore.
      *
@@ -848,8 +861,7 @@ class FirebaseAuthRepository @Inject constructor(
                     name = displayName,
                     nameLowercase = displayName.toUserNameLowercase(),
                     avatarUrl = firebaseUser.photoUrl?.toString(),
-                    createdAtMillis = now,
-                    tosAcceptedAtMillis = now
+                    createdAtMillis = now
                 )
                 val privateDto = UserPrivateDto(
                     userId = firebaseUser.uid,
@@ -867,18 +879,12 @@ class FirebaseAuthRepository @Inject constructor(
                 // nie generuje write'a.
                 val existingNameLc = snap.getString("nameLowercase").orEmpty()
                 val existingName = snap.getString("name").orEmpty()
-                val tosAcceptedAt = snap.getLong("tosAcceptedAtMillis") ?: 0L
                 
-                val updates = mutableMapOf<String, Any>()
                 if (existingNameLc.isBlank() && existingName.isNotBlank()) {
-                    updates["nameLowercase"] = existingName.toUserNameLowercase()
-                }
-                if (tosAcceptedAt == 0L) {
-                    updates["tosAcceptedAtMillis"] = snap.getLong("createdAtMillis") ?: now
-                }
-                
-                if (updates.isNotEmpty()) {
-                    docRef.set(updates, SetOptions.merge()).await()
+                    docRef.set(
+                        mapOf("nameLowercase" to existingName.toUserNameLowercase()),
+                        SetOptions.merge()
+                    ).await()
                 }
                 ensurePrivateProfile(firebaseUser, snap)
             }
