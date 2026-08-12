@@ -355,31 +355,18 @@ class HomeViewModel @Inject constructor(
 
         // Następnie (lub równolegle przez Repository) pobieramy dane z sieci.
         // Repository samo zarządza tym, czy najpierw zwraca cache.
-        // Pobieramy dane lokalne (promień 50km) ORAZ globalne nowości, aby sekcja nie była zbyt mała.
-        coroutineScope {
-            val nearbyTask = async {
-                placeRepository.getPlacesNear(lat, lng, performanceConfig.homeFetchRadiusKm)
+        // Pobieramy dane lokalne (promień 50km). Sekcje same odfiltrują mniejsze promienie.
+        when (
+            val result = placeRepository.getPlacesNear(
+                lat,
+                lng,
+                performanceConfig.homeFetchRadiusKm
+            )
+        ) {
+            is OpResult.Success -> {
+                updateHomeSections(result.data, lat, lng, isStale)
             }
-            val globalRecentTask = async {
-                placeRepository.getPlacesPage(pageSize = performanceConfig.homeRecentlyAddedLimit)
-            }
-
-            val nearbyResult = nearbyTask.await()
-            val globalRecentResult = globalRecentTask.await()
-
-            val combinedPlaces = mutableListOf<Place>()
-            if (nearbyResult is OpResult.Success) {
-                combinedPlaces.addAll(nearbyResult.data)
-            }
-            if (globalRecentResult is OpResult.Success) {
-                combinedPlaces.addAll(globalRecentResult.data.items)
-            }
-
-            val uniquePlaces = combinedPlaces.distinctBy { it.id }
-            
-            if (uniquePlaces.isNotEmpty()) {
-                updateHomeSections(uniquePlaces, lat, lng, isStale)
-            } else if (nearbyResult is OpResult.Failure) {
+            is OpResult.Failure -> {
                 if (_uiState.value.nearbyPlaces.isEmpty()) {
                     _uiState.update {
                         it.copy(
@@ -387,7 +374,7 @@ class HomeViewModel @Inject constructor(
                             isNearbyLoading = false,
                             isRecentlyAddedLoading = false,
                             isRefreshing = false,
-                            errorMessage = nearbyResult.error.toPlacesErrorMessage(
+                            errorMessage = result.error.toPlacesErrorMessage(
                                 UiText.StringResource(com.kidzone.R.string.error_fetch_places)
                             )
                         )
@@ -561,6 +548,7 @@ internal fun buildHomeSections(
         .map { (place, distanceKm) -> HomeViewModel.PlaceWithDistance(place, distanceKm) }
 
     val recentlyAdded = placesWithDistance
+        .filter { (_, distanceKm) -> distanceKm != null && distanceKm <= 5.0 }
         .sortedWith(
             compareByDescending<Pair<Place, Double>> { it.first.createdAtMillis }
                 .thenBy { it.second }
