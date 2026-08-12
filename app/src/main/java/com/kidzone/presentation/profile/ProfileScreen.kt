@@ -1550,7 +1550,7 @@ internal fun ProfileNavRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 44.dp)
+            .heightIn(min = 48.dp)
             .clickable(
                 onClickLabel = label,
                 role = Role.Button,

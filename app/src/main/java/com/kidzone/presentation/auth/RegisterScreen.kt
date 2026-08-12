@@ -246,8 +246,8 @@ fun RegisterScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Checkbox(
-                                checked = false, // Placeholder or real state if added to ViewModel
-                                onCheckedChange = { /* Handle if added to ViewModel */ },
+                                checked = state.isTosAccepted,
+                                onCheckedChange = viewModel::onTosAcceptanceChange,
                                 colors = CheckboxDefaults.colors(
                                     checkedColor = MaterialTheme.colorScheme.primary
                                 )
@@ -255,7 +255,7 @@ fun RegisterScreen(
                             Column {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = "Rejestrując się akceptujesz ",
+                                        text = "Akceptuję ",
                                         style = MaterialTheme.typography.bodySmall
                                     )
                                     TextButton(

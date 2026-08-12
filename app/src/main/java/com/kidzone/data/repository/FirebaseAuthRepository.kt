@@ -234,6 +234,7 @@ class FirebaseAuthRepository @Inject constructor(
                 nameLowercase = nameLowercase,
                 avatarUrl = firebaseUser.photoUrl?.toString(),
                 createdAtMillis = createdAtMillis,
+                tosAcceptedAtMillis = createdAtMillis,
                 badgeEarnedAt = emptyMap()
             )
             val privateDto = UserPrivateDto(
@@ -847,7 +848,8 @@ class FirebaseAuthRepository @Inject constructor(
                     name = displayName,
                     nameLowercase = displayName.toUserNameLowercase(),
                     avatarUrl = firebaseUser.photoUrl?.toString(),
-                    createdAtMillis = now
+                    createdAtMillis = now,
+                    tosAcceptedAtMillis = now
                 )
                 val privateDto = UserPrivateDto(
                     userId = firebaseUser.uid,
@@ -865,11 +867,18 @@ class FirebaseAuthRepository @Inject constructor(
                 // nie generuje write'a.
                 val existingNameLc = snap.getString("nameLowercase").orEmpty()
                 val existingName = snap.getString("name").orEmpty()
+                val tosAcceptedAt = snap.getLong("tosAcceptedAtMillis") ?: 0L
+                
+                val updates = mutableMapOf<String, Any>()
                 if (existingNameLc.isBlank() && existingName.isNotBlank()) {
-                    docRef.set(
-                        mapOf("nameLowercase" to existingName.toUserNameLowercase()),
-                        SetOptions.merge()
-                    ).await()
+                    updates["nameLowercase"] = existingName.toUserNameLowercase()
+                }
+                if (tosAcceptedAt == 0L) {
+                    updates["tosAcceptedAtMillis"] = snap.getLong("createdAtMillis") ?: now
+                }
+                
+                if (updates.isNotEmpty()) {
+                    docRef.set(updates, SetOptions.merge()).await()
                 }
                 ensurePrivateProfile(firebaseUser, snap)
             }

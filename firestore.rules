@@ -11,6 +11,20 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isNotBanned() {
+      return isSignedIn()
+        && (
+          !exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          || (
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) == 0
+            || (
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) > 0
+              && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) < request.time.toMillis()
+            )
+          )
+        );
+    }
+
     function isAdmin() {
       return isSignedIn()
         && (
@@ -30,7 +44,7 @@ service cloud.firestore {
     }
 
     function isNotUpdating(fields) {
-      return !request.resource.data
+      return resource == null || !request.resource.data
         .diff(resource.data)
         .affectedKeys()
         .hasAny(fields);
@@ -43,14 +57,11 @@ service cloud.firestore {
     }
 
     function hasValidPhotoHashes() {
-      let data = request.resource.data;
-      let photoHashes = data.get('photoHashes', {});
-      let photoUrls = data.get('photoUrls', []);
-      return photoHashes is map
-          && photoHashes.size() <= 5
-          && photoUrls is list
-          && photoHashes.keys().hasOnly(photoUrls)
-          && photoHashes.size() == photoUrls.size();
+      return request.resource.data.get('photoHashes', {}) is map
+          && request.resource.data.get('photoHashes', {}).size() <= 5
+          && request.resource.data.get('photoUrls', []) is list
+          && request.resource.data.get('photoHashes', {}).keys().hasOnly(request.resource.data.get('photoUrls', []))
+          && request.resource.data.get('photoHashes', {}).size() == request.resource.data.get('photoUrls', []).size();
     }
 
     function hasNoPrivateUserFields() {
@@ -68,7 +79,8 @@ service cloud.firestore {
     }
 
     function isDeletingOnlyLegacyFcmTokens() {
-      return request.resource.data
+      return resource != null
+        && request.resource.data
           .diff(resource.data)
           .affectedKeys()
           .hasOnly(['fcmTokens'])
@@ -76,33 +88,18 @@ service cloud.firestore {
     }
 
     function isOnlyAddingPhotos() {
-      let data = request.resource.data;
-      let oldData = resource.data;
-      let affected = data.diff(oldData).affectedKeys();
-
-      // Tylko pola zdjęć mogą być zmieniane
-      let isPhotoField = affected.hasOnly(['photoUrls', 'photoUploadedBy', 'photoHashes']);
-
-      // Zabezpieczenie dla gości: mogą dodawać, ale nie mogą usuwać cudzych zdjęć
-      let currentUrls = data.get('photoUrls', []).toSet();
-      let oldUrls = oldData.get('photoUrls', []).toSet();
-      let noDeletion = currentUrls.hasAll(oldUrls);
-
-      return isPhotoField && noDeletion;
+      return resource != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoUrls', 'photoUploadedBy', 'photoHashes'])
+        && request.resource.data.get('photoUrls', []).toSet().hasAll(resource.data.get('photoUrls', []).toSet());
     }
 
     // Validates a report for a place. Hardened in #356.
     function isValidPlaceReport() {
-      let data = request.resource.data;
-      let reason = data.get('reason', null);
-      let comment = data.get('comment', null);
-      let status = data.get('status', null);
-
-      return data.keys().hasAll(['placeId', 'reporterId', 'createdAtMillis'])
-        && data.keys().hasOnly(['placeId', 'reporterId', 'reason', 'comment', 'status', 'createdAtMillis'])
-        && data.reporterId == request.auth.uid
-        && data.placeId is string
-        && (reason == null || (reason is string && reason in [
+      return request.resource.data.keys().hasAll(['placeId', 'reporterId', 'createdAtMillis'])
+        && request.resource.data.keys().hasOnly(['placeId', 'reporterId', 'reason', 'comment', 'status', 'createdAtMillis'])
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.placeId is string
+        && (request.resource.data.get('reason', null) == null || (request.resource.data.reason is string && request.resource.data.reason in [
           'INCORRECT_INFORMATION',
           'CLOSED_OR_MISSING',
           'DUPLICATE',
@@ -110,53 +107,43 @@ service cloud.firestore {
           'INAPPROPRIATE',
           'OTHER'
         ]))
-        && (comment == null || (comment is string && comment.size() <= 500))
-        && (status == null || status == 'pending')
-        && data.createdAtMillis is int;
+        && (request.resource.data.get('comment', null) == null || (request.resource.data.comment is string && request.resource.data.comment.size() <= 500))
+        && (request.resource.data.get('status', null) == null || request.resource.data.status == 'pending')
+        && request.resource.data.createdAtMillis is int;
     }
 
     function isValidReviewReport() {
-      let data = request.resource.data;
-      let reason = data.get('reason', null);
-      let comment = data.get('comment', null);
-      let status = data.get('status', null);
-
-      return data.keys().hasAll(['reviewId', 'reporterId', 'createdAtMillis'])
-        && data.keys().hasOnly(['reviewId', 'reporterId', 'reason', 'comment', 'status', 'createdAtMillis'])
-        && data.reporterId == request.auth.uid
-        && data.reviewId is string
-        && (reason == null || (reason is string && reason in [
+      return request.resource.data.keys().hasAll(['reviewId', 'reporterId', 'createdAtMillis'])
+        && request.resource.data.keys().hasOnly(['reviewId', 'reporterId', 'reason', 'comment', 'status', 'createdAtMillis'])
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.reviewId is string
+        && (request.resource.data.get('reason', null) == null || (request.resource.data.reason is string && request.resource.data.reason in [
           'SPAM',
           'OFFENSIVE',
           'FALSE_INFO',
           'NOT_RELEVANT',
           'OTHER'
         ]))
-        && (comment == null || (comment is string && comment.size() <= 500))
-        && (status == null || status == 'pending')
-        && data.createdAtMillis is int;
+        && (request.resource.data.get('comment', null) == null || (request.resource.data.comment is string && request.resource.data.comment.size() <= 500))
+        && (request.resource.data.get('status', null) == null || request.resource.data.status == 'pending')
+        && request.resource.data.createdAtMillis is int;
     }
 
     function isValidPhotoReport() {
-      let data = request.resource.data;
-      let reason = data.get('reason', null);
-      let comment = data.get('comment', null);
-      let status = data.get('status', null);
-
-      return data.keys().hasAll(['photoUrl', 'reporterId', 'createdAtMillis'])
-        && data.keys().hasOnly(['photoUrl', 'reporterId', 'reason', 'comment', 'status', 'createdAtMillis'])
-        && data.reporterId == request.auth.uid
-        && data.photoUrl is string
-        && (reason == null || (reason is string && reason in [
+      return request.resource.data.keys().hasAll(['photoUrl', 'reporterId', 'createdAtMillis'])
+        && request.resource.data.keys().hasOnly(['photoUrl', 'reporterId', 'reason', 'comment', 'status', 'createdAtMillis'])
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.photoUrl is string
+        && (request.resource.data.get('reason', null) == null || (request.resource.data.reason is string && request.resource.data.reason in [
           'INAPPROPRIATE',
           'NOT_RELEVANT',
           'COPYRIGHT',
           'OFFENSIVE',
           'OTHER'
         ]))
-        && (comment == null || (comment is string && comment.size() <= 500))
-        && (status == null || status == 'pending')
-        && data.createdAtMillis is int;
+        && (request.resource.data.get('comment', null) == null || (request.resource.data.comment is string && request.resource.data.comment.size() <= 500))
+        && (request.resource.data.get('status', null) == null || request.resource.data.status == 'pending')
+        && request.resource.data.createdAtMillis is int;
     }
 
     function isValidPlaceChangeRequest() {
@@ -248,6 +235,7 @@ service cloud.firestore {
         && request.resource.data.role == 'user'
         && request.resource.data.placesAddedCount == 0
         && request.resource.data.reviewsCount == 0
+        && request.resource.data.get('tosAcceptedAtMillis', 0) > 0
         && hasNoPrivateUserFields();
 
       allow update: if (
@@ -301,7 +289,7 @@ service cloud.firestore {
     match /places/{placeId} {
       allow read: if true;
 
-      allow create: if isSignedIn()
+      allow create: if isNotBanned()
         && request.resource.data.ownerUserId is string
         && request.resource.data.ownerUserId == request.auth.uid
         && request.resource.data.averageRating is number
@@ -314,7 +302,7 @@ service cloud.firestore {
         && (
           isAdmin()
           || (
-            isSignedIn()
+            isNotBanned()
             && (
               // Właściciel miejsca może zmieniać wszystko poza licznikami (w tym USUWAĆ zdjęcia)
               (resource.data.ownerUserId == request.auth.uid && isNotUpdating([
@@ -338,7 +326,7 @@ service cloud.firestore {
     match /reviews/{reviewId} {
       allow read: if true;
 
-      allow create: if isSignedIn()
+      allow create: if isNotBanned()
         && request.resource.data.userId is string
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.placeId is string
@@ -352,7 +340,8 @@ service cloud.firestore {
 
       allow update: if isAdmin()
         || (
-          isOwner(resource.data.userId)
+          isNotBanned()
+          && isOwner(resource.data.userId)
           && isNotUpdating([
             'userId',
             'placeId',
@@ -376,7 +365,7 @@ service cloud.firestore {
     }
 
     match /place_reports/{reportId} {
-      allow create: if isSignedIn()
+      allow create: if isNotBanned()
         && isValidPlaceReport();
 
       allow read: if isAdmin()
@@ -389,7 +378,7 @@ service cloud.firestore {
     }
 
    match /review_reports/{reportId} {
-     allow create: if isSignedIn()
+     allow create: if isNotBanned()
        && isValidReviewReport();
 
      allow read: if isAdmin()
@@ -402,7 +391,7 @@ service cloud.firestore {
    }
 
     match /photo_reports/{reportId} {
-      allow create: if isSignedIn()
+      allow create: if isNotBanned()
         && isValidPhotoReport();
 
       allow read: if isAdmin()
@@ -415,7 +404,7 @@ service cloud.firestore {
     }
 
     match /place_change_requests/{requestId} {
-      allow create: if isSignedIn()
+      allow create: if isNotBanned()
         && isValidPlaceChangeRequest();
 
       allow read: if isAdmin()

@@ -471,6 +471,22 @@ class PlaceDetailsViewModel @Inject constructor(
             }
             return
         }
+        if (user.isBanned) {
+            _uiState.update {
+                it.copy(
+                    addReviewError = if (user.bannedUntilMillis == -1L) {
+                        UiText.StringResource(R.string.ban_permanent)
+                    } else {
+                        val date = java.text.SimpleDateFormat(
+                            "dd.MM.yyyy HH:mm",
+                            java.util.Locale.getDefault()
+                        ).format(java.util.Date(user.bannedUntilMillis))
+                        UiText.StringResource(R.string.ban_temporary, date)
+                    }
+                )
+            }
+            return
+        }
         if (rating !in 1..5) {
             _uiState.update {
                 it.copy(addReviewError = UiText.StringResource(R.string.error_invalid_rating))

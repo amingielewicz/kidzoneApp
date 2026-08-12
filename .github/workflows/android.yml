@@ -83,6 +83,9 @@ jobs:
       - name: Scan secrets with Gitleaks
         run: gitleaks detect --source . --verbose --redact
 
+      - name: Verify Java version
+        run: java -version
+
       - name: Run Android Lint
         run: ./gradlew clean lintDebug
         env:

@@ -147,4 +147,12 @@ Aplikacja używa `CrashlyticsTree`, który automatycznie usuwa (redaguje) adresy
 - [x] lista aktywnych SDK odpowiada `gradle/libs.versions.toml`,
 - [x] polityka prywatności opisuje wszystkie aktywne usługi,
 - [x] logi Logcat nie zawierają współrzędnych ani danych osobowych (zweryfikowano #356),
-- [x] Cloud Rules (Firestore/Storage) zostały utwardzone (hasOnly, max length, isValidFileName) (#356).
+- [x] Cloud Rules (Firestore/Storage) zostały utwardzone (hasOnly, max length, isValidFileName) (#356),
+- [x] mechanizmy blokowania użytkowników (ban) i akceptacji Regulaminu (TOS) są wdrożone technicznie (#373).
+
+## Polityka UGC (User Generated Content)
+
+Zgodnie z wymaganiami Google Play, aplikacja wdraża:
+- **Akceptację Regulaminu**: Każdy użytkownik musi zaakceptować TOS przy rejestracji (`tosAcceptedAtMillis`),
+- **Blokowanie użytkowników**: System umożliwia administratorowi nałożenie blokady czasowej lub permanentnej (`bannedUntilMillis`), co technicznie uniemożliwia dodawanie jakichkolwiek treści (walidacja po stronie aplikacji i reguł Firestore),
+- **Zgłaszanie treści**: Użytkownicy mogą zgłaszać miejsca, opinie i zdjęcia (Issue #347).

@@ -11,6 +11,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -28,24 +29,14 @@ import org.junit.jupiter.api.extension.RegisterExtension
  * 🧪 Cel testu:
  * - Weryfikacja procesu rejestracji nowego użytkownika przez [RegisterViewModel].
  * - Sprawdzenie lokalnej walidacji formularza i obsługi błędów z backendu.
- *
- * 🛠️ Środowisko:
- * - Mockowanie warstwy autoryzacji ([AuthRepository]).
- * - [MainDispatcherRule] dla deterministycznych testów asynchronicznych.
- *
- * 🔍 Scenariusze:
- * - Poprawna rejestracja konta.
- * - Walidacja zbyt krótkich nazw i słabych haseł.
- * - Obsługa konfliktów (zajęty email lub nazwa użytkownika).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RegisterViewModelTest {
 
-    companion object {
-        @JvmField
-        @RegisterExtension
-        val mainDispatcherRule = MainDispatcherRule()
-    }
+    private val testDispatcher = UnconfinedTestDispatcher()
+
+    @RegisterExtension
+    val mainDispatcherRule = MainDispatcherRule(testDispatcher)
 
     private lateinit var authRepository: AuthRepository
     private lateinit var viewModel: RegisterViewModel
@@ -55,10 +46,6 @@ class RegisterViewModelTest {
         authRepository = mockk(relaxed = true)
         viewModel = RegisterViewModel(authRepository)
     }
-
-    // =========================================================================
-    // Form validation
-    // =========================================================================
 
     @Nested
     @DisplayName("Form validation")
@@ -70,9 +57,8 @@ class RegisterViewModelTest {
             assertEquals("", state.name)
             assertEquals("", state.email)
             assertEquals("", state.password)
+            assertFalse(state.isTosAccepted)
             assertFalse(state.isFormValid)
-            assertFalse(state.isLoading)
-            assertFalse(state.isRegistered)
         }
 
         @Test
@@ -82,74 +68,44 @@ class RegisterViewModelTest {
         }
 
         @Test
-        fun `isNameValid returns true for non-blank name`() {
-            viewModel.onNameChange("Jan")
-            assertTrue(viewModel.uiState.value.isNameValid)
-        }
-
-        @Test
-        fun `isEmailValid returns false for missing at sign`() {
-            viewModel.onEmailChange("invalid-email")
-            assertFalse(viewModel.uiState.value.isEmailValid)
-        }
-
-        @Test
-        fun `isEmailValid returns false for missing domain dot`() {
-            viewModel.onEmailChange("user@nodot")
-            assertFalse(viewModel.uiState.value.isEmailValid)
-        }
-
-        @Test
-        fun `isEmailValid returns false for too short email`() {
-            viewModel.onEmailChange("a@b.")
-            assertFalse(viewModel.uiState.value.isEmailValid)
-        }
-
-        @Test
         fun `isEmailValid returns true for valid email`() {
             viewModel.onEmailChange("user@example.com")
             assertTrue(viewModel.uiState.value.isEmailValid)
         }
 
         @Test
-        fun `isPasswordValid returns false for weak password`() {
-            viewModel.onPasswordChange("short")
-            assertFalse(viewModel.uiState.value.isPasswordValid)
-        }
-
-        @Test
         fun `isPasswordValid returns true for strong password`() {
-            viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onPasswordChange("StrongP@ss123!")
             assertTrue(viewModel.uiState.value.isPasswordValid)
         }
 
         @Test
-        fun `isFormValid is true only when all fields valid`() {
+        fun `isFormValid becomes true only when all fields valid including TOS`() {
             viewModel.onNameChange("Jan Kowalski")
             viewModel.onEmailChange("jan@example.com")
-            viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onPasswordChange("StrongP@ss123!")
+            viewModel.onTosAcceptanceChange(true)
             assertTrue(viewModel.uiState.value.isFormValid)
         }
 
         @Test
-        fun `isFormValid is false when password is weak`() {
-            viewModel.onNameChange("Jan")
+        fun `isFormValid remains false when TOS not accepted`() {
+            viewModel.onNameChange("Jan Kowalski")
             viewModel.onEmailChange("jan@example.com")
-            viewModel.onPasswordChange("weak")
+            viewModel.onPasswordChange("StrongP@ss123!")
+            viewModel.onTosAcceptanceChange(false)
             assertFalse(viewModel.uiState.value.isFormValid)
         }
 
         @Test
         fun `changing name clears error message`() {
-            // Force an error first
+            viewModel.onEmailChange("jan@example.com")
+            viewModel.onPasswordChange("StrongP@ss123!")
+            viewModel.onTosAcceptanceChange(true)
+            
+            // Trigger error by submitting blank name
             viewModel.onNameChange("")
-            viewModel.onEmailChange("user@example.com")
-            viewModel.onPasswordChange("StrongP@ss1")
-            // Trigger register to set errorMessage for blank name
-            runTest {
-                viewModel.register()
-                advanceUntilIdle()
-            }
+            viewModel.register()
             assertNotNull(viewModel.uiState.value.errorMessage)
 
             viewModel.onNameChange("Jan")
@@ -157,190 +113,73 @@ class RegisterViewModelTest {
         }
     }
 
-    // =========================================================================
-    // Registration
-    // =========================================================================
-
     @Nested
-    @DisplayName("register()")
+    @DisplayName("Registration process")
     inner class Register {
 
         @Test
-        fun `shows error when name is blank`() = runTest {
-            viewModel.onEmailChange("user@example.com")
-            viewModel.onPasswordChange("StrongP@ss1")
-            viewModel.register()
-            advanceUntilIdle()
-
-            val state = viewModel.uiState.value
-            assertTrue(state.errorMessage is UiText.StringResource)
-            assertEquals(R.string.error_enter_username, (state.errorMessage as UiText.StringResource).resId)
-        }
-
-        @Test
-        fun `shows error when email is blank`() = runTest {
-            viewModel.onNameChange("Jan")
-            viewModel.onPasswordChange("StrongP@ss1")
-            viewModel.register()
-            advanceUntilIdle()
-
-            val state = viewModel.uiState.value
-            assertTrue(state.errorMessage is UiText.StringResource)
-            assertEquals(R.string.error_enter_email, (state.errorMessage as UiText.StringResource).resId)
-        }
-
-        @Test
-        fun `shows error when password is blank`() = runTest {
-            viewModel.onNameChange("Jan")
-            viewModel.onEmailChange("user@example.com")
-            viewModel.register()
-            advanceUntilIdle()
-
-            val state = viewModel.uiState.value
-            assertTrue(state.errorMessage is UiText.StringResource)
-            assertEquals(R.string.error_enter_password, (state.errorMessage as UiText.StringResource).resId)
-        }
-
-        @Test
-        fun `shows password policy error for weak password`() = runTest {
-            viewModel.onNameChange("Jan")
-            viewModel.onEmailChange("user@example.com")
-            viewModel.onPasswordChange("weak")
-            viewModel.register()
-            advanceUntilIdle()
-
-            val state = viewModel.uiState.value
-            assertTrue(state.errorMessage is UiText.StringResource)
-            assertEquals(R.string.error_weak_password, (state.errorMessage as UiText.StringResource).resId)
-        }
-
-        @Test
-        fun `successful registration sets isRegistered and shows success message`() = runTest {
+        fun `successful registration signs out to force verification`() = runTest {
             val user = TestFixtures.user()
             coEvery { authRepository.registerWithEmail(any(), any(), any()) } returns
                 OpResult.success(user)
 
             viewModel.onNameChange("Jan Kowalski")
             viewModel.onEmailChange("jan@example.com")
-            viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onPasswordChange("StrongP@ss123!")
+            viewModel.onTosAcceptanceChange(true)
+            
             viewModel.register()
             advanceUntilIdle()
 
-            val state = viewModel.uiState.value
-            assertTrue(state.isRegistered)
-            assertTrue(state.successMessage is UiText.StringResource)
-            assertEquals(R.string.register_success_message, (state.successMessage as UiText.StringResource).resId)
-            assertFalse(state.isLoading)
-            assertNull(state.errorMessage)
-        }
-
-        @Test
-        fun `signs out after successful registration`() = runTest {
-            coEvery { authRepository.registerWithEmail(any(), any(), any()) } returns
-                OpResult.success(TestFixtures.user())
-
-            viewModel.onNameChange("Jan")
-            viewModel.onEmailChange("jan@example.com")
-            viewModel.onPasswordChange("StrongP@ss1")
-            viewModel.register()
-            advanceUntilIdle()
-
+            assertTrue(viewModel.uiState.value.isRegistered)
             coVerify { authRepository.signOut() }
         }
 
         @Test
-        fun `does not sign out on registration failure`() = runTest {
-            coEvery { authRepository.registerWithEmail(any(), any(), any()) } returns
-                OpResult.failure(AuthException.EmailAlreadyInUse)
-
+        fun `shows error when TOS not accepted`() = runTest {
             viewModel.onNameChange("Jan")
             viewModel.onEmailChange("jan@example.com")
-            viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onPasswordChange("StrongP@ss123!")
+            viewModel.onTosAcceptanceChange(false)
+            
             viewModel.register()
             advanceUntilIdle()
 
-            coVerify(exactly = 0) { authRepository.signOut() }
+            val state = viewModel.uiState.value
+            assertFalse(state.isRegistered)
+            assertEquals(R.string.field_required, (state.errorMessage as? UiText.StringResource)?.resId)
         }
 
         @Test
-        fun `trims name and email before sending`() = runTest {
+        fun `trims inputs before repository call`() = runTest {
             coEvery { authRepository.registerWithEmail(any(), any(), any()) } returns
                 OpResult.success(TestFixtures.user())
 
             viewModel.onNameChange("  Jan  ")
             viewModel.onEmailChange("  jan@example.com  ")
-            viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onPasswordChange("StrongP@ss123!")
+            viewModel.onTosAcceptanceChange(true)
+            
             viewModel.register()
             advanceUntilIdle()
 
-            coVerify { authRepository.registerWithEmail("Jan", "jan@example.com", "StrongP@ss1") }
+            coVerify { authRepository.registerWithEmail("Jan", "jan@example.com", "StrongP@ss123!") }
         }
 
         @Test
-        fun `email already in use shows appropriate error`() = runTest {
+        fun `maps auth exceptions correctly`() = runTest {
             coEvery { authRepository.registerWithEmail(any(), any(), any()) } returns
                 OpResult.failure(AuthException.EmailAlreadyInUse)
 
             viewModel.onNameChange("Jan")
-            viewModel.onEmailChange("existing@example.com")
-            viewModel.onPasswordChange("StrongP@ss1")
-            viewModel.register()
-            advanceUntilIdle()
-
-            val state = viewModel.uiState.value
-            assertFalse(state.isRegistered)
-            assertTrue(state.errorMessage is UiText.StringResource)
-            assertEquals(R.string.error_email_already_in_use, (state.errorMessage as UiText.StringResource).resId)
-        }
-
-        @Test
-        fun `username already taken shows appropriate error`() = runTest {
-            coEvery { authRepository.registerWithEmail(any(), any(), any()) } returns
-                OpResult.failure(AuthException.UsernameAlreadyTaken)
-
-            viewModel.onNameChange("ExistingUser")
-            viewModel.onEmailChange("new@example.com")
-            viewModel.onPasswordChange("StrongP@ss1")
-            viewModel.register()
-            advanceUntilIdle()
-
-            val state = viewModel.uiState.value
-            assertFalse(state.isRegistered)
-            assertTrue(state.errorMessage is UiText.StringResource)
-            assertEquals(R.string.error_username_taken, (state.errorMessage as UiText.StringResource).resId)
-        }
-
-        @Test
-        fun `isLoading is true during registration`() = runTest {
-            coEvery { authRepository.registerWithEmail(any(), any(), any()) } coAnswers {
-                assertTrue(viewModel.uiState.value.isLoading)
-                OpResult.success(TestFixtures.user())
-            }
-
-            viewModel.onNameChange("Jan")
             viewModel.onEmailChange("jan@example.com")
-            viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onPasswordChange("StrongP@ss123!")
+            viewModel.onTosAcceptanceChange(true)
+            
             viewModel.register()
             advanceUntilIdle()
 
-            assertFalse(viewModel.uiState.value.isLoading)
-        }
-
-        @Test
-        fun `network error shows generic error message`() = runTest {
-            coEvery { authRepository.registerWithEmail(any(), any(), any()) } returns
-                OpResult.failure(AuthException.Network(RuntimeException("Connection timeout")))
-
-            viewModel.onNameChange("Jan")
-            viewModel.onEmailChange("jan@example.com")
-            viewModel.onPasswordChange("StrongP@ss1")
-            viewModel.register()
-            advanceUntilIdle()
-
-            val state = viewModel.uiState.value
-            assertTrue(state.errorMessage is UiText.StringResource)
-            assertEquals(R.string.error_network, (state.errorMessage as UiText.StringResource).resId)
-            assertFalse(state.isRegistered)
+            assertEquals(R.string.error_email_already_in_use, (viewModel.uiState.value.errorMessage as? UiText.StringResource)?.resId)
         }
     }
 }

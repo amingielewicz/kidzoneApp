@@ -439,6 +439,24 @@ class AddPlaceViewModel @Inject @Suppress("LongParameterList") constructor(
                 return@launch
             }
 
+            if (currentUser.isBanned) {
+                _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        errorMessage = if (currentUser.bannedUntilMillis == -1L) {
+                            UiText.StringResource(R.string.ban_permanent)
+                        } else {
+                            val date = java.text.SimpleDateFormat(
+                                "dd.MM.yyyy HH:mm",
+                                java.util.Locale.getDefault()
+                            ).format(java.util.Date(currentUser.bannedUntilMillis))
+                            UiText.StringResource(R.string.ban_temporary, date)
+                        }
+                    )
+                }
+                return@launch
+            }
+
             val targetPlaceId = state.editingPlaceId ?: UUID.randomUUID().toString()
 
             // Upload nowych zdjęć

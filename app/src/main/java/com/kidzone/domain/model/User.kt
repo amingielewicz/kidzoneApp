@@ -18,6 +18,7 @@ package com.kidzone.domain.model
  * @property badgeEarnedAt mapa nazw odznak do czasu ich pierwszego zdobycia.
  * @property bannedUntilMillis czas końca blokady (-1 = permanentna, 0 = brak).
  * @property banReason administracyjny powód blokady.
+ * @property tosAcceptedAtMillis czas akceptacji Regulaminu (UGC compliance).
  * @property emailNotificationsEnabled prywatna zgoda na powiadomienia e-mail.
  */
 data class User(
@@ -34,6 +35,7 @@ data class User(
     val badgeEarnedAt: Map<String, Long> = emptyMap(),
     val bannedUntilMillis: Long = 0L,
     val banReason: String = "",
+    val tosAcceptedAtMillis: Long = 0L,
     val emailNotificationsEnabled: Boolean = true
 ) {
     /**
