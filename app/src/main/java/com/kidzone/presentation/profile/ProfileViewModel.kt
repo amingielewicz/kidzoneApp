@@ -451,7 +451,7 @@ class ProfileViewModel @Inject constructor(
         }
         pendingSeenBadgesUserId = null
         pendingSeenBadgeNames = emptySet()
-        detectedBadgeNames = emptySet()
+        // detectedBadgeNames remains to prevent re-triggering in the same session
         badgeBuffer.clear()
         isInitialCollectionPhase = false
         _uiState.update { it.copy(newlyEarnedBadges = emptyList()) }
@@ -464,14 +464,24 @@ class ProfileViewModel @Inject constructor(
         val allKnownBadges = seenNamesInPrefs + detectedBadgeNames
         val currentNames = currentBadges.map { it.name }.toSet()
         
-        val newlyEarned = currentBadges.filter { it.name !in allKnownBadges }.sortedBy { it.ordinal }
+        // Filtrujemy tylko te, których nie znamy lokalnie.
+        var newlyEarned = currentBadges.filter { it.name !in allKnownBadges }.sortedBy { it.ordinal }
+
+        // Dodatkowe zabezpieczenie: jeśli badge jest już w profilu (Firestore), 
+        // to nie jest "nowy" dla tego użytkownika, a jedynie dla tego urządzenia.
+        // Wyświetlamy go tylko podczas pierwszej synchronizacji (initial phase).
+        if (!isInitialCollectionPhase) {
+            val firestoreBadges = user.value?.badgeEarnedAt?.keys ?: emptySet()
+            newlyEarned = newlyEarned.filter { it.name !in firestoreBadges }
+        }
         
         // Obsługa odznak odebranych (np. spadek w rankingu).
-        val seenAsBadges = allKnownBadges.mapNotNull { runCatching { UserBadge.valueOf(it) }.getOrNull() }.toSet()
-        val revoked = seenAsBadges.filter { b -> currentBadges.none { it == b } }
+        // Tylko jeśli faktycznie coś ubyło względem tego, co zapisaliśmy jako widoczne.
+        val revoked = seenNamesInPrefs.filter { name -> currentBadges.none { it.name == name } }
         if (revoked.isNotEmpty()) {
-            viewModelScope.launch { authRepository.revokeBadges(revoked.map { it.name }) }
-            // Uaktualniamy lokalną pamięć, aby nie próbować odbierać w nieskończoność.
+            viewModelScope.launch { authRepository.revokeBadges(revoked) }
+            // Nie czyścimy całego stanu seen, bo to spowoduje ponowne gratulacje dla reszty.
+            // Zamiast tego usuwamy tylko te odebrane z lokalnego zapisu.
             badgePreferences.setSeenBadges(userId, currentNames)
         }
 
@@ -483,10 +493,8 @@ class ProfileViewModel @Inject constructor(
             pendingSeenBadgeNames = currentNames
             
             if (isInitialCollectionPhase) {
-                // Podczas startu zbieramy wszystko (historyczne + nowe) do jednego okna.
                 badgeBuffer.addAll(newlyEarned)
             } else {
-                // Odznaki zdobyte w trakcie sesji zapisujemy też trwale w bazy (z timestampem).
                 viewModelScope.launch {
                     authRepository.recordBadgesEarned(newlyEarned.map { it.name })
                 }

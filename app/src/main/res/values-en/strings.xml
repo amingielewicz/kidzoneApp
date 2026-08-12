@@ -203,6 +203,7 @@
     <string name="notification_settings">Email and push notifications</string>
     <string name="terms_of_service">Terms of service</string>
     <string name="privacy_policy">Privacy policy</string>
+    <string name="privacy_policy_acc">Privacy policy</string>
     <string name="privacy_policy_effective_date">Effective from: %1$s</string>
     <!-- Onboarding -->
     <string name="onboarding_title_1">Welcome to kidZone!</string>

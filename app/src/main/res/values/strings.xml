@@ -204,6 +204,7 @@
     <string name="notification_settings">Powiadomienia email i push</string>
     <string name="terms_of_service">Regulamin użytkowania</string>
     <string name="privacy_policy">Polityka prywatności</string>
+    <string name="privacy_policy_acc">Politykę prywatności</string>
     <string name="privacy_policy_effective_date">Obowiązuje od: %1$s</string>
     <!-- Onboarding -->
     <string name="onboarding_title_1">Witaj w kidZone!</string>

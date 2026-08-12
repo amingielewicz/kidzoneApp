@@ -11,7 +11,7 @@ import com.kidzone.data.local.sync.PendingOperationEntity
  * - Zarządzanie tabelami cache'u (miejsca, opinie) oraz kolejką operacji oczekujących.
  *
  * ⚙️ Techniczne:
- * - `version = 5`: Dodano mapy JSON dla `photoHashes` w encjach.
+ * - `version = 7`: Dodano `tosAcceptedAtMillis` do `UserEntity`.
  * - `exportSchema = false`: Schematy nie są eksportowane (używamy czyszczenia cache przy zmianach).
  *
  * ✅ Gwarancje:
@@ -19,7 +19,7 @@ import com.kidzone.data.local.sync.PendingOperationEntity
  */
 @Database(
     entities = [PlaceEntity::class, ReviewEntity::class, PendingOperationEntity::class, UserEntity::class],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class KidZoneDatabase : RoomDatabase() {

@@ -11,6 +11,12 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isTosAccepted() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('tosAcceptedAtMillis', 0) > 0;
+    }
+
     function isNotBanned() {
       return isSignedIn()
         && (
@@ -235,7 +241,6 @@ service cloud.firestore {
         && request.resource.data.role == 'user'
         && request.resource.data.placesAddedCount == 0
         && request.resource.data.reviewsCount == 0
-        && request.resource.data.get('tosAcceptedAtMillis', 0) > 0
         && hasNoPrivateUserFields();
 
       allow update: if (
@@ -255,7 +260,10 @@ service cloud.firestore {
         )
         || (
           isOwner(userId)
-          && isDeletingOnlyLegacyFcmTokens()
+          && (
+            isDeletingOnlyLegacyFcmTokens()
+            || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tosAcceptedAtMillis'])
+          )
         )
         || isAdmin();
 
@@ -289,7 +297,8 @@ service cloud.firestore {
     match /places/{placeId} {
       allow read: if true;
 
-      allow create: if isNotBanned()
+      allow create: if isTosAccepted()
+        && isNotBanned()
         && request.resource.data.ownerUserId is string
         && request.resource.data.ownerUserId == request.auth.uid
         && request.resource.data.averageRating is number
@@ -326,7 +335,8 @@ service cloud.firestore {
     match /reviews/{reviewId} {
       allow read: if true;
 
-      allow create: if isNotBanned()
+      allow create: if isTosAccepted()
+        && isNotBanned()
         && request.resource.data.userId is string
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.placeId is string
@@ -365,7 +375,8 @@ service cloud.firestore {
     }
 
     match /place_reports/{reportId} {
-      allow create: if isNotBanned()
+      allow create: if isTosAccepted()
+        && isNotBanned()
         && isValidPlaceReport();
 
       allow read: if isAdmin()
@@ -378,7 +389,8 @@ service cloud.firestore {
     }
 
    match /review_reports/{reportId} {
-     allow create: if isNotBanned()
+     allow create: if isTosAccepted()
+       && isNotBanned()
        && isValidReviewReport();
 
      allow read: if isAdmin()
@@ -391,7 +403,8 @@ service cloud.firestore {
    }
 
     match /photo_reports/{reportId} {
-      allow create: if isNotBanned()
+      allow create: if isTosAccepted()
+        && isNotBanned()
         && isValidPhotoReport();
 
       allow read: if isAdmin()
@@ -404,7 +417,8 @@ service cloud.firestore {
     }
 
     match /place_change_requests/{requestId} {
-      allow create: if isNotBanned()
+      allow create: if isTosAccepted()
+        && isNotBanned()
         && isValidPlaceChangeRequest();
 
       allow read: if isAdmin()
