@@ -15,11 +15,10 @@ service cloud.firestore {
       return isSignedIn()
         && (
           !exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) == 0
           || (
-            let user = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-            let bannedUntil = user.get('bannedUntilMillis', 0);
-            bannedUntil == 0
-            || (bannedUntil > 0 && bannedUntil < request.time.toMillis())
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) > 0
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) < request.time.toMillis()
           )
         );
     }
