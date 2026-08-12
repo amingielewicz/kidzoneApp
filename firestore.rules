@@ -260,20 +260,17 @@ service cloud.firestore {
         )
         || (
           isOwner(userId)
-          && (
-            isDeletingOnlyLegacyFcmTokens()
-            || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tosAcceptedAtMillis'])
-          )
+          && isDeletingOnlyLegacyFcmTokens()
         )
         || isAdmin();
 
-      allow delete: if isAdmin();
+      allow delete: if isOwner(userId) || isAdmin();
 
       match /private/profile {
         allow read: if isOwner(userId) || isAdmin();
         allow create: if isOwner(userId);
         allow update: if isOwner(userId) || isAdmin();
-        allow delete: if isAdmin();
+        allow delete: if isOwner(userId) || isAdmin();
       }
 
       match /private/messaging {
@@ -314,11 +311,11 @@ service cloud.firestore {
             isNotBanned()
             && (
               // Właściciel miejsca może zmieniać wszystko poza licznikami (w tym USUWAĆ zdjęcia)
-              (resource.data.ownerUserId == request.auth.uid && isNotUpdating([
-                'averageRating',
-                'reviewsCount',
-                'ownerUserId'
-              ]))
+              // Dodatkowo pozwalamy właścicielowi na anonymizację (ownerUserId -> "")
+              (resource.data.ownerUserId == request.auth.uid && (
+                isNotUpdating(['averageRating', 'reviewsCount', 'ownerUserId'])
+                || (request.resource.data.ownerUserId == "" && isNotUpdating(['averageRating', 'reviewsCount']))
+              ))
               // Osoby trzecie mogą tylko DODAWAC zdjęcia
               || isOnlyAddingPhotos()
             )
@@ -352,22 +349,30 @@ service cloud.firestore {
         || (
           isNotBanned()
           && isOwner(resource.data.userId)
-          && isNotUpdating([
-            'userId',
-            'placeId',
-            'createdAtMillis'
-          ])
-          && request.resource.data
-            .diff(resource.data)
-            .affectedKeys()
-            .hasOnly([
-              'rating',
-              'comment',
-              'photoUrls',
-              'photoHashes',
-              'updatedAtMillis'
-            ])
-          && isValidRating(request.resource.data.rating)
+          && (
+            (
+              isNotUpdating(['userId', 'placeId', 'createdAtMillis'])
+              && request.resource.data
+                .diff(resource.data)
+                .affectedKeys()
+                .hasOnly([
+                  'rating',
+                  'comment',
+                  'photoUrls',
+                  'photoHashes',
+                  'updatedAtMillis'
+                ])
+            )
+            || (
+              request.resource.data.userId == ""
+              && isNotUpdating(['placeId', 'createdAtMillis'])
+              && request.resource.data
+                .diff(resource.data)
+                .affectedKeys()
+                .hasOnly(['userId', 'authorName'])
+            )
+          )
+          && (request.resource.data.userId == "" || isValidRating(request.resource.data.rating))
         );
 
       allow delete: if isAdmin()
