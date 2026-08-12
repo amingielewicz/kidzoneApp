@@ -27,8 +27,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** Okno czasowe używane przez sekcję ostatnio dodanych miejsc (30 dni). */
-private const val RECENTLY_ADDED_WINDOW_MILLIS = 30L * 24L * 60L * 60L * 1000L
 private const val LOCATION_RETRY_DELAY_MS = 1_000L
 private const val LOCATION_RETRY_COUNT = 3
 private const val ONE_MINUTE_MILLIS = 60_000L
@@ -357,18 +355,31 @@ class HomeViewModel @Inject constructor(
 
         // Następnie (lub równolegle przez Repository) pobieramy dane z sieci.
         // Repository samo zarządza tym, czy najpierw zwraca cache.
-        // Tutaj wywołanie gwarantuje próbę synchronizacji.
-        when (
-            val result = placeRepository.getPlacesNear(
-                lat,
-                lng,
-                performanceConfig.homeFetchRadiusKm
-            )
-        ) {
-            is OpResult.Success -> {
-                updateHomeSections(result.data, lat, lng, isStale)
+        // Pobieramy dane lokalne (promień 50km) ORAZ globalne nowości, aby sekcja nie była zbyt mała.
+        coroutineScope {
+            val nearbyTask = async {
+                placeRepository.getPlacesNear(lat, lng, performanceConfig.homeFetchRadiusKm)
             }
-            is OpResult.Failure -> {
+            val globalRecentTask = async {
+                placeRepository.getPlacesPage(pageSize = performanceConfig.homeRecentlyAddedLimit)
+            }
+
+            val nearbyResult = nearbyTask.await()
+            val globalRecentResult = globalRecentTask.await()
+
+            val combinedPlaces = mutableListOf<Place>()
+            if (nearbyResult is OpResult.Success) {
+                combinedPlaces.addAll(nearbyResult.data)
+            }
+            if (globalRecentResult is OpResult.Success) {
+                combinedPlaces.addAll(globalRecentResult.data.items)
+            }
+
+            val uniquePlaces = combinedPlaces.distinctBy { it.id }
+            
+            if (uniquePlaces.isNotEmpty()) {
+                updateHomeSections(uniquePlaces, lat, lng, isStale)
+            } else if (nearbyResult is OpResult.Failure) {
                 if (_uiState.value.nearbyPlaces.isEmpty()) {
                     _uiState.update {
                         it.copy(
@@ -376,7 +387,7 @@ class HomeViewModel @Inject constructor(
                             isNearbyLoading = false,
                             isRecentlyAddedLoading = false,
                             isRefreshing = false,
-                            errorMessage = result.error.toPlacesErrorMessage(
+                            errorMessage = nearbyResult.error.toPlacesErrorMessage(
                                 UiText.StringResource(com.kidzone.R.string.error_fetch_places)
                             )
                         )
@@ -526,13 +537,11 @@ internal data class HomeSections(
  *
  * @param placesWithDistance miejsca połączone z odległością od użytkownika.
  * @param performanceConfig limity i promienie pobrane z Remote Config.
- * @param nowMillis czas odniesienia używany do sekcji ostatnio dodanych.
  * @return gotowe, posortowane i ograniczone sekcje.
  */
 internal fun buildHomeSections(
     placesWithDistance: List<Pair<Place, Double>>,
-    performanceConfig: PerformanceConfig = PerformanceConfig(),
-    nowMillis: Long = System.currentTimeMillis()
+    performanceConfig: PerformanceConfig = PerformanceConfig()
 ): HomeSections {
     val nearby = placesWithDistance
         .sortedBy { it.second }
@@ -551,11 +560,7 @@ internal fun buildHomeSections(
         .take(performanceConfig.homeTopPlacesLimit)
         .map { (place, distanceKm) -> HomeViewModel.PlaceWithDistance(place, distanceKm) }
 
-    val recentThresholdMillis = nowMillis - RECENTLY_ADDED_WINDOW_MILLIS
     val recentlyAdded = placesWithDistance
-        .filter { (place, _) ->
-            place.createdAtMillis >= recentThresholdMillis
-        }
         .sortedWith(
             compareByDescending<Pair<Place, Double>> { it.first.createdAtMillis }
                 .thenBy { it.second }

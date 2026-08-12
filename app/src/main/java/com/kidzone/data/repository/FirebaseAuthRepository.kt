@@ -129,10 +129,20 @@ class FirebaseAuthRepository @Inject constructor(
         var privateDto: UserPrivateDto? = null
 
         fun syncToLocal() {
-            val user = publicDto?.toDomain(
+            var user = publicDto?.toDomain(
                 privateProfile = privateDto,
                 includeLegacyPrivateFallback = shouldObservePrivateProfile
             ) ?: return
+
+            // Fallback dla adresu e-mail: jeśli obserwujemy własny profil i Firestore
+            // nie ma jeszcze adresu (np. po zmianie lub podczas migracji), używamy
+            // danych z Firebase Auth jako Single Source of Truth dla tożsamości.
+            if (shouldObservePrivateProfile && user.email.isBlank()) {
+                val authEmail = firebaseAuth.currentUser?.email
+                if (!authEmail.isNullOrBlank()) {
+                    user = user.copy(email = authEmail)
+                }
+            }
 
             // Aktualizujemy cache lokalny. Dzięki temu Profil, avatar
             // i statystyki będą dostępne natychmiast po starcie offline.

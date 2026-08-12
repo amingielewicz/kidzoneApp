@@ -321,9 +321,11 @@ fun RegisterScreen(
     }
 }
 
+@Suppress("MagicNumber")
 @Composable
 private fun PasswordRequirements(password: String) {
     val statuses = com.kidzone.utils.PasswordPolicy.evaluate(password)
+    val successColor = Color(0xFF4CAF50)
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -331,7 +333,10 @@ private fun PasswordRequirements(password: String) {
         statuses.forEach { status ->
             val label = when (status.labelKey) {
                 com.kidzone.utils.PasswordPolicy.LabelKey.MinLength -> 
-                    stringResource(R.string.password_requirement_min_length, com.kidzone.utils.PasswordPolicy.MIN_LENGTH)
+                    stringResource(
+                        R.string.password_requirement_min_length, 
+                        com.kidzone.utils.PasswordPolicy.MIN_LENGTH
+                    )
                 com.kidzone.utils.PasswordPolicy.LabelKey.Lowercase -> 
                     stringResource(R.string.password_requirement_lowercase)
                 com.kidzone.utils.PasswordPolicy.LabelKey.Uppercase -> 
@@ -348,13 +353,13 @@ private fun PasswordRequirements(password: String) {
                     imageVector = if (status.isSatisfied) Icons.Default.Check else Icons.Default.Close,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = if (status.isSatisfied) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
+                    tint = if (status.isSatisfied) successColor else MaterialTheme.colorScheme.error
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (status.isSatisfied) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (status.isSatisfied) successColor else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

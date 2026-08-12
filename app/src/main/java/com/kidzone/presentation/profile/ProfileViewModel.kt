@@ -160,6 +160,12 @@ class ProfileViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(AppConfig.FLOW_SUBSCRIPTION_TIMEOUT_MS), null)
 
     init {
+        // Zawsze odświeżamy dane z Firebase Auth przy wejściu na profil,
+        // aby wykryć zmiany np. po kliknięciu linku weryfikacyjnego e-mail.
+        viewModelScope.launch {
+            authRepository.refreshUser()
+        }
+
         viewModelScope.launch {
             user.mapNotNull { it }
                 .distinctUntilChanged { old, new -> 

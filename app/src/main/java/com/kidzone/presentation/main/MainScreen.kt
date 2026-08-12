@@ -465,7 +465,7 @@ fun MainScreen(
         )
     }
 
-    if (state.showTosDialog) {
+    if (state.showTosDialog && !showHomeIntro) {
         MandatoryTosDialog(
             onAccept = { viewModel.acceptTos() },
             isAccepting = state.isAcceptingTos
