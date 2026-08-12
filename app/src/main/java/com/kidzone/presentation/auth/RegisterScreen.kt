@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -26,6 +27,8 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -187,6 +190,7 @@ fun RegisterScreen(
                             leadingIcon = {
                                 Icon(Icons.Default.Person, contentDescription = null)
                             },
+                            isError = state.name.isNotEmpty() && !state.isNameValid,
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
@@ -200,6 +204,15 @@ fun RegisterScreen(
                             label = { RequiredFieldLabel(stringResource(R.string.email)) },
                             leadingIcon = {
                                 Icon(Icons.Default.Email, contentDescription = null)
+                            },
+                            isError = state.email.isNotEmpty() && !state.isEmailValid,
+                            supportingText = {
+                                if (state.email.isNotEmpty() && !state.isEmailValid) {
+                                    Text(
+                                        text = stringResource(R.string.invalid_email),
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
                             },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
@@ -232,6 +245,7 @@ fun RegisterScreen(
                             },
                             visualTransformation = if (isPasswordVisible) VisualTransformation.None
                             else PasswordVisualTransformation(),
+                            isError = state.password.isNotEmpty() && !state.isPasswordValid,
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
@@ -240,6 +254,10 @@ fun RegisterScreen(
                                 imeAction = ImeAction.Done
                             )
                         )
+
+                        if (state.password.isNotEmpty()) {
+                            PasswordRequirements(password = state.password)
+                        }
 
                         Spacer(Modifier.height(8.dp))
 
@@ -300,6 +318,46 @@ fun RegisterScreen(
 
     if (isPrivacyOpen) {
         PrivacyPolicyDialog(onDismiss = { isPrivacyOpen = false })
+    }
+}
+
+@Composable
+private fun PasswordRequirements(password: String) {
+    val statuses = com.kidzone.utils.PasswordPolicy.evaluate(password)
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        statuses.forEach { status ->
+            val label = when (status.labelKey) {
+                com.kidzone.utils.PasswordPolicy.LabelKey.MinLength -> 
+                    stringResource(R.string.password_requirement_min_length, com.kidzone.utils.PasswordPolicy.MIN_LENGTH)
+                com.kidzone.utils.PasswordPolicy.LabelKey.Lowercase -> 
+                    stringResource(R.string.password_requirement_lowercase)
+                com.kidzone.utils.PasswordPolicy.LabelKey.Uppercase -> 
+                    stringResource(R.string.password_requirement_uppercase)
+                com.kidzone.utils.PasswordPolicy.LabelKey.SpecialCharacter -> 
+                    stringResource(R.string.password_requirement_special_character)
+            }
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = if (status.isSatisfied) Icons.Default.Check else Icons.Default.Close,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = if (status.isSatisfied) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (status.isSatisfied) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 
