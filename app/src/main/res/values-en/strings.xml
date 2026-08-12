@@ -617,7 +617,7 @@
     <string name="delete_account_places_prefix">Your places</string>
     <string name="confirm_google_button">Confirm with Google</string>
     <string name="change_email_title">Change email address</string>
-    <string name="current_email_label">Current address: %1$s</string>
+    <string name="current_email_label">Current address:</string>
     <string name="new_email_label">New email address</string>
     <string name="email_same_as_current">The new email address must be different from the current one</string>
     <string name="email_already_set">This is your current address</string>
