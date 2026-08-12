@@ -40,6 +40,7 @@ data class UserDto(
     val badgeEarnedAt: Map<String, Long> = emptyMap(),
     val bannedUntilMillis: Long = 0L,
     val banReason: String = "",
+    val tosAcceptedAtMillis: Long = 0L,
     val emailNotificationsEnabled: Boolean = true
 ) {
     fun toDomain(
@@ -59,6 +60,7 @@ data class UserDto(
         badgeEarnedAt = badgeEarnedAt,
         bannedUntilMillis = bannedUntilMillis,
         banReason = banReason,
+        tosAcceptedAtMillis = tosAcceptedAtMillis,
         emailNotificationsEnabled = privateProfile?.emailNotificationsEnabled
             ?: emailNotificationsEnabled.takeIf { includeLegacyPrivateFallback }
             ?: true
@@ -77,7 +79,8 @@ data class UserDto(
         "nameLowercase" to nameLowercase,
         "badgeEarnedAt" to badgeEarnedAt,
         "bannedUntilMillis" to bannedUntilMillis,
-        "banReason" to banReason
+        "banReason" to banReason,
+        "tosAcceptedAtMillis" to tosAcceptedAtMillis
     )
 
     companion object {
@@ -91,7 +94,8 @@ data class UserDto(
             nameLowercase = user.nameLowercase,
             badgeEarnedAt = user.badgeEarnedAt,
             bannedUntilMillis = user.bannedUntilMillis,
-            banReason = user.banReason
+            banReason = user.banReason,
+            tosAcceptedAtMillis = user.tosAcceptedAtMillis
         )
     }
 }

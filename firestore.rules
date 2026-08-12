@@ -11,6 +11,19 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isNotBanned() {
+      return isSignedIn()
+        && (
+          !exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          || (
+            let user = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+            let bannedUntil = user.get('bannedUntilMillis', 0);
+            bannedUntil == 0
+            || (bannedUntil > 0 && bannedUntil < request.time.toMillis())
+          )
+        );
+    }
+
     function isAdmin() {
       return isSignedIn()
         && (
@@ -248,6 +261,7 @@ service cloud.firestore {
         && request.resource.data.role == 'user'
         && request.resource.data.placesAddedCount == 0
         && request.resource.data.reviewsCount == 0
+        && request.resource.data.get('tosAcceptedAtMillis', 0) > 0
         && hasNoPrivateUserFields();
 
       allow update: if (
@@ -301,7 +315,7 @@ service cloud.firestore {
     match /places/{placeId} {
       allow read: if true;
 
-      allow create: if isSignedIn()
+      allow create: if isNotBanned()
         && request.resource.data.ownerUserId is string
         && request.resource.data.ownerUserId == request.auth.uid
         && request.resource.data.averageRating is number
@@ -314,7 +328,7 @@ service cloud.firestore {
         && (
           isAdmin()
           || (
-            isSignedIn()
+            isNotBanned()
             && (
               // Właściciel miejsca może zmieniać wszystko poza licznikami (w tym USUWAĆ zdjęcia)
               (resource.data.ownerUserId == request.auth.uid && isNotUpdating([
@@ -338,7 +352,7 @@ service cloud.firestore {
     match /reviews/{reviewId} {
       allow read: if true;
 
-      allow create: if isSignedIn()
+      allow create: if isNotBanned()
         && request.resource.data.userId is string
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.placeId is string
@@ -352,7 +366,8 @@ service cloud.firestore {
 
       allow update: if isAdmin()
         || (
-          isOwner(resource.data.userId)
+          isNotBanned()
+          && isOwner(resource.data.userId)
           && isNotUpdating([
             'userId',
             'placeId',
@@ -376,7 +391,7 @@ service cloud.firestore {
     }
 
     match /place_reports/{reportId} {
-      allow create: if isSignedIn()
+      allow create: if isNotBanned()
         && isValidPlaceReport();
 
       allow read: if isAdmin()
@@ -389,7 +404,7 @@ service cloud.firestore {
     }
 
    match /review_reports/{reportId} {
-     allow create: if isSignedIn()
+     allow create: if isNotBanned()
        && isValidReviewReport();
 
      allow read: if isAdmin()
@@ -402,7 +417,7 @@ service cloud.firestore {
    }
 
     match /photo_reports/{reportId} {
-      allow create: if isSignedIn()
+      allow create: if isNotBanned()
         && isValidPhotoReport();
 
       allow read: if isAdmin()
@@ -415,7 +430,7 @@ service cloud.firestore {
     }
 
     match /place_change_requests/{requestId} {
-      allow create: if isSignedIn()
+      allow create: if isNotBanned()
         && isValidPlaceChangeRequest();
 
       allow read: if isAdmin()
