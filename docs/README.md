@@ -1,6 +1,6 @@
 # kidZone documentation
 
-Ostatnia aktualizacja: 2026-07-14
+Ostatnia aktualizacja: 2026-08-13
 
 Centralny indeks dokumentacji technicznej, produktowej, QA, bezpieczeństwa i procesu wydawniczego projektu kidZone.
 

@@ -5,6 +5,26 @@ Wszystkie istotne zmiany w projekcie kidZone.
 Format oparty na [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/),
 a wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
+## [1.1.0] — 2026-08-13
+
+### Dodane
+- Obowiązkowy pop-up akceptacji Regulaminu (TOS) i Polityki prywatności dla wszystkich użytkowników (Email + Google).
+- System blokowania użytkowników (Bans) na poziomie aplikacji i reguł Firestore.
+- Geolokalizacja oparta o adres IP (fallback przy braku GPS).
+- Walidacja siły hasła z interaktywną checklistą wymagań.
+- Wyświetlanie przybliżonej odległości do miejsc w sekcjach na ekranie Start.
+
+### Zmienione
+- Sekcja „Nowości w okolicy” pokazuje teraz wyłącznie miejsca w promieniu 5 km.
+- Podbicie JDK do wersji 21 dla wszystkich procesów CI/CD.
+- Ujednolicenie walidacji formularza rejestracji (real-time feedback).
+
+### Poprawki
+- Naprawiono błąd wielokrotnego wyświetlania gratulacji za tę samą odznakę.
+- Usunięto błąd formatowania adresu e-mail w ustawieniach profilu (%1$s).
+- Poprawiono kolejność wyświetlania okien powitalnych (Intro przed TOS).
+- Stabilizacja testów jednostkowych RegisterViewModel (UnconfinedTestDispatcher).
+
 ## [1.0.0] — 2026-06-15
 
 ### Dodane

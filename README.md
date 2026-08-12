@@ -12,7 +12,8 @@ Społecznościowa aplikacja mobilna dla rodziców i opiekunów. Ułatwia odkrywa
 - dodawanie oraz edycja miejsc,
 - opinie, oceny i zdjęcia,
 - profile użytkowników, odznaki i rankingi,
-- zgłoszenia naruszeń oraz propozycje zmian,
+- zgłaszania naruszeń, blokady użytkowników (Bans) oraz obowiązkowa akceptacja Regulaminu (TOS),
+- propozycje zmian w danych miejsc,
 - powiadomienia push,
 - widget „Miejsca w pobliżu”,
 - tryb offline oparty na Room i WorkManager,
@@ -36,9 +37,9 @@ Karty miejsc korzystają ze wspólnego komponentu `CategoryBadge`, dzięki czemu
 | --- | --- |
 | Android min SDK | 26 (Android 8.0) |
 | Android target SDK | 35 (Android 15) |
-| JDK | 17 |
-| Kotlin | 2.0.20 |
-| Android Gradle Plugin | 8.13.2 |
+| JDK | 21 |
+| Kotlin | 2.0.21 |
+| Android Gradle Plugin | 8.14.5 |
 | Node.js dla Cloud Functions | 22 |
 
 ## Stack technologiczny

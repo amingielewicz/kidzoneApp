@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private const val RECENTLY_ADDED_RADIUS_KM = 5.0
 private const val LOCATION_RETRY_DELAY_MS = 1_000L
 private const val LOCATION_RETRY_COUNT = 3
 private const val ONE_MINUTE_MILLIS = 60_000L
@@ -548,7 +549,7 @@ internal fun buildHomeSections(
         .map { (place, distanceKm) -> HomeViewModel.PlaceWithDistance(place, distanceKm) }
 
     val recentlyAdded = placesWithDistance
-        .filter { (_, distanceKm) -> distanceKm != null && distanceKm <= 5.0 }
+        .filter { (_, distanceKm) -> distanceKm <= RECENTLY_ADDED_RADIUS_KM }
         .sortedWith(
             compareByDescending<Pair<Place, Double>> { it.first.createdAtMillis }
                 .thenBy { it.second }

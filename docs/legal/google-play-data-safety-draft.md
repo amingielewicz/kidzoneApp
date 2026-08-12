@@ -4,7 +4,7 @@ Powiązane issue: #182, #210, #213, #216, #269, #271, #272, #274, #275, #303, #3
 
 Milestone: `v1.0.0`
 
-Ostatnia aktualizacja: 2026-08-06
+Ostatnia aktualizacja: 2026-08-13
 
 ## Cel
 
@@ -148,11 +148,12 @@ Aplikacja używa `CrashlyticsTree`, który automatycznie usuwa (redaguje) adresy
 - [x] polityka prywatności opisuje wszystkie aktywne usługi,
 - [x] logi Logcat nie zawierają współrzędnych ani danych osobowych (zweryfikowano #356),
 - [x] Cloud Rules (Firestore/Storage) zostały utwardzone (hasOnly, max length, isValidFileName) (#356),
-- [x] mechanizmy blokowania użytkowników (ban) i akceptacji Regulaminu (TOS) są wdrożone technicznie (#373).
+- [x] mechanizmy blokowania użytkowników (ban) i akceptacji Regulaminu (TOS) są wdrożone technicznie (#373),
+- [x] akceptacja Regulaminu jest wymuszona globalnym oknem dialogowym dla wszystkich użytkowników (PR #375).
 
 ## Polityka UGC (User Generated Content)
 
 Zgodnie z wymaganiami Google Play, aplikacja wdraża:
-- **Akceptację Regulaminu**: Każdy użytkownik musi zaakceptować TOS przy rejestracji (`tosAcceptedAtMillis`),
+- **Akceptację Regulaminu**: Każdy użytkownik musi zaakceptować TOS przed przejściem do aplikacji (blokujący pop-up), co jest rejestrowane w profilu (`tosAcceptedAtMillis`),
 - **Blokowanie użytkowników**: System umożliwia administratorowi nałożenie blokady czasowej lub permanentnej (`bannedUntilMillis`), co technicznie uniemożliwia dodawanie jakichkolwiek treści (walidacja po stronie aplikacji i reguł Firestore),
 - **Zgłaszanie treści**: Użytkownicy mogą zgłaszać miejsca, opinie i zdjęcia (Issue #347).
