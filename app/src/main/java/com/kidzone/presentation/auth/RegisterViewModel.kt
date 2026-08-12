@@ -165,6 +165,10 @@ class RegisterViewModel @Inject constructor(
                 _uiState.update { it.copy(errorMessage = UiText.StringResource(R.string.error_weak_password)) }
                 return
             }
+            !state.isTosAccepted -> {
+                _uiState.update { it.copy(errorMessage = UiText.StringResource(R.string.field_required)) }
+                return
+            }
         }
 
         viewModelScope.launch {
