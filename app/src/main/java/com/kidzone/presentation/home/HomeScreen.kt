@@ -280,58 +280,45 @@ fun HomeScreen(
                         }
                     }
 
-                if (showLocationAwareContent) {
-                    item {
-                        HomeSection(
-                            title = stringResource(R.string.home_nearby_section_title),
-                            items = if (hasLocationContext || state.isGlobalFallback) {
-                                state.nearbyPlaces.map {
+                    if (showLocationAwareContent) {
+                        item {
+                            HomeSection(
+                                title = stringResource(R.string.home_nearby_section_title),
+                                items = state.nearbyPlaces.map {
                                     HomePlaceItem(it.place, it.distanceKm, staleLocationAgeMinutes)
-                                }
-                            } else {
-                                emptyList()
-                            },
-                            isLoading = state.isNearbyLoading,
-                            emptyMessage = stringResource(R.string.home_gps_empty_message),
-                            emptyIcon = EMPTY_NEARBY_ICON,
-                            onPlaceClick = { onOpenPlaceDetails(it, "nearby") },
-                            animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
-                            keyPrefix = "nearby"
-                        )
-                    }
+                                },
+                                isLoading = state.isNearbyLoading,
+                                emptyMessage = stringResource(R.string.home_no_nearby_places),
+                                emptyIcon = EMPTY_NEARBY_ICON,
+                                onPlaceClick = { onOpenPlaceDetails(it, "nearby") },
+                                animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
+                                keyPrefix = "nearby"
+                            )
+                        }
 
-                    item {
-                        HomeSection(
-                            title = stringResource(R.string.home_top_section_title),
-                            items = if (hasLocationContext || state.isGlobalFallback) {
-                                state.topPlaces.map {
+                        item {
+                            HomeSection(
+                                title = stringResource(R.string.home_top_section_title),
+                                items = state.topPlaces.map {
                                     HomePlaceItem(it.place, it.distanceKm, staleLocationAgeMinutes)
-                                }
-                            } else {
-                                emptyList()
-                            },
-                            isLoading = state.isTopLoading,
-                            emptyMessage = stringResource(R.string.home_gps_empty_message),
-                            emptyIcon = EMPTY_TOP_ICON,
-                            onPlaceClick = { onOpenPlaceDetails(it, "top") },
-                            animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
-                            keyPrefix = "top"
-                        )
-                    }
+                                },
+                                isLoading = state.isTopLoading,
+                                emptyMessage = stringResource(R.string.home_no_top_places),
+                                emptyIcon = EMPTY_TOP_ICON,
+                                onPlaceClick = { onOpenPlaceDetails(it, "top") },
+                                animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
+                                keyPrefix = "top"
+                            )
+                        }
 
-                    if (!state.isGlobalFallback) {
                         item {
                             HomeSection(
                                 title = stringResource(R.string.home_recent_section_title),
-                                items = if (hasLocationContext) {
-                                    state.recentlyAddedPlaces.map {
-                                        HomePlaceItem(it.place, it.distanceKm, staleLocationAgeMinutes)
-                                    }
-                                } else {
-                                    emptyList()
+                                items = state.recentlyAddedPlaces.map {
+                                    HomePlaceItem(it.place, it.distanceKm, staleLocationAgeMinutes)
                                 },
-                                isLoading = hasLocationContext && state.isRecentlyAddedLoading,
-                                emptyMessage = stringResource(R.string.home_gps_empty_message),
+                                isLoading = state.isRecentlyAddedLoading,
+                                emptyMessage = stringResource(R.string.home_no_recent_nearby_places),
                                 emptyIcon = EMPTY_RECENT_ICON,
                                 onPlaceClick = { onOpenPlaceDetails(it, "recent") },
                                 animation = PlaceCardAnimation(sharedTransitionScope, animatedContentScope),
@@ -339,7 +326,6 @@ fun HomeScreen(
                             )
                         }
                     }
-                }
                 }
             }
         }
@@ -622,8 +608,6 @@ private fun HomeSection(
     keyPrefix: String,
     emptyIcon: String? = null
 ) {
-    if (items.isEmpty() && !isLoading) return
-
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SectionHeader(
             title = title,
