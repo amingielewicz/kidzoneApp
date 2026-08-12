@@ -15,6 +15,9 @@ const OWNER_UID = 'owner-user';
 const OTHER_UID = 'other-user';
 const ADMIN_UID = 'admin-user';
 
+// Constant timestamp for stable tests
+const TEST_TS = 1700000000000;
+
 vi.setConfig({
   testTimeout: 30_000,
   hookTimeout: 30_000,
@@ -64,7 +67,7 @@ describe('users rules', () => {
         role: 'user',
         placesAddedCount: 0,
         reviewsCount: 0,
-        tosAcceptedAtMillis: Date.now(),
+        tosAcceptedAtMillis: TEST_TS,
       })
     );
   });
@@ -78,7 +81,7 @@ describe('users rules', () => {
         role: 'user',
         placesAddedCount: 0,
         reviewsCount: 0,
-        tosAcceptedAtMillis: Date.now(),
+        tosAcceptedAtMillis: TEST_TS,
         email: 'owner@example.com',
         fcmTokens: ['token-1'],
       })
@@ -94,7 +97,7 @@ describe('users rules', () => {
         role: 'user',
         placesAddedCount: 0,
         reviewsCount: 0,
-        tosAcceptedAtMillis: Date.now(),
+        tosAcceptedAtMillis: TEST_TS,
         phone: '+48123123123',
         address: 'Private street 1',
         privateSettings: { marketing: false },
@@ -110,7 +113,7 @@ describe('users rules', () => {
         name: 'Owner',
         role: 'user',
         placesAddedCount: 0,
-        tosAcceptedAtMillis: Date.now(),
+        tosAcceptedAtMillis: TEST_TS,
       })
     );
   });
@@ -123,7 +126,7 @@ describe('users rules', () => {
         name: 'Owner',
         role: 'admin',
         placesAddedCount: 0,
-        tosAcceptedAtMillis: Date.now(),
+        tosAcceptedAtMillis: TEST_TS,
       })
     );
   });
@@ -135,7 +138,7 @@ describe('users rules', () => {
       email: 'owner@example.com',
       placesAddedCount: 0,
       reviewsCount: 0,
-      tosAcceptedAtMillis: Date.now(),
+      tosAcceptedAtMillis: TEST_TS,
     });
 
     const db = authedDb(OWNER_UID);
@@ -154,7 +157,7 @@ describe('users rules', () => {
       name: 'Owner',
       role: 'user',
       placesAddedCount: 0,
-      tosAcceptedAtMillis: Date.now(),
+      tosAcceptedAtMillis: TEST_TS,
     });
 
     const db = authedDb(ADMIN_UID, { admin: true });
@@ -224,7 +227,7 @@ describe('users rules', () => {
       db.doc(`users/${OWNER_UID}/private/messaging`).set({
         userId: OWNER_UID,
         fcmTokens: ['token-1'],
-        updatedAtMillis: Date.now(),
+        updatedAtMillis: TEST_TS,
       })
     );
     await assertSucceeds(db.doc(`users/${OWNER_UID}/private/messaging`).get());
@@ -263,13 +266,13 @@ describe('users rules', () => {
       role: 'user',
       placesAddedCount: 0,
       reviewsCount: 0,
-      createdAtMillis: Date.now(),
-      tosAcceptedAtMillis: Date.now(),
+      createdAtMillis: TEST_TS,
+      tosAcceptedAtMillis: TEST_TS,
     });
     batch.set(db.doc(`users/${OWNER_UID}/private/messaging`), {
       userId: OWNER_UID,
       fcmTokens: ['token-1'],
-      updatedAtMillis: Date.now(),
+      updatedAtMillis: TEST_TS,
     });
 
     await assertSucceeds(batch.commit());
@@ -282,7 +285,7 @@ describe('users rules', () => {
       placesAddedCount: 0,
       reviewsCount: 0,
       fcmTokens: ['token-1'],
-      tosAcceptedAtMillis: Date.now(),
+      tosAcceptedAtMillis: TEST_TS,
     });
 
     const db = authedDb(OWNER_UID);
@@ -293,7 +296,7 @@ describe('users rules', () => {
         role: 'user',
         placesAddedCount: 0,
         reviewsCount: 0,
-        tosAcceptedAtMillis: Date.now(),
+        tosAcceptedAtMillis: TEST_TS,
       })
     );
   });
@@ -305,7 +308,7 @@ describe('users rules', () => {
       placesAddedCount: 0,
       reviewsCount: 0,
       fcmTokens: ['legacy-token'],
-      tosAcceptedAtMillis: Date.now(),
+      tosAcceptedAtMillis: TEST_TS,
     });
 
     const db = authedDb(OWNER_UID);
@@ -315,7 +318,7 @@ describe('users rules', () => {
       {
         userId: OWNER_UID,
         fcmTokens: ['legacy-token'],
-        updatedAtMillis: Date.now(),
+        updatedAtMillis: TEST_TS,
       },
       { merge: true }
     );
@@ -326,7 +329,7 @@ describe('users rules', () => {
         role: 'user',
         placesAddedCount: 0,
         reviewsCount: 0,
-        tosAcceptedAtMillis: Date.now(),
+        tosAcceptedAtMillis: TEST_TS,
       }
     );
 
@@ -431,21 +434,40 @@ describe('places rules', () => {
     );
   });
 
-  it('rejects non-owner changing place photos', async () => {
+  it('allows non-owner to ADD photos but not remove them', async () => {
     await seed('places/place-1', {
       name: 'Playground',
       ownerUserId: OWNER_UID,
       averageRating: 0,
       reviewsCount: 0,
-      photoUrls: [],
-      photoHashes: {},
+      photoUrls: ['https://example.com/existing.webp'],
+      photoUploadedBy: { 'https://example.com/existing.webp': OWNER_UID },
+      photoHashes: { 'https://example.com/existing.webp': 'hash-old' },
     });
 
+    const db = authedDb(OTHER_UID);
+
+    // Adding should succeed
+    await assertSucceeds(
+      db.doc('places/place-1').update({
+        photoUrls: ['https://example.com/existing.webp', 'https://example.com/new.webp'],
+        photoUploadedBy: {
+          'https://example.com/existing.webp': OWNER_UID,
+          'https://example.com/new.webp': OTHER_UID
+        },
+        photoHashes: {
+          'https://example.com/existing.webp': 'hash-old',
+          'https://example.com/new.webp': 'hash-new'
+        },
+      })
+    );
+
+    // Replacing/Removing should fail
     await assertFails(
-      authedDb(OTHER_UID).doc('places/place-1').update({
+      db.doc('places/place-1').update({
         photoUrls: ['https://attacker.example/photo.webp'],
         photoUploadedBy: { 'https://attacker.example/photo.webp': OTHER_UID },
-        photoHashes: { 'https://attacker.example/photo.webp': 'hash3' },
+        photoHashes: { 'https://attacker.example/photo.webp': 'hash-attack' },
       })
     );
   });
@@ -518,8 +540,8 @@ describe('reviews rules', () => {
       comment: 'Good',
       photoUrls: [],
       photoHashes: {},
-      createdAtMillis: Date.now(),
-      updatedAtMillis: Date.now(),
+      createdAtMillis: TEST_TS,
+      updatedAtMillis: TEST_TS,
     });
 
     const db = authedDb(OWNER_UID);
@@ -537,15 +559,15 @@ describe('reviews rules', () => {
       comment: 'Good',
       photoUrls: [],
       photoHashes: {},
-      createdAtMillis: Date.now(),
-      updatedAtMillis: Date.now(),
+      createdAtMillis: TEST_TS,
+      updatedAtMillis: TEST_TS,
     });
 
     await assertSucceeds(
       authedDb(OWNER_UID).doc('reviews/review-1').update({
         rating: 5,
         comment: 'Great',
-        updatedAtMillis: Date.now(),
+        updatedAtMillis: TEST_TS + 1000,
       })
     );
   });
@@ -558,8 +580,8 @@ describe('reviews rules', () => {
       comment: 'Good',
       photoUrls: [],
       photoHashes: {},
-      createdAtMillis: Date.now(),
-      updatedAtMillis: Date.now(),
+      createdAtMillis: TEST_TS,
+      updatedAtMillis: TEST_TS,
     });
 
     const db = authedDb(OWNER_UID);
@@ -578,7 +600,7 @@ describe('reports rules', () => {
       db.doc('place_reports/report-1').set({
         reporterId: OWNER_UID,
         placeId: 'place-1',
-        createdAtMillis: Date.now(),
+        createdAtMillis: TEST_TS,
       })
     );
 
@@ -592,7 +614,7 @@ describe('reports rules', () => {
       db.doc('place_reports/report-1').set({
         reporterId: OWNER_UID,
         placeId: 'place-1',
-        createdAtMillis: Date.now(),
+        createdAtMillis: TEST_TS,
       })
     );
   });

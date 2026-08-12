@@ -15,10 +15,12 @@ service cloud.firestore {
       return isSignedIn()
         && (
           !exists(/databases/$(database)/documents/users/$(request.auth.uid))
-          || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) == 0
           || (
-            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) > 0
-            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) < request.time.toMillis()
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) == 0
+            || (
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) > 0
+              && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) < request.time.toMillis()
+            )
           )
         );
     }
@@ -42,7 +44,7 @@ service cloud.firestore {
     }
 
     function isNotUpdating(fields) {
-      return !request.resource.data
+      return resource == null || !request.resource.data
         .diff(resource.data)
         .affectedKeys()
         .hasAny(fields);
@@ -80,7 +82,8 @@ service cloud.firestore {
     }
 
     function isDeletingOnlyLegacyFcmTokens() {
-      return request.resource.data
+      return resource != null
+        && request.resource.data
           .diff(resource.data)
           .affectedKeys()
           .hasOnly(['fcmTokens'])
@@ -88,6 +91,8 @@ service cloud.firestore {
     }
 
     function isOnlyAddingPhotos() {
+      if (resource == null) { return false; }
+
       let data = request.resource.data;
       let oldData = resource.data;
       let affected = data.diff(oldData).affectedKeys();

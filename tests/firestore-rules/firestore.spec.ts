@@ -25,7 +25,6 @@ import {
   setDoc,
   getDoc,
   updateDoc,
-  deleteDoc,
   collection,
   addDoc,
   writeBatch,
@@ -35,6 +34,7 @@ import {
 } from 'firebase/firestore';
 
 const PROJECT_ID = 'kidzone-rules-test';
+const TEST_TS = 1700000000000;
 
 let testEnv: RulesTestEnvironment;
 
@@ -86,7 +86,7 @@ async function seedPlace(placeId: string, ownerUserId: string) {
       reviewsCount: 0,
       photoUrls: [],
       photoHashes: {},
-      createdAtMillis: Date.now(),
+      createdAtMillis: TEST_TS,
     });
   });
 }
@@ -99,8 +99,8 @@ async function seedUser(uid: string, data?: Record<string, unknown>) {
       placesAddedCount: 0,
       reviewsCount: 0,
       role: 'user',
-      createdAtMillis: Date.now(),
-      tosAcceptedAtMillis: Date.now(),
+      createdAtMillis: TEST_TS,
+      tosAcceptedAtMillis: TEST_TS,
       ...data,
     });
   });
@@ -138,7 +138,7 @@ describe('Users collection', () => {
         email: 'private@example.com',
         fcmTokens: ['token-1'],
         placesAddedCount: 0,
-        tosAcceptedAtMillis: Date.now(),
+        tosAcceptedAtMillis: TEST_TS,
       }),
     );
   });
@@ -154,7 +154,7 @@ describe('Users collection', () => {
         privateSettings: { marketing: false },
         placesAddedCount: 0,
         reviewsCount: 0,
-        tosAcceptedAtMillis: Date.now(),
+        tosAcceptedAtMillis: TEST_TS,
       }),
     );
   });
@@ -179,7 +179,7 @@ describe('Users collection', () => {
       setDoc(doc(db, 'users', 'user1', 'private', 'messaging'), {
         userId: 'user1',
         fcmTokens: ['token-1'],
-        updatedAtMillis: Date.now(),
+        updatedAtMillis: TEST_TS,
       }),
     );
     await assertSucceeds(getDoc(doc(db, 'users', 'user1', 'private', 'messaging')));
@@ -220,21 +220,20 @@ describe('Users collection', () => {
       role: 'user',
       placesAddedCount: 0,
       reviewsCount: 0,
-      createdAtMillis: Date.now(),
-      tosAcceptedAtMillis: Date.now(),
+      createdAtMillis: TEST_TS,
+      tosAcceptedAtMillis: TEST_TS,
     });
     batch.set(doc(db, 'users', 'user1', 'private', 'messaging'), {
       userId: 'user1',
       fcmTokens: ['token-1'],
-      updatedAtMillis: Date.now(),
+      updatedAtMillis: TEST_TS,
     });
 
     await assertSucceeds(batch.commit());
   });
 
   it('allows owner to delete legacy public FCM tokens only', async () => {
-    const createdAtMillis = Date.now();
-    await seedUser('user1', { createdAtMillis, fcmTokens: ['token-1'] });
+    await seedUser('user1', { fcmTokens: ['token-1'] });
     const db = authedDb('user1');
 
     await assertSucceeds(
@@ -243,15 +242,14 @@ describe('Users collection', () => {
         placesAddedCount: 0,
         reviewsCount: 0,
         role: 'user',
-        createdAtMillis,
-        tosAcceptedAtMillis: createdAtMillis,
+        createdAtMillis: TEST_TS,
+        tosAcceptedAtMillis: TEST_TS,
       }),
     );
   });
 
   it('allows login migration batch to write private token and delete public legacy field', async () => {
-    const createdAtMillis = Date.now();
-    await seedUser('user1', { createdAtMillis, fcmTokens: ['legacy-token'] });
+    await seedUser('user1', { fcmTokens: ['legacy-token'] });
     const db = authedDb('user1');
     const batch = writeBatch(db);
     batch.set(
@@ -259,7 +257,7 @@ describe('Users collection', () => {
       {
         userId: 'user1',
         fcmTokens: arrayUnion('legacy-token'),
-        updatedAtMillis: Date.now(),
+        updatedAtMillis: TEST_TS,
       },
       { merge: true },
     );
@@ -342,9 +340,9 @@ describe('Places collection', () => {
         ownerUserId: 'user1',
         averageRating: 0,
         reviewsCount: 0,
+        createdAtMillis: TEST_TS,
         photoUrls: [],
         photoHashes: {},
-        createdAtMillis: Date.now(),
       }),
     );
   });
@@ -357,9 +355,9 @@ describe('Places collection', () => {
         ownerUserId: 'someoneElse',
         averageRating: 0,
         reviewsCount: 0,
+        createdAtMillis: TEST_TS,
         photoUrls: [],
         photoHashes: {},
-        createdAtMillis: Date.now(),
       }),
     );
   });
@@ -392,15 +390,36 @@ describe('Places collection', () => {
     );
   });
 
-  it('denies non-owner from changing place photos', async () => {
+  it('allows non-owner to ADD photos but not remove them', async () => {
     await seedPlace('place1', 'owner1');
     const db = authedDb('user2');
-    await assertFails(
+
+    // Adding should succeed
+    await assertSucceeds(
       updateDoc(doc(db, 'places', 'place1'), {
-        photoUrls: ['https://attacker.example/photo.webp'],
-        photoUploadedBy: { 'https://attacker.example/photo.webp': 'user2' },
-        photoHashes: { 'https://attacker.example/photo.webp': 'hash3' },
+        photoUrls: ['https://example.com/photo.webp'],
+        photoUploadedBy: { 'https://example.com/photo.webp': 'user2' },
+        photoHashes: { 'https://example.com/photo.webp': 'hash3' },
       }),
+    );
+
+    // Seeded with a photo
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'places', 'place1'), {
+            ownerUserId: 'owner1',
+            photoUrls: ['https://example.com/p1.webp'],
+            photoUploadedBy: { 'https://example.com/p1.webp': 'owner1' },
+            photoHashes: { 'https://example.com/p1.webp': 'h1' },
+        });
+    });
+
+    // Replacing/Removing existing photo should fail if not owner
+    await assertFails(
+        updateDoc(doc(db, 'places', 'place1'), {
+            photoUrls: ['https://attacker.example/photo.webp'],
+            photoUploadedBy: { 'https://attacker.example/photo.webp': 'user2' },
+            photoHashes: { 'https://attacker.example/photo.webp': 'h2' },
+        })
     );
   });
 
@@ -440,7 +459,9 @@ describe('Reviews collection', () => {
         placeId: 'place1',
         rating: 4,
         comment: 'Nice',
-        createdAtMillis: Date.now(),
+        photoUrls: [],
+        photoHashes: {},
+        createdAtMillis: TEST_TS,
       });
     });
     const db = unauthDb();
@@ -456,7 +477,9 @@ describe('Reviews collection', () => {
         placeId: 'place1',
         rating: 5,
         comment: 'Self review',
-        createdAtMillis: Date.now(),
+        photoUrls: [],
+        photoHashes: {},
+        createdAtMillis: TEST_TS,
       }),
     );
   });
@@ -470,7 +493,9 @@ describe('Reviews collection', () => {
         placeId: 'place1',
         rating: 4,
         comment: 'Good place',
-        createdAtMillis: Date.now(),
+        photoUrls: [],
+        photoHashes: {},
+        createdAtMillis: TEST_TS,
       }),
     );
   });
@@ -484,7 +509,9 @@ describe('Reviews collection', () => {
         placeId: 'place1',
         rating: 4,
         comment: 'Spoofed',
-        createdAtMillis: Date.now(),
+        photoUrls: [],
+        photoHashes: {},
+        createdAtMillis: TEST_TS,
       }),
     );
   });
@@ -499,8 +526,8 @@ describe('Reviews collection', () => {
         comment: 'Good',
         photoUrls: [],
         photoHashes: {},
-        createdAtMillis: Date.now(),
-        updatedAtMillis: Date.now(),
+        createdAtMillis: TEST_TS,
+        updatedAtMillis: TEST_TS,
       });
     });
     const db = authedDb('reviewer1');
@@ -508,7 +535,7 @@ describe('Reviews collection', () => {
       updateDoc(doc(db, 'reviews', 'review1'), {
         rating: 5,
         comment: 'Great',
-        updatedAtMillis: Date.now(),
+        updatedAtMillis: TEST_TS + 1000,
       }),
     );
   });
@@ -523,8 +550,8 @@ describe('Reviews collection', () => {
         comment: 'Good',
         photoUrls: [],
         photoHashes: {},
-        createdAtMillis: Date.now(),
-        updatedAtMillis: Date.now(),
+        createdAtMillis: TEST_TS,
+        updatedAtMillis: TEST_TS,
       });
     });
     const db = authedDb('reviewer1');
@@ -544,15 +571,15 @@ describe('Reviews collection', () => {
         comment: 'Good',
         photoUrls: [],
         photoHashes: {},
-        createdAtMillis: Date.now(),
-        updatedAtMillis: Date.now(),
+        createdAtMillis: TEST_TS,
+        updatedAtMillis: TEST_TS,
       });
     });
     const db = authedDb('reviewer1');
 
     await assertFails(updateDoc(doc(db, 'reviews', 'review1'), { userId: 'user2' }));
     await assertFails(updateDoc(doc(db, 'reviews', 'review1'), { placeId: 'place2' }));
-    await assertFails(updateDoc(doc(db, 'reviews', 'review1'), { createdAtMillis: Date.now() }));
+    await assertFails(updateDoc(doc(db, 'reviews', 'review1'), { createdAtMillis: TEST_TS + 5000 }));
   });
 });
 
@@ -566,7 +593,7 @@ describe('Reports collections', () => {
         reason: 'INAPPROPRIATE',
         comment: 'Bad content',
         status: 'pending',
-        createdAtMillis: Date.now(),
+        createdAtMillis: TEST_TS,
       }),
     );
   });
@@ -580,7 +607,7 @@ describe('Reports collections', () => {
         reason: 'INAPPROPRIATE',
         comment: 'Spoofed',
         status: 'pending',
-        createdAtMillis: Date.now(),
+        createdAtMillis: TEST_TS,
       }),
     );
   });
@@ -593,7 +620,7 @@ describe('Reports collections', () => {
         reporterId: 'reporter1',
         reason: 'SPAM',
         status: 'pending',
-        createdAtMillis: Date.now(),
+        createdAtMillis: TEST_TS,
       });
     });
     const db = authedDb('admin1', { admin: true });
@@ -608,7 +635,7 @@ describe('Reports collections', () => {
         reporterId: 'reporter1',
         reason: 'SPAM',
         status: 'pending',
-        createdAtMillis: Date.now(),
+        createdAtMillis: TEST_TS,
       });
     });
     const db = authedDb('reporter1');
@@ -623,7 +650,7 @@ describe('Reports collections', () => {
         reporterId: 'reporter1',
         reason: 'SPAM',
         status: 'pending',
-        createdAtMillis: Date.now(),
+        createdAtMillis: TEST_TS,
       });
     });
     const db = authedDb('randomUser');
