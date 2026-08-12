@@ -48,6 +48,10 @@ class MainViewModel @Inject constructor(
                     }
                 }
                 .collect { fullUser ->
+                    // Jeśli użytkownik właśnie kliknął "Akceptuję", ignorujemy stan z DB
+                    // dopóki nie zostanie on trwale zapisany.
+                    if (_uiState.value.isAcceptingTos) return@collect
+
                     val needsTos = fullUser != null && fullUser.tosAcceptedAtMillis == 0L
                     _uiState.update { it.copy(showTosDialog = needsTos) }
                 }
@@ -56,10 +60,11 @@ class MainViewModel @Inject constructor(
 
     fun acceptTos() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isAcceptingTos = true) }
+            _uiState.update { it.copy(isAcceptingTos = true, showTosDialog = false) }
             val result = authRepository.acceptTos()
-            if (result is OpResult.Success) {
-                _uiState.update { it.copy(showTosDialog = false, isAcceptingTos = false) }
+            if (result is OpResult.Failure) {
+                // Przy błędzie przywracamy dialog
+                _uiState.update { it.copy(showTosDialog = true, isAcceptingTos = false) }
             } else {
                 _uiState.update { it.copy(isAcceptingTos = false) }
             }

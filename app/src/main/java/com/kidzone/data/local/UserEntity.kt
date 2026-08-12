@@ -21,6 +21,7 @@ import com.kidzone.domain.model.User
  * @property badgeEarnedAtJson mapa odznak w formacie JSON (URL -> timestamp).
  * @property bannedUntilMillis czas końca blokady.
  * @property banReason administracyjny powód blokady.
+ * @property tosAcceptedAtMillis czas akceptacji Regulaminu.
  * @property emailNotificationsEnabled prywatna zgoda na powiadomienia e-mail.
  * @property cachedAtMillis czas zapisu rekordu w lokalnej bazie.
  */
@@ -39,6 +40,7 @@ data class UserEntity(
     val badgeEarnedAtJson: String, // JSON map
     val bannedUntilMillis: Long,
     val banReason: String,
+    val tosAcceptedAtMillis: Long,
     val emailNotificationsEnabled: Boolean,
     val cachedAtMillis: Long = System.currentTimeMillis()
 ) {
@@ -69,6 +71,7 @@ data class UserEntity(
             badgeEarnedAt = badges,
             bannedUntilMillis = bannedUntilMillis,
             banReason = banReason,
+            tosAcceptedAtMillis = tosAcceptedAtMillis,
             emailNotificationsEnabled = emailNotificationsEnabled
         )
     }
@@ -95,6 +98,7 @@ data class UserEntity(
                 badgeEarnedAtJson = badgesJson,
                 bannedUntilMillis = user.bannedUntilMillis,
                 banReason = user.banReason,
+                tosAcceptedAtMillis = user.tosAcceptedAtMillis,
                 emailNotificationsEnabled = user.emailNotificationsEnabled
             )
         }

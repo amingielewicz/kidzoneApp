@@ -770,10 +770,19 @@ class FirebaseAuthRepository @Inject constructor(
         val uid = firebaseAuth.currentUser?.uid
             ?: error("No signed-in user")
         
+        val now = System.currentTimeMillis()
+        
+        // 1. Update Firestore
         firestore.collection(FirestoreCollections.USERS)
             .document(uid)
-            .update("tosAcceptedAtMillis", System.currentTimeMillis())
+            .update("tosAcceptedAtMillis", now)
             .await()
+            
+        // 2. Update local cache immediately to prevent dialog from reappearing on restart
+        val localUser = database.userDao().getById(uid)
+        if (localUser != null) {
+            database.userDao().upsert(localUser.copy(tosAcceptedAtMillis = now))
+        }
             
         OpResult.success(Unit)
     } catch (e: Exception) {
