@@ -22,11 +22,13 @@ class AndroidBadgePreferences @Inject constructor(
     }
 
     override fun getSeenBadges(uid: String): Set<String> {
-        return prefs.getStringSet("$KEY_PREFIX$uid", emptySet()).orEmpty()
+        // Return a copy to avoid modification issues with SharedPreferences internal state
+        return prefs.getStringSet("$KEY_PREFIX$uid", emptySet())?.toSet().orEmpty()
     }
 
     override fun setSeenBadges(uid: String, badges: Set<String>) {
-        prefs.edit().putStringSet("$KEY_PREFIX$uid", badges).apply()
+        // Use commit() instead of apply() to ensure synchronous write before next possible read
+        prefs.edit().putStringSet("$KEY_PREFIX$uid", badges).commit()
     }
 
     private companion object {
