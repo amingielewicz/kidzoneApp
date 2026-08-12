@@ -8,46 +8,37 @@ import org.junit.jupiter.api.Test
 class HomeSectionsTest {
 
     @Test
-    fun `recently added section keeps only places from last 30 days sorted by newest first`() {
-        val dayMillis = 24L * 60L * 60L * 1000L
-        val nowMillis = 1_800_000_000_000L
-
-        val newestFarther = TestFixtures.place(
-            id = "newest-farther",
-            createdAtMillis = nowMillis - dayMillis
+    fun `recently added section keeps only places from 5km radius sorted by newest first`() {
+        val now = System.currentTimeMillis()
+        val newestFar = TestFixtures.place(
+            id = "newest-far",
+            createdAtMillis = now
         )
-        val olderCloser = TestFixtures.place(
-            id = "older-closer",
-            createdAtMillis = nowMillis - 2L * dayMillis
+        val olderNear = TestFixtures.place(
+            id = "older-near",
+            createdAtMillis = now - 1000L
         )
-        val outsideWindow = TestFixtures.place(
-            id = "outside-window",
-            createdAtMillis = nowMillis - 31L * dayMillis
-        )
-        val futurePlace = TestFixtures.place(
-            id = "future-place",
-            createdAtMillis = nowMillis + dayMillis
+        val newestNear = TestFixtures.place(
+            id = "newest-near",
+            createdAtMillis = now - 500L
         )
 
         val sections = buildHomeSections(
             placesWithDistance = listOf(
-                newestFarther to 8.0,
-                olderCloser to 1.0,
-                outsideWindow to 0.5,
-                futurePlace to 0.2
-            ),
-            nowMillis = nowMillis
+                newestFar to 6.0,   // Outside 5km
+                olderNear to 1.0,   // Inside 5km
+                newestNear to 0.5   // Inside 5km
+            )
         )
 
         assertEquals(
-            listOf("future-place", "newest-farther", "older-closer"),
+            listOf("newest-near", "older-near"),
             sections.recentlyAddedPlaces.map { it.place.id }
         )
     }
 
     @Test
     fun `sections use performance config limits and top radius`() {
-        val nowMillis = 1_800_000_000_000L
         val config = PerformanceConfig(
             homeNearbyLimit = 2,
             homeTopPlacesLimit = 1,
@@ -59,19 +50,19 @@ class HomeSectionsTest {
             id = "high-rated-far",
             averageRating = 5.0,
             reviewsCount = 10,
-            createdAtMillis = nowMillis - 1_000L
+            createdAtMillis = System.currentTimeMillis()
         )
         val lowerRatedNear = TestFixtures.place(
             id = "lower-rated-near",
             averageRating = 4.0,
             reviewsCount = 3,
-            createdAtMillis = nowMillis - 2_000L
+            createdAtMillis = System.currentTimeMillis() - 2000L
         )
         val unratedNearest = TestFixtures.place(
             id = "unrated-nearest",
             averageRating = 0.0,
             reviewsCount = 0,
-            createdAtMillis = nowMillis - 3_000L
+            createdAtMillis = System.currentTimeMillis() - 3000L
         )
 
         val sections = buildHomeSections(
@@ -80,8 +71,7 @@ class HomeSectionsTest {
                 lowerRatedNear to 2.0,
                 unratedNearest to 0.5
             ),
-            performanceConfig = config,
-            nowMillis = nowMillis
+            performanceConfig = config
         )
 
         assertEquals(
@@ -89,6 +79,7 @@ class HomeSectionsTest {
             sections.nearbyPlaces.map { it.place.id }
         )
         assertEquals(listOf("lower-rated-near"), sections.topPlaces.map { it.place.id })
-        assertEquals(listOf("high-rated-far"), sections.recentlyAddedPlaces.map { it.place.id })
+        // Recently added is limited to 1, and high-rated-far (newest) is outside 5km radius
+        assertEquals(listOf("lower-rated-near"), sections.recentlyAddedPlaces.map { it.place.id })
     }
 }

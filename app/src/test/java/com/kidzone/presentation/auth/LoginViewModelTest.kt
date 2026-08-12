@@ -12,6 +12,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -402,20 +403,31 @@ class LoginViewModelTest {
         }
 
         @Test
-        fun `successful resend shows info message and hides button`() = runTest {
+        fun `successful resend shows info message and starts cooldown`() = runTest {
             coEvery { authRepository.resendVerificationEmail(any(), any()) } returns
                 OpResult.success(Unit)
 
             viewModel.onEmailChange("user@test.com")
             viewModel.onPasswordChange("password123")
             viewModel.resendVerificationEmail()
-            advanceUntilIdle()
+            
+            // Advance a bit to trigger the initial success state
+            advanceTimeBy(100)
 
             val state = viewModel.uiState.value
             assertFalse(state.isMessageError)
-            assertFalse(state.showResendVerification)
+            assertTrue(state.showResendVerification)
+            assertEquals(60, state.resendCooldownSeconds)
             assertTrue(state.message is UiText.StringResource)
             assertEquals(R.string.verification_email_sent, (state.message as UiText.StringResource).resId)
+            
+            // Advance 30 seconds
+            advanceTimeBy(30000)
+            assertEquals(30, viewModel.uiState.value.resendCooldownSeconds)
+            
+            // Advance another 31 seconds to finish cooldown
+            advanceTimeBy(31000)
+            assertEquals(0, viewModel.uiState.value.resendCooldownSeconds)
         }
 
         @Test

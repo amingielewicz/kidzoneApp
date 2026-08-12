@@ -18,6 +18,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private const val VERIFICATION_RESEND_COOLDOWN_SECONDS = 60
+private const val ONE_SECOND_DELAY_MS = 1000L
+
 /**
  * 🎯 Odpowiedzialności:
  * - Zarządzanie formularzem logowania, resetem hasła i ponowną wysyłką weryfikacji.
@@ -292,7 +295,7 @@ class LoginViewModel @Inject constructor(
                         message = UiText.StringResource(R.string.verification_email_sent),
                         isMessageError = false,
                         showResendVerification = true, // Keep showing but with cooldown
-                        resendCooldownSeconds = 60
+                        resendCooldownSeconds = VERIFICATION_RESEND_COOLDOWN_SECONDS
                     )
                     is OpResult.Failure -> it.copy(
                         isLoading = false,
@@ -304,7 +307,7 @@ class LoginViewModel @Inject constructor(
             
             // Start countdown
             while (_uiState.value.resendCooldownSeconds > 0) {
-                delay(1000)
+                delay(ONE_SECOND_DELAY_MS)
                 _uiState.update { it.copy(resendCooldownSeconds = it.resendCooldownSeconds - 1) }
             }
         }
