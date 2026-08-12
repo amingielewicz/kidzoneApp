@@ -64,6 +64,7 @@ describe('users rules', () => {
         role: 'user',
         placesAddedCount: 0,
         reviewsCount: 0,
+        tosAcceptedAtMillis: Date.now(),
       })
     );
   });
@@ -77,6 +78,7 @@ describe('users rules', () => {
         role: 'user',
         placesAddedCount: 0,
         reviewsCount: 0,
+        tosAcceptedAtMillis: Date.now(),
         email: 'owner@example.com',
         fcmTokens: ['token-1'],
       })
@@ -92,6 +94,7 @@ describe('users rules', () => {
         role: 'user',
         placesAddedCount: 0,
         reviewsCount: 0,
+        tosAcceptedAtMillis: Date.now(),
         phone: '+48123123123',
         address: 'Private street 1',
         privateSettings: { marketing: false },
@@ -107,6 +110,7 @@ describe('users rules', () => {
         name: 'Owner',
         role: 'user',
         placesAddedCount: 0,
+        tosAcceptedAtMillis: Date.now(),
       })
     );
   });
@@ -119,6 +123,7 @@ describe('users rules', () => {
         name: 'Owner',
         role: 'admin',
         placesAddedCount: 0,
+        tosAcceptedAtMillis: Date.now(),
       })
     );
   });
@@ -130,6 +135,7 @@ describe('users rules', () => {
       email: 'owner@example.com',
       placesAddedCount: 0,
       reviewsCount: 0,
+      tosAcceptedAtMillis: Date.now(),
     });
 
     const db = authedDb(OWNER_UID);
@@ -148,6 +154,7 @@ describe('users rules', () => {
       name: 'Owner',
       role: 'user',
       placesAddedCount: 0,
+      tosAcceptedAtMillis: Date.now(),
     });
 
     const db = authedDb(ADMIN_UID, { admin: true });
@@ -257,6 +264,7 @@ describe('users rules', () => {
       placesAddedCount: 0,
       reviewsCount: 0,
       createdAtMillis: Date.now(),
+      tosAcceptedAtMillis: Date.now(),
     });
     batch.set(db.doc(`users/${OWNER_UID}/private/messaging`), {
       userId: OWNER_UID,
@@ -274,6 +282,7 @@ describe('users rules', () => {
       placesAddedCount: 0,
       reviewsCount: 0,
       fcmTokens: ['token-1'],
+      tosAcceptedAtMillis: Date.now(),
     });
 
     const db = authedDb(OWNER_UID);
@@ -284,6 +293,7 @@ describe('users rules', () => {
         role: 'user',
         placesAddedCount: 0,
         reviewsCount: 0,
+        tosAcceptedAtMillis: Date.now(),
       })
     );
   });
@@ -295,6 +305,7 @@ describe('users rules', () => {
       placesAddedCount: 0,
       reviewsCount: 0,
       fcmTokens: ['legacy-token'],
+      tosAcceptedAtMillis: Date.now(),
     });
 
     const db = authedDb(OWNER_UID);
@@ -315,6 +326,7 @@ describe('users rules', () => {
         role: 'user',
         placesAddedCount: 0,
         reviewsCount: 0,
+        tosAcceptedAtMillis: Date.now(),
       }
     );
 
@@ -338,6 +350,8 @@ describe('places rules', () => {
         ownerUserId: OWNER_UID,
         averageRating: 0,
         reviewsCount: 0,
+        photoUrls: [],
+        photoHashes: {},
       })
     );
   });
@@ -351,6 +365,8 @@ describe('places rules', () => {
         ownerUserId: OWNER_UID,
         averageRating: 0,
         reviewsCount: 0,
+        photoUrls: [],
+        photoHashes: {},
       })
     );
   });
@@ -361,6 +377,8 @@ describe('places rules', () => {
       ownerUserId: OWNER_UID,
       averageRating: 0,
       reviewsCount: 0,
+      photoUrls: [],
+      photoHashes: {},
     });
 
     const db = authedDb(OWNER_UID);
@@ -376,6 +394,8 @@ describe('places rules', () => {
       ownerUserId: OWNER_UID,
       averageRating: 0,
       reviewsCount: 0,
+      photoUrls: [],
+      photoHashes: {},
     });
 
     const db = authedDb(OWNER_UID);
@@ -391,18 +411,22 @@ describe('places rules', () => {
       ownerUserId: OWNER_UID,
       averageRating: 0,
       reviewsCount: 0,
+      photoUrls: [],
+      photoHashes: {},
     });
 
     await assertSucceeds(
       authedDb(OWNER_UID).doc('places/place-1').update({
         photoUrls: ['https://example.com/photo.webp'],
-        photoUploadedBy: [OWNER_UID],
+        photoUploadedBy: { 'https://example.com/photo.webp': OWNER_UID },
+        photoHashes: { 'https://example.com/photo.webp': 'hash1' },
       })
     );
 
     await assertSucceeds(
       authedDb(ADMIN_UID, { admin: true }).doc('places/place-1').update({
         photoUrls: ['https://example.com/moderated.webp'],
+        photoHashes: { 'https://example.com/moderated.webp': 'hash2' },
       })
     );
   });
@@ -413,12 +437,15 @@ describe('places rules', () => {
       ownerUserId: OWNER_UID,
       averageRating: 0,
       reviewsCount: 0,
+      photoUrls: [],
+      photoHashes: {},
     });
 
     await assertFails(
       authedDb(OTHER_UID).doc('places/place-1').update({
         photoUrls: ['https://attacker.example/photo.webp'],
-        photoUploadedBy: [OTHER_UID],
+        photoUploadedBy: { 'https://attacker.example/photo.webp': OTHER_UID },
+        photoHashes: { 'https://attacker.example/photo.webp': 'hash3' },
       })
     );
   });
@@ -435,6 +462,8 @@ describe('reviews rules', () => {
         userId: OTHER_UID,
         placeId: 'place-1',
         rating: 5,
+        photoUrls: [],
+        photoHashes: {},
       })
     );
   });
@@ -488,6 +517,7 @@ describe('reviews rules', () => {
       rating: 4,
       comment: 'Good',
       photoUrls: [],
+      photoHashes: {},
       createdAtMillis: Date.now(),
       updatedAtMillis: Date.now(),
     });
@@ -506,6 +536,7 @@ describe('reviews rules', () => {
       rating: 4,
       comment: 'Good',
       photoUrls: [],
+      photoHashes: {},
       createdAtMillis: Date.now(),
       updatedAtMillis: Date.now(),
     });
@@ -526,6 +557,7 @@ describe('reviews rules', () => {
       rating: 4,
       comment: 'Good',
       photoUrls: [],
+      photoHashes: {},
       createdAtMillis: Date.now(),
       updatedAtMillis: Date.now(),
     });
@@ -546,6 +578,7 @@ describe('reports rules', () => {
       db.doc('place_reports/report-1').set({
         reporterId: OWNER_UID,
         placeId: 'place-1',
+        createdAtMillis: Date.now(),
       })
     );
 
@@ -559,6 +592,7 @@ describe('reports rules', () => {
       db.doc('place_reports/report-1').set({
         reporterId: OWNER_UID,
         placeId: 'place-1',
+        createdAtMillis: Date.now(),
       })
     );
   });

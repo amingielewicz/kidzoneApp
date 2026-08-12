@@ -84,6 +84,8 @@ async function seedPlace(placeId: string, ownerUserId: string) {
       ownerUserId,
       averageRating: 0,
       reviewsCount: 0,
+      photoUrls: [],
+      photoHashes: {},
       createdAtMillis: Date.now(),
     });
   });
@@ -98,6 +100,7 @@ async function seedUser(uid: string, data?: Record<string, unknown>) {
       reviewsCount: 0,
       role: 'user',
       createdAtMillis: Date.now(),
+      tosAcceptedAtMillis: Date.now(),
       ...data,
     });
   });
@@ -135,6 +138,7 @@ describe('Users collection', () => {
         email: 'private@example.com',
         fcmTokens: ['token-1'],
         placesAddedCount: 0,
+        tosAcceptedAtMillis: Date.now(),
       }),
     );
   });
@@ -150,6 +154,7 @@ describe('Users collection', () => {
         privateSettings: { marketing: false },
         placesAddedCount: 0,
         reviewsCount: 0,
+        tosAcceptedAtMillis: Date.now(),
       }),
     );
   });
@@ -216,6 +221,7 @@ describe('Users collection', () => {
       placesAddedCount: 0,
       reviewsCount: 0,
       createdAtMillis: Date.now(),
+      tosAcceptedAtMillis: Date.now(),
     });
     batch.set(doc(db, 'users', 'user1', 'private', 'messaging'), {
       userId: 'user1',
@@ -238,6 +244,7 @@ describe('Users collection', () => {
         reviewsCount: 0,
         role: 'user',
         createdAtMillis,
+        tosAcceptedAtMillis: createdAtMillis,
       }),
     );
   });
@@ -335,6 +342,8 @@ describe('Places collection', () => {
         ownerUserId: 'user1',
         averageRating: 0,
         reviewsCount: 0,
+        photoUrls: [],
+        photoHashes: {},
         createdAtMillis: Date.now(),
       }),
     );
@@ -348,6 +357,8 @@ describe('Places collection', () => {
         ownerUserId: 'someoneElse',
         averageRating: 0,
         reviewsCount: 0,
+        photoUrls: [],
+        photoHashes: {},
         createdAtMillis: Date.now(),
       }),
     );
@@ -367,7 +378,8 @@ describe('Places collection', () => {
     await assertSucceeds(
       updateDoc(doc(ownerDb, 'places', 'place1'), {
         photoUrls: ['https://example.com/photo.webp'],
-        photoUploadedBy: ['owner1'],
+        photoUploadedBy: { 'https://example.com/photo.webp': 'owner1' },
+        photoHashes: { 'https://example.com/photo.webp': 'hash1' },
       }),
     );
 
@@ -375,6 +387,7 @@ describe('Places collection', () => {
     await assertSucceeds(
       updateDoc(doc(adminDb, 'places', 'place1'), {
         photoUrls: ['https://example.com/moderated.webp'],
+        photoHashes: { 'https://example.com/moderated.webp': 'hash2' },
       }),
     );
   });
@@ -385,7 +398,8 @@ describe('Places collection', () => {
     await assertFails(
       updateDoc(doc(db, 'places', 'place1'), {
         photoUrls: ['https://attacker.example/photo.webp'],
-        photoUploadedBy: ['user2'],
+        photoUploadedBy: { 'https://attacker.example/photo.webp': 'user2' },
+        photoHashes: { 'https://attacker.example/photo.webp': 'hash3' },
       }),
     );
   });
@@ -484,6 +498,7 @@ describe('Reviews collection', () => {
         rating: 4,
         comment: 'Good',
         photoUrls: [],
+        photoHashes: {},
         createdAtMillis: Date.now(),
         updatedAtMillis: Date.now(),
       });
@@ -507,6 +522,7 @@ describe('Reviews collection', () => {
         rating: 4,
         comment: 'Good',
         photoUrls: [],
+        photoHashes: {},
         createdAtMillis: Date.now(),
         updatedAtMillis: Date.now(),
       });
@@ -527,6 +543,7 @@ describe('Reviews collection', () => {
         rating: 4,
         comment: 'Good',
         photoUrls: [],
+        photoHashes: {},
         createdAtMillis: Date.now(),
         updatedAtMillis: Date.now(),
       });
