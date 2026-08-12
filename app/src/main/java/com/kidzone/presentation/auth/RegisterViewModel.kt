@@ -73,6 +73,7 @@ class RegisterViewModel @Inject constructor(
         val name: String = "",
         val email: String = "",
         val password: String = "",
+        val isTosAccepted: Boolean = false,
         val isLoading: Boolean = false,
         val errorMessage: UiText? = null,
         val successMessage: UiText? = null,
@@ -96,7 +97,7 @@ class RegisterViewModel @Inject constructor(
 
         /** Czy wszystkie pola formularza przechodzą walidację lokalną. */
         val isFormValid: Boolean
-            get() = isNameValid && isEmailValid && isPasswordValid
+            get() = isNameValid && isEmailValid && isPasswordValid && isTosAccepted
     }
 
     private val _uiState = MutableStateFlow(UiState())
@@ -117,6 +118,11 @@ class RegisterViewModel @Inject constructor(
     /** Aktualizuje hasło i czyści poprzedni błąd. */
     fun onPasswordChange(value: String) {
         _uiState.update { it.copy(password = value, errorMessage = null) }
+    }
+
+    /** Aktualizuje stan akceptacji regulaminu. */
+    fun onTosAcceptanceChange(accepted: Boolean) {
+        _uiState.update { it.copy(isTosAccepted = accepted) }
     }
 
     /** Pokazuje standardowy komunikat problemu z połączeniem. */
