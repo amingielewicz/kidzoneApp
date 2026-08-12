@@ -70,6 +70,7 @@ class RegisterViewModelTest {
             assertEquals("", state.name)
             assertEquals("", state.email)
             assertEquals("", state.password)
+            assertFalse(state.isTosAccepted)
             assertFalse(state.isFormValid)
             assertFalse(state.isLoading)
             assertFalse(state.isRegistered)
@@ -128,7 +129,17 @@ class RegisterViewModelTest {
             viewModel.onNameChange("Jan Kowalski")
             viewModel.onEmailChange("jan@example.com")
             viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onTosAcceptanceChange(true)
             assertTrue(viewModel.uiState.value.isFormValid)
+        }
+
+        @Test
+        fun `isFormValid is false when TOS not accepted`() {
+            viewModel.onNameChange("Jan Kowalski")
+            viewModel.onEmailChange("jan@example.com")
+            viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onTosAcceptanceChange(false)
+            assertFalse(viewModel.uiState.value.isFormValid)
         }
 
         @Test
@@ -136,6 +147,7 @@ class RegisterViewModelTest {
             viewModel.onNameChange("Jan")
             viewModel.onEmailChange("jan@example.com")
             viewModel.onPasswordChange("weak")
+            viewModel.onTosAcceptanceChange(true)
             assertFalse(viewModel.uiState.value.isFormValid)
         }
 
@@ -145,6 +157,7 @@ class RegisterViewModelTest {
             viewModel.onNameChange("")
             viewModel.onEmailChange("user@example.com")
             viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onTosAcceptanceChange(true)
             // Trigger register to set errorMessage for blank name
             runTest {
                 viewModel.register()
@@ -169,6 +182,7 @@ class RegisterViewModelTest {
         fun `shows error when name is blank`() = runTest {
             viewModel.onEmailChange("user@example.com")
             viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onTosAcceptanceChange(true)
             viewModel.register()
             advanceUntilIdle()
 
@@ -181,6 +195,7 @@ class RegisterViewModelTest {
         fun `shows error when email is blank`() = runTest {
             viewModel.onNameChange("Jan")
             viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onTosAcceptanceChange(true)
             viewModel.register()
             advanceUntilIdle()
 
@@ -193,6 +208,7 @@ class RegisterViewModelTest {
         fun `shows error when password is blank`() = runTest {
             viewModel.onNameChange("Jan")
             viewModel.onEmailChange("user@example.com")
+            viewModel.onTosAcceptanceChange(true)
             viewModel.register()
             advanceUntilIdle()
 
@@ -206,12 +222,27 @@ class RegisterViewModelTest {
             viewModel.onNameChange("Jan")
             viewModel.onEmailChange("user@example.com")
             viewModel.onPasswordChange("weak")
+            viewModel.onTosAcceptanceChange(true)
             viewModel.register()
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
             assertTrue(state.errorMessage is UiText.StringResource)
             assertEquals(R.string.error_weak_password, (state.errorMessage as UiText.StringResource).resId)
+        }
+
+        @Test
+        fun `shows error when TOS not accepted`() = runTest {
+            viewModel.onNameChange("Jan")
+            viewModel.onEmailChange("user@example.com")
+            viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onTosAcceptanceChange(false)
+            viewModel.register()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertTrue(state.errorMessage is UiText.StringResource)
+            assertEquals(R.string.field_required, (state.errorMessage as UiText.StringResource).resId)
         }
 
         @Test
@@ -223,6 +254,7 @@ class RegisterViewModelTest {
             viewModel.onNameChange("Jan Kowalski")
             viewModel.onEmailChange("jan@example.com")
             viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onTosAcceptanceChange(true)
             viewModel.register()
             advanceUntilIdle()
 
@@ -242,6 +274,7 @@ class RegisterViewModelTest {
             viewModel.onNameChange("Jan")
             viewModel.onEmailChange("jan@example.com")
             viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onTosAcceptanceChange(true)
             viewModel.register()
             advanceUntilIdle()
 
@@ -256,6 +289,7 @@ class RegisterViewModelTest {
             viewModel.onNameChange("Jan")
             viewModel.onEmailChange("jan@example.com")
             viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onTosAcceptanceChange(true)
             viewModel.register()
             advanceUntilIdle()
 
@@ -270,6 +304,7 @@ class RegisterViewModelTest {
             viewModel.onNameChange("  Jan  ")
             viewModel.onEmailChange("  jan@example.com  ")
             viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onTosAcceptanceChange(true)
             viewModel.register()
             advanceUntilIdle()
 
@@ -284,6 +319,7 @@ class RegisterViewModelTest {
             viewModel.onNameChange("Jan")
             viewModel.onEmailChange("existing@example.com")
             viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onTosAcceptanceChange(true)
             viewModel.register()
             advanceUntilIdle()
 
@@ -301,6 +337,7 @@ class RegisterViewModelTest {
             viewModel.onNameChange("ExistingUser")
             viewModel.onEmailChange("new@example.com")
             viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onTosAcceptanceChange(true)
             viewModel.register()
             advanceUntilIdle()
 
@@ -320,6 +357,7 @@ class RegisterViewModelTest {
             viewModel.onNameChange("Jan")
             viewModel.onEmailChange("jan@example.com")
             viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onTosAcceptanceChange(true)
             viewModel.register()
             advanceUntilIdle()
 
@@ -334,6 +372,7 @@ class RegisterViewModelTest {
             viewModel.onNameChange("Jan")
             viewModel.onEmailChange("jan@example.com")
             viewModel.onPasswordChange("StrongP@ss1")
+            viewModel.onTosAcceptanceChange(true)
             viewModel.register()
             advanceUntilIdle()
 
