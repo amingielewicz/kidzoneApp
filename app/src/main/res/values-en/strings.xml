@@ -74,6 +74,7 @@
     <string name="password_reset_sent">We sent a password reset link to %1$s. If you signed in with Google, use the “Sign in with Google” button below.</string>
     <string name="verification_email_sent">Verification link resent. Check your inbox.</string>
     <string name="verification_email_error">Failed to send verification link</string>
+    <string name="resend_verification_cooldown">Resend in %1$ds</string>
     <string name="error_enter_username">Please enter a username</string>
     <string name="error_enter_email">Please enter an email address</string>
     <string name="error_enter_password">Please enter a password</string>

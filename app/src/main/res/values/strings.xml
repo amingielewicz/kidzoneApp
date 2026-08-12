@@ -75,6 +75,7 @@
     <string name="password_reset_sent">Wysłaliśmy link do zresetowania hasła na %1$s. Jeśli logowałeś/aś się przez Google, użyj przycisku „Zaloguj się przez Google” poniżej.</string>
     <string name="verification_email_sent">Link weryfikacyjny wysłany ponownie. Sprawdź skrzynkę.</string>
     <string name="verification_email_error">Nie udało się wysłać linku weryfikacyjnego</string>
+    <string name="resend_verification_cooldown">Wyślij ponownie za %1$ds</string>
     <string name="error_enter_username">Podaj nazwę użytkownika</string>
     <string name="error_enter_email">Podaj adres e-mail</string>
     <string name="error_enter_password">Podaj hasło</string>

@@ -465,7 +465,10 @@ fun MainScreen(
         )
     }
 
-    if (state.showTosDialog && !showHomeIntro) {
+    val onboardingDone = prefs.getBoolean(KEY_HOME_INTRO_USED, false) ||
+            hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+
+    if (state.showTosDialog && onboardingDone) {
         MandatoryTosDialog(
             onAccept = { viewModel.acceptTos() },
             isAccepting = state.isAcceptingTos
