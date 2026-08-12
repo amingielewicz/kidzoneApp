@@ -164,6 +164,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
 
+    kotlinOptions {
+        jvmTarget = "21"
+    }
+
 // -------------------------------------------------------------------------
 // Compose / BuildConfig
 // -------------------------------------------------------------------------
@@ -203,6 +207,7 @@ android {
 // -----------------------------------------------------------------------------
 
 kotlin {
+    jvmToolchain(21)
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_21)
     }
