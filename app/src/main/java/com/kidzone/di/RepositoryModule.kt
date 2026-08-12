@@ -3,7 +3,9 @@ package com.kidzone.di
 import com.kidzone.data.repository.FirebaseAuthRepository
 import com.kidzone.data.repository.FirestorePlaceRepository
 import com.kidzone.data.repository.FirestoreReviewRepository
+import com.kidzone.data.repository.RetrofitIpLocationRepository
 import com.kidzone.domain.repository.AuthRepository
+import com.kidzone.domain.repository.IpLocationRepository
 import com.kidzone.domain.repository.PlaceRepository
 import com.kidzone.domain.repository.ReviewRepository
 import dagger.Binds
@@ -34,4 +36,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindReviewRepository(impl: FirestoreReviewRepository): ReviewRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindIpLocationRepository(impl: RetrofitIpLocationRepository): IpLocationRepository
 }

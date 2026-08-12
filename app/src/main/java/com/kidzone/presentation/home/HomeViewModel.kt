@@ -6,7 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.kidzone.data.remote.PerformanceConfig
 import com.kidzone.data.remote.PerformanceConfigProvider
 import com.kidzone.domain.model.Place
+import com.kidzone.domain.repository.IpLocationRepository
 import com.kidzone.domain.repository.PlaceRepository
+import com.kidzone.domain.service.LocationPreferences
 import com.kidzone.domain.service.LocationProvider
 import com.kidzone.utils.GeoUtils
 import com.kidzone.utils.OpResult
@@ -16,6 +18,7 @@ import com.kidzone.widget.NearbyPlacesWidget
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -73,6 +76,8 @@ private const val DEFAULT_CITY_LNG = 21.0122
 class HomeViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
     private val locationProvider: LocationProvider,
+    private val ipLocationRepository: IpLocationRepository,
+    private val locationPreferences: LocationPreferences,
     private val performanceConfigProvider: PerformanceConfigProvider,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
@@ -422,38 +427,56 @@ class HomeViewModel @Inject constructor(
 
             val performanceConfig = performanceConfigProvider.performanceConfig
 
-            val topPlacesDeferred = async { placeRepository.getTopPlaces(performanceConfig.homeTopPlacesLimit) }
-            val nearbyPlacesDeferred = async {
-                placeRepository.getPlacesNear(DEFAULT_CITY_LAT, DEFAULT_CITY_LNG, performanceConfig.homeFetchRadiusKm)
+            // Próbujemy pobrać lokalizację z IP (z cache lub sieci)
+            val fallbackCoords = if (locationPreferences.isIpLocationValid()) {
+                locationPreferences.getIpLocation()
+            } else {
+                when (val ipResult = ipLocationRepository.getApproximateLocation()) {
+                    is OpResult.Success -> {
+                        locationPreferences.saveIpLocation(ipResult.data.first, ipResult.data.second)
+                        ipResult.data
+                    }
+                    else -> null
+                }
             }
 
-            val topResult = topPlacesDeferred.await()
-            val nearbyResult = nearbyPlacesDeferred.await()
+            val targetLat = fallbackCoords?.first ?: DEFAULT_CITY_LAT
+            val targetLng = fallbackCoords?.second ?: DEFAULT_CITY_LNG
 
-            val topPlaces = when (topResult) {
-                is OpResult.Success -> topResult.data.map { PlaceWithDistance(it, null) }
-                else -> emptyList()
-            }
+            coroutineScope {
+                val topPlacesTask = async { placeRepository.getTopPlaces(performanceConfig.homeTopPlacesLimit) }
+                val nearbyPlacesTask = async {
+                    placeRepository.getPlacesNear(targetLat, targetLng, performanceConfig.homeFetchRadiusKm)
+                }
 
-            val nearbyPlaces = when (nearbyResult) {
-                is OpResult.Success -> nearbyResult.data.map { PlaceWithDistance(it, null) }
-                else -> emptyList()
-            }
+                val topResult = topPlacesTask.await()
+                val nearbyResult = nearbyPlacesTask.await()
 
-            _uiState.update {
-                it.copy(
-                    topPlaces = topPlaces,
-                    nearbyPlaces = nearbyPlaces,
-                    recentlyAddedPlaces = emptyList(),
-                    isTopLoading = false,
-                    isNearbyLoading = false,
-                    isRecentlyAddedLoading = false,
-                    isRefreshing = false,
-                    isAcquiringLocation = false,
-                    isUsingStaleLocation = false,
-                    staleLocationAgeMinutes = null,
-                    hasWeakGpsSignal = false
-                )
+                val topPlaces = when (topResult) {
+                    is OpResult.Success -> topResult.data.map { PlaceWithDistance(it, null) }
+                    else -> emptyList()
+                }
+
+                val nearbyPlaces = when (nearbyResult) {
+                    is OpResult.Success -> nearbyResult.data.map { PlaceWithDistance(it, null) }
+                    else -> emptyList()
+                }
+
+                _uiState.update {
+                    it.copy(
+                        topPlaces = topPlaces,
+                        nearbyPlaces = nearbyPlaces,
+                        recentlyAddedPlaces = emptyList(),
+                        isTopLoading = false,
+                        isNearbyLoading = false,
+                        isRecentlyAddedLoading = false,
+                        isRefreshing = false,
+                        isAcquiringLocation = false,
+                        isUsingStaleLocation = false,
+                        staleLocationAgeMinutes = null,
+                        hasWeakGpsSignal = false
+                    )
+                }
             }
         }
     }
