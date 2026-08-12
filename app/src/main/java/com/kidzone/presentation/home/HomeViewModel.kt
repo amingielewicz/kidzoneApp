@@ -27,8 +27,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** Okno czasowe używane przez sekcję ostatnio dodanych miejsc. */
-private const val RECENTLY_ADDED_WINDOW_MILLIS = 14L * 24L * 60L * 60L * 1000L
+/** Okno czasowe używane przez sekcję ostatnio dodanych miejsc (30 dni). */
+private const val RECENTLY_ADDED_WINDOW_MILLIS = 30L * 24L * 60L * 60L * 1000L
 private const val LOCATION_RETRY_DELAY_MS = 1_000L
 private const val LOCATION_RETRY_COUNT = 3
 private const val ONE_MINUTE_MILLIS = 60_000L
@@ -412,14 +412,16 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Pobiera dane globalne (Top, Recent) oraz z domyślnego miasta, gdy nie można użyć GPS.
+     */
     private fun loadGlobalFallbackPlaces() {
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
                     isTopLoading = true,
                     isNearbyLoading = true,
-                    isRecentlyAddedLoading = false,
-                    isRefreshing = true,
+                    isRecentlyAddedLoading = true,
                     errorMessage = null,
                     isGlobalFallback = true
                 )
@@ -448,9 +450,13 @@ class HomeViewModel @Inject constructor(
                 val nearbyPlacesTask = async {
                     placeRepository.getPlacesNear(targetLat, targetLng, performanceConfig.homeFetchRadiusKm)
                 }
+                val recentPlacesTask = async {
+                    placeRepository.getPlacesPage(pageSize = performanceConfig.homeRecentlyAddedLimit)
+                }
 
                 val topResult = topPlacesTask.await()
                 val nearbyResult = nearbyPlacesTask.await()
+                val recentResult = recentPlacesTask.await()
 
                 val topPlaces = when (topResult) {
                     is OpResult.Success -> topResult.data.map { PlaceWithDistance(it, null) }
@@ -462,11 +468,16 @@ class HomeViewModel @Inject constructor(
                     else -> emptyList()
                 }
 
+                val recentPlaces = when (recentResult) {
+                    is OpResult.Success -> recentResult.data.items.map { PlaceWithDistance(it, null) }
+                    else -> emptyList()
+                }
+
                 _uiState.update {
                     it.copy(
                         topPlaces = topPlaces,
                         nearbyPlaces = nearbyPlaces,
-                        recentlyAddedPlaces = emptyList(),
+                        recentlyAddedPlaces = recentPlaces,
                         isTopLoading = false,
                         isNearbyLoading = false,
                         isRecentlyAddedLoading = false,
@@ -556,7 +567,7 @@ internal fun buildHomeSections(
     val recentThresholdMillis = nowMillis - RECENTLY_ADDED_WINDOW_MILLIS
     val recentlyAdded = placesWithDistance
         .filter { (place, _) ->
-            place.createdAtMillis >= recentThresholdMillis && place.createdAtMillis <= nowMillis
+            place.createdAtMillis >= recentThresholdMillis
         }
         .sortedWith(
             compareByDescending<Pair<Place, Double>> { it.first.createdAtMillis }
