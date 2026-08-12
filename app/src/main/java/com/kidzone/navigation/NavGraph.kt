@@ -172,9 +172,14 @@ fun KidZoneNavGraph(
 
             composable(Route.Register.path) {
                 RegisterScreen(
-                    onRegisterSuccess = {
+                    onRegisterSuccess = { showMessage ->
                         // Po rejestracji user jest wylogowany (musi potwierdzić email).
                         // Wracamy na Login z komunikatem o weryfikacji.
+                        if (showMessage) {
+                            navController.previousBackStackEntry
+                                ?.savedStateHandle
+                                ?.set("registration_success", true)
+                        }
                         navController.navigate(Route.Login.path) {
                             popUpTo(Route.Register.path) { inclusive = true }
                         }

@@ -1,5 +1,6 @@
 package com.kidzone.presentation.auth
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.R
@@ -20,6 +21,7 @@ import javax.inject.Inject
 
 private const val VERIFICATION_RESEND_COOLDOWN_SECONDS = 60
 private const val ONE_SECOND_DELAY_MS = 1000L
+internal const val KEY_REGISTRATION_SUCCESS = "registration_success"
 
 /**
  * 🎯 Odpowiedzialności:
@@ -62,7 +64,8 @@ private const val ONE_SECOND_DELAY_MS = 1000L
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val prefetchService: DataPrefetchService
+    private val prefetchService: DataPrefetchService,
+    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     /**
@@ -99,6 +102,19 @@ class LoginViewModel @Inject constructor(
 
     /** Stan obserwowany przez ekran Compose. */
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    init {
+        // Sprawdź czy wróciliśmy z ekranu rejestracji z sukcesem
+        if (savedStateHandle.get<Boolean>(KEY_REGISTRATION_SUCCESS) == true) {
+            _uiState.update {
+                it.copy(
+                    message = UiText.StringResource(R.string.register_success_verify_email),
+                    isMessageError = false
+                )
+            }
+            savedStateHandle.remove<Boolean>(KEY_REGISTRATION_SUCCESS)
+        }
+    }
 
     /** Aktualizuje e-mail i czyści poprzedni komunikat formularza. */
     fun onEmailChange(value: String) {

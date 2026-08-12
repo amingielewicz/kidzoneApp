@@ -95,7 +95,7 @@ private val RegisterBackgroundStartColor = Color(0xFFE3F2FD)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegisterScreen(
-    onRegisterSuccess: () -> Unit,
+    onRegisterSuccess: (verifyEmailMessage: Boolean) -> Unit,
     onBack: () -> Unit,
     viewModel: RegisterViewModel = hiltViewModel()
 ) {
@@ -109,7 +109,7 @@ fun RegisterScreen(
 
     LaunchedEffect(state.isRegistered) {
         if (state.isRegistered) {
-            onRegisterSuccess()
+            onRegisterSuccess(true)
         }
     }
 

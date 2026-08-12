@@ -76,6 +76,7 @@
     <string name="verification_email_sent">Link weryfikacyjny wysłany ponownie. Sprawdź skrzynkę.</string>
     <string name="verification_email_error">Nie udało się wysłać linku weryfikacyjnego</string>
     <string name="resend_verification_cooldown">Wyślij ponownie za %1$ds</string>
+    <string name="register_success_verify_email">Konto utworzone! Zweryfikuj e-mail przed zalogowaniem.</string>
     <string name="error_enter_username">Podaj nazwę użytkownika</string>
     <string name="error_enter_email">Podaj adres e-mail</string>
     <string name="error_enter_password">Podaj hasło</string>

@@ -465,8 +465,7 @@ fun MainScreen(
         )
     }
 
-    val onboardingDone = prefs.getBoolean(KEY_HOME_INTRO_USED, false) ||
-            hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+    val onboardingDone = prefs.getBoolean(KEY_HOME_INTRO_USED, false)
 
     if (state.showTosDialog && onboardingDone) {
         MandatoryTosDialog(
