@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test
 class HomeSectionsTest {
 
     @Test
-    fun `recently added section keeps only places from last 14 days sorted by newest first`() {
+    fun `recently added section keeps only places from last 30 days sorted by newest first`() {
         val dayMillis = 24L * 60L * 60L * 1000L
         val nowMillis = 1_800_000_000_000L
 
@@ -22,7 +22,7 @@ class HomeSectionsTest {
         )
         val outsideWindow = TestFixtures.place(
             id = "outside-window",
-            createdAtMillis = nowMillis - 15L * dayMillis
+            createdAtMillis = nowMillis - 31L * dayMillis
         )
         val futurePlace = TestFixtures.place(
             id = "future-place",
@@ -40,7 +40,7 @@ class HomeSectionsTest {
         )
 
         assertEquals(
-            listOf("newest-farther", "older-closer"),
+            listOf("future-place", "newest-farther", "older-closer"),
             sections.recentlyAddedPlaces.map { it.place.id }
         )
     }

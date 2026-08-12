@@ -427,57 +427,30 @@ class HomeViewModel @Inject constructor(
                 )
             }
 
+            val coords = resolveFallbackCoordinates()
             val performanceConfig = performanceConfigProvider.performanceConfig
 
-            // Próbujemy pobrać lokalizację z IP (z cache lub sieci)
-            val fallbackCoords = if (locationPreferences.isIpLocationValid()) {
-                locationPreferences.getIpLocation()
-            } else {
-                when (val ipResult = ipLocationRepository.getApproximateLocation()) {
-                    is OpResult.Success -> {
-                        locationPreferences.saveIpLocation(ipResult.data.first, ipResult.data.second)
-                        ipResult.data
-                    }
-                    else -> null
-                }
-            }
-
-            val targetLat = fallbackCoords?.first ?: DEFAULT_CITY_LAT
-            val targetLng = fallbackCoords?.second ?: DEFAULT_CITY_LNG
-
             coroutineScope {
-                val topPlacesTask = async { placeRepository.getTopPlaces(performanceConfig.homeTopPlacesLimit) }
-                val nearbyPlacesTask = async {
-                    placeRepository.getPlacesNear(targetLat, targetLng, performanceConfig.homeFetchRadiusKm)
+                val topTask = async { placeRepository.getTopPlaces(performanceConfig.homeTopPlacesLimit) }
+                val nearbyTask = async {
+                    placeRepository.getPlacesNear(coords.first, coords.second, performanceConfig.homeFetchRadiusKm)
                 }
-                val recentPlacesTask = async {
+                val recentTask = async {
                     placeRepository.getPlacesPage(pageSize = performanceConfig.homeRecentlyAddedLimit)
                 }
 
-                val topResult = topPlacesTask.await()
-                val nearbyResult = nearbyPlacesTask.await()
-                val recentResult = recentPlacesTask.await()
+                val topResult = topTask.await()
+                val nearbyResult = nearbyTask.await()
+                val recentResult = recentTask.await()
 
-                val topPlaces = when (topResult) {
-                    is OpResult.Success -> topResult.data.map { PlaceWithDistance(it, null) }
-                    else -> emptyList()
-                }
-
-                val nearbyPlaces = when (nearbyResult) {
-                    is OpResult.Success -> nearbyResult.data.map { PlaceWithDistance(it, null) }
-                    else -> emptyList()
-                }
-
-                val recentPlaces = when (recentResult) {
-                    is OpResult.Success -> recentResult.data.items.map { PlaceWithDistance(it, null) }
-                    else -> emptyList()
-                }
-
-                _uiState.update {
-                    it.copy(
-                        topPlaces = topPlaces,
-                        nearbyPlaces = nearbyPlaces,
-                        recentlyAddedPlaces = recentPlaces,
+                _uiState.update { state ->
+                    state.copy(
+                        topPlaces = (topResult as? OpResult.Success)?.data
+                            ?.map { PlaceWithDistance(it, null) }.orEmpty(),
+                        nearbyPlaces = (nearbyResult as? OpResult.Success)?.data
+                            ?.map { PlaceWithDistance(it, null) }.orEmpty(),
+                        recentlyAddedPlaces = (recentResult as? OpResult.Success)?.data?.items
+                            ?.map { PlaceWithDistance(it, null) }.orEmpty(),
                         isTopLoading = false,
                         isNearbyLoading = false,
                         isRecentlyAddedLoading = false,
@@ -489,6 +462,20 @@ class HomeViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    private suspend fun resolveFallbackCoordinates(): Pair<Double, Double> {
+        if (locationPreferences.isIpLocationValid()) {
+            locationPreferences.getIpLocation()?.let { return it }
+        }
+
+        return when (val ipResult = ipLocationRepository.getApproximateLocation()) {
+            is OpResult.Success -> {
+                locationPreferences.saveIpLocation(ipResult.data.first, ipResult.data.second)
+                ipResult.data
+            }
+            else -> DEFAULT_CITY_LAT to DEFAULT_CITY_LNG
         }
     }
 
