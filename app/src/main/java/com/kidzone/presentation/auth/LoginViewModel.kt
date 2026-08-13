@@ -300,12 +300,14 @@ class LoginViewModel @Inject constructor(
                     is OpResult.Failure -> it.copy(
                         isLoading = false,
                         message = UiText.StringResource(R.string.verification_email_error),
-                        isMessageError = true
+                        isMessageError = true,
+                        showResendVerification = true,
+                        resendCooldownSeconds = VERIFICATION_RESEND_COOLDOWN_SECONDS
                     )
                 }
             }
             
-            // Start countdown
+            // Start countdown (regardless of result to prevent API spamming)
             while (_uiState.value.resendCooldownSeconds > 0) {
                 delay(ONE_SECOND_DELAY_MS)
                 _uiState.update { it.copy(resendCooldownSeconds = it.resendCooldownSeconds - 1) }
