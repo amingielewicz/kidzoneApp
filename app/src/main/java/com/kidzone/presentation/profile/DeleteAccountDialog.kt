@@ -69,23 +69,15 @@ fun DeleteAccountDialog(
     onConfirm: (currentPassword: String) -> Unit = {},
     onConfirmGoogle: (idToken: String) -> Unit = {},
 ) {
-    var isConfirmedByPrompt by rememberSaveable {
-        mutableStateOf(false)
-    }
-
-    if (!isConfirmedByPrompt) {
-        DeleteConfirmationPrompt(
-            onConfirm = { isConfirmedByPrompt = true },
-            onDismiss = onDismiss
-        )
-        return
-    }
-
     var password by rememberSaveable {
         mutableStateOf("")
     }
 
     var showPassword by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var showFinalConfirmation by rememberSaveable {
         mutableStateOf(false)
     }
 
@@ -103,6 +95,21 @@ fun DeleteAccountDialog(
         )
     } else {
         null
+    }
+
+    if (showFinalConfirmation) {
+        DeleteConfirmationPrompt(
+            onConfirm = {
+                if (isGoogleUser) {
+                    googleSignInLauncher?.invoke()
+                } else {
+                    onConfirm(password)
+                }
+                showFinalConfirmation = false
+            },
+            onDismiss = onDismiss // Close everything
+        )
+        return
     }
 
     AlertDialog(
@@ -233,11 +240,7 @@ fun DeleteAccountDialog(
                     )
                 },
                 onClick = {
-                    if (isGoogleUser) {
-                        googleSignInLauncher?.invoke()
-                    } else {
-                        onConfirm(password)
-                    }
+                    showFinalConfirmation = true
                 },
                 isOffline = isOffline,
                 enabled = isFormValid,
