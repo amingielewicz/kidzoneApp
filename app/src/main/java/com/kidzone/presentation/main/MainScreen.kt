@@ -141,8 +141,11 @@ fun MainScreen(
         context.getSharedPreferences(MAIN_UI_PREFS, Context.MODE_PRIVATE)
     }
     val networkStatus by rememberNetworkStatus()
-    var showHomeIntro by remember {
-        mutableStateOf(!prefs.getBoolean(KEY_HOME_INTRO_USED, false))
+    val userId = state.userId
+    val introKey = remember(userId) { "home_intro_used_${userId ?: "guest"}" }
+    
+    var showHomeIntro by remember(introKey) {
+        mutableStateOf(!prefs.getBoolean(introKey, false))
     }
     var showAddPlaceFabLabel by remember {
         mutableStateOf(!prefs.getBoolean(KEY_ADD_PLACE_FAB_LABEL_USED, false))
@@ -159,7 +162,7 @@ fun MainScreen(
     fun markHomeIntroUsed() {
         if (showHomeIntro) {
             showHomeIntro = false
-            prefs.edit().putBoolean(KEY_HOME_INTRO_USED, true).apply()
+            prefs.edit().putBoolean(introKey, true).apply()
         }
     }
 

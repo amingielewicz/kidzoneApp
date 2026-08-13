@@ -31,13 +31,20 @@ class MainViewModel @Inject constructor(
 
     data class UiState(
         val showTosDialog: Boolean = false,
-        val isAcceptingTos: Boolean = false
+        val isAcceptingTos: Boolean = false,
+        val userId: String? = null
     )
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            authRepository.currentUser.collect { user ->
+                _uiState.update { it.copy(userId = user?.id) }
+            }
+        }
+
         viewModelScope.launch {
             authRepository.currentUser
                 .flatMapLatest { user ->
