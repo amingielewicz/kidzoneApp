@@ -270,6 +270,7 @@ fun DeleteAccountDialog(
     )
 }
 
+@Suppress("FunctionNaming")
 @Composable
 private fun DeleteConfirmationPrompt(
     onConfirm: () -> Unit,
@@ -281,7 +282,7 @@ private fun DeleteConfirmationPrompt(
         icon = { DeleteAccountWarningIcon() },
         title = {
             Text(
-                text = "Czy na pewno chcesz usunąć konto?",
+                text = stringResource(R.string.delete_account_confirmation_title),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center
@@ -289,7 +290,7 @@ private fun DeleteConfirmationPrompt(
         },
         text = {
             Text(
-                text = "Ta operacja jest nieodwracalna. Twoje dane profilowe zostaną usunięte, a dodane przez Ciebie treści zostaną zanonimizowane.",
+                text = stringResource(R.string.delete_account_confirmation_message),
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center
             )
@@ -299,7 +300,10 @@ private fun DeleteConfirmationPrompt(
                 onClick = onConfirm,
                 colors = ButtonDefaults.textButtonColors(contentColor = ModalDangerColor)
             ) {
-                Text("Usuń konto", fontWeight = FontWeight.Bold)
+                Text(
+                    text = stringResource(R.string.delete_account),
+                    fontWeight = FontWeight.Bold
+                )
             }
         },
         dismissButton = {

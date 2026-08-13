@@ -75,6 +75,14 @@
     <string name="verification_email_sent">Verification link resent. Check your inbox.</string>
     <string name="verification_email_error">Failed to send verification link</string>
     <string name="resend_verification_cooldown">Resend in %1$ds</string>
+    <string name="mandatory_tos_title">kidZone Terms of Use</string>
+    <string name="mandatory_tos_message">Before proceeding to the app, please read and accept the Terms of Service and Privacy Policy.</string>
+    <string name="mandatory_tos_accept">Accept and continue</string>
+    <string name="terms_of_service_short">Terms</string>
+    <string name="privacy_policy_short">Privacy</string>
+    <string name="delete_account_confirmation_title">Are you sure you want to delete your account?</string>
+    <string name="delete_account_confirmation_message">This operation is irreversible. Your profile data will be deleted, and the content you added will be anonymized.</string>
+    <string name="register_success_verify_email">Account created! Please verify your email before logging in.</string>
     <string name="error_enter_username">Please enter a username</string>
     <string name="error_enter_email">Please enter an email address</string>
     <string name="error_enter_password">Please enter a password</string>

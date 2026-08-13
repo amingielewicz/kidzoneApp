@@ -63,7 +63,7 @@ fun MandatoryTosDialog(
         },
         title = {
             Text(
-                text = "Zasady korzystania z kidZone",
+                text = stringResource(R.string.mandatory_tos_title),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -90,6 +90,7 @@ fun MandatoryTosDialog(
     }
 }
 
+@Suppress("FunctionNaming")
 @Composable
 private fun MandatoryTosDialogContent(
     onShowTerms: () -> Unit,
@@ -109,7 +110,7 @@ private fun MandatoryTosDialogContent(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Regulamin")
+                Text(stringResource(R.string.terms_of_service_short))
             }
             Spacer(Modifier.width(8.dp))
             OutlinedButton(
@@ -117,12 +118,13 @@ private fun MandatoryTosDialogContent(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Prywatność")
+                Text(stringResource(R.string.privacy_policy_short))
             }
         }
     }
 }
 
+@Suppress("FunctionNaming")
 @Composable
 private fun MandatoryTosConfirmButton(
     onClick: () -> Unit,
@@ -141,7 +143,10 @@ private fun MandatoryTosConfirmButton(
                 strokeWidth = 2.dp
             )
         } else {
-            Text("Akceptuję i przechodzę dalej", fontWeight = FontWeight.Bold)
+            Text(
+                text = stringResource(R.string.mandatory_tos_accept),
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
