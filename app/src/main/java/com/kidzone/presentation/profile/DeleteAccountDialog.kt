@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.kidzone.R
 import com.kidzone.presentation.auth.rememberGoogleSignInLauncher
@@ -45,6 +46,7 @@ import com.kidzone.presentation.common.ModalPasswordVisibilityButton
 import com.kidzone.presentation.common.ModalTextButton
 import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.common.RequiredFieldLabel
+import androidx.compose.material3.TextButton
 import com.kidzone.utils.UiText
 
 /**
@@ -67,6 +69,18 @@ fun DeleteAccountDialog(
     onConfirm: (currentPassword: String) -> Unit = {},
     onConfirmGoogle: (idToken: String) -> Unit = {},
 ) {
+    var isConfirmedByPrompt by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    if (!isConfirmedByPrompt) {
+        DeleteConfirmationPrompt(
+            onConfirm = { isConfirmedByPrompt = true },
+            onDismiss = onDismiss
+        )
+        return
+    }
+
     var password by rememberSaveable {
         mutableStateOf("")
     }
@@ -250,6 +264,47 @@ fun DeleteAccountDialog(
                 enabled = !isInProgress,
             )
         },
+    )
+}
+
+@Composable
+private fun DeleteConfirmationPrompt(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = ModalDialogShape,
+        icon = { DeleteAccountWarningIcon() },
+        title = {
+            Text(
+                text = "Czy na pewno chcesz usunąć konto?",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center
+            )
+        },
+        text = {
+            Text(
+                text = "Ta operacja jest nieodwracalna. Twoje dane profilowe zostaną usunięte, a dodane przez Ciebie treści zostaną zanonimizowane.",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(contentColor = ModalDangerColor)
+            ) {
+                Text("Usuń konto", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            ModalTextButton(
+                text = stringResource(R.string.cancel),
+                onClick = onDismiss
+            )
+        }
     )
 }
 
