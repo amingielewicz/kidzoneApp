@@ -142,10 +142,7 @@ fun MainScreen(
     }
     val networkStatus by rememberNetworkStatus()
     var showHomeIntro by remember {
-        mutableStateOf(
-            !prefs.getBoolean(KEY_HOME_INTRO_USED, false) &&
-                    !hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
-        )
+        mutableStateOf(!prefs.getBoolean(KEY_HOME_INTRO_USED, false))
     }
     var showAddPlaceFabLabel by remember {
         mutableStateOf(!prefs.getBoolean(KEY_ADD_PLACE_FAB_LABEL_USED, false))
@@ -465,7 +462,7 @@ fun MainScreen(
         )
     }
 
-    if (state.showTosDialog) {
+    if (state.showTosDialog && !showHomeIntro) {
         MandatoryTosDialog(
             onAccept = { viewModel.acceptTos() },
             isAccepting = state.isAcceptingTos
