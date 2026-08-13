@@ -369,10 +369,15 @@ fun LoginScreen(
                             Spacer(Modifier.height(8.dp))
                             OutlinedButton(
                                 onClick = viewModel::resendVerificationEmail,
-                                enabled = !state.isLoading,
+                                enabled = !state.isLoading && state.resendCooldownSeconds == 0,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(stringResource(R.string.resend_verification_link))
+                                val text = if (state.resendCooldownSeconds > 0) {
+                                    stringResource(R.string.resend_verification_cooldown, state.resendCooldownSeconds)
+                                } else {
+                                    stringResource(R.string.resend_verification_link)
+                                }
+                                Text(text)
                             }
                         }
 

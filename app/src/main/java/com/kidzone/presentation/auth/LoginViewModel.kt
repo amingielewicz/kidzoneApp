@@ -10,12 +10,16 @@ import com.kidzone.utils.OpResult
 import com.kidzone.utils.UiText
 import com.kidzone.utils.toAuthErrorMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+private const val VERIFICATION_RESEND_COOLDOWN_SECONDS = 60
+private const val ONE_SECOND_DELAY_MS = 1000L
 
 /**
  * 🎯 Odpowiedzialności:
@@ -82,6 +86,7 @@ class LoginViewModel @Inject constructor(
         val isMessageError: Boolean = true,
         val isSignedIn: Boolean = false,
         val showResendVerification: Boolean = false,
+        val resendCooldownSeconds: Int = 0,
         val banMessage: UiText? = null,
         val banReason: UiText? = null
     ) {
@@ -278,7 +283,8 @@ class LoginViewModel @Inject constructor(
      */
     fun resendVerificationEmail() {
         val state = _uiState.value
-        if (state.email.isBlank() || state.password.isBlank()) return
+        if (state.email.isBlank() || state.password.isBlank() || state.resendCooldownSeconds > 0) return
+        
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val result = authRepository.resendVerificationEmail(state.email.trim(), state.password)
@@ -288,7 +294,8 @@ class LoginViewModel @Inject constructor(
                         isLoading = false,
                         message = UiText.StringResource(R.string.verification_email_sent),
                         isMessageError = false,
-                        showResendVerification = false
+                        showResendVerification = true,
+                        resendCooldownSeconds = VERIFICATION_RESEND_COOLDOWN_SECONDS
                     )
                     is OpResult.Failure -> it.copy(
                         isLoading = false,
@@ -296,6 +303,12 @@ class LoginViewModel @Inject constructor(
                         isMessageError = true
                     )
                 }
+            }
+            
+            // Start countdown
+            while (_uiState.value.resendCooldownSeconds > 0) {
+                delay(ONE_SECOND_DELAY_MS)
+                _uiState.update { it.copy(resendCooldownSeconds = it.resendCooldownSeconds - 1) }
             }
         }
     }
