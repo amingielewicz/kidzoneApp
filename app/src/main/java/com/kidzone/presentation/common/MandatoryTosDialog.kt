@@ -38,6 +38,7 @@ import com.kidzone.presentation.profile.TermsOfServiceDialog
  * Blokujący dialog wymuszający akceptację Regulaminu i Polityki prywatności.
  * Wyświetlany dla wszystkich zalogowanych użytkowników, którzy jeszcze nie wyrazili zgody.
  */
+@Suppress("FunctionNaming")
 @Composable
 fun MandatoryTosDialog(
     onAccept: () -> Unit,
@@ -68,50 +69,16 @@ fun MandatoryTosDialog(
             )
         },
         text = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "Przed przejściem do aplikacji prosimy o zapoznanie się i zaakceptowanie Regulaminu oraz Polityki prywatności.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(Modifier.height(24.dp))
-                
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedButton(
-                        onClick = { showTerms = true },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Regulamin")
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    OutlinedButton(
-                        onClick = { showPrivacy = true },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Prywatność")
-                    }
-                }
-            }
+            MandatoryTosDialogContent(
+                onShowTerms = { showTerms = true },
+                onShowPrivacy = { showPrivacy = true }
+            )
         },
         confirmButton = {
-            Button(
+            MandatoryTosConfirmButton(
                 onClick = onAccept,
-                enabled = !isAccepting,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                if (isAccepting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text("Akceptuję i przechodzę dalej", fontWeight = FontWeight.Bold)
-                }
-            }
+                isLoading = isAccepting
+            )
         }
     )
 
@@ -120,5 +87,61 @@ fun MandatoryTosDialog(
     }
     if (showPrivacy) {
         PrivacyPolicyDialog(onDismiss = { showPrivacy = false })
+    }
+}
+
+@Composable
+private fun MandatoryTosDialogContent(
+    onShowTerms: () -> Unit,
+    onShowPrivacy: () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = stringResource(R.string.mandatory_tos_message),
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(24.dp))
+
+        Row(modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = onShowTerms,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Regulamin")
+            }
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(
+                onClick = onShowPrivacy,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Prywatność")
+            }
+        }
+    }
+}
+
+@Composable
+private fun MandatoryTosConfirmButton(
+    onClick: () -> Unit,
+    isLoading: Boolean
+) {
+    Button(
+        onClick = onClick,
+        enabled = !isLoading,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                color = MaterialTheme.colorScheme.onPrimary,
+                strokeWidth = 2.dp
+            )
+        } else {
+            Text("Akceptuję i przechodzę dalej", fontWeight = FontWeight.Bold)
+        }
     }
 }
