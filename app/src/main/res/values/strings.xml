@@ -621,14 +621,14 @@
     <string name="delete_account_places_prefix">Twoje miejsca</string>
     <string name="confirm_google_button">Potwierdź przez Google</string>
     <string name="change_email_title">Zmiana adresu e-mail</string>
-    <string name="current_email_label">Aktualny adres: %1$s</string>
+    <string name="current_email_label">Aktualny adres:</string>
     <string name="new_email_label">Nowy adres e-mail</string>
     <string name="email_already_set">To jest Twój aktualny adres</string>
     <string name="email_verification_hint">Wyślemy link weryfikacyjny na nowy adres</string>
     <string name="send_link">Wyślij link</string>
     <string name="profile_update_failed">Nie udało się zapisać profilu</string>
     <string name="password_changed">Hasło zostało zmienione</string>
-    <string name="change_email_verification_sent">Wysłaliśmy link weryfikacyjny na: %1$s. Kliknij w niego, by potwierdzić zmianę adresu.</string>
+    <string name="change_email_verification_sent">Link weryfikacyjny wysłany na: %1$s. Kliknij w niego, aby potwierdzić zmianę.</string>
     <string name="account_action_failed">Nie udało się wykonać akcji</string>
     <string name="delete_account_failed">Nie udało się usunąć konta</string>
     <string name="error_delete_account_google_unsupported">Usuwanie konta jest dostępne tylko dla logowania e-mail/hasło. W przypadku logowania przez Google, usuń konto w ustawieniach konta Google lub skontaktuj się z nami.</string>

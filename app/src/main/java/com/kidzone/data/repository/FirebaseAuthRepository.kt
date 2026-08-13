@@ -129,10 +129,20 @@ class FirebaseAuthRepository @Inject constructor(
         var privateDto: UserPrivateDto? = null
 
         fun syncToLocal() {
-            val user = publicDto?.toDomain(
+            var user = publicDto?.toDomain(
                 privateProfile = privateDto,
                 includeLegacyPrivateFallback = shouldObservePrivateProfile
             ) ?: return
+
+            // Fallback dla adresu e-mail: jeśli obserwujemy własny profil i Firestore
+            // nie ma jeszcze adresu (np. po zmianie lub podczas migracji), używamy
+            // danych z Firebase Auth jako Single Source of Truth dla tożsamości.
+            if (shouldObservePrivateProfile && user.email.isBlank()) {
+                val authEmail = firebaseAuth.currentUser?.email
+                if (!authEmail.isNullOrBlank()) {
+                    user = user.copy(email = authEmail)
+                }
+            }
 
             // Aktualizujemy cache lokalny. Dzięki temu Profil, avatar
             // i statystyki będą dostępne natychmiast po starcie offline.
@@ -570,9 +580,6 @@ class FirebaseAuthRepository @Inject constructor(
         val user = firebaseAuth.currentUser
             ?: error("No signed-in user")
 
-        // MVP: tylko email/password. Dla Google reauth musiałby przejść
-        // przez UI launcher – wymaga większej zmiany VM/UI niż mamy czas
-        // dziś, dorobimy w następnym PR.
         val email = user.email
         val isPasswordUser = user.providerData.any { it.providerId == EmailAuthProvider.PROVIDER_ID }
         if (email == null || !isPasswordUser) {
@@ -585,9 +592,8 @@ class FirebaseAuthRepository @Inject constructor(
         performAccountDeletion(user)
 
         OpResult.success(Unit)
-    } catch (e: FirebaseAuthInvalidCredentialsException) {
-        OpResult.failure(AuthException.InvalidCredentials)
     } catch (e: Exception) {
+        Timber.e(e, "Account deletion failed")
         OpResult.failure(e)
     }
 
@@ -602,9 +608,8 @@ class FirebaseAuthRepository @Inject constructor(
         performAccountDeletion(user)
 
         OpResult.success(Unit)
-    } catch (e: FirebaseAuthInvalidCredentialsException) {
-        OpResult.failure(AuthException.InvalidCredentials)
     } catch (e: Exception) {
+        Timber.e(e, "Account deletion (Google) failed")
         OpResult.failure(e)
     }
 

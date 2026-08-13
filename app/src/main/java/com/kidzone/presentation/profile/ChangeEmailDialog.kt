@@ -119,7 +119,7 @@ fun ChangeEmailDialog(
                 )
 
                 Text(
-                    text = currentEmail,
+                    text = currentEmail.ifBlank { stringResource(R.string.address_unavailable) },
                     style = MaterialTheme.typography.bodyLarge,
                 )
 
