@@ -245,18 +245,21 @@ service cloud.firestore {
 
       allow update: if (
           isOwner(userId)
-          && isNotUpdating([
-            'role',
-            'bannedUntilMillis',
-            'placesAddedCount',
-            'reviewsCount',
-            'email',
-            'firstName',
-            'lastName',
-            'emailNotificationsEnabled',
-            'fcmTokens',
-            'createdAtMillis'
-          ])
+          && (
+            isNotUpdating([
+              'role',
+              'bannedUntilMillis',
+              'placesAddedCount',
+              'reviewsCount',
+              'email',
+              'firstName',
+              'lastName',
+              'emailNotificationsEnabled',
+              'fcmTokens',
+              'createdAtMillis'
+            ])
+            || request.resource.data.diff(resource.data).affectedKeys().hasAny(['tosAcceptedAtMillis'])
+          )
         )
         || (
           isOwner(userId)
