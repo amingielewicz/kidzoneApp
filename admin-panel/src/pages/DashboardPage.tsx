@@ -1,40 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Grid,
-  Card,
-  CardContent,
-  Typography,
-  CircularProgress,
-  List,
-  ListItem,
-  ListItemAvatar,
-  ListItemText,
-  ListItemButton,
-  Avatar,
-  Chip,
-  Paper,
-  Rating,
-} from '@mui/material';
+import { Box, Grid, Card, CardContent, Typography, CircularProgress, List, ListItem, ListItemAvatar, ListItemText, ListItemButton, Avatar, Chip, Paper, Rating } from '@mui/material';
 import PlaceIcon from '@mui/icons-material/Place';
 import ReviewsIcon from '@mui/icons-material/RateReview';
 import PeopleIcon from '@mui/icons-material/People';
 import ReportIcon from '@mui/icons-material/Report';
 import WarningIcon from '@mui/icons-material/Warning';
-import PhotoIcon from '@mui/icons-material/Photo';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import BlockIcon from '@mui/icons-material/Block';
-import {
-  collection,
-  query,
-  orderBy,
-  getDocs,
-  getCountFromServer,
-  limit,
-  where,
-} from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, getCountFromServer, limit, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 
 interface RecentUser { id: string; name: string; email: string; avatarUrl?: string; createdAtMillis: number; }
@@ -43,151 +18,33 @@ interface RecentReview { id: string; authorName: string; comment: string; rating
 interface RecentReport { id: string; type: 'place' | 'review' | 'photo'; reason: string; comment: string; createdAtMillis: number; }
 interface BlockedUser { id: string; name: string; email: string; avatarUrl?: string; bannedUntilMillis: number; banReason?: string; }
 
-function formatDate(millis: number): string {
-  return new Date(millis).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-function formatBanDate(millis: number): string {
-  return new Date(millis).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
-function formatRemainingTime(bannedUntilMillis: number): string {
-  if (bannedUntilMillis === -1) return 'Bezterminowo';
-  const remainingMillis = Math.max(0, bannedUntilMillis - Date.now());
-  const minutes = Math.ceil(remainingMillis / 60000);
-  const days = Math.floor(minutes / 1440);
-  const hours = Math.floor((minutes % 1440) / 60);
-  if (days > 0) return `${days} ${days === 1 ? 'dzień' : 'dni'}`;
-  if (hours > 0) return `${hours} ${hours === 1 ? 'godzina' : 'godziny'}`;
-  return `${minutes} min`;
-}
-
-const REASON_LABELS: Record<string, string> = {
-  NOT_EXISTS: 'Nie istnieje / zamknięte', INAPPROPRIATE: 'Nieodpowiednia treść', DUPLICATE: 'Duplikat',
-  FALSE_DATA: 'Fałszywe dane', SPAM: 'Spam / reklama', OFFENSIVE: 'Obraźliwa treść',
-  FALSE_INFO: 'Fałszywe informacje', NOT_RELEVANT: 'Nie dotyczy miejsca', COPYRIGHT: 'Prawa autorskie', OTHER: 'Inne',
-};
+function formatDate(millis: number): string { return new Date(millis).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
+function formatBanDate(millis: number): string { return new Date(millis).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+function formatRemainingTime(millis: number): string { if (millis === -1) return 'Bezterminowo'; const minutes = Math.ceil(Math.max(0, millis - Date.now()) / 60000); const days = Math.floor(minutes / 1440); const hours = Math.floor((minutes % 1440) / 60); if (days > 0) return `${days} ${days === 1 ? 'dzień' : 'dni'}`; if (hours > 0) return `${hours} ${hours === 1 ? 'godzina' : 'godziny'}`; return `${minutes} min`; }
+const REASON_LABELS: Record<string, string> = { NOT_EXISTS: 'Nie istnieje / zamknięte', INAPPROPRIATE: 'Nieodpowiednia treść', DUPLICATE: 'Duplikat', FALSE_DATA: 'Fałszywe dane', SPAM: 'Spam / reklama', OFFENSIVE: 'Obraźliwa treść', FALSE_INFO: 'Fałszywe informacje', NOT_RELEVANT: 'Nie dotyczy miejsca', COPYRIGHT: 'Prawa autorskie', OTHER: 'Inne' };
 
 export function DashboardPage() {
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ places: 0, reviews: 0, users: 0, pendingReports: 0 });
-  const [recentUsers, setRecentUsers] = useState<RecentUser[]>([]);
-  const [recentPlaces, setRecentPlaces] = useState<RecentPlace[]>([]);
-  const [recentReviews, setRecentReviews] = useState<RecentReview[]>([]);
-  const [recentReports, setRecentReports] = useState<RecentReport[]>([]);
-  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
-
+  const navigate = useNavigate(); const [loading, setLoading] = useState(true); const [stats, setStats] = useState({ places: 0, reviews: 0, users: 0, pendingReports: 0 }); const [recentUsers, setRecentUsers] = useState<RecentUser[]>([]); const [recentPlaces, setRecentPlaces] = useState<RecentPlace[]>([]); const [recentReviews, setRecentReviews] = useState<RecentReview[]>([]); const [recentReports, setRecentReports] = useState<RecentReport[]>([]); const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   useEffect(() => { fetchDashboard(); }, []);
-
   async function fetchDashboard() {
     try {
-      const [placesC, reviewsC, usersC] = await Promise.all([
-        getCountFromServer(collection(db, 'places')),
-        getCountFromServer(collection(db, 'reviews')),
-        getCountFromServer(collection(db, 'users')),
-      ]);
-      const usersSnap = await getDocs(query(collection(db, 'users'), orderBy('createdAtMillis', 'desc'), limit(5)));
-      setRecentUsers(usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as RecentUser));
-
-      // Do not use orderBy here: older user documents may not contain ban fields.
-      const blockedUsersSnap = await getDocs(query(collection(db, 'users'), limit(500)));
-      const now = Date.now();
-      setBlockedUsers(
-        blockedUsersSnap.docs
-          .map((d) => ({ id: d.id, ...d.data() }) as BlockedUser)
-          .filter((user) => typeof user.bannedUntilMillis === 'number' && (user.bannedUntilMillis === -1 || user.bannedUntilMillis > now))
-          .sort((a, b) => {
-            if (a.bannedUntilMillis === -1) return -1;
-            if (b.bannedUntilMillis === -1) return 1;
-            return a.bannedUntilMillis - b.bannedUntilMillis;
-          }),
-      );
-
-      const placesSnap = await getDocs(query(collection(db, 'places'), orderBy('createdAtMillis', 'desc'), limit(5)));
-      setRecentPlaces(placesSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as RecentPlace));
-      const reviewsSnap = await getDocs(query(collection(db, 'reviews'), orderBy('createdAtMillis', 'desc'), limit(5)));
-      setRecentReviews(reviewsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as RecentReview));
-
+      const [placesC, reviewsC, usersC] = await Promise.all([getCountFromServer(collection(db, 'places')), getCountFromServer(collection(db, 'reviews')), getCountFromServer(collection(db, 'users'))]);
+      const usersSnap = await getDocs(query(collection(db, 'users'), orderBy('createdAtMillis', 'desc'), limit(5))); setRecentUsers(usersSnap.docs.map(d => ({ id: d.id, ...d.data() }) as RecentUser));
+      const blockedUsersSnap = await getDocs(query(collection(db, 'users'), limit(500))); const now = Date.now();
+      setBlockedUsers(blockedUsersSnap.docs.map(d => ({ id: d.id, ...d.data() }) as BlockedUser).filter(u => typeof u.bannedUntilMillis === 'number' && (u.bannedUntilMillis === -1 || u.bannedUntilMillis > now)).sort((a,b) => a.bannedUntilMillis === -1 ? -1 : b.bannedUntilMillis === -1 ? 1 : a.bannedUntilMillis - b.bannedUntilMillis));
+      const placesSnap = await getDocs(query(collection(db, 'places'), orderBy('createdAtMillis', 'desc'), limit(5))); setRecentPlaces(placesSnap.docs.map(d => ({ id: d.id, ...d.data() }) as RecentPlace));
+      const reviewsSnap = await getDocs(query(collection(db, 'reviews'), orderBy('createdAtMillis', 'desc'), limit(5))); setRecentReviews(reviewsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as RecentReview));
       let pendingReportsCount = 0;
-      try {
-        const [prCount, rrCount, phCount] = await Promise.all([
-          getCountFromServer(query(collection(db, 'place_reports'), where('status', '==', 'pending'))),
-          getCountFromServer(query(collection(db, 'review_reports'), where('status', '==', 'pending'))),
-          getCountFromServer(query(collection(db, 'photo_reports'), where('status', '==', 'pending'))),
-        ]);
-        pendingReportsCount = prCount.data().count + rrCount.data().count + phCount.data().count;
-        const [prSnap2, rrSnap2, phSnap2] = await Promise.all([
-          getDocs(query(collection(db, 'place_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'), limit(5))),
-          getDocs(query(collection(db, 'review_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'), limit(5))),
-          getDocs(query(collection(db, 'photo_reports'), where('status', '==', 'pending'), orderBy('createdAtMillis', 'desc'), limit(5))),
-        ]);
-        const reports: RecentReport[] = [
-          ...prSnap2.docs.map((d) => ({ id: d.id, type: 'place' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
-          ...rrSnap2.docs.map((d) => ({ id: d.id, type: 'review' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
-          ...phSnap2.docs.map((d) => ({ id: d.id, type: 'photo' as const, reason: d.data().reason || '', comment: d.data().comment || '', createdAtMillis: d.data().createdAtMillis || 0 })),
-        ];
-        reports.sort((a, b) => b.createdAtMillis - a.createdAtMillis);
-        setRecentReports(reports.slice(0, 5));
-      } catch (reportErr) {
-        console.error('Failed to fetch reports for dashboard:', reportErr);
-        setRecentReports([]);
-      }
+      try { const [prCount, rrCount, phCount] = await Promise.all([getCountFromServer(query(collection(db,'place_reports'),where('status','==','pending'))),getCountFromServer(query(collection(db,'review_reports'),where('status','==','pending'))),getCountFromServer(query(collection(db,'photo_reports'),where('status','==','pending')))]); pendingReportsCount = prCount.data().count + rrCount.data().count + phCount.data().count; const [pr,rr,ph] = await Promise.all([getDocs(query(collection(db,'place_reports'),where('status','==','pending'),orderBy('createdAtMillis','desc'),limit(5))),getDocs(query(collection(db,'review_reports'),where('status','==','pending'),orderBy('createdAtMillis','desc'),limit(5))),getDocs(query(collection(db,'photo_reports'),where('status','==','pending'),orderBy('createdAtMillis','desc'),limit(5)))]); const reports: RecentReport[]=[...pr.docs.map(d=>({id:d.id,type:'place' as const,reason:d.data().reason||'',comment:d.data().comment||'',createdAtMillis:d.data().createdAtMillis||0})),...rr.docs.map(d=>({id:d.id,type:'review' as const,reason:d.data().reason||'',comment:d.data().comment||'',createdAtMillis:d.data().createdAtMillis||0})),...ph.docs.map(d=>({id:d.id,type:'photo' as const,reason:d.data().reason||'',comment:d.data().comment||'',createdAtMillis:d.data().createdAtMillis||0}))]; reports.sort((a,b)=>b.createdAtMillis-a.createdAtMillis); setRecentReports(reports.slice(0,5)); } catch(e) { console.error(e); setRecentReports([]); }
       setStats({ places: placesC.data().count, reviews: reviewsC.data().count, users: usersC.data().count, pendingReports: pendingReportsCount });
-    } catch (err) {
-      console.error('Dashboard fetch error:', err);
-    } finally { setLoading(false); }
+    } catch(e) { console.error('Dashboard fetch error:',e); } finally { setLoading(false); }
   }
-
   if (loading) return <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>;
-
-  return (
-    <Box>
-      <Typography variant="h4" fontWeight={700} mb={1}>Dashboard</Typography>
-      <Typography variant="body2" color="text.secondary" mb={3}>Podsumowanie statystyk i ostatnia aktywność w kidZone.</Typography>
-
-      <Grid container spacing={3} mb={4}>
-        <Grid item xs={12} sm={6} md={3}><Card sx={{ borderLeft: '4px solid #1976D2', height: '100%' }}><CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, height: '100%' }}><PlaceIcon sx={{ fontSize: 36, color: '#1976D2' }} /><Box><Typography variant="h5" fontWeight={700}>{stats.places}</Typography><Typography variant="body2" color="text.secondary">Miejsca</Typography></Box></CardContent></Card></Grid>
-        <Grid item xs={12} sm={6} md={3}><Card sx={{ borderLeft: '4px solid #388E3C', height: '100%' }}><CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, height: '100%' }}><ReviewsIcon sx={{ fontSize: 36, color: '#388E3C' }} /><Box><Typography variant="h5" fontWeight={700}>{stats.reviews}</Typography><Typography variant="body2" color="text.secondary">Opinie</Typography></Box></CardContent></Card></Grid>
-        <Grid item xs={12} sm={6} md={3}><Card sx={{ borderLeft: '4px solid #7B1FA2', height: '100%' }}><CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, height: '100%' }}><PeopleIcon sx={{ fontSize: 36, color: '#7B1FA2' }} /><Box><Typography variant="h5" fontWeight={700}>{stats.users}</Typography><Typography variant="body2" color="text.secondary">Użytkownicy</Typography></Box></CardContent></Card></Grid>
-        <Grid item xs={12} sm={6} md={3}><Card sx={{ borderLeft: '4px solid #D32F2F', height: '100%' }}><CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, height: '100%' }}><ReportIcon sx={{ fontSize: 36, color: '#D32F2F' }} /><Box><Typography variant="h5" fontWeight={700}>{stats.pendingReports}</Typography><Typography variant="body2" color="text.secondary">Zgłoszenia oczekujące</Typography></Box></CardContent></Card></Grid>
-      </Grid>
-
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Box display="flex" alignItems="center" justifyContent="space-between" gap={1} mb={2}>
-          <Box display="flex" alignItems="center" gap={1}><BlockIcon color="error" /><Typography variant="h6" fontWeight={600}>Zablokowani użytkownicy</Typography></Box>
-          <Chip label={blockedUsers.length} size="small" color="error" variant="outlined" />
-        </Box>
-        {blockedUsers.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">Brak aktualnie zablokowanych użytkowników.</Typography>
-        ) : (
-          <List dense disablePadding>
-            {blockedUsers.map((user) => (
-              <ListItem key={user.id} disableGutters sx={{ py: 1 }}>
-                <ListItemButton onClick={() => navigate('/users')} sx={{ borderRadius: 1 }}>
-                  <ListItemAvatar><Avatar src={user.avatarUrl} sx={{ width: 36, height: 36 }}>{user.name?.charAt(0) || user.email?.charAt(0) || '?'}</Avatar></ListItemAvatar>
-                  <ListItemText
-                    primary={user.name || user.email || 'Użytkownik'}
-                    secondary={user.email}
-                    primaryTypographyProps={{ fontWeight: 600 }}
-                  />
-                  <Box sx={{ textAlign: 'right', ml: 2 }}>
-                    <Typography variant="body2" fontWeight={600}>{user.banReason ? (REASON_LABELS[user.banReason] || user.banReason) : 'Brak podanego powodu'}</Typography>
-                    <Typography variant="caption" color="text.secondary">Pozostało: {formatRemainingTime(user.bannedUntilMillis)}</Typography>
-                    <Typography variant="caption" display="block" color="text.secondary">Do: {user.bannedUntilMillis === -1 ? 'bezterminowo' : formatBanDate(user.bannedUntilMillis)}</Typography>
-                  </Box>
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
-        )}
-      </Paper>
-
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={4}><Paper sx={{ p: 2, overflow: 'hidden' }}><Box display="flex" alignItems="center" gap={1} mb={2}><PersonAddIcon color="primary" /><Typography variant="h6" fontWeight={600}>Nowi użytkownicy</Typography></Box><List dense disablePadding>{recentUsers.map((u) => <ListItem key={u.id} disableGutters><ListItemAvatar><Avatar src={u.avatarUrl} sx={{ width: 32, height: 32, fontSize: 14 }}>{u.name?.charAt(0) || '?'}</Avatar></ListItemAvatar><ListItemText primary={u.name || u.email} secondary={formatDate(u.createdAtMillis)} primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }} secondaryTypographyProps={{ variant: 'caption' }} /></ListItem>)}{recentUsers.length === 0 && <Typography variant="body2" color="text.secondary">Brak</Typography>}</List></Paper></Grid>
-        <Grid item xs={12} md={4}><Paper sx={{ p: 2 }}><Box display="flex" alignItems="center" gap={1} mb={2}><NewReleasesIcon color="primary" /><Typography variant="h6" fontWeight={600}>Nowe miejsca</Typography></Box><List dense disablePadding>{recentPlaces.map((p) => <ListItem key={p.id} disableGutters sx={{ minWidth: 0 }}><ListItemAvatar><Avatar sx={{ width: 32, height: 32 }}><PlaceIcon sx={{ fontSize: 18 }} /></Avatar></ListItemAvatar><ListItemText primary={p.name} secondary={formatDate(p.createdAtMillis)} sx={{ minWidth: 0, pr: 1 }} primaryTypographyProps={{ variant: 'body2', fontWeight: 500, sx: { overflowWrap: 'anywhere', wordBreak: 'break-word' } }} secondaryTypographyProps={{ variant: 'caption' }} />{p.averageRating > 0 && <Chip label={p.averageRating.toFixed(1)} size="small" />}</ListItem>)}{recentPlaces.length === 0 && <Typography variant="body2" color="text.secondary">Brak</Typography>}</List></Paper></Grid>
-        <Grid item xs={12} md={4}><Paper sx={{ p: 2, overflow: 'hidden' }}><Box display="flex" alignItems="center" gap={1} mb={2}><ReviewsIcon color="primary" /><Typography variant="h6" fontWeight={600}>Nowe opinie</Typography></Box><List dense disablePadding>{recentReviews.map((r) => <ListItem key={r.id} disableGutters sx={{ alignItems: 'flex-start' }}><ListItemText primary={<Box display="flex" alignItems="center" gap={1} minWidth={0} flexWrap="wrap"><Typography variant="body2" fontWeight={500} sx={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{r.authorName || 'Anonim'}</Typography><Rating value={r.rating} size="small" readOnly /></Box>} secondary={r.comment ? `${r.comment.substring(0, 80)}${r.comment.length > 80 ? '…' : ''}` : 'Brak komentarza'} secondaryTypographyProps={{ variant: 'caption', sx: { overflowWrap: 'anywhere' } }} /></ListItem>)}{recentReviews.length === 0 && <Typography variant="body2" color="text.secondary">Brak</Typography>}</List></Paper></Grid>
-      </Grid>
-
-      {recentReports.length > 0 && <Paper sx={{ p: 2, mt: 3 }}><Box display="flex" alignItems="center" gap={1} mb={2}><WarningIcon color="warning" /><Typography variant="h6" fontWeight={600}>Ostatnie zgłoszenia</Typography></Box><List dense disablePadding>{recentReports.map((r) => <ListItem key={`${r.type}-${r.id}`} disableGutters><ListItemText primary={REASON_LABELS[r.reason] || r.reason || 'Zgłoszenie'} secondary={r.comment || formatDate(r.createdAtMillis)} /></ListItem>)}</List></Paper>}
-    </Box>
-  );
+  return <Box>
+    <Typography variant="h4" fontWeight={700} mb={1}>Dashboard</Typography><Typography variant="body2" color="text.secondary" mb={3}>Podsumowanie statystyk i ostatnia aktywność w kidZone.</Typography>
+    <Grid container spacing={3} mb={4}>{[['Miejsca',stats.places,PlaceIcon,'#1976D2'],['Opinie',stats.reviews,ReviewsIcon,'#388E3C'],['Użytkownicy',stats.users,PeopleIcon,'#7B1FA2'],['Zgłoszenia oczekujące',stats.pendingReports,ReportIcon,'#D32F2F']].map(([label,value,Icon,color])=><Grid item xs={12} sm={6} md={3} key={label as string}><Card sx={{borderLeft:`4px solid ${color}`,height:'100%'}}><CardContent sx={{display:'flex',alignItems:'center',gap:2,height:'100%'}}><Icon sx={{fontSize:36,color}}/><Box><Typography variant="h5" fontWeight={700}>{value as number}</Typography><Typography variant="body2" color="text.secondary">{label as string}</Typography></Box></CardContent></Card></Grid>)}</Grid>
+    <Paper sx={{p:2,mb:3}}><Box display="flex" alignItems="center" justifyContent="space-between" mb={2}><Box display="flex" alignItems="center" gap={1}><BlockIcon color="error"/><Typography variant="h6" fontWeight={600}>Zablokowani użytkownicy</Typography></Box><Chip label={blockedUsers.length} size="small" color="error" variant="outlined"/></Box>{blockedUsers.length===0?<Typography variant="body2" color="text.secondary">Brak aktualnie zablokowanych użytkowników.</Typography>:<List dense disablePadding>{blockedUsers.map(u=><ListItem key={u.id} disableGutters><ListItemButton onClick={()=>navigate('/users')}><ListItemAvatar><Avatar src={u.avatarUrl}>{u.name?.charAt(0)||u.email?.charAt(0)||'?'}</Avatar></ListItemAvatar><ListItemText primary={u.name||u.email||'Użytkownik'} secondary={u.email}/><Box sx={{textAlign:'right',ml:2}}><Typography variant="body2" fontWeight={600}>{u.banReason?(REASON_LABELS[u.banReason]||u.banReason):'Brak podanego powodu'}</Typography><Typography variant="caption" color="text.secondary">Pozostało: {formatRemainingTime(u.bannedUntilMillis)}</Typography><Typography variant="caption" display="block" color="text.secondary">Do: {u.bannedUntilMillis===-1?'bezterminowo':formatBanDate(u.bannedUntilMillis)}</Typography></Box></ListItemButton></ListItem>)}</List>}</Paper>
+    <Grid container spacing={3}><Grid item xs={12} md={4}><Paper sx={{p:2}}><Box display="flex" alignItems="center" gap={1} mb={2}><PersonAddIcon color="primary"/><Typography variant="h6">Nowi użytkownicy</Typography></Box><List dense>{recentUsers.map(u=><ListItem key={u.id}><ListItemAvatar><Avatar src={u.avatarUrl}>{u.name?.charAt(0)||'?'}</Avatar></ListItemAvatar><ListItemText primary={u.name||u.email} secondary={formatDate(u.createdAtMillis)}/></ListItem>)}{!recentUsers.length&&<Typography variant="body2" color="text.secondary">Brak</Typography>}</List></Paper></Grid><Grid item xs={12} md={4}><Paper sx={{p:2}}><Box display="flex" alignItems="center" gap={1} mb={2}><NewReleasesIcon color="primary"/><Typography variant="h6">Nowe miejsca</Typography></Box><List dense>{recentPlaces.map(p=><ListItem key={p.id}><ListItemAvatar><Avatar><PlaceIcon/></Avatar></ListItemAvatar><ListItemText primary={p.name} secondary={formatDate(p.createdAtMillis)}/>{p.averageRating>0&&<Chip label={p.averageRating.toFixed(1)} size="small"/>}</ListItem>)}</List></Paper></Grid><Grid item xs={12} md={4}><Paper sx={{p:2}}><Box display="flex" alignItems="center" gap={1} mb={2}><ReviewsIcon color="primary"/><Typography variant="h6">Nowe opinie</Typography></Box><List dense>{recentReviews.map(r=><ListItem key={r.id}><ListItemText primary={r.authorName||'Anonim'} secondary={r.comment||'Brak komentarza'}/><Rating value={r.rating} size="small" readOnly/></ListItem>)}</List></Paper></Grid></Grid>
+    {recentReports.length>0&&<Paper sx={{p:2,mt:3}}><Box display="flex" alignItems="center" gap={1} mb={2}><WarningIcon color="warning"/><Typography variant="h6">Ostatnie zgłoszenia</Typography></Box><List dense>{recentReports.map(r=><ListItem key={`${r.type}-${r.id}`}><ListItemText primary={REASON_LABELS[r.reason]||r.reason||'Zgłoszenie'} secondary={r.comment||formatDate(r.createdAtMillis)}/></ListItem>)}</List></Paper>}
+  </Box>;
 }
