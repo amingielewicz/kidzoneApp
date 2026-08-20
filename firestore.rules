@@ -25,7 +25,10 @@ service cloud.firestore {
           !exists(/databases/$(database)/documents/users/$(request.auth.uid))
           || (
             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) == 0
-            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) < request.time.toMillis()
+            || (
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) > 0
+              && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) < request.time.toMillis()
+            )
           )
         );
     }
@@ -38,12 +41,8 @@ service cloud.firestore {
             && request.auth.token.admin == true
           )
           || (
-            exists(
-              /databases/$(database)/documents/users/$(request.auth.uid)
-            )
-            && get(
-              /databases/$(database)/documents/users/$(request.auth.uid)
-            ).data.role == 'admin'
+            exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin'
           )
         );
     }
@@ -237,9 +236,9 @@ service cloud.firestore {
       allow read: if isSignedIn();
 
       allow create: if isOwner(userId)
-        && request.resource.data.role == 'user'
-        && request.resource.data.placesAddedCount == 0
-        && request.resource.data.reviewsCount == 0
+        && request.resource.data.get('role', 'user') == 'user'
+        && request.resource.data.get('placesAddedCount', 0) == 0
+        && request.resource.data.get('reviewsCount', 0) == 0
         && hasNoPrivateUserFields();
 
       allow update: if (
