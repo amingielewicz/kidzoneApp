@@ -12,6 +12,8 @@ service cloud.firestore {
     }
 
     function isTosAccepted() {
+      // Dla bezpieczeństwa: jeśli dokument nie istnieje, uznajemy że TOS niezaakceptowany.
+      // Użytkownik musi najpierw przejść przez proces rejestracji/logowania, który tworzy ten dokument.
       return isSignedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('tosAcceptedAtMillis', 0) > 0;
@@ -23,10 +25,7 @@ service cloud.firestore {
           !exists(/databases/$(database)/documents/users/$(request.auth.uid))
           || (
             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) == 0
-            || (
-              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) > 0
-              && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) < request.time.toMillis()
-            )
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('bannedUntilMillis', 0) < request.time.toMillis()
           )
         );
     }
@@ -245,21 +244,18 @@ service cloud.firestore {
 
       allow update: if (
           isOwner(userId)
-          && (
-            isNotUpdating([
-              'role',
-              'bannedUntilMillis',
-              'placesAddedCount',
-              'reviewsCount',
-              'email',
-              'firstName',
-              'lastName',
-              'emailNotificationsEnabled',
-              'fcmTokens',
-              'createdAtMillis'
-            ])
-            || request.resource.data.diff(resource.data).affectedKeys().hasAny(['tosAcceptedAtMillis'])
-          )
+          && isNotUpdating([
+            'role',
+            'bannedUntilMillis',
+            'placesAddedCount',
+            'reviewsCount',
+            'email',
+            'firstName',
+            'lastName',
+            'emailNotificationsEnabled',
+            'fcmTokens',
+            'createdAtMillis'
+          ])
         )
         || (
           isOwner(userId)
