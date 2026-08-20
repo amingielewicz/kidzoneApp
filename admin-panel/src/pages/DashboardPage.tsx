@@ -25,6 +25,7 @@ import WarningIcon from '@mui/icons-material/Warning';
 import PhotoIcon from '@mui/icons-material/Photo';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
+import BlockIcon from '@mui/icons-material/Block';
 import {
   collection,
   query,
@@ -68,12 +69,44 @@ interface RecentReport {
   createdAtMillis: number;
 }
 
+interface BlockedUser {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  bannedUntilMillis: number;
+  banReason?: string;
+}
+
 function formatDate(millis: number): string {
   return new Date(millis).toLocaleDateString('pl-PL', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
   });
+}
+
+function formatBanDate(millis: number): string {
+  return new Date(millis).toLocaleDateString('pl-PL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatRemainingTime(bannedUntilMillis: number): string {
+  if (bannedUntilMillis === -1) return 'Bezterminowo';
+
+  const remainingMillis = Math.max(0, bannedUntilMillis - Date.now());
+  const remainingMinutes = Math.ceil(remainingMillis / (60 * 1000));
+  const days = Math.floor(remainingMinutes / (60 * 24));
+  const hours = Math.floor((remainingMinutes % (60 * 24)) / 60);
+
+  if (days > 0) return `${days} ${days === 1 ? 'dzień' : days < 5 ? 'dni' : 'dni'}`;
+  if (hours > 0) return `${hours} ${hours === 1 ? 'godzina' : 'godziny'}`;
+  return `${remainingMinutes} min`;
 }
 
 const REASON_LABELS: Record<string, string> = {
@@ -89,25 +122,6 @@ const REASON_LABELS: Record<string, string> = {
   OTHER: 'Inne',
 };
 
-/**
- * 🎯 Odpowiedzialności:
- * - Wyświetlanie statystyk agregowanych aplikacji (liczba miejsc, opinii, użytkowników).
- * - Prezentacja ostatniej aktywności w systemie.
- * - Szybki wgląd w oczekujące zgłoszenia naruszeń.
- *
- * 📥 Wejście:
- * - Dane z kolekcji `users`, `places`, `reviews` oraz `*_reports`.
- *
- * 📤 Wyjście:
- * - Nawigacja do szczegółów raportów lub list obiektów.
- *
- * ⚡ Zarządzanie stanem:
- * - Lokalne hooki `useState` do przechowywania list i liczników.
- * - `useEffect` do inicjalnego pobrania danych (fetchDashboard).
- *
- * 🛡️ Bezpieczeństwo:
- * - Dostępny wyłącznie dla użytkowników z przypisaną rolą administratora.
- */
 export function DashboardPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -116,6 +130,7 @@ export function DashboardPage() {
   const [recentPlaces, setRecentPlaces] = useState<RecentPlace[]>([]);
   const [recentReviews, setRecentReviews] = useState<RecentReview[]>([]);
   const [recentReports, setRecentReports] = useState<RecentReport[]>([]);
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
 
   useEffect(() => {
     fetchDashboard();
@@ -123,48 +138,55 @@ export function DashboardPage() {
 
   async function fetchDashboard() {
     try {
-      // Stats - basic counts
       const [placesC, reviewsC, usersC] = await Promise.all([
         getCountFromServer(collection(db, 'places')),
         getCountFromServer(collection(db, 'reviews')),
         getCountFromServer(collection(db, 'users')),
       ]);
 
-      // Recent users
       const usersSnap = await getDocs(
         query(collection(db, 'users'), orderBy('createdAtMillis', 'desc'), limit(5)),
       );
       setRecentUsers(usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as RecentUser));
 
-      // Recent places
+      // Blocked users use the same `bannedUntilMillis` / `banReason` fields as UsersPage.
+      // We fetch the same maximum number of users as the administration list and filter out expired bans.
+      try {
+        const blockedUsersSnap = await getDocs(query(collection(db, 'users'), limit(500)));
+        const now = Date.now();
+        const activeBlockedUsers = blockedUsersSnap.docs
+          .map((d) => ({ id: d.id, ...d.data() }) as BlockedUser)
+          .filter((user) => user.bannedUntilMillis === -1 || user.bannedUntilMillis > now)
+          .sort((a, b) => {
+            if (a.bannedUntilMillis === -1) return -1;
+            if (b.bannedUntilMillis === -1) return 1;
+            return b.bannedUntilMillis - a.bannedUntilMillis;
+          });
+        setBlockedUsers(activeBlockedUsers);
+      } catch (blockedUsersErr) {
+        console.error('Failed to fetch blocked users for dashboard:', blockedUsersErr);
+        setBlockedUsers([]);
+      }
+
       const placesSnap = await getDocs(
         query(collection(db, 'places'), orderBy('createdAtMillis', 'desc'), limit(5)),
       );
       setRecentPlaces(placesSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as RecentPlace));
 
-      // Recent reviews
       const reviewsSnap = await getDocs(
         query(collection(db, 'reviews'), orderBy('createdAtMillis', 'desc'), limit(5)),
       );
       setRecentReviews(reviewsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as RecentReview));
 
-      // Reports - count only pending using getCountFromServer (efficient)
       let pendingReportsCount = 0;
       try {
         const [prCount, rrCount, phCount] = await Promise.all([
-          getCountFromServer(
-            query(collection(db, 'place_reports'), where('status', '==', 'pending')),
-          ),
-          getCountFromServer(
-            query(collection(db, 'review_reports'), where('status', '==', 'pending')),
-          ),
-          getCountFromServer(
-            query(collection(db, 'photo_reports'), where('status', '==', 'pending')),
-          ),
+          getCountFromServer(query(collection(db, 'place_reports'), where('status', '==', 'pending'))),
+          getCountFromServer(query(collection(db, 'review_reports'), where('status', '==', 'pending'))),
+          getCountFromServer(query(collection(db, 'photo_reports'), where('status', '==', 'pending'))),
         ]);
         pendingReportsCount = prCount.data().count + rrCount.data().count + phCount.data().count;
 
-        // Fetch only recent pending reports for the list (limit 5)
         const [prSnap2, rrSnap2, phSnap2] = await Promise.all([
           getDocs(
             query(
@@ -251,20 +273,12 @@ export function DashboardPage() {
         Podsumowanie statystyk i ostatnia aktywność w kidZone.
       </Typography>
 
-      {/* Stats cards */}
       <Grid container spacing={3} mb={4}>
         <Grid item xs={12} sm={6} md={3}>
           <Card sx={{ borderLeft: '4px solid #1976D2', height: '100%' }}>
             <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, height: '100%' }}>
               <PlaceIcon sx={{ fontSize: 36, color: '#1976D2' }} />
-              <Box>
-                <Typography variant="h5" fontWeight={700}>
-                  {stats.places}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Miejsca
-                </Typography>
-              </Box>
+              <Box><Typography variant="h5" fontWeight={700}>{stats.places}</Typography><Typography variant="body2" color="text.secondary">Miejsca</Typography></Box>
             </CardContent>
           </Card>
         </Grid>
@@ -272,14 +286,7 @@ export function DashboardPage() {
           <Card sx={{ borderLeft: '4px solid #388E3C', height: '100%' }}>
             <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, height: '100%' }}>
               <ReviewsIcon sx={{ fontSize: 36, color: '#388E3C' }} />
-              <Box>
-                <Typography variant="h5" fontWeight={700}>
-                  {stats.reviews}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Opinie
-                </Typography>
-              </Box>
+              <Box><Typography variant="h5" fontWeight={700}>{stats.reviews}</Typography><Typography variant="body2" color="text.secondary">Opinie</Typography></Box>
             </CardContent>
           </Card>
         </Grid>
@@ -287,14 +294,7 @@ export function DashboardPage() {
           <Card sx={{ borderLeft: '4px solid #7B1FA2', height: '100%' }}>
             <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, height: '100%' }}>
               <PeopleIcon sx={{ fontSize: 36, color: '#7B1FA2' }} />
-              <Box>
-                <Typography variant="h5" fontWeight={700}>
-                  {stats.users}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Użytkownicy
-                </Typography>
-              </Box>
+              <Box><Typography variant="h5" fontWeight={700}>{stats.users}</Typography><Typography variant="body2" color="text.secondary">Użytkownicy</Typography></Box>
             </CardContent>
           </Card>
         </Grid>
@@ -302,154 +302,108 @@ export function DashboardPage() {
           <Card sx={{ borderLeft: '4px solid #D32F2F', height: '100%' }}>
             <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, height: '100%' }}>
               <ReportIcon sx={{ fontSize: 36, color: '#D32F2F' }} />
-              <Box>
-                <Typography variant="h5" fontWeight={700}>
-                  {stats.pendingReports}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Zgłoszenia oczekujące
-                </Typography>
-              </Box>
+              <Box><Typography variant="h5" fontWeight={700}>{stats.pendingReports}</Typography><Typography variant="body2" color="text.secondary">Zgłoszenia oczekujące</Typography></Box>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      {/* Recent activity */}
       <Grid container spacing={3}>
-        {/* Recent users */}
         <Grid item xs={12} md={4}>
           <Paper sx={{ p: 2, overflow: 'hidden' }}>
             <Box display="flex" alignItems="center" gap={1} mb={2}>
               <PersonAddIcon color="primary" />
-              <Typography variant="h6" fontWeight={600}>
-                Nowi użytkownicy
-              </Typography>
+              <Typography variant="h6" fontWeight={600}>Nowi użytkownicy</Typography>
             </Box>
             <List dense disablePadding>
               {recentUsers.map((u) => (
                 <ListItem key={u.id} disableGutters>
-                  <ListItemAvatar>
-                    <Avatar src={u.avatarUrl} sx={{ width: 32, height: 32, fontSize: 14 }}>
-                      {u.name?.charAt(0) || '?'}
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={u.name || u.email}
-                    secondary={formatDate(u.createdAtMillis)}
-                    primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }}
-                    secondaryTypographyProps={{ variant: 'caption' }}
-                  />
+                  <ListItemAvatar><Avatar src={u.avatarUrl} sx={{ width: 32, height: 32, fontSize: 14 }}>{u.name?.charAt(0) || '?'}</Avatar></ListItemAvatar>
+                  <ListItemText primary={u.name || u.email} secondary={formatDate(u.createdAtMillis)} primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }} secondaryTypographyProps={{ variant: 'caption' }} />
                 </ListItem>
               ))}
-              {recentUsers.length === 0 && (
-                <Typography variant="body2" color="text.secondary">
-                  Brak
-                </Typography>
-              )}
+              {recentUsers.length === 0 && <Typography variant="body2" color="text.secondary">Brak</Typography>}
             </List>
           </Paper>
         </Grid>
 
-        {/* Recent places */}
         <Grid item xs={12} md={4}>
           <Paper sx={{ p: 2 }}>
             <Box display="flex" alignItems="center" gap={1} mb={2}>
               <NewReleasesIcon color="primary" />
-              <Typography variant="h6" fontWeight={600}>
-                Nowe miejsca
-              </Typography>
+              <Typography variant="h6" fontWeight={600}>Nowe miejsca</Typography>
             </Box>
             <List dense disablePadding>
               {recentPlaces.map((p) => (
                 <ListItem key={p.id} disableGutters sx={{ minWidth: 0 }}>
-                  <ListItemAvatar>
-                    <Avatar sx={{ width: 32, height: 32, bgcolor: '#e3f2fd' }}>
-                      <PlaceIcon sx={{ fontSize: 18, color: '#1976D2' }} />
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={p.name}
-                    secondary={formatDate(p.createdAtMillis)}
-                    sx={{ minWidth: 0, pr: 1 }}
-                    primaryTypographyProps={{
-                      variant: 'body2',
-                      fontWeight: 500,
-                      sx: { overflowWrap: 'anywhere', wordBreak: 'break-word' },
-                    }}
-                    secondaryTypographyProps={{ variant: 'caption' }}
-                  />
+                  <ListItemAvatar><Avatar sx={{ width: 32, height: 32, bgcolor: '#e3f2fd' }}><PlaceIcon sx={{ fontSize: 18, color: '#1976D2' }} /></Avatar></ListItemAvatar>
+                  <ListItemText primary={p.name} secondary={formatDate(p.createdAtMillis)} sx={{ minWidth: 0, pr: 1 }} primaryTypographyProps={{ variant: 'body2', fontWeight: 500, sx: { overflowWrap: 'anywhere', wordBreak: 'break-word' } }} secondaryTypographyProps={{ variant: 'caption' }} />
                   {p.averageRating > 0 && <Chip label={p.averageRating.toFixed(1)} size="small" />}
                 </ListItem>
               ))}
-              {recentPlaces.length === 0 && (
-                <Typography variant="body2" color="text.secondary">
-                  Brak
-                </Typography>
-              )}
+              {recentPlaces.length === 0 && <Typography variant="body2" color="text.secondary">Brak</Typography>}
             </List>
           </Paper>
         </Grid>
 
-        {/* Recent reviews */}
         <Grid item xs={12} md={4}>
           <Paper sx={{ p: 2, overflow: 'hidden' }}>
             <Box display="flex" alignItems="center" gap={1} mb={2}>
               <ReviewsIcon color="primary" />
-              <Typography variant="h6" fontWeight={600}>
-                Nowe opinie
-              </Typography>
+              <Typography variant="h6" fontWeight={600}>Nowe opinie</Typography>
             </Box>
             <List dense disablePadding>
               {recentReviews.map((r) => (
                 <ListItem key={r.id} disableGutters sx={{ alignItems: 'flex-start' }}>
                   <ListItemText
-                    primary={
-                      <Box display="flex" alignItems="center" gap={1} minWidth={0} flexWrap="wrap">
-                        <Typography
-                          variant="body2"
-                          fontWeight={500}
-                          sx={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
-                        >
-                          {r.authorName || 'Anonim'}
-                        </Typography>
-                        <Rating value={r.rating} size="small" readOnly />
-                      </Box>
-                    }
-                    secondary={
-                      r.comment
-                        ? r.comment.length > 60
-                          ? r.comment.slice(0, 60) + '...'
-                          : r.comment
-                        : '(bez komentarza)'
-                    }
+                    primary={<Box display="flex" alignItems="center" gap={1} minWidth={0} flexWrap="wrap"><Typography variant="body2" fontWeight={500} sx={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{r.authorName || 'Anonim'}</Typography><Rating value={r.rating} size="small" readOnly /></Box>}
+                    secondary={r.comment ? r.comment.length > 60 ? r.comment.slice(0, 60) + '...' : r.comment : '(bez komentarza)'}
                     secondaryTypographyProps={{ variant: 'caption' }}
                   />
                 </ListItem>
               ))}
-              {recentReviews.length === 0 && (
-                <Typography variant="body2" color="text.secondary">
-                  Brak
-                </Typography>
-              )}
+              {recentReviews.length === 0 && <Typography variant="body2" color="text.secondary">Brak</Typography>}
             </List>
           </Paper>
         </Grid>
       </Grid>
 
-      {/* Recent reports */}
+      <Paper sx={{ p: 2, mt: 3 }}>
+        <Box display="flex" alignItems="center" gap={1} mb={2}>
+          <BlockIcon color="error" />
+          <Typography variant="h6" fontWeight={600}>Zablokowani użytkownicy</Typography>
+          <Chip label={blockedUsers.length} size="small" color="error" />
+        </Box>
+        {blockedUsers.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">Brak aktualnie zablokowanych użytkowników</Typography>
+        ) : (
+          <List dense disablePadding>
+            {blockedUsers.map((user) => (
+              <ListItem key={user.id} disableGutters sx={{ py: 1 }}>
+                <ListItemAvatar>
+                  <Avatar src={user.avatarUrl} sx={{ width: 36, height: 36, fontSize: 14 }}>
+                    {user.name?.charAt(0) || user.email?.charAt(0) || '?'}
+                  </Avatar>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={<Box display="flex" alignItems="center" gap={1} flexWrap="wrap"><Typography variant="body2" fontWeight={600}>{user.name || user.email}</Typography><Chip label={formatRemainingTime(user.bannedUntilMillis)} size="small" color="error" variant="outlined" /></Box>}
+                  secondary={<Box component="span" sx={{ display: 'block' }}><span>{user.banReason || 'Naruszenie regulaminu'}</span>{user.bannedUntilMillis === -1 ? ' — blokada bezterminowa' : ` — do ${formatBanDate(user.bannedUntilMillis)}`}</Box>}
+                  secondaryTypographyProps={{ variant: 'caption' }}
+                />
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </Paper>
+
       <Paper sx={{ p: 2, mt: 3 }}>
         <Box display="flex" alignItems="center" gap={1} mb={2}>
           <ReportIcon color="error" />
-          <Typography variant="h6" fontWeight={600}>
-            Nowe zgłoszenia
-          </Typography>
+          <Typography variant="h6" fontWeight={600}>Nowe zgłoszenia</Typography>
           <Chip label={recentReports.length} size="small" color="error" />
         </Box>
         {recentReports.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">
-            Brak oczekujących zgłoszeń
-          </Typography>
+          <Typography variant="body2" color="text.secondary">Brak oczekujących zgłoszeń</Typography>
         ) : (
           <List dense disablePadding>
             {recentReports.map((r) => (
@@ -463,47 +417,14 @@ export function DashboardPage() {
                 sx={{ borderRadius: 1, mb: 0.5 }}
               >
                 <ListItemAvatar>
-                  <Avatar
-                    sx={{
-                      width: 32,
-                      height: 32,
-                      bgcolor:
-                        r.type === 'place'
-                          ? '#ffebee'
-                          : r.type === 'review'
-                            ? '#fff3e0'
-                            : '#fce4ec',
-                    }}
-                  >
+                  <Avatar sx={{ width: 32, height: 32, bgcolor: r.type === 'place' ? '#ffebee' : r.type === 'review' ? '#fff3e0' : '#fce4ec' }}>
                     {r.type === 'place' && <PlaceIcon sx={{ fontSize: 18, color: '#D32F2F' }} />}
                     {r.type === 'review' && <WarningIcon sx={{ fontSize: 18, color: '#F57C00' }} />}
                     {r.type === 'photo' && <PhotoIcon sx={{ fontSize: 18, color: '#C2185B' }} />}
                   </Avatar>
                 </ListItemAvatar>
                 <ListItemText
-                  primary={
-                    <Box display="flex" alignItems="center" gap={1}>
-                      <Chip
-                        label={
-                          r.type === 'place'
-                            ? 'Miejsce'
-                            : r.type === 'review'
-                              ? 'Opinia'
-                              : 'Zdjęcie'
-                        }
-                        size="small"
-                        variant="outlined"
-                        color={
-                          r.type === 'place'
-                            ? 'error'
-                            : r.type === 'review'
-                              ? 'warning'
-                              : 'secondary'
-                        }
-                      />
-                      <Typography variant="body2">{REASON_LABELS[r.reason] || r.reason}</Typography>
-                    </Box>
-                  }
+                  primary={<Box display="flex" alignItems="center" gap={1}><Chip label={r.type === 'place' ? 'Miejsce' : r.type === 'review' ? 'Opinia' : 'Zdjęcie'} size="small" variant="outlined" color={r.type === 'place' ? 'error' : r.type === 'review' ? 'warning' : 'secondary'} /><Typography variant="body2">{REASON_LABELS[r.reason] || r.reason}</Typography></Box>}
                   secondary={`${formatDate(r.createdAtMillis)}${r.comment ? ' — ' + (r.comment.length > 40 ? r.comment.slice(0, 40) + '...' : r.comment) : ''}`}
                   secondaryTypographyProps={{ variant: 'caption' }}
                 />
