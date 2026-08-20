@@ -60,11 +60,9 @@ class MainViewModel @Inject constructor(
                     // dopóki nie zostanie on trwale zapisany.
                     if (_uiState.value.isAcceptingTos) return@collect
 
-                    // Dla nowych użytkowników dokument w Firestore może jeszcze nie istnieć (fullUser == null).
-                    // W takim przypadku również musimy wymusić akceptację Regulaminu.
-                    val isUserSignedIn = authRepository.currentUser.first() != null
-                    val needsTos = isUserSignedIn && (fullUser == null || fullUser.tosAcceptedAtMillis == 0L)
-                    
+                    // Nowy użytkownik może jeszcze nie mieć dokumentu (fullUser == null).
+                    // Wtedy również musimy pokazać Regulamin.
+                    val needsTos = fullUser == null || fullUser.tosAcceptedAtMillis == 0L
                     _uiState.update { it.copy(showTosDialog = needsTos) }
                 }
         }
