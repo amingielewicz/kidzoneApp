@@ -94,7 +94,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.runtime.collectAsState
 
 private const val MAIN_UI_PREFS = "main_ui_prefs"
-private const val KEY_HOME_INTRO_USED = "home_intro_used"
 private const val KEY_ADD_PLACE_FAB_LABEL_USED = "add_place_fab_label_used"
 private const val LOCATION_REQUEST_INTERVAL_MS = 10_000L
 private const val LOCATION_REQUEST_MIN_INTERVAL_MS = 5_000L

@@ -90,9 +90,10 @@ import timber.log.Timber
  * 📤 Wyjście:
  * - Rozpoczęcie sesji Firebase i przekierowanie do głównej części aplikacji.
  */
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit,
+    onLoginSuccess: (userId: String) -> Unit,
     onNavigateToRegister: () -> Unit,
     viewModel: LoginViewModel = hiltViewModel()
 ) {
@@ -139,12 +140,12 @@ fun LoginScreen(
 
     // Po pomyślnym logowaniu - nawigacja na main.
     LaunchedEffect(state.isSignedIn) {
-        if (state.isSignedIn) onLoginSuccess()
+        if (state.isSignedIn) onLoginSuccess(state.userId.orEmpty())
     }
 
-    LaunchedEffect(state.message, state.isMessageError) {
+    LaunchedEffect(state.message) {
         val message = state.message
-        if (message != null && state.isMessageError) {
+        if (message != null) {
             snackbarHostState.showSnackbar(message.asString(context))
             viewModel.consumeMessage()
         }
