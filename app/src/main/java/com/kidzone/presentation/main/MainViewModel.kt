@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -31,13 +32,20 @@ class MainViewModel @Inject constructor(
 
     data class UiState(
         val showTosDialog: Boolean = false,
-        val isAcceptingTos: Boolean = false
+        val isAcceptingTos: Boolean = false,
+        val userId: String? = null
     )
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            authRepository.currentUser.collect { user ->
+                _uiState.update { it.copy(userId = user?.id) }
+            }
+        }
+
         viewModelScope.launch {
             authRepository.currentUser
                 .flatMapLatest { user ->
@@ -52,7 +60,9 @@ class MainViewModel @Inject constructor(
                     // dopóki nie zostanie on trwale zapisany.
                     if (_uiState.value.isAcceptingTos) return@collect
 
-                    val needsTos = fullUser != null && fullUser.tosAcceptedAtMillis == 0L
+                    // Nowy użytkownik może jeszcze nie mieć dokumentu (fullUser == null).
+                    // Wtedy również musimy pokazać Regulamin.
+                    val needsTos = fullUser == null || fullUser.tosAcceptedAtMillis == 0L
                     _uiState.update { it.copy(showTosDialog = needsTos) }
                 }
         }

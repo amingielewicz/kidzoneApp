@@ -94,7 +94,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.runtime.collectAsState
 
 private const val MAIN_UI_PREFS = "main_ui_prefs"
-private const val KEY_HOME_INTRO_USED = "home_intro_used"
 private const val KEY_ADD_PLACE_FAB_LABEL_USED = "add_place_fab_label_used"
 private const val LOCATION_REQUEST_INTERVAL_MS = 10_000L
 private const val LOCATION_REQUEST_MIN_INTERVAL_MS = 5_000L
@@ -141,11 +140,11 @@ fun MainScreen(
         context.getSharedPreferences(MAIN_UI_PREFS, Context.MODE_PRIVATE)
     }
     val networkStatus by rememberNetworkStatus()
-    var showHomeIntro by remember {
-        mutableStateOf(
-            !prefs.getBoolean(KEY_HOME_INTRO_USED, false) &&
-                    !hasRuntimePermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
-        )
+    val userId = state.userId
+    val introKey = remember(userId) { "home_intro_used_${userId ?: "guest"}" }
+    
+    var showHomeIntro by remember(introKey) {
+        mutableStateOf(!prefs.getBoolean(introKey, false))
     }
     var showAddPlaceFabLabel by remember {
         mutableStateOf(!prefs.getBoolean(KEY_ADD_PLACE_FAB_LABEL_USED, false))
@@ -162,7 +161,7 @@ fun MainScreen(
     fun markHomeIntroUsed() {
         if (showHomeIntro) {
             showHomeIntro = false
-            prefs.edit().putBoolean(KEY_HOME_INTRO_USED, true).apply()
+            prefs.edit().putBoolean(introKey, true).apply()
         }
     }
 
@@ -465,7 +464,7 @@ fun MainScreen(
         )
     }
 
-    if (state.showTosDialog) {
+    if (state.showTosDialog && !showHomeIntro) {
         MandatoryTosDialog(
             onAccept = { viewModel.acceptTos() },
             isAccepting = state.isAcceptingTos

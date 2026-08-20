@@ -35,7 +35,6 @@ private const val NEW_PLACE_LNG = "newPlaceLng"
 
 /** SharedPreferences klucz – czy user widzial onboarding. */
 private const val ONBOARDING_PREFS = "kidzone_onboarding"
-private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
 
 /**
  * 🎯 Odpowiedzialności:
@@ -83,7 +82,7 @@ fun KidZoneNavGraph(
         ) {
             composable(Route.Splash.path) {
                 SplashScreen(
-                    onSignedIn = {
+                    onSignedIn = { userId ->
                         // Gate: maintenance mode check (Remote Config)
                         val remoteConfig = dagger.hilt.android.EntryPointAccessors
                             .fromApplication(
@@ -97,8 +96,11 @@ fun KidZoneNavGraph(
                             return@SplashScreen
                         }
 
-                        val onboardingDone = onboardingPrefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
-                        val destination = if (onboardingDone) Route.Main.path else Route.Onboarding.path
+                        // Onboarding jest przypisany do użytkownika, aby przy testowaniu
+                        // wielu kont na jednym urządzeniu każdy widział slajdy.
+                        val userOnboardingKey = "onboarding_completed_$userId"
+                        val onboardingDone = onboardingPrefs.getBoolean(userOnboardingKey, false)
+                        val destination = if (onboardingDone) Route.Main.create(userId) else Route.Onboarding.create(userId)
                         navController.navigate(destination) {
                             popUpTo(Route.Splash.path) { inclusive = true }
                         }
@@ -159,9 +161,10 @@ fun KidZoneNavGraph(
 
             composable(Route.Login.path) {
                 LoginScreen(
-                    onLoginSuccess = {
-                        val onboardingDone = onboardingPrefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
-                        val destination = if (onboardingDone) Route.Main.path else Route.Onboarding.path
+                    onLoginSuccess = { userId ->
+                        val userOnboardingKey = "onboarding_completed_$userId"
+                        val onboardingDone = onboardingPrefs.getBoolean(userOnboardingKey, false)
+                        val destination = if (onboardingDone) Route.Main.create(userId) else Route.Onboarding.create(userId)
                         navController.navigate(destination) {
                             popUpTo(Route.Login.path) { inclusive = true }
                         }
@@ -173,28 +176,38 @@ fun KidZoneNavGraph(
             composable(Route.Register.path) {
                 RegisterScreen(
                     onRegisterSuccess = {
-                        // Po rejestracji user jest wylogowany (musi potwierdzić email).
-                        // Wracamy na Login z komunikatem o weryfikacji.
-                        navController.navigate(Route.Login.path) {
-                            popUpTo(Route.Register.path) { inclusive = true }
-                        }
+                        // Po rejestracji wracamy na Login (który jest pod spodem)
+                        // i przekazujemy sygnał sukcesu przez SavedStateHandle.
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle
+                            ?.set("registration_success", true)
+                        
+                        navController.popBackStack()
                     },
                     onBack = { navController.popBackStack() }
                 )
             }
 
-            composable(Route.Onboarding.path) {
+            composable(
+                route = Route.Onboarding.path,
+                arguments = listOf(navArgument(Route.Onboarding.ARG_USER_ID) { type = NavType.StringType })
+            ) { backStackEntry ->
+                val userId = backStackEntry.arguments?.getString(Route.Onboarding.ARG_USER_ID).orEmpty()
                 OnboardingScreen(
                     onComplete = {
-                        onboardingPrefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, true).apply()
-                        navController.navigate(Route.Main.path) {
+                        val userOnboardingKey = "onboarding_completed_$userId"
+                        onboardingPrefs.edit().putBoolean(userOnboardingKey, true).apply()
+                        navController.navigate(Route.Main.create(userId)) {
                             popUpTo(Route.Onboarding.path) { inclusive = true }
                         }
                     }
                 )
             }
 
-            composable(Route.Main.path) { backStackEntry ->
+            composable(
+                route = Route.Main.path,
+                arguments = listOf(navArgument(Route.Main.ARG_USER_ID) { type = NavType.StringType })
+            ) { backStackEntry ->
                 // Po pomyślnym `addPlace` (tryb create) NavGraph zapisuje
                 // współrzędne nowego miejsca w savedStateHandle tego wpisu –
                 // MainScreen je odczytuje i nawiguje na zakładkę Map +
@@ -247,6 +260,13 @@ fun KidZoneNavGraph(
                         }
                     },
                     onSignOut = {
+                        // Resetujemy flagi UI, aby nowy użytkownik na tym samym urządzeniu
+                        // również widział onboarding i intro.
+                        context.getSharedPreferences(ONBOARDING_PREFS, android.content.Context.MODE_PRIVATE)
+                            .edit().clear().apply()
+                        context.getSharedPreferences("main_ui_prefs", android.content.Context.MODE_PRIVATE)
+                            .edit().clear().apply()
+
                         navController.navigate(Route.Login.path) {
                             popUpTo(Route.Main.path) { inclusive = true }
                         }
@@ -362,6 +382,13 @@ fun KidZoneNavGraph(
                         navController.popBackStack(Route.Main.path, inclusive = false)
                     },
                     onSignOut = {
+                        // Resetujemy flagi UI, aby nowy użytkownik na tym samym urządzeniu
+                        // również widział onboarding i intro.
+                        context.getSharedPreferences(ONBOARDING_PREFS, android.content.Context.MODE_PRIVATE)
+                            .edit().clear().apply()
+                        context.getSharedPreferences("main_ui_prefs", android.content.Context.MODE_PRIVATE)
+                            .edit().clear().apply()
+
                         navController.navigate(Route.Login.path) {
                             popUpTo(Route.Main.path) { inclusive = true }
                         }

@@ -12,11 +12,17 @@ sealed class Route(val path: String) {
     data object Splash : Route("splash")
     data object Login : Route("login")
     data object Register : Route("register")
-    data object Onboarding : Route("onboarding")
+    data object Onboarding : Route("onboarding/{userId}") {
+        const val ARG_USER_ID = "userId"
+        fun create(userId: String): String = "onboarding/$userId"
+    }
     data object Maintenance : Route("maintenance")
 
     // --- Main shell (zawiera bottom navigation) ---
-    data object Main : Route("main")
+    data object Main : Route("main/{userId}") {
+        const val ARG_USER_ID = "userId"
+        fun create(userId: String): String = "main/$userId"
+    }
 
     // Karty w obrębie Main:
     data object Home : Route("home")

@@ -39,17 +39,18 @@ import com.kidzone.R
  * 📤 Wyjście:
  * - Automatyczne przekierowanie po wykryciu stanu autentykacji.
  */
+@Suppress("FunctionNaming")
 @Composable
 fun SplashScreen(
     viewModel: SplashViewModel = hiltViewModel(),
-    onSignedIn: () -> Unit,
+    onSignedIn: (userId: String) -> Unit,
     onSignedOut: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
 
     LaunchedEffect(state) {
-        when (state) {
-            SplashViewModel.State.SignedIn -> onSignedIn()
+        when (val s = state) {
+            is SplashViewModel.State.SignedIn -> onSignedIn(s.userId)
             SplashViewModel.State.SignedOut -> onSignedOut()
             SplashViewModel.State.Loading -> Unit
         }

@@ -74,6 +74,15 @@
     <string name="password_reset_sent">We sent a password reset link to %1$s. If you signed in with Google, use the “Sign in with Google” button below.</string>
     <string name="verification_email_sent">Verification link resent. Check your inbox.</string>
     <string name="verification_email_error">Failed to send verification link</string>
+    <string name="resend_verification_cooldown">Resend in %1$ds</string>
+    <string name="mandatory_tos_title">kidZone Terms of Use</string>
+    <string name="mandatory_tos_message">Before proceeding to the app, please read and accept the Terms of Service and Privacy Policy.</string>
+    <string name="mandatory_tos_accept">Accept and continue</string>
+    <string name="terms_of_service_short">Terms</string>
+    <string name="privacy_policy_short">Privacy</string>
+    <string name="delete_account_confirmation_title">Are you sure you want to delete your account?</string>
+    <string name="delete_account_confirmation_message">This operation is irreversible. Your profile data will be deleted, and the content you added will be anonymized.</string>
+    <string name="register_success_verify_email">Account created! Please verify your email before logging in.</string>
     <string name="error_enter_username">Please enter a username</string>
     <string name="error_enter_email">Please enter an email address</string>
     <string name="error_enter_password">Please enter a password</string>
@@ -617,7 +626,7 @@
     <string name="delete_account_places_prefix">Your places</string>
     <string name="confirm_google_button">Confirm with Google</string>
     <string name="change_email_title">Change email address</string>
-    <string name="current_email_label">Current address: %1$s</string>
+    <string name="current_email_label">Current address:</string>
     <string name="new_email_label">New email address</string>
     <string name="email_same_as_current">The new email address must be different from the current one</string>
     <string name="email_already_set">This is your current address</string>

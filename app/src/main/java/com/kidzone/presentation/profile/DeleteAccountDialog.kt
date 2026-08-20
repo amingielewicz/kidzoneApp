@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.kidzone.R
 import com.kidzone.presentation.auth.rememberGoogleSignInLauncher
@@ -45,6 +46,7 @@ import com.kidzone.presentation.common.ModalPasswordVisibilityButton
 import com.kidzone.presentation.common.ModalTextButton
 import com.kidzone.presentation.common.OfflineAwareSubmitButton
 import com.kidzone.presentation.common.RequiredFieldLabel
+import androidx.compose.material3.TextButton
 import com.kidzone.utils.UiText
 
 /**
@@ -75,6 +77,10 @@ fun DeleteAccountDialog(
         mutableStateOf(false)
     }
 
+    var showFinalConfirmation by rememberSaveable {
+        mutableStateOf(false)
+    }
+
     val isFormValid =
         isGoogleUser || password.isNotBlank()
 
@@ -89,6 +95,21 @@ fun DeleteAccountDialog(
         )
     } else {
         null
+    }
+
+    if (showFinalConfirmation) {
+        DeleteConfirmationPrompt(
+            onConfirm = {
+                if (isGoogleUser) {
+                    googleSignInLauncher?.invoke()
+                } else {
+                    onConfirm(password)
+                }
+                showFinalConfirmation = false
+            },
+            onDismiss = onDismiss // Close everything
+        )
+        return
     }
 
     AlertDialog(
@@ -219,11 +240,7 @@ fun DeleteAccountDialog(
                     )
                 },
                 onClick = {
-                    if (isGoogleUser) {
-                        googleSignInLauncher?.invoke()
-                    } else {
-                        onConfirm(password)
-                    }
+                    showFinalConfirmation = true
                 },
                 isOffline = isOffline,
                 enabled = isFormValid,
@@ -250,6 +267,51 @@ fun DeleteAccountDialog(
                 enabled = !isInProgress,
             )
         },
+    )
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun DeleteConfirmationPrompt(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = ModalDialogShape,
+        icon = { DeleteAccountWarningIcon() },
+        title = {
+            Text(
+                text = stringResource(R.string.delete_account_confirmation_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center
+            )
+        },
+        text = {
+            Text(
+                text = stringResource(R.string.delete_account_confirmation_message),
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(contentColor = ModalDangerColor)
+            ) {
+                Text(
+                    text = stringResource(R.string.delete_account),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        dismissButton = {
+            ModalTextButton(
+                text = stringResource(R.string.cancel),
+                onClick = onDismiss
+            )
+        }
     )
 }
 

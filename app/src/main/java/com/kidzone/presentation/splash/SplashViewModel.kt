@@ -73,18 +73,18 @@ class SplashViewModel @Inject constructor(
     /**
      * Stan rozstrzygnięcia sesji na ekranie startowym.
      */
-    enum class State {
+    sealed class State {
         /** Trwa odczyt sesji lub minimalny czas prezentacji splasha. */
-        Loading,
+        object Loading : State()
 
         /** Użytkownik posiada aktywną sesję. */
-        SignedIn,
+        data class SignedIn(val userId: String) : State()
 
         /** Brak aktywnej sesji albo odczyt zakończył się timeoutem. */
-        SignedOut
+        object SignedOut : State()
     }
 
-    private val _state = MutableStateFlow(State.Loading)
+    private val _state = MutableStateFlow<State>(State.Loading)
 
     /**
      * Niezmienny strumień aktualnego stanu ekranu startowego.
@@ -102,7 +102,7 @@ class SplashViewModel @Inject constructor(
             if (remaining > 0) delay(remaining)
             if (user != null) {
                 prefetchService.startPrefetch()
-                _state.value = State.SignedIn
+                _state.value = State.SignedIn(user.id)
             } else {
                 _state.value = State.SignedOut
             }

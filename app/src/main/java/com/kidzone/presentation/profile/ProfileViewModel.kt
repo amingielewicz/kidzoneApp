@@ -156,8 +156,23 @@ class ProfileViewModel @Inject constructor(
         .combine(rankings) { user, rankCtx -> user to rankCtx }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    val user: StateFlow<User?> = profileState.map { (it as? ScreenState.Content)?.data }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(AppConfig.FLOW_SUBSCRIPTION_TIMEOUT_MS), null)
+    val user: StateFlow<User?> = combine(
+        profileState,
+        authRepository.currentUser
+    ) { pState, authUser ->
+        val userFromProfile = (pState as? ScreenState.Content)?.data
+        if (userFromProfile != null && authUser != null && userFromProfile.id == authUser.id) {
+            // Jeśli to profil aktualnie zalogowanego użytkownika, upewnij się że email 
+            // i podstawowe dane są wzięte z sesji Auth (Single Source of Truth dla tożsamości)
+            userFromProfile.copy(
+                email = userFromProfile.email.ifBlank { authUser.email },
+                name = userFromProfile.name.ifBlank { authUser.name },
+                avatarUrl = userFromProfile.avatarUrl ?: authUser.avatarUrl
+            )
+        } else {
+            userFromProfile
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(AppConfig.FLOW_SUBSCRIPTION_TIMEOUT_MS), null)
 
     init {
         viewModelScope.launch {

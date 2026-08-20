@@ -1,5 +1,6 @@
 package com.kidzone.presentation.auth
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kidzone.R
@@ -10,12 +11,17 @@ import com.kidzone.utils.OpResult
 import com.kidzone.utils.UiText
 import com.kidzone.utils.toAuthErrorMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+private const val VERIFICATION_RESEND_COOLDOWN_SECONDS = 60
+private const val ONE_SECOND_DELAY_MS = 1000L
+private const val KEY_REGISTRATION_SUCCESS = "registration_success"
 
 /**
  * 🎯 Odpowiedzialności:
@@ -52,13 +58,14 @@ import javax.inject.Inject
  * - Deterministyczne zmiany stanu w odpowiedzi na błędy i sukcesy.
  *
  * 🧼 Lifecycle:
- * - Operacje wiązane z viewModelScope (anulowane automatycznie).
+ * - Operacje wiązane with viewModelScope (anulowane automatycznie).
  */
 @Suppress("TooManyFunctions")
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val prefetchService: DataPrefetchService
+    private val prefetchService: DataPrefetchService,
+    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     /**
@@ -81,7 +88,9 @@ class LoginViewModel @Inject constructor(
         val message: UiText? = null,
         val isMessageError: Boolean = true,
         val isSignedIn: Boolean = false,
+        val userId: String? = null,
         val showResendVerification: Boolean = false,
+        val resendCooldownSeconds: Int = 0,
         val banMessage: UiText? = null,
         val banReason: UiText? = null
     ) {
@@ -94,6 +103,19 @@ class LoginViewModel @Inject constructor(
 
     /** Stan obserwowany przez ekran Compose. */
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    init {
+        // Sprawdź czy wróciliśmy z ekranu rejestracji z sukcesem
+        if (savedStateHandle.get<Boolean>(KEY_REGISTRATION_SUCCESS) == true) {
+            _uiState.update {
+                it.copy(
+                    message = UiText.StringResource(R.string.register_success_verify_email),
+                    isMessageError = false
+                )
+            }
+            savedStateHandle.remove<Boolean>(KEY_REGISTRATION_SUCCESS)
+        }
+    }
 
     /** Aktualizuje e-mail i czyści poprzedni komunikat formularza. */
     fun onEmailChange(value: String) {
@@ -130,7 +152,11 @@ class LoginViewModel @Inject constructor(
             }
             _uiState.update {
                 when (result) {
-                    is OpResult.Success -> it.copy(isLoading = false, isSignedIn = true)
+                    is OpResult.Success -> it.copy(
+                        isLoading = false,
+                        isSignedIn = true,
+                        userId = result.data.id
+                    )
                     is OpResult.Failure -> {
                         val isBanned = result.error is AuthException.AccountBanned
                         val isEmailNotVerified = result.error is AuthException.EmailNotVerified
@@ -174,7 +200,11 @@ class LoginViewModel @Inject constructor(
             }
             _uiState.update {
                 when (result) {
-                    is OpResult.Success -> it.copy(isLoading = false, isSignedIn = true)
+                    is OpResult.Success -> it.copy(
+                        isLoading = false,
+                        isSignedIn = true,
+                        userId = result.data.id
+                    )
                     is OpResult.Failure -> {
                         val isBanned = result.error is AuthException.AccountBanned
                         it.copy(
@@ -278,7 +308,8 @@ class LoginViewModel @Inject constructor(
      */
     fun resendVerificationEmail() {
         val state = _uiState.value
-        if (state.email.isBlank() || state.password.isBlank()) return
+        if (state.email.isBlank() || state.password.isBlank() || state.resendCooldownSeconds > 0) return
+        
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val result = authRepository.resendVerificationEmail(state.email.trim(), state.password)
@@ -288,14 +319,23 @@ class LoginViewModel @Inject constructor(
                         isLoading = false,
                         message = UiText.StringResource(R.string.verification_email_sent),
                         isMessageError = false,
-                        showResendVerification = false
+                        showResendVerification = true,
+                        resendCooldownSeconds = VERIFICATION_RESEND_COOLDOWN_SECONDS
                     )
                     is OpResult.Failure -> it.copy(
                         isLoading = false,
                         message = UiText.StringResource(R.string.verification_email_error),
-                        isMessageError = true
+                        isMessageError = true,
+                        showResendVerification = true,
+                        resendCooldownSeconds = VERIFICATION_RESEND_COOLDOWN_SECONDS
                     )
                 }
+            }
+            
+            // Start countdown (regardless of result to prevent API spamming)
+            while (_uiState.value.resendCooldownSeconds > 0) {
+                delay(ONE_SECOND_DELAY_MS)
+                _uiState.update { it.copy(resendCooldownSeconds = it.resendCooldownSeconds - 1) }
             }
         }
     }

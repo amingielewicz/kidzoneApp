@@ -90,9 +90,10 @@ import timber.log.Timber
  * 📤 Wyjście:
  * - Rozpoczęcie sesji Firebase i przekierowanie do głównej części aplikacji.
  */
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit,
+    onLoginSuccess: (userId: String) -> Unit,
     onNavigateToRegister: () -> Unit,
     viewModel: LoginViewModel = hiltViewModel()
 ) {
@@ -139,12 +140,12 @@ fun LoginScreen(
 
     // Po pomyślnym logowaniu - nawigacja na main.
     LaunchedEffect(state.isSignedIn) {
-        if (state.isSignedIn) onLoginSuccess()
+        if (state.isSignedIn) onLoginSuccess(state.userId.orEmpty())
     }
 
-    LaunchedEffect(state.message, state.isMessageError) {
+    LaunchedEffect(state.message) {
         val message = state.message
-        if (message != null && state.isMessageError) {
+        if (message != null) {
             snackbarHostState.showSnackbar(message.asString(context))
             viewModel.consumeMessage()
         }
@@ -369,10 +370,15 @@ fun LoginScreen(
                             Spacer(Modifier.height(8.dp))
                             OutlinedButton(
                                 onClick = viewModel::resendVerificationEmail,
-                                enabled = !state.isLoading,
+                                enabled = !state.isLoading && state.resendCooldownSeconds == 0,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(stringResource(R.string.resend_verification_link))
+                                val text = if (state.resendCooldownSeconds > 0) {
+                                    stringResource(R.string.resend_verification_cooldown, state.resendCooldownSeconds)
+                                } else {
+                                    stringResource(R.string.resend_verification_link)
+                                }
+                                Text(text)
                             }
                         }
 
