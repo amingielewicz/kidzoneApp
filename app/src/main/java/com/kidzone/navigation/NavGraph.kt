@@ -100,7 +100,7 @@ fun KidZoneNavGraph(
                         // wielu kont na jednym urządzeniu każdy widział slajdy.
                         val userOnboardingKey = "onboarding_completed_$userId"
                         val onboardingDone = onboardingPrefs.getBoolean(userOnboardingKey, false)
-                        val destination = if (onboardingDone) Route.Main.path else Route.Onboarding.create(userId)
+                        val destination = if (onboardingDone) Route.Main.create(userId) else Route.Onboarding.create(userId)
                         navController.navigate(destination) {
                             popUpTo(Route.Splash.path) { inclusive = true }
                         }
@@ -164,7 +164,7 @@ fun KidZoneNavGraph(
                     onLoginSuccess = { userId ->
                         val userOnboardingKey = "onboarding_completed_$userId"
                         val onboardingDone = onboardingPrefs.getBoolean(userOnboardingKey, false)
-                        val destination = if (onboardingDone) Route.Main.path else Route.Onboarding.create(userId)
+                        val destination = if (onboardingDone) Route.Main.create(userId) else Route.Onboarding.create(userId)
                         navController.navigate(destination) {
                             popUpTo(Route.Login.path) { inclusive = true }
                         }
@@ -198,14 +198,17 @@ fun KidZoneNavGraph(
                     onComplete = {
                         val userOnboardingKey = "onboarding_completed_$userId"
                         onboardingPrefs.edit().putBoolean(userOnboardingKey, true).apply()
-                        navController.navigate(Route.Main.path) {
+                        navController.navigate(Route.Main.create(userId)) {
                             popUpTo(Route.Onboarding.path) { inclusive = true }
                         }
                     }
                 )
             }
 
-            composable(Route.Main.path) { backStackEntry ->
+            composable(
+                route = Route.Main.path,
+                arguments = listOf(navArgument(Route.Main.ARG_USER_ID) { type = NavType.StringType })
+            ) { backStackEntry ->
                 // Po pomyślnym `addPlace` (tryb create) NavGraph zapisuje
                 // współrzędne nowego miejsca w savedStateHandle tego wpisu –
                 // MainScreen je odczytuje i nawiguje na zakładkę Map +
